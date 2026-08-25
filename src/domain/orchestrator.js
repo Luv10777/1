@@ -1,4 +1,5 @@
 import { createCreativeCompiler } from './compiler.js'
+import { createMockObjectStorage, runVisualQa } from './media.js'
 import { createBatch, createBatchItem, createCampaign, createCostLedgerEntry, createFactSnapshot, createIdempotencyKey, createStep, STEP_STATES, WORKFLOW_STATES, transition } from './creative.js'
 
 export function createWorkflowOrchestrator({ providers, now = () => new Date().toISOString() } = {}) {
@@ -11,6 +12,7 @@ export function createWorkflowOrchestrator({ providers, now = () => new Date().t
   const idempotency = new Map()
   const events = []
   const compiler = createCreativeCompiler({ providers })
+  const storage = providers.storage || createMockObjectStorage()
 
   const record = (type, payload) => events.push({ id: `evt_${crypto.randomUUID()}`, type, payload, createdAt: now() })
   const reserve = (campaign, batch) => {
@@ -82,7 +84,10 @@ export function createWorkflowOrchestrator({ providers, now = () => new Date().t
         try {
           const generated = await providers.image.create({ brief: campaign.brief, index: item.index, estimatedCost: 8 })
           step.provider = generated.provider; step.providerTaskId = generated.taskId; step.state = STEP_STATES.SUCCEEDED; step.actualCost = generated.estimatedCost
-          item.state = STEP_STATES.SUCCEEDED; item.outputAssetId = generated.output.taskId; batch.completed += 1
+          const assetId = generated.output.taskId || ('asset_' + item.id)
+          await storage.put({ tenantId: campaign.tenantId, assetId, contentType: 'image/webp', size: 0 })
+          item.qaReport = runVisualQa({ assetId, expectedRatio: item.kind === 'VIDEO' ? '9:16' : '3:4', actualRatio: item.kind === 'VIDEO' ? '9:16' : '3:4', hasProductReference: true })
+          item.state = item.qaReport.blocking ? STEP_STATES.FAILED : STEP_STATES.SUCCEEDED; item.outputAssetId = assetId; batch.completed += item.qaReport.blocking ? 0 : 1; batch.failed += item.qaReport.blocking ? 1 : 0
           costs.push(createCostLedgerEntry({ tenantId: campaign.tenantId, workflowRunId: batch.id, itemId: item.id, provider: generated.provider, modelAlias: generated.modelAlias, kind: item.kind, estimatedCredits: generated.estimatedCost, actualCredits: generated.actualCost, status: 'CAPTURED' }))
         } catch (error) {
           step.state = STEP_STATES.FAILED; item.state = STEP_STATES.FAILED; item.errorCode = error.code || 'PROVIDER_ERROR'; batch.failed += 1
