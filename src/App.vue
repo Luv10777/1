@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { auth } from './stores/auth'
 import AppShell from './layouts/AppShell.vue'
 
 const route = useRoute()

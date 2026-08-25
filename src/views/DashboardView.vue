@@ -36,7 +36,7 @@ const pulseBars = [28, 44, 38, 62, 54, 78, 64, 72, 48, 84, 68, 92, 74, 88, 80, 9
 
     <section class="metrics-grid">
       <article v-for="metric in metrics" :key="metric.label" class="metric-card" :class="`metric-${metric.tone}`"><div class="metric-header"><span>{{ metric.label }}</span><span class="metric-glyph">{{ metric.tone === 'violet' ? '↗' : metric.tone === 'amber' ? '!' : '◔' }}</span></div><div class="metric-number">{{ metric.value }}<small>{{ metric.unit }}</small></div><div class="metric-foot"><span class="metric-delta">{{ metric.delta }}</span><span>{{ metric.note }}</span></div></article>
-      <article class="metric-card model-card"><div class="metric-header"><span>模型与连接</span><span class="metric-glyph">✦</span></div><div class="model-status"><span class="status-pulse" /><strong>3 / 3 在线</strong></div><div class="model-list"><span>FluAPI <i>READY</i></span><span>ToAPIs <i>READY</i></span><span>素材服务 <i>READY</i></span></div></article>
+      <article class="metric-card model-card"><div class="metric-header"><span>模型与连接</span><span class="metric-glyph">✦</span></div><div class="model-status"><span class="status-pulse offline" /><strong>演示模式</strong></div><div class="model-list"><span>核心 API <i class="status-demo">未配置</i></span><span>AI 模型 <i class="status-demo">未配置</i></span><span>对象存储 <i class="status-demo">未配置</i></span></div></article>
     </section>
 
     <section class="workspace-grid">
