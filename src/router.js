@@ -10,6 +10,10 @@ import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
 import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
+import BrandsView from './views/BrandsView.vue'
+import AssetsView from './views/AssetsView.vue'
+import KnowledgeView from './views/KnowledgeView.vue'
+import WorksView from './views/WorksView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -28,10 +32,10 @@ const routes = [
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
   { path: '/digital-human', name: 'digital-human', component: PlaceholderView, meta: { title: '数字人播报', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '建立门店可持续使用的数字人讲解与播报模板。' } },
   { path: '/merchants', name: 'merchants', component: PlaceholderView, meta: { title: '商家与门店', eyebrow: 'ASSETS', icon: '⌂', description: '管理租户、商家资料与门店运营边界。' } },
-  { path: '/brands', name: 'brands', component: PlaceholderView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
-  { path: '/assets', name: 'assets', component: PlaceholderView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
-  { path: '/knowledge', name: 'knowledge', component: PlaceholderView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
-  { path: '/works', name: 'works', component: PlaceholderView, meta: { title: '作品库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
+  { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
+  { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
+  { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
+  { path: '/works', name: 'works', component: WorksView, meta: { title: '作品库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
   { path: '/reviews', name: 'reviews', component: PlaceholderView, meta: { title: '评论与 AI 客服', eyebrow: 'OPERATIONS', icon: '◠', description: '聚合门店评论，给出可审核的智能回复建议。' } },
   { path: '/publishing', name: 'publishing', component: PlaceholderView, meta: { title: '内容发布', eyebrow: 'OPERATIONS', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/analytics', name: 'analytics', component: PlaceholderView, meta: { title: '运营分析', eyebrow: 'OPERATIONS', icon: '⌗', description: '从内容、门店与活动三个视角观察增长表现。' } },
