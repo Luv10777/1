@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { AUTONOMY_LEVELS, API_SCOPES, createBenchmarkSnapshot, createOAuthApplication, createTemplatePackage, decideAgentToolCall, issueAccessToken } from '../domain/ecosystem.js'
+import { AUTONOMY_LEVELS, createBenchmarkSnapshot, createOAuthApplication, createTemplatePackage, decideAgentToolCall, issueAccessToken } from '../domain/ecosystem.js'
 
 const activeTab = ref('overview')
 const notice = ref('')

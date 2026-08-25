@@ -1,6 +1,6 @@
 import { createCreativeCompiler } from './compiler.js'
 import { createMockObjectStorage, runVisualQa } from './media.js'
-import { createBatch, createBatchItem, createCampaign, createCostLedgerEntry, createFactSnapshot, createIdempotencyKey, createStep, STEP_STATES, WORKFLOW_STATES, transition } from './creative.js'
+import { createBatch, createBatchItem, createCampaign, createCostLedgerEntry, createIdempotencyKey, createStep, STEP_STATES, WORKFLOW_STATES, transition } from './creative.js'
 
 export function createWorkflowOrchestrator({ providers, now = () => new Date().toISOString() } = {}) {
   if (!providers?.text || !providers?.image) throw new Error('PROVIDER_REGISTRY_REQUIRED')

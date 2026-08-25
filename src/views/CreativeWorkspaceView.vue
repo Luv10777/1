@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { creative } from '../stores/creative.js'
-import { WORKFLOW_STATES } from '../domain/creative.js'
 
 const examples = [
   '给梧曜咖啡店新出的 29.9 元双人下午茶做 6 张小红书风格图片，年轻情侣、温暖高级、周末到店，不改产品外观。',

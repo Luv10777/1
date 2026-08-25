@@ -1,18 +1,16 @@
 # 梧曜星枢 · AI 商家增长平台
 
-梧曜星枢是面向商家和门店的 AI 内容增长工作台。当前仓库已完成第一阶段前端基线，以及第二阶段 M0–M5 首批的浏览器端领域契约、Mock 编排器和一句话创作工作区。
+**嘉兴市梧曜科技有限公司**  
+**产品：梧曜星枢 / WUYAO NEXUS**
 
-当前实现可以本地演示从一句话需求到计划、Prompt、QA、成本确认和批量任务启动的闭环，但仍不是生产后端。真实模型、队列、数据库、对象存储、服务端鉴权和平台发布能力需要后续 Core API 与 Worker 阶段接入。
+梧曜星枢是面向商家和门店的 AI 内容增长工作台。
 
 ## 当前状态
 
-- 分支：`feat/phase-2-ai-creative-compiler`
-- 最新提交：`f43dddd feat(ops): add video review and connector contracts`
-- GitHub：<https://github.com/Luv10777/1>
-- 本地创作工作区：<http://localhost:4173/creative>
-- 验证结果：18 个测试通过，lint 通过，生产构建通过
-
-详细状态见 [`PROJECT_MEMORY.md`](PROJECT_MEMORY.md)、[`docs/project-status.md`](docs/project-status.md) 和 [`docs/phase2-progress.md`](docs/phase2-progress.md)。
+- **分支**: `feat/phase-1-functional-foundation`
+- **GitHub**: https://github.com/Luv10777/1
+- **运行模式**: 演示模式（Demo Mode）
+- **最新提交**: 阶段一工程基础修复完成
 
 ## 本地运行
 
@@ -21,57 +19,187 @@ npm install
 npm run dev
 ```
 
-默认开发地址为 <http://localhost:4173/>。生产构建和预览：
+默认开发地址：http://localhost:4173/
+
+生产构建：
 
 ```bash
 npm run build
 npm run preview
 ```
 
-提交前建议运行：
+## 质量检查
+
+提交前必须全部通过：
 
 ```bash
-npm test
-npm run lint -- --quiet
-npm run build
+npm test          # 38个测试全部通过
+npm run lint      # ESLint检查通过
+npm run typecheck # TypeScript类型检查通过
+npm run build     # 生产构建成功
 ```
 
 ## 演示登录
 
-- 手机号：任意 11 位、以 `1` 开头的手机号
-- 验证码：任意 6 位数字
-- 认证模式：`VITE_AUTH_MODE=mock`
+- **手机号**: 任意11位、以`1`开头的手机号
+- **验证码**: 任意6位数字
+- **认证模式**: `VITE_AUTH_MODE=mock`
 
 ## 已完成能力
 
-第一阶段包含 Vue 3 + Vite + Vue Router 工程、深色“星枢控制台”视觉系统、Mock 登录态、路由守卫、运营总览、商家/门店切换、22 个稳定业务路由、403/404、权限前置模型和响应式后台布局。
+### 阶段一：工程基础（✅ 已完成）
 
-第二阶段当前包含：
+- ✅ TypeScript 配置和类型检查
+- ✅ ESLint Flat Config 配置
+- ✅ 标准目录结构（api、components、stores、types、utils、services）
+- ✅ 统一请求封装和错误处理（`utils/request.js`）
+- ✅ 环境配置管理（`utils/config.js`）
+- ✅ 表单验证工具（`utils/validator.js`）
+- ✅ 通用工具函数（`utils/index.js`）
+- ✅ API客户端模块（`api/index.js`）
+- ✅ 通用组件库：
+  - Loading（加载状态）
+  - Empty（空状态）
+  - ErrorState（错误状态）
+  - StatusBadge（状态徽章）
+  - ConfirmDialog（确认对话框）
+- ✅ 删除虚假的 FluAPI/ToAPIs READY 状态
+- ✅ 明确标识演示模式
+- ✅ 单元测试基础（38个测试通过）
+- ✅ 包命名修正（wuyuo → wuyao）
 
-- Campaign / Batch / Item / Step 数据契约和工作流状态机
-- Mock Workflow Orchestrator、批量执行、单项失败隔离、事件记录、幂等键、额度预占和成本台账
-- Intent JSON Schema 校验、商家事实快照、缺失事实阻断、Creative Plan、Prompt Artifact 和 Prompt QA
-- `/creative` 一句话创作工作区、计划预览、成本确认、Prompt 展开、QA 摘要和批量启动
-- 租户隔离的 Mock Object Storage、图片比例/商品参考/文字安全区 QA
-- 视频 brief、脚本与分镜、角色/场景锁定、时长一致性 QA 和 Mock 视频 Provider
-- 高风险内容审核阻断、评论回复草稿、连接器 Token 生命周期、能力状态和回调签名契约
+### 前期已完成
+
+- Vue 3 + Vite + Vue Router 工程基础
+- 深色"星枢控制台"视觉系统
+- Mock 登录态和路由守卫
+- 22个业务路由和页面框架
+- 领域契约和工作流状态机
+- Mock 工作流编排器
+- 一句话创作工作区原型
+
+## 当前架构
+
+```
+src/
+├── api/              # API客户端（auth、merchant、store、brand等）
+├── components/       # 通用组件（Loading、Empty、ErrorState等）
+├── domain/           # 领域逻辑和业务契约
+├── layouts/          # 页面布局（AppShell）
+├── stores/           # 状态管理（auth、creative、billing等）
+├── types/            # 类型定义
+├── utils/            # 工具函数（request、config、validator等）
+├── views/            # 业务页面
+├── App.vue
+├── main.js
+└── router.js
+```
+
+## 演示模式说明
+
+当前项目运行在**演示模式**下：
+
+- ✅ 前端工程完整，可本地运行和构建
+- ✅ 领域契约和业务逻辑已定义
+- ✅ 所有测试通过，代码质量基线建立
+- ⚠️ **未配置后端API**（`VITE_API_BASE_URL`为空）
+- ⚠️ **未配置AI模型**（FluAPI、ToAPIs等）
+- ⚠️ **未配置对象存储**
+- ⚠️ **使用Mock登录**（`VITE_AUTH_MODE=mock`）
+
+所有API调用会明确提示"演示模式"或"未配置"，**不会伪造真实业务数据**。
+
+## 待完成能力（阶段二至七）
+
+### 阶段二：登录、权限和商家基础
+- [ ] 手机验证码登录（服务端）
+- [ ] JWT Token 和 Refresh Token
+- [ ] 多租户、用户、角色、权限模型
+- [ ] 商家与门店管理
+- [ ] 数据库表结构（PostgreSQL）
+- [ ] Redis 会话管理
+
+### 阶段三：四大资源库
+- [ ] 品牌库（品牌定位、视觉资产、语言风格）
+- [ ] 素材库（图片、视频、音频，预签名直传）
+- [ ] 知识库（文档解析、向量化、结构化提取）
+- [ ] 作品库（生成结果、审核流程、发布追踪）
+
+### 阶段四：统一AI模型网关与任务中心
+- [ ] Provider接口抽象（FluAPI、ToAPIs适配器）
+- [ ] 模型别名路由（TEXT_FAST、IMAGE_PRIMARY等）
+- [ ] 异步任务管理（RabbitMQ）
+- [ ] 成本预估与额度管理
+- [ ] Webhook回调与状态轮询
+- [ ] 任务失败重试和取消机制
+
+### 阶段五：一句话批量内容生成
+- [ ] 意图识别和Prompt优化
+- [ ] CampaignPlan JSON生成与校验
+- [ ] 内容变量矩阵（商品×角度×钩子×场景）
+- [ ] 成本确认和批量执行
+- [ ] 图片/视频质量检测
+- [ ] 人工审核流程
+
+### 阶段六：补齐全部菜单模块
+- [ ] 模型对话
+- [ ] 文案提取/重写
+- [ ] 视频结构分析
+- [ ] AI图片/视频创作
+- [ ] 数字人播报
+- [ ] 评论与AI客服
+- [ ] 内容发布与运营分析
+- [ ] 清除所有PlaceholderView
+
+### 阶段七：视觉统一、测试覆盖和交付
+- [ ] 设计系统一致性
+- [ ] 完整测试覆盖
+- [ ] 部署文档
+- [ ] 环境变量清单
+- [ ] 创建Pull Request
 
 ## 生产边界
 
-当前 Provider、对象存储、视频生成和连接器均为 Mock 或契约级实现。业务代码只使用 `TEXT_PLANNER`、`IMAGE_PRIMARY`、`VIDEO_PRIMARY` 等内部能力别名，不绑定真实 FluAPI、ToAPIs 或 Seedance 模型名。
+当前**不具备生产能力**：
 
-尚未完成的生产能力包括 Core API、数据库迁移、Redis/RabbitMQ/Worker、任务恢复与消费幂等、真实模型和对象存储接入、服务端 RBAC 与多租户强隔离、Webhook 重放防护、FFmpeg/数字人链路、审核中心前端、真实 OAuth、发布日历、评论同步、数据回流和运营后台。
+- ❌ 无后端API（Spring Boot需开发）
+- ❌ 无数据库（PostgreSQL需配置）
+- ❌ 无真实AI模型接入
+- ❌ 无对象存储
+- ❌ 无消息队列（RabbitMQ）
+- ❌ 无真实用户认证
+- ❌ 无多租户数据隔离
+- ❌ 无支付和计费
 
-真实 API Key、Cookie、OAuth 凭证和商家生产数据不得写入前端、Git 或 `VITE_` 环境变量。
+**真实API Key、OAuth凭证和商家生产数据不得写入Git。**
 
 ## 文档
 
-- [`PROJECT_MEMORY.md`](PROJECT_MEMORY.md)：项目长期记忆和交接摘要
-- [`docs/project-status.md`](docs/project-status.md)：当前状态、指标、风险和缓解措施
-- [`docs/phase2-progress.md`](docs/phase2-progress.md)：第二阶段里程碑进度
-- [`docs/phase2-task-list.md`](docs/phase2-task-list.md)：可执行任务清单
-- [`docs/phase2-architecture.md`](docs/phase2-architecture.md)：领域契约与架构边界
-- [`DESIGN.md`](DESIGN.md)：视觉与组件 tokens
-- [`docs/project-audit.md`](docs/project-audit.md)：项目审计与边界
-- [`docs/phase-1-plan.md`](docs/phase-1-plan.md)：第一阶段交付记录
-- [`docs/vercel-deployment.md`](docs/vercel-deployment.md)：Vercel 部署交接
+- [PROJECT_MEMORY.md](PROJECT_MEMORY.md) - 项目长期记忆
+- [docs/project-status.md](docs/project-status.md) - 项目状态
+- [docs/phase2-progress.md](docs/phase2-progress.md) - 第二阶段进度
+- [DESIGN.md](DESIGN.md) - 视觉设计
+- [CHANGELOG.md](CHANGELOG.md) - 变更日志
+
+## 开发原则
+
+1. **不允许静态假数据和虚假状态**
+2. **未配置的能力必须明确标识"未配置"或"演示模式"**
+3. **API Key和密钥只能在服务端**
+4. **所有AI任务必须进入任务中心**
+5. **所有生成结果必须进入作品库**
+6. **保持深空科技感视觉风格**
+7. **提交前必须通过lint、typecheck、test、build**
+
+## 技术栈
+
+- **前端**: Vue 3, Vite, Vue Router
+- **计划后端**: Java 21 + Spring Boot 3
+- **计划数据库**: PostgreSQL + Redis
+- **计划消息队列**: RabbitMQ
+- **计划对象存储**: MinIO / 腾讯云COS / 火山TOS
+- **计划AI适配**: FluAPI、ToAPIs
+
+## 许可
+
+嘉兴市梧曜科技有限公司版权所有

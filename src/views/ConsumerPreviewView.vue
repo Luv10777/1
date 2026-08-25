@@ -5,7 +5,7 @@ import { OFFERING_KINDS } from '../domain/commerce.js'
 
 const formatPrice = (minor) => `¥${(minor / 100).toFixed(2)}`
 const isService = (offering) => offering.kind === OFFERING_KINDS.SERVICE
-const cartItems = computed(() => commerce.cart.items)
+const _cartItems = computed(() => commerce.cart.items)
 </script>
 
 <template>
