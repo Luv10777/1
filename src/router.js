@@ -5,11 +5,13 @@ import DashboardView from './views/DashboardView.vue'
 import PlaceholderView from './views/PlaceholderView.vue'
 import ForbiddenView from './views/ForbiddenView.vue'
 import NotFoundView from './views/NotFoundView.vue'
+import CreativeWorkspaceView from './views/CreativeWorkspaceView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '运营总览', eyebrow: 'TODAY / OPERATIONS' } },
+  { path: '/creative', name: 'creative', component: CreativeWorkspaceView, meta: { title: '一句话创作', eyebrow: 'AI WORKSPACE' } },
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', eyebrow: 'AI WORKSPACE', icon: '✦', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },
   { path: '/copy/extract', name: 'copy-extract', component: PlaceholderView, meta: { title: '文案提取', eyebrow: 'CONTENT TOOLS', icon: '↗', description: '从已有素材中提取可复用的卖点、语气与结构。' } },
   { path: '/copy/rewrite', name: 'copy-rewrite', component: PlaceholderView, meta: { title: '文案重写', eyebrow: 'CONTENT TOOLS', icon: 'Aa', description: '保留核心信息，切换平台语气与传播场景。' } },

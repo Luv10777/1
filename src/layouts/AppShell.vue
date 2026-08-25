@@ -17,6 +17,7 @@ const navGroups = [
     label: '工作台',
     items: [
       { name: 'dashboard', label: '运营总览', path: '/dashboard', glyph: '◒' },
+      { name: 'creative', label: '一句话创作', path: '/creative', glyph: '✧' },
       { name: 'chat', label: '模型对话', path: '/chat', glyph: '✦' },
     ],
   },
