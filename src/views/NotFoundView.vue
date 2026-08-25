@@ -1,0 +1,1 @@
+<template><div class="state-page"><span class="state-code">404</span><p class="eyebrow">LOST IN THE CONSTELLATION</p><h1>这条路径还没有星标。</h1><p>页面可能已移动，或者链接还没有接入第一阶段的工作区。</p><RouterLink to="/dashboard" class="primary-button compact">回到运营总览 <span>→</span></RouterLink></div></template>

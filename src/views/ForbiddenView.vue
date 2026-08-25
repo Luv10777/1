@@ -1,0 +1,1 @@
+<template><div class="state-page"><span class="state-code">403</span><p class="eyebrow">ACCESS BOUNDARY</p><h1>这个入口暂时不属于你。</h1><p>请切换到有权限的租户或联系平台管理员。你的当前会话仍然有效。</p><RouterLink to="/dashboard" class="primary-button compact">回到运营总览 <span>→</span></RouterLink></div></template>
