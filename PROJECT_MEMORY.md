@@ -4,12 +4,23 @@
 >
 > 用途：为后续协作者和 AI 代理提供可核对的项目上下文。本文档只记录已经在本地仓库或验证命令中确认的事实，不把 Mock 能力描述成生产能力。
 
+## 当前同步快照（2026-08-25）
+
+- 本地目录：C:\Users\Administrator\梧曜AI；GitHub：github.com/Luv10777/1。
+- 当前分支：feat/phase-5-open-ecosystem-growth-os。
+- 最新提交：0d9f846 feat(phase5): add open platform sandbox contracts。
+- Phase 5 M0/M1：组织树、策略继承、RBAC+ABAC、OAuth Scope/Token、声明式模板、隐私安全 Benchmark、受控 Growth OS 和 /ecosystem Sandbox 页面。
+- Phase 5 M3/M4：API 版本/弃用回落、配额、Webhook 幂等投递/重试/死信、Connector Manifest 审核与停用契约。
+- 验证基线：34/34 Node 测试通过；npm run lint -- --quiet 通过；npm run build 通过；npm run typecheck 因未安装 vue-tsc 暂不可用。
+- 开发服务器保持运行：localhost:4173；/ecosystem、/billing、/consumer 均返回 HTTP 200；当前监听进程 PID 26856。
+- 明确未接通：生产 Core API、数据库、OAuth Gateway、Webhook Worker、Connector Runtime、真实 Benchmark 数据、Agent Executor、内容溯源、Cell/灾备和外部生产调用。
+
 ## 仓库与运行状态
 
 - 本地目录：`C:\Users\Administrator\梧曜AI`
 - GitHub 仓库：<https://github.com/Luv10777/1>
-- 当前分支：`feat/phase-2-ai-creative-compiler`
-- 最新提交：`f43dddd feat(ops): add video review and connector contracts`
+- 当前分支：feat/phase-5-open-ecosystem-growth-os。
+- 最新提交：0d9f846 feat(phase5): add open platform sandbox contracts。
 - `main` 未直接修改；第二阶段使用独立功能分支协作
 - 开发地址：<http://localhost:4173/>
 - 创作工作区：<http://localhost:4173/creative>
@@ -49,10 +60,10 @@
 最近一次验证已确认：
 
 ```text
-18 个测试全部通过
+34 个测试全部通过
 npm run lint -- --quiet 通过
 npm run build 通过
-/creative 返回 HTTP 200
+/ecosystem、/billing、/consumer、/creative 均返回 HTTP 200
 ```
 
 测试文件：`src/domain/creative.test.js`、`compiler.test.js`、`media.test.js`、`video.test.js`、`review.test.js`、`connectors.test.js`。
