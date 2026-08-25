@@ -1,4 +1,12 @@
-# 变更记录## 2026-08-25 · Phase 4 M0–M2 首批
+# 变更记录
+
+## 2026-08-25 · Phase 5 M0/M1 Sandbox
+
+- 新增组织策略继承、ABAC 门店边界、OAuth Scope/Token、声明式模板、隐私安全 Benchmark 与受控 Growth OS 契约。
+- 新增生态治理 Sandbox 页面 /ecosystem，明确 SANDBOX / INTERNAL 状态，不宣称生产开放平台能力。
+- 新增 4 组 Phase 5 领域测试；当前生产 Open API、Webhook Worker、Connector Runtime、真实 Benchmark 数据、Agent Executor、内容溯源和灾备仍未接通。
+
+## 2026-08-25 · Phase 4 M0–M2 首批
 
 - 新增 SaaS 商业化差距分析与架构边界，明确 SaaS Billing 与 Consumer Commerce 账务完全隔离。
 - 新增版本化套餐、订阅生命周期、权益计算、UsageEvent、信用点数不可变流水和独立 SaaS 订单契约。

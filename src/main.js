@@ -5,5 +5,6 @@ import './style.css'
 import './creative.css'
 import './consumer.css'
 import './billing.css'
+import './ecosystem.css'
 
 createApp(App).use(router).mount('#app')
