@@ -7,11 +7,13 @@ import ForbiddenView from './views/ForbiddenView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import CreativeWorkspaceView from './views/CreativeWorkspaceView.vue'
 import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
+import BillingView from './views/BillingView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
+  { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '运营总览', eyebrow: 'TODAY / OPERATIONS' } },
   { path: '/creative', name: 'creative', component: CreativeWorkspaceView, meta: { title: '一句话创作', eyebrow: 'AI WORKSPACE' } },
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', eyebrow: 'AI WORKSPACE', icon: '✦', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },

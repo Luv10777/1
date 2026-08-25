@@ -4,5 +4,6 @@ import router from './router'
 import './style.css'
 import './creative.css'
 import './consumer.css'
+import './billing.css'
 
 createApp(App).use(router).mount('#app')
