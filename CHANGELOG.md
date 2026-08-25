@@ -1,5 +1,11 @@
 # 变更记录
 
+## 2026-08-25 · Phase 5 M3/M4 Sandbox
+
+- 新增 Open API 版本解析、弃用回落、配额窗口、Webhook 幂等投递/重试/死信和 Connector Manifest 审核契约。
+- 新增 4 组开放平台领域测试；所有能力仍为确定性 Sandbox/Mock，不执行网络请求或第三方任意代码。
+- 补充 API 版本、Webhook 投递与连接器审核文档；生产 Gateway、Worker、Runtime、密钥托管和真实外部调用仍未接通。
+
 ## 2026-08-25 · Phase 5 M0/M1 Sandbox
 
 - 新增组织策略继承、ABAC 门店边界、OAuth Scope/Token、声明式模板、隐私安全 Benchmark 与受控 Growth OS 契约。
