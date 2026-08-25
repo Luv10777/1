@@ -9,6 +9,7 @@ import CreativeWorkspaceView from './views/CreativeWorkspaceView.vue'
 import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
 import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
+import TaskCenterView from './views/TaskCenterView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -34,7 +35,7 @@ const routes = [
   { path: '/reviews', name: 'reviews', component: PlaceholderView, meta: { title: '评论与 AI 客服', eyebrow: 'OPERATIONS', icon: '◠', description: '聚合门店评论，给出可审核的智能回复建议。' } },
   { path: '/publishing', name: 'publishing', component: PlaceholderView, meta: { title: '内容发布', eyebrow: 'OPERATIONS', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/analytics', name: 'analytics', component: PlaceholderView, meta: { title: '运营分析', eyebrow: 'OPERATIONS', icon: '⌗', description: '从内容、门店与活动三个视角观察增长表现。' } },
-  { path: '/tasks', name: 'tasks', component: PlaceholderView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
+  { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
   { path: '/settings', name: 'settings', component: PlaceholderView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '管理成员、角色、通知和平台连接配置。' } },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },
   { path: '/404', name: 'not-found', component: NotFoundView, meta: { title: '页面不存在', public: true } },
