@@ -1,3 +1,4 @@
+import { createCreativeCompiler } from './compiler.js'
 import { createBatch, createBatchItem, createCampaign, createCostLedgerEntry, createFactSnapshot, createIdempotencyKey, createStep, STEP_STATES, WORKFLOW_STATES, transition } from './creative.js'
 
 export function createWorkflowOrchestrator({ providers, now = () => new Date().toISOString() } = {}) {
@@ -9,6 +10,7 @@ export function createWorkflowOrchestrator({ providers, now = () => new Date().t
   const costs = []
   const idempotency = new Map()
   const events = []
+  const compiler = createCreativeCompiler({ providers })
 
   const record = (type, payload) => events.push({ id: `evt_${crypto.randomUUID()}`, type, payload, createdAt: now() })
   const reserve = (campaign, batch) => {
@@ -32,19 +34,27 @@ export function createWorkflowOrchestrator({ providers, now = () => new Date().t
     async interpret(campaignId, input = {}) {
       const campaign = campaigns.get(campaignId)
       if (!campaign) throw new Error('CAMPAIGN_NOT_FOUND')
-      const response = await providers.text.generate({ ...input, brief: campaign.brief, modelAlias: 'TEXT_PLANNER' })
-      campaign.facts = createFactSnapshot(input.facts || [])
-      campaign.missingFacts = response.output.json.missingFacts || []
-      campaign.plan = response.output.json
-      campaign.state = transition(campaign.state, WORKFLOW_STATES.PLANNED)
+      const result = await compiler.compile({ ...input, brief: campaign.brief, requiredFacts: input.requiredFacts || [] })
+      campaign.facts = result.factSnapshot
+      campaign.missingFacts = result.missingFacts
+      campaign.plan = result.plan || null
+      campaign.promptArtifacts = result.promptArtifacts || []
+      campaign.qaReport = result.qaReport || null
       campaign.updatedAt = now()
-      record('CAMPAIGN_PLANNED', { campaignId, requestId: response.requestId })
-      return { campaign, providerResult: response }
+      if (result.blocked) {
+        record('CAMPAIGN_BLOCKED', { campaignId, reason: result.reason, missingFacts: result.missingFacts })
+        return { campaign, blocked: true, ...result }
+      }
+      campaign.state = transition(campaign.state, WORKFLOW_STATES.PLANNED)
+      record('CAMPAIGN_PLANNED', { campaignId, requestId: result.providerResult.requestId })
+      return { campaign, blocked: false, ...result }
     },
     confirmCampaign(campaignId, input = {}) {
       const campaign = campaigns.get(campaignId)
       if (!campaign) throw new Error('CAMPAIGN_NOT_FOUND')
       if (campaign.state !== WORKFLOW_STATES.PLANNED) throw new Error('CAMPAIGN_PLAN_REQUIRED')
+      if (campaign.missingFacts?.length) throw new Error('CONFIRMED_FACTS_REQUIRED')
+      if (campaign.qaReport?.blockingIssues) throw new Error('QA_BLOCKED')
       campaign.state = transition(campaign.state, WORKFLOW_STATES.CONFIRMED)
       const batch = createBatch(campaign, { count: input.count || campaign.plan?.contentCount || 1, estimatedCredits: input.estimatedCredits || (input.count || campaign.plan?.contentCount || 1) * 8 })
       batch.state = transition(batch.state, WORKFLOW_STATES.CONFIRMED)

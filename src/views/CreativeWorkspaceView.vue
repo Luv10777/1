@@ -10,7 +10,7 @@ const examples = [
 const contentCount = ref(6)
 const channels = ref(['小红书', '抖音'])
 const brief = ref('')
-const isPlanned = computed(() => creative.phase === 'planned' || creative.phase === 'confirmed' || creative.phase === 'running' || creative.phase === 'qa' || creative.phase === 'needs_review')
+const isPlanned = computed(() => ['planned', 'blocked', 'confirmed', 'running', 'qa', 'needs_review'].includes(creative.phase))
 const completedPercent = computed(() => creative.batch ? Math.round((creative.batch.completed / creative.batch.count) * 100) : 0)
 
 const interpret = async () => { if (brief.value.trim()) await creative.interpret(brief.value, { contentCount: contentCount.value, channels: channels.value }) }
@@ -31,6 +31,24 @@ const startBatch = () => creative.start()
 
     <section v-if="isPlanned" class="plan-section"><div class="section-label"><p class="eyebrow accent">02 / AI UNDERSTANDING</p><span class="mono">{{ creative.campaign?.id }}</span></div><div class="plan-grid"><article class="panel plan-summary"><div class="plan-status"><span class="status-pulse" /> 已完成理解 <span class="mono">TEXT_PLANNER</span></div><h2>{{ creative.campaign?.plan?.intent || '本地生活增长活动' }}</h2><p>系统将围绕 <strong>{{ creative.campaign?.plan?.audience }}</strong>，在 {{ creative.campaign?.plan?.channels?.join(' / ') }} 输出 {{ creative.campaign?.plan?.contentCount }} 个内容单元。</p><div class="plan-tags"><span v-for="tag in [creative.campaign?.plan?.tone, ...(creative.campaign?.plan?.channels || [])]" :key="tag">{{ tag }}</span></div></article><article class="panel plan-facts"><p class="eyebrow">CONFIRMED FACTS</p><div v-for="fact in creative.campaign?.facts" :key="fact.id" class="fact-row"><span class="fact-check">✓</span><span>{{ fact.field }}</span><strong>{{ fact.value }}</strong></div><div v-if="creative.campaign?.missingFacts?.length" class="missing-facts"><span class="eyebrow">MISSING / NEED CONFIRMATION</span><p>{{ creative.campaign.missingFacts.join('、') }}</p></div></article></div></section>
 
+    <section v-if="creative.promptArtifacts.length" class="prompt-review panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow accent">PROMPT ARTIFACTS / QA</p><h3>Compiled generation instructions</h3></div>
+        <span class="qa-score mono">QA {{ creative.qaReport?.blockingIssues ? 'BLOCKED' : 'READY' }}</span>
+      </div>
+      <div class="prompt-list">
+        <details v-for="artifact in creative.promptArtifacts.slice(0, 4)" :key="artifact.id" class="prompt-item">
+          <summary><span class="prompt-index">{{ artifact.planUnitId.replace('creative_unit_', '#') }}</span><span>{{ artifact.modelAlias }} · {{ artifact.templateVersion }}</span><span class="prompt-review-state">{{ artifact.reviewed ? 'REVIEWED' : 'PENDING REVIEW' }}</span></summary>
+          <pre>{{ artifact.prompt }}</pre>
+        </details>
+      </div>
+      <div class="qa-summary"><span class="status-pulse" /><span>{{ creative.qaReport?.checkedCount || 0 }} checked</span><span>{{ creative.qaReport?.warningCount || 0 }} warnings</span><span>{{ creative.qaReport?.blockingIssues || 0 }} blockers</span></div>
+    </section>
+    <section v-if="creative.phase === 'blocked'" class="blocked-bar panel">
+      <span class="blocked-icon">!</span>
+      <div><p class="eyebrow">FACTS REQUIRED BEFORE GENERATION</p><h3>确认关键事实后，才能继续。</h3><p>当前缺少：{{ creative.campaign?.missingFacts?.join('、') }}。系统不会猜测价格、地址或营业时间。</p></div>
+      <button class="text-link" @click="creative.reset">修改需求 <span>→</span></button>
+    </section>
     <section v-if="creative.phase === 'planned'" class="confirm-bar panel"><div><p class="eyebrow">03 / CONFIRM & RESERVE</p><h3>计划清晰后，再开始生成。</h3><p>预计 {{ contentCount * 8 }} credits · Mock Provider · 可逐项重试</p></div><div class="confirm-actions"><button class="text-link muted" @click="creative.reset">重新描述</button><button class="primary-button compact" @click="confirmPlan">确认计划并预占额度 <span>→</span></button></div></section>
 
     <section v-if="creative.batch" class="batch-section"><div class="section-label"><p class="eyebrow accent">04 / BATCH EXECUTION</p><span class="batch-state mono">{{ creative.batch.state }}</span></div><article class="panel batch-panel"><div class="batch-header"><div><h2>{{ creative.batch.count }} 个内容单元</h2><p>成功项不会因失败项重试而重复计费。</p></div><div class="batch-progress"><strong>{{ completedPercent }}%</strong><span>{{ creative.batch.completed }} / {{ creative.batch.count }} 已完成</span></div></div><div class="progress-track"><span :style="{ width: `${completedPercent}%` }" /></div><div class="batch-items"><div v-for="item in creative.items" :key="item.id" class="batch-item"><span class="item-index">{{ String(item.index + 1).padStart(2, '0') }}</span><span class="item-kind">IMAGE_PRIMARY</span><span class="item-status" :class="item.state.toLowerCase()">{{ item.state === 'SUCCEEDED' ? '生成完成' : item.state === 'FAILED' ? '需要重试' : item.state }}</span><button v-if="item.state === 'FAILED'" class="row-arrow" aria-label="重试">↻</button></div></div><button v-if="creative.phase === 'confirmed'" class="primary-button batch-start" :disabled="creative.loading" @click="startBatch">{{ creative.loading ? '队列执行中…' : '启动批量生成' }} <span>→</span></button><div v-if="creative.phase === 'qa'" class="qa-callout"><span class="status-pulse" /><div><strong>批量生成完成，等待质量检查</strong><p>下一步将检查产品一致性、文字风险、构图与平台比例。</p></div><span class="mono">QA READY</span></div></article></section>

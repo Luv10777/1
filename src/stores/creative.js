@@ -13,6 +13,8 @@ export const creative = reactive({
   phase: 'idle',
   error: '',
   lastProviderResult: null,
+  promptArtifacts: [],
+  qaReport: null,
   async interpret(brief, options = {}) {
     this.loading = true
     this.error = ''
@@ -36,7 +38,9 @@ export const creative = reactive({
       })
       this.campaign = result.campaign
       this.lastProviderResult = result.providerResult
-      this.phase = 'planned'
+      this.promptArtifacts = result.promptArtifacts || []
+      this.qaReport = result.qaReport || null
+      this.phase = result.blocked ? 'blocked' : 'planned'
       return result
     } catch (error) {
       this.error = error.message
@@ -75,6 +79,6 @@ export const creative = reactive({
     }
   },
   reset() {
-    this.brief = ''; this.campaign = null; this.batch = null; this.items = []; this.loading = false; this.phase = 'idle'; this.error = ''; this.lastProviderResult = null
+    this.brief = ''; this.campaign = null; this.batch = null; this.items = []; this.loading = false; this.phase = 'idle'; this.error = ''; this.lastProviderResult = null; this.promptArtifacts = []; this.qaReport = null
   },
 })
