@@ -12,8 +12,6 @@ public class MerchantFactSnapshotResponse {
     private Long tenantId;
     private Long merchantId;
     private String snapshotVersion;
-    private String snapshotHash;
-    private String factsSummary;
-    private Boolean isComplete;
+    private String snapshotCode;
     private LocalDateTime createdAt;
 }
