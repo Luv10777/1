@@ -14,6 +14,8 @@ import BrandsView from './views/BrandsView.vue'
 import AssetsView from './views/AssetsView.vue'
 import KnowledgeView from './views/KnowledgeView.vue'
 import WorksView from './views/WorksView.vue'
+import VideoProjectsView from './views/VideoProjectsView.vue'
+import VideoProjectDetailView from './views/VideoProjectDetailView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -28,7 +30,9 @@ const routes = [
   { path: '/copy/rewrite', name: 'copy-rewrite', component: PlaceholderView, meta: { title: '文案重写', eyebrow: 'CONTENT TOOLS', icon: 'Aa', description: '保留核心信息，切换平台语气与传播场景。' } },
   { path: '/video/analyze', name: 'video-analyze', component: PlaceholderView, meta: { title: '视频结构分析', eyebrow: 'CONTENT TOOLS', icon: '◌', description: '拆解视频节奏、镜头意图与可复制的内容骨架。' } },
   { path: '/image/create', name: 'image-create', component: PlaceholderView, meta: { title: 'AI 图片创作', eyebrow: 'CONTENT TOOLS', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。' } },
-  { path: '/video/create', name: 'video-create', component: PlaceholderView, meta: { title: 'AI 视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
+  { path: '/video/create', name: 'video-create', component: VideoProjectsView, meta: { title: 'AI 视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
+  { path: '/video-projects', name: 'video-projects', component: VideoProjectsView, meta: { title: '视频项目', eyebrow: 'CONTENT TOOLS' } },
+  { path: '/video-projects/:id', name: 'video-project-detail', component: VideoProjectDetailView, meta: { title: '项目详情', eyebrow: 'CONTENT TOOLS' } },
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
   { path: '/digital-human', name: 'digital-human', component: PlaceholderView, meta: { title: '数字人播报', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '建立门店可持续使用的数字人讲解与播报模板。' } },
   { path: '/merchants', name: 'merchants', component: PlaceholderView, meta: { title: '商家与门店', eyebrow: 'ASSETS', icon: '⌂', description: '管理租户、商家资料与门店运营边界。' } },
