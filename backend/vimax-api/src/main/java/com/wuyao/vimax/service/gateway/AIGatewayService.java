@@ -25,6 +25,7 @@ public class AIGatewayService {
     private final ProviderJobRepository providerJobRepository;
     private final FluAPIAdapter fluAPIAdapter;
     private final ToAPIsAdapter toAPIsAdapter;
+    private final APIKeyConfig apiKeyConfig;
 
     /**
      * 提交文本生成任务
@@ -45,7 +46,7 @@ public class AIGatewayService {
 
         if ("FLUAPI".equals(provider)) {
             // 使用真实的 API Key
-            String apiKey = APIKeyConfig.getFluApiTextKey();
+            String apiKey = apiKeyConfig.getFluApiTextKey();
             String jobId = fluAPIAdapter.submitTextGeneration(prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
@@ -74,7 +75,7 @@ public class AIGatewayService {
 
         if ("FLUAPI".equals(provider)) {
             // 使用真实的 API Key
-            String apiKey = APIKeyConfig.getFluApiImageKey();
+            String apiKey = apiKeyConfig.getFluApiImageKey();
             String jobId = fluAPIAdapter.submitImageGeneration(prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
@@ -103,7 +104,7 @@ public class AIGatewayService {
 
         if ("TOAPIS".equals(provider)) {
             // 使用真实的 API Key
-            String apiKey = APIKeyConfig.getToApisKey();
+            String apiKey = apiKeyConfig.getToApisKey();
             String jobId = toAPIsAdapter.submitVideoGeneration(imageUrl, prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
@@ -147,10 +148,10 @@ public class AIGatewayService {
         // 使用真实的 API Key
         String apiKey;
         if ("FLUAPI".equals(job.getProvider())) {
-            apiKey = APIKeyConfig.getFluApiTextKey();
+            apiKey = apiKeyConfig.getFluApiTextKey();
             fluAPIAdapter.checkJobStatus(job, apiKey);
         } else if ("TOAPIS".equals(job.getProvider())) {
-            apiKey = APIKeyConfig.getToApisKey();
+            apiKey = apiKeyConfig.getToApisKey();
             toAPIsAdapter.checkJobStatus(job, apiKey);
         }
 

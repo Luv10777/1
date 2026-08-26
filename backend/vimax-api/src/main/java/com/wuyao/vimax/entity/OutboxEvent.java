@@ -56,6 +56,12 @@ public class OutboxEvent {
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
 
+    @Column(name = "status", length = 50, nullable = false)
+    private String status = "PENDING";
+
+    @Column(name = "max_retries", nullable = false)
+    private Integer maxRetries = 3;
+
     @Column(name = "version", nullable = false)
     private Integer version = 1;
 

@@ -31,7 +31,7 @@ public class OutboxEventService {
         OutboxEvent event = new OutboxEvent();
         event.setEventType(eventType);
         event.setAggregateType(aggregateType);
-        event.setAggregateId(aggregateId);
+        event.setAggregateId(String.valueOf(aggregateId));
         event.setPayload(payload);
         event.setStatus("PENDING");
 

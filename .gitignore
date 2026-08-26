@@ -3,6 +3,50 @@
 .env.*.local
 node_modules
 dist
+
+# Environment variables - NEVER COMMIT
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# Sensitive files
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+
+# Java
+target/
+*.class
+*.jar
+*.war
+!backend/vimax-api/.mvn/wrapper/maven-wrapper.jar
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
 *.log
 .DS_Store
 .vscode

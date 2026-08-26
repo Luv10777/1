@@ -77,3 +77,21 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Provider API Keys (从环境变量读取)
+provider:
+  fluapi:
+    image:
+      key: ${FLUAPI_IMAGE_KEY:}
+    text:
+      key: ${FLUAPI_TEXT_KEY:}
+  toapis:
+    seedance:
+      key: ${TOAPIS_SEEDANCE_KEY:}
+
+# MinIO 配置
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:vimax-assets}
