@@ -7,12 +7,12 @@
 ## 当前同步快照（2026-08-25）
 
 - 本地目录：C:\Users\Administrator\梧曜AI；GitHub：github.com/Luv10777/1。
-- 当前分支：feat/phase-5-open-ecosystem-growth-os。
-- 最新提交：0d9f846 feat(phase5): add open platform sandbox contracts。
-- Phase 5 M0/M1：组织树、策略继承、RBAC+ABAC、OAuth Scope/Token、声明式模板、隐私安全 Benchmark、受控 Growth OS 和 /ecosystem Sandbox 页面。
-- Phase 5 M3/M4：API 版本/弃用回落、配额、Webhook 幂等投递/重试/死信、Connector Manifest 审核与停用契约。
+- 当前分支：main（已与 origin/main 完全同步）。
+- 最新提交：844e9d4 Merge feat/phase-1-functional-foundation into main。
+- 本地与远程提交哈希一致：844e9d4ea8ba670eff07b3cde670b9d371a42442。
+- Phase 1-5 所有功能分支已合并至 main 分支。
 - 验证基线：34/34 Node 测试通过；npm run lint -- --quiet 通过；npm run build 通过；npm run typecheck 因未安装 vue-tsc 暂不可用。
-- 开发服务器保持运行：localhost:4173；/ecosystem、/billing、/consumer 均返回 HTTP 200；当前监听进程 PID 26856。
+- 开发服务器状态：当前未运行（之前运行在 localhost:4173）。
 - 明确未接通：生产 Core API、数据库、OAuth Gateway、Webhook Worker、Connector Runtime、真实 Benchmark 数据、Agent Executor、内容溯源、Cell/灾备和外部生产调用。
 
 ## 仓库与运行状态
