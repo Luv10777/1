@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { auth } from '../stores/auth'
 
@@ -11,6 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const menuOpen = ref(false)
 const accountOpen = ref(false)
+const pageScroll = ref(null)
 
 const navGroups = [
   {
@@ -64,6 +65,12 @@ const navGroups = [
 
 const isActive = (name) => route.name === name
 const closeMenu = () => { menuOpen.value = false }
+
+watch(() => route.fullPath, async () => {
+  await nextTick()
+  pageScroll.value?.scrollTo({ top: 0, left: 0 })
+})
+
 const logout = () => {
   auth.logout()
   router.push({ name: 'login' })
@@ -144,7 +151,7 @@ const logout = () => {
           <button class="top-account" @click="accountOpen = !accountOpen"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span>{{ auth.user?.name || '林知夏' }}</span><span class="chevron">⌄</span></button>
         </div>
       </header>
-      <div class="page-scroll"><slot /></div>
+      <div ref="pageScroll" class="page-scroll"><slot /></div>
     </main>
   </div>
 </template>
