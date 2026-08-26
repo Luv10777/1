@@ -81,9 +81,7 @@ public class MerchantFactSnapshotController {
         response.setTenantId(snapshot.getTenantId());
         response.setMerchantId(snapshot.getMerchantId());
         response.setSnapshotVersion(snapshot.getSnapshotVersion());
-        response.setSnapshotHash(snapshot.getSnapshotHash());
-        response.setFactsSummary(snapshot.getFactsSummary());
-        response.setIsComplete(snapshot.getIsComplete());
+        response.setSnapshotCode(snapshot.getSnapshotCode());
         response.setCreatedAt(snapshot.getCreatedAt());
         return response;
     }
