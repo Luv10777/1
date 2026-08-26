@@ -87,8 +87,8 @@ public class CostCalculationService {
             }
         }
 
-        run.setEstimatedCost(totalEstimatedCost);
-        run.setActualCost(totalActualCost);
+        run.setEstimatedCostCredits(totalEstimatedCost);
+        run.setActualCostCredits(totalActualCost);
         runRepository.save(run);
 
         log.info("工作流成本已计算: runId={}, estimated=${}, actual=${}",
@@ -105,8 +105,8 @@ public class CostCalculationService {
         WorkflowRun run = runRepository.findById(workflowRunId)
             .orElseThrow(() -> new IllegalArgumentException("工作流运行不存在"));
 
-        BigDecimal currentReserved = run.getReservedCost() != null ? run.getReservedCost() : BigDecimal.ZERO;
-        run.setReservedCost(currentReserved.add(amount));
+        BigDecimal currentReserved = run.getReservedCredits() != null ? run.getReservedCredits() : BigDecimal.ZERO;
+        run.setReservedCredits(currentReserved.add(amount));
         runRepository.save(run);
     }
 
@@ -120,8 +120,8 @@ public class CostCalculationService {
         WorkflowRun run = runRepository.findById(workflowRunId)
             .orElseThrow(() -> new IllegalArgumentException("工作流运行不存在"));
 
-        BigDecimal currentReserved = run.getReservedCost() != null ? run.getReservedCost() : BigDecimal.ZERO;
-        run.setReservedCost(currentReserved.subtract(amount).max(BigDecimal.ZERO));
+        BigDecimal currentReserved = run.getReservedCredits() != null ? run.getReservedCredits() : BigDecimal.ZERO;
+        run.setReservedCredits(currentReserved.subtract(amount).max(BigDecimal.ZERO));
         runRepository.save(run);
     }
 
