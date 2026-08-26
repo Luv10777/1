@@ -1,9 +1,19 @@
 from typing import Dict, Any
 from loguru import logger
+from app.clients.platform_api import PlatformAPIClient
+from app.clients.ai_gateway import AIGatewayClient
+from app.services.ffmpeg_processor import FFmpegProcessor
+from app.services.quality_checker import QualityChecker
 
 
 class WorkflowExecutor:
     """工作流执行器"""
+
+    def __init__(self):
+        self.platform_api = PlatformAPIClient()
+        self.ai_gateway = AIGatewayClient()
+        self.ffmpeg = FFmpegProcessor()
+        self.quality_checker = QualityChecker()
 
     async def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """执行工作流任务"""

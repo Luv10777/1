@@ -43,7 +43,9 @@ public class AIGatewayService {
         job.setModelCapability(modelCapability);
 
         if ("FLUAPI".equals(provider)) {
-            String jobId = fluAPIAdapter.submitTextGeneration(prompt, modelCapability);
+            // TODO: 从配置读取 API Key
+            String apiKey = "mock_api_key";
+            String jobId = fluAPIAdapter.submitTextGeneration(prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
 
@@ -70,7 +72,9 @@ public class AIGatewayService {
         job.setModelCapability(modelCapability);
 
         if ("FLUAPI".equals(provider)) {
-            String jobId = fluAPIAdapter.submitImageGeneration(prompt, modelCapability);
+            // TODO: 从配置读取 API Key
+            String apiKey = "mock_api_key";
+            String jobId = fluAPIAdapter.submitImageGeneration(prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
 
@@ -97,7 +101,9 @@ public class AIGatewayService {
         job.setModelCapability(modelCapability);
 
         if ("TOAPIS".equals(provider)) {
-            String jobId = toAPIsAdapter.submitVideoGeneration(imageUrl, prompt, modelCapability);
+            // TODO: 从配置读取 API Key
+            String apiKey = "mock_api_key";
+            String jobId = toAPIsAdapter.submitVideoGeneration(imageUrl, prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
 
@@ -137,10 +143,13 @@ public class AIGatewayService {
         log.debug("检查任务状态：jobId={}, provider={}, providerJobId={}",
                 job.getId(), job.getProvider(), job.getProviderJobId());
 
+        // TODO: 从配置中读取 API Key
+        String apiKey = "mock_api_key";
+
         if ("FLUAPI".equals(job.getProvider())) {
-            fluAPIAdapter.checkJobStatus(job);
+            fluAPIAdapter.checkJobStatus(job, apiKey);
         } else if ("TOAPIS".equals(job.getProvider())) {
-            toAPIsAdapter.checkJobStatus(job);
+            toAPIsAdapter.checkJobStatus(job, apiKey);
         }
 
         job.setLastCheckedAt(LocalDateTime.now());
