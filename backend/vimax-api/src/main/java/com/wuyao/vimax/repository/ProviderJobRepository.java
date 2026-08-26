@@ -35,4 +35,9 @@ public interface ProviderJobRepository extends JpaRepository<ProviderJob, Long> 
      * 按状态查询
      */
     List<ProviderJob> findByStatus(String status);
+
+    /**
+     * 按状态列表查询
+     */
+    List<ProviderJob> findByStatusIn(List<String> statuses);
 }

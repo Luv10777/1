@@ -14,22 +14,12 @@ import java.util.Optional;
 public interface AssetRepository extends JpaRepository<Asset, Long> {
 
     /**
-     * 根据 code 查找资产
+     * 根据SHA256哈希查找（去重）
      */
-    Optional<Asset> findByCode(String code);
+    Optional<Asset> findBySha256Hash(String sha256Hash);
 
     /**
-     * 查询商家的资产列表
+     * 根据 S3 Key 查找
      */
-    List<Asset> findByMerchantIdAndStatus(Long merchantId, String status);
-
-    /**
-     * 按类型查询资产
-     */
-    List<Asset> findByMerchantIdAndTypeAndStatus(Long merchantId, String type, String status);
-
-    /**
-     * 检查资产是否存在
-     */
-    boolean existsByCode(String code);
+    Optional<Asset> findByS3Key(String s3Key);
 }
