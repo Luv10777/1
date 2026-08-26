@@ -7,7 +7,9 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 商家事实快照表
+ * 商家事实快照
+ *
+ * Phase 2.1: 用于记录工作流运行时的商家信息
  */
 @Entity
 @Table(name = "merchant_fact_snapshots")
@@ -24,20 +26,59 @@ public class MerchantFactSnapshot {
     @Column(name = "merchant_id", nullable = false)
     private Long merchantId;
 
-    @Column(name = "snapshot_version", nullable = false, length = 50)
-    private String snapshotVersion = "v1.0";
+    @Column(name = "snapshot_code", length = 50, nullable = false, unique = true)
+    private String snapshotCode;
 
-    @Column(name = "snapshot_hash", nullable = false, length = 64, unique = true)
-    private String snapshotHash;
+    @Column(name = "snapshot_version", length = 20, nullable = false)
+    private String snapshotVersion;
 
-    @Column(name = "facts_summary", columnDefinition = "JSONB", nullable = false)
-    private String factsSummary;
+    @Column(name = "merchant_name", length = 200, nullable = false)
+    private String merchantName;
 
-    @Column(name = "is_complete")
-    private Boolean isComplete = false;
+    @Column(name = "merchant_type", length = 50)
+    private String merchantType;
 
-    @Column(name = "missing_critical_facts", columnDefinition = "JSONB")
-    private String missingCriticalFacts;
+    @Column(name = "industry", length = 100)
+    private String industry;
+
+    @Column(name = "business_hours", length = 200)
+    private String businessHours;
+
+    @Column(name = "address", columnDefinition = "TEXT")
+    private String address;
+
+    @Column(name = "contact_phone", length = 50)
+    private String contactPhone;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "tags", columnDefinition = "TEXT")
+    private String tags;
+
+    @Column(name = "product_categories", columnDefinition = "TEXT")
+    private String productCategories;
+
+    @Column(name = "key_products", columnDefinition = "TEXT")
+    private String keyProducts;
+
+    @Column(name = "selling_points", columnDefinition = "TEXT")
+    private String sellingPoints;
+
+    @Column(name = "target_audience", columnDefinition = "TEXT")
+    private String targetAudience;
+
+    @Column(name = "brand_voice", columnDefinition = "TEXT")
+    private String brandVoice;
+
+    @Column(name = "competitors", columnDefinition = "TEXT")
+    private String competitors;
+
+    @Column(name = "marketing_goals", columnDefinition = "TEXT")
+    private String marketingGoals;
+
+    @Column(name = "additional_info", columnDefinition = "JSONB")
+    private String additionalInfo;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

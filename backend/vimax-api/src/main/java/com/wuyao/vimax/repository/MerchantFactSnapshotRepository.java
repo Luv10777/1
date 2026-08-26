@@ -4,27 +4,21 @@ import com.wuyao.vimax.entity.MerchantFactSnapshot;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
- * 商家事实快照 Repository
+ * MerchantFactSnapshot Repository
  */
 @Repository
 public interface MerchantFactSnapshotRepository extends JpaRepository<MerchantFactSnapshot, Long> {
 
     /**
-     * 根据哈希查找快照（去重）
+     * 根据快照代码查找
      */
-    Optional<MerchantFactSnapshot> findBySnapshotHash(String snapshotHash);
+    Optional<MerchantFactSnapshot> findBySnapshotCode(String snapshotCode);
 
     /**
-     * 查询商家的所有快照
+     * 根据商家ID查找最新快照
      */
-    List<MerchantFactSnapshot> findByMerchantIdOrderByCreatedAtDesc(Long merchantId);
-
-    /**
-     * 检查快照是否存在
-     */
-    boolean existsBySnapshotHash(String snapshotHash);
+    Optional<MerchantFactSnapshot> findFirstByMerchantIdOrderByCreatedAtDesc(Long merchantId);
 }
