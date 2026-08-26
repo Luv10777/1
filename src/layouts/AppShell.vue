@@ -13,9 +13,11 @@ const router = useRouter()
 const menuOpen = ref(false)
 const accountOpen = ref(false)
 const pageScroll = ref(null)
+const NAV_STORAGE_KEY = 'wuyao-sidebar-groups'
 
 const navGroups = [
   {
+    key: 'workspace',
     label: '工作台',
     items: [
       { name: 'dashboard', label: '运营总览', path: '/dashboard', glyph: '◒' },
@@ -26,6 +28,7 @@ const navGroups = [
     ],
   },
   {
+    key: 'content',
     label: '内容工具',
     items: [
       { name: 'copy-extract', label: '文案提取', path: '/copy/extract', glyph: '↗' },
@@ -38,6 +41,7 @@ const navGroups = [
     ],
   },
   {
+    key: 'assets',
     label: '资产',
     items: [
       { name: 'merchants', label: '商家与门店', path: '/merchants', glyph: '⌂' },
@@ -48,6 +52,7 @@ const navGroups = [
     ],
   },
   {
+    key: 'operations',
     label: '运营',
     items: [
       { name: 'reviews', label: '评论与 AI 客服', path: '/reviews', glyph: '◠' },
@@ -56,6 +61,7 @@ const navGroups = [
     ],
   },
   {
+    key: 'system',
     label: '系统',
     items: [
       { name: 'tasks', label: '任务中心', path: '/tasks', glyph: '✓' },
@@ -64,10 +70,54 @@ const navGroups = [
   },
 ]
 
+const getRouteGroup = () => navGroups.find(group => group.items.some(item => item.name === route.name))
+
+const getInitialExpandedGroups = () => {
+  let savedGroups = []
+  try {
+    const storedGroups = JSON.parse(localStorage.getItem(NAV_STORAGE_KEY) || '[]')
+    if (Array.isArray(storedGroups)) savedGroups = storedGroups
+  } catch {
+    // Ignore malformed or unavailable local storage and use the active group.
+  }
+
+  const knownKeys = new Set(navGroups.map(group => group.key))
+  const initialGroups = new Set(savedGroups.filter(key => knownKeys.has(key)))
+  initialGroups.add(getRouteGroup()?.key || navGroups[0].key)
+  return initialGroups
+}
+
+const expandedGroups = ref(getInitialExpandedGroups())
 const isActive = (name) => route.name === name
+const isGroupActive = (group) => group.items.some(item => isActive(item.name))
+const isGroupExpanded = (key) => expandedGroups.value.has(key)
 const closeMenu = () => { menuOpen.value = false }
 
+const saveExpandedGroups = () => {
+  try {
+    localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify([...expandedGroups.value]))
+  } catch {
+    // Navigation remains functional when local storage is unavailable.
+  }
+}
+
+const toggleGroup = (key) => {
+  const nextGroups = new Set(expandedGroups.value)
+  if (nextGroups.has(key)) nextGroups.delete(key)
+  else nextGroups.add(key)
+  expandedGroups.value = nextGroups
+  saveExpandedGroups()
+}
+
+const expandActiveGroup = () => {
+  const activeGroup = getRouteGroup()
+  if (!activeGroup || expandedGroups.value.has(activeGroup.key)) return
+  expandedGroups.value = new Set([...expandedGroups.value, activeGroup.key])
+  saveExpandedGroups()
+}
+
 watch(() => route.fullPath, async () => {
+  expandActiveGroup()
   await nextTick()
   pageScroll.value?.scrollTo({ top: 0, left: 0 })
 })
@@ -101,20 +151,43 @@ const logout = () => {
       </div>
 
       <nav class="primary-nav" aria-label="主导航">
-        <div v-for="group in navGroups" :key="group.label" class="nav-group">
-          <p class="nav-group-label">{{ group.label }}</p>
-          <RouterLink
-            v-for="item in group.items"
-            :key="item.name"
-            :to="item.path"
-            class="nav-item"
-            :class="{ active: isActive(item.name) }"
-            @click="closeMenu"
+        <div
+          v-for="group in navGroups"
+          :key="group.key"
+          class="nav-group"
+          :class="{ 'has-active-item': isGroupActive(group) }"
+        >
+          <button
+            class="nav-group-trigger"
+            type="button"
+            :aria-expanded="isGroupExpanded(group.key)"
+            :aria-controls="`nav-group-${group.key}`"
+            @click="toggleGroup(group.key)"
           >
-            <span class="nav-glyph" aria-hidden="true">{{ item.glyph }}</span>
-            <span>{{ item.label }}</span>
-            <span v-if="item.name === 'tasks'" class="nav-count">3</span>
-          </RouterLink>
+            <span class="nav-group-label">{{ group.label }}</span>
+            <span class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true">⌄</span>
+          </button>
+          <div
+            :id="`nav-group-${group.key}`"
+            class="nav-group-items"
+            :class="{ expanded: isGroupExpanded(group.key) }"
+            :aria-hidden="!isGroupExpanded(group.key)"
+          >
+            <div class="nav-group-items-inner">
+              <RouterLink
+                v-for="item in group.items"
+                :key="item.name"
+                :to="item.path"
+                class="nav-item"
+                :class="{ active: isActive(item.name) }"
+                @click="closeMenu"
+              >
+                <span class="nav-glyph" aria-hidden="true">{{ item.glyph }}</span>
+                <span>{{ item.label }}</span>
+                <span v-if="item.name === 'tasks'" class="nav-count">3</span>
+              </RouterLink>
+            </div>
+          </div>
         </div>
       </nav>
 

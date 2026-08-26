@@ -65,3 +65,36 @@
 [data-theme='light'] .meter-top button:hover{color:#fff}
 [data-theme='light'] .theme-toggle{box-shadow:0 3px 12px rgba(42,39,68,.06)}
 @media(max-width:640px){.theme-toggle{min-width:30px;width:30px;padding:0}.theme-toggle-label{display:none}.auth-theme-toggle{width:auto;min-width:62px;padding:0 9px}.auth-theme-toggle .theme-toggle-label{display:inline}}
+
+/* Collapsible navigation hierarchy */
+.nav-group{margin:8px 0 10px}
+.nav-group-trigger{width:100%;height:32px;display:flex;align-items:center;gap:7px;padding:0 10px;border:0;border-radius:7px;color:#67657a;background:transparent;text-align:left;transition:color .18s ease,background .18s ease}
+.nav-group-trigger:hover{color:var(--ink-soft);background:rgba(255,255,255,.035)}
+.nav-group.has-active-item>.nav-group-trigger{color:#9d98e7}
+.nav-group-trigger .nav-group-label{min-width:0;flex:1;margin:0;color:inherit;font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase}
+.nav-group-chevron{width:14px;color:var(--ink-muted);font-size:14px;line-height:1;text-align:center;transform:rotate(-90deg);transition:transform .2s ease,color .18s ease}
+.nav-group-chevron.expanded{transform:rotate(0)}
+.nav-group-items{display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows .22s ease,opacity .18s ease,visibility 0s linear .22s}
+.nav-group-items.expanded{grid-template-rows:1fr;opacity:1;visibility:visible;transition-delay:0s}
+.nav-group-items-inner{min-height:0;margin-left:8px;padding-left:5px;overflow:hidden;border-left:1px solid var(--line)}
+.nav-group-items .nav-item{padding-left:8px}
+[data-theme='light'] .nav-group-trigger{color:#8a8899}
+[data-theme='light'] .nav-group-trigger:hover{color:var(--ink-soft);background:rgba(89,82,232,.05)}
+[data-theme='light'] .nav-group.has-active-item>.nav-group-trigger{color:#5e57c9}
+
+/* Sidebar typography: keep dense navigation readable on standard displays. */
+.sidebar .brand-name{font-size:17px}
+.sidebar .brand-caption{font-size:9px}
+.sidebar .tenant-copy .eyebrow{font-size:10px}
+.sidebar .tenant-copy strong{font-size:13px}
+.nav-group-trigger{height:40px}
+.nav-group-trigger .nav-group-label{font-size:14px;font-weight:600;letter-spacing:.05em}
+.nav-group-chevron{font-size:16px}
+.nav-group-items .nav-item{min-height:42px;font-size:14px}
+.nav-group-items .nav-glyph{font-size:16px}
+.sidebar .status-capsule .eyebrow{font-size:9.5px}
+.sidebar .status-capsule strong{font-size:12px}
+.sidebar .status-time{font-size:10px}
+.sidebar .account-copy strong{font-size:13px}
+.sidebar .account-copy small{font-size:11px}
+.sidebar .account-menu button{font-size:12px}
