@@ -2,6 +2,7 @@
 import { nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { auth } from '../stores/auth'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 defineProps({
   // The shell intentionally owns global navigation while pages own their content.
@@ -145,6 +146,7 @@ const logout = () => {
         <button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button>
         <div class="breadcrumb"><span>梧曜星枢</span><span class="breadcrumb-slash">/</span><strong>{{ route.meta.title || '运营总览' }}</strong></div>
         <div class="topbar-actions">
+          <ThemeToggle />
           <button class="help-button" aria-label="帮助中心">?</button>
           <span class="topbar-divider" />
           <button class="notification-button" aria-label="通知"><span class="notification-dot" />◔</button>
