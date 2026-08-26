@@ -1,0 +1,924 @@
+{
+  "metadata": {
+    "audit_date": "2026-08-25",
+    "vimax_commit": "05a48943878312d88fe5a016c12a9654940ecc43",
+    "vimax_version": "v1.2.0",
+    "vimax_commit_date": "2026-07-29 16:56:44 +0800",
+    "current_project_commit": "844e9d4ea8ba670eff07b3cde670b9d371a42442",
+    "current_project_branch": "main",
+    "total_candidates": 33,
+    "a_level_count": 7,
+    "b_level_count": 13,
+    "c_level_count": 5,
+    "d_level_count": 8
+  },
+  "candidates": [
+    {
+      "priority": 1,
+      "source_file": "interfaces/shot_description.py",
+      "symbols": ["ShotDescription", "ShotBriefDescription"],
+      "callers": [
+        "pipelines/script2video_pipeline.py:Script2VideoPipeline.decompose_visual_descriptions()",
+        "agents/storyboard_artist.py:StoryboardArtist.design_storyboard()"
+      ],
+      "dependencies": ["pydantic.BaseModel", "typing.List", "typing.Literal"],
+      "inputs": {
+        "idx": "int",
+        "cam_idx": "int",
+        "visual_desc": "str",
+        "variation_type": "Literal['large', 'medium', 'small']",
+        "ff_desc": "str (首帧描述)",
+        "lf_desc": "str (尾帧描述)",
+        "motion_desc": "str (运动描述)",
+        "audio_desc": "str (音频描述)"
+      },
+      "outputs": "Pydantic 模型实例，可序列化为 JSON",
+      "reuse_level": "A",
+      "score": 95,
+      "target_module": "domain/video/Shot.java",
+      "required_changes": [
+        "Python Pydantic BaseModel → Java Entity + Lombok",
+        "字段类型映射：List[int] → List<Integer>, Optional[str] → String (nullable)",
+        "添加数据库注解 @Entity, @Table, @Column",
+        "添加状态字段 status (PENDING/GENERATING/COMPLETED/FAILED)",
+        "添加对象存储 URL 字段 (firstFrameUrl, lastFrameUrl, videoUrl)"
+      ],
+      "risks": [
+        "Python 动态类型 → Java 静态类型需要严格校验",
+        "variation_type 枚举值需要与前端同步"
+      ],
+      "evidence": [
+        "ViMax commit: 05a4894",
+        "文件路径: interfaces/shot_description.py 第 91-186 行",
+        "被 Script2VideoPipeline 核心流程调用",
+        "包含首帧/尾帧/运动描述，直接对应梧曜视频生成需求"
+      ]
+    },
+    {
+      "priority": 2,
+      "source_file": "interfaces/character.py",
+      "symbols": ["CharacterInScene"],
+      "callers": [
+        "agents/character_extractor.py:CharacterExtractor.extract_characters()",
+        "pipelines/script2video_pipeline.py:generate_character_portraits()"
+      ],
+      "dependencies": ["pydantic.BaseModel"],
+      "inputs": {
+        "idx": "int",
+        "identifier_in_scene": "str (角色标识，如 Alice)",
+        "is_visible": "bool (是否可见)",
+        "static_features": "str (静态特征：面部、体型)",
+        "dynamic_features": "Optional[str] (动态特征：服装、配饰)"
+      },
+      "outputs": "CharacterInScene 实例",
+      "reuse_level": "A",
+      "score": 90,
+      "target_module": "domain/video/Character.java",
+      "required_changes": [
+        "添加 projectId 关联字段",
+        "添加肖像图片 URL 字段 (frontPortraitUrl, sidePortraitUrl, backPortraitUrl)",
+        "Optional[str] → @Nullable String"
+      ],
+      "risks": ["角色一致性追踪依赖 LLM 准确识别"],
+      "evidence": [
+        "文件路径: interfaces/character.py 第 8-46 行",
+        "核心数据模型，被角色提取和肖像生成调用",
+        "static_features / dynamic_features 设计清晰"
+      ]
+    },
+    {
+      "priority": 3,
+      "source_file": "interfaces/camera.py",
+      "symbols": ["Camera"],
+      "callers": ["pipelines/script2video_pipeline.py:construct_camera_tree()"],
+      "dependencies": ["pydantic.BaseModel", "typing.List", "typing.Optional"],
+      "inputs": {
+        "idx": "int",
+        "active_shot_idxs": "List[int] (该摄像机拍摄的镜头索引)",
+        "parent_cam_idx": "Optional[int] (父摄像机索引)",
+        "parent_shot_idx": "Optional[int] (依赖的镜头索引)",
+        "is_parent_fully_covers_child": "Optional[bool]",
+        "missing_info": "Optional[str] (子镜头缺失的信息)"
+      },
+      "outputs": "Camera 实例，构成树结构",
+      "reuse_level": "A",
+      "score": 85,
+      "target_module": "domain/video/Camera.java",
+      "required_changes": [
+        "添加 projectId 关联",
+        "parent_cam_idx / parent_shot_idx 逻辑保留",
+        "树结构遍历算法翻译为 Java"
+      ],
+      "risks": ["摄像机依赖关系复杂，需要严格验证"],
+      "evidence": [
+        "文件路径: interfaces/camera.py 第 6-43 行",
+        "树结构设计支持镜头间的依赖关系",
+        "用于优化参考图生成（复用父镜头首帧）"
+      ]
+    },
+    {
+      "priority": 4,
+      "source_file": "tools/protocols.py",
+      "symbols": ["ImageGenerator", "VideoGenerator"],
+      "callers": [
+        "pipelines/script2video_pipeline.py:generate_frames_for_single_camera()",
+        "pipelines/script2video_pipeline.py:generate_video_for_single_shot()"
+      ],
+      "dependencies": ["typing.Protocol", "interfaces.ImageOutput", "interfaces.VideoOutput"],
+      "inputs": {
+        "ImageGenerator.generate_single_image": {
+          "prompt": "str",
+          "reference_image_paths": "List[str]",
+          "kwargs": "额外参数（size, style等）"
+        },
+        "VideoGenerator.generate_single_video": {
+          "prompt": "str",
+          "reference_image_paths": "List[str] (1-2张参考图)",
+          "kwargs": "额外参数（resolution, fps, duration等）"
+        }
+      },
+      "outputs": "ImageOutput / VideoOutput",
+      "reuse_level": "A",
+      "score": 95,
+      "target_module": "providers/ImageProvider.java, providers/VideoProvider.java",
+      "required_changes": [
+        "Python Protocol → Java Interface",
+        "异步方法签名：async def → CompletableFuture<ImageOutput>",
+        "**kwargs → 明确定义参数类或 Map<String, Object>"
+      ],
+      "risks": ["无，协议抽象清晰"],
+      "evidence": [
+        "文件路径: tools/protocols.py 第 14-35 行",
+        "runtime_checkable Protocol 支持鸭子类型",
+        "梧曜可定义 FluAPIImageProvider / SeedanceVideoProvider 实现"
+      ]
+    },
+    {
+      "priority": 5,
+      "source_file": "utils/video.py",
+      "symbols": ["concatenate_video_files"],
+      "callers": ["pipelines/idea2video_pipeline.py:__call__()", "pipelines/script2video_pipeline.py:__call__()"],
+      "dependencies": ["moviepy.VideoFileClip", "moviepy.concatenate_videoclips"],
+      "inputs": {
+        "video_paths": "List[str] (镜头视频路径)",
+        "output_path": "str",
+        "codec": "str (默认 libx264)",
+        "preset": "str (默认 medium)"
+      },
+      "outputs": "output_path (拼接后的视频路径)",
+      "reuse_level": "A",
+      "score": 85,
+      "target_module": "workers/media/FFmpegWorker.java",
+      "required_changes": [
+        "moviepy → ProcessBuilder 调用 ffmpeg 命令行",
+        "确保进程和文件句柄清理（try-finally）",
+        "错误处理：ffmpeg 返回码检查"
+      ],
+      "risks": [
+        "Windows/Linux ffmpeg 路径差异",
+        "大文件拼接内存占用"
+      ],
+      "evidence": [
+        "文件路径: utils/video.py 第 26-44 行",
+        "关键设计：finally 块确保 clip.close() 释放 ffmpeg 进程",
+        "codec 和 preset 参数可配置"
+      ]
+    },
+    {
+      "priority": 6,
+      "source_file": "interfaces/image_output.py",
+      "symbols": ["ImageOutput"],
+      "callers": ["所有 ImageGenerator 实现类"],
+      "dependencies": ["PIL.Image", "base64", "cv2"],
+      "inputs": {
+        "fmt": "Literal['b64', 'url', 'pil', 'np']",
+        "ext": "str (默认 png)",
+        "data": "Union[str, Image.Image] (根据 fmt)"
+      },
+      "outputs": "ImageOutput 实例，支持 .save(path) 方法",
+      "reuse_level": "A",
+      "score": 80,
+      "target_module": "domain/media/ImageOutput.java",
+      "required_changes": [
+        "fmt 枚举：B64, URL, PIL → BASE64, URL, BYTES",
+        "save() 方法逻辑：base64 解码 / HTTP 下载 / 直接写入",
+        "PIL.Image → BufferedImage 或 byte[]"
+      ],
+      "risks": ["图片格式转换兼容性"],
+      "evidence": [
+        "文件路径: interfaces/image_output.py 第 10-61 行",
+        "统一输出抽象，支持多种格式",
+        "save() 方法根据 fmt 动态调用对应保存逻辑"
+      ]
+    },
+    {
+      "priority": 7,
+      "source_file": "interfaces/video_output.py",
+      "symbols": ["VideoOutput"],
+      "callers": ["所有 VideoGenerator 实现类"],
+      "dependencies": ["utils.video.download_video"],
+      "inputs": {
+        "fmt": "Literal['url', 'bytes']",
+        "ext": "str (默认 mp4)",
+        "data": "Union[str, bytes]"
+      },
+      "outputs": "VideoOutput 实例，支持 .save(path) 方法",
+      "reuse_level": "A",
+      "score": 80,
+      "target_module": "domain/media/VideoOutput.java",
+      "required_changes": [
+        "fmt 枚举：URL, BYTES",
+        "save_url() → HTTP 下载逻辑",
+        "save_bytes() → 直接写入文件"
+      ],
+      "risks": ["视频下载超时处理"],
+      "evidence": [
+        "文件路径: interfaces/video_output.py 第 8-43 行",
+        "与 ImageOutput 设计一致"
+      ]
+    },
+    {
+      "priority": 8,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["Script2VideoPipeline.__call__"],
+      "callers": ["main_script2video.py"],
+      "dependencies": [
+        "agents.CharacterExtractor",
+        "agents.StoryboardArtist",
+        "agents.CameraImageGenerator",
+        "tools.ImageGenerator",
+        "tools.VideoGenerator"
+      ],
+      "inputs": {
+        "script": "str (场景脚本)",
+        "user_requirement": "str (用户需求)",
+        "style": "str (风格)",
+        "characters": "Optional[List[CharacterInScene]]",
+        "character_portraits_registry": "Optional[Dict] (角色肖像注册表)"
+      },
+      "outputs": "final_video_path (最终视频路径)",
+      "reuse_level": "B",
+      "score": 80,
+      "target_module": "workflows/video_creation/ScriptToVideoWorkflow.java",
+      "required_changes": [
+        "状态存储：working_dir/*.json → PostgreSQL + 对象存储",
+        "并发模型：asyncio.gather() → RabbitMQ 任务队列",
+        "LLM 调用：Langchain → FluAPI HTTP Client",
+        "事件同步：asyncio.Event → 数据库状态字段"
+      ],
+      "risks": [
+        "状态机迁移复杂",
+        "任务依赖关系需严格验证"
+      ],
+      "evidence": [
+        "文件路径: pipelines/script2video_pipeline.py 第 195-320 行",
+        "完整流程：角色提取 → 分镜设计 → 帧生成 → 视频生成 → 拼接",
+        "使用 asyncio.gather() 并行生成所有镜头"
+      ]
+    },
+    {
+      "priority": 9,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["generate_frames_for_single_camera"],
+      "callers": ["Script2VideoPipeline.__call__"],
+      "dependencies": [
+        "agents.CameraImageGenerator",
+        "agents.ReferenceImageSelector",
+        "tools.ImageGenerator"
+      ],
+      "inputs": {
+        "camera": "Camera",
+        "shot_descriptions": "List[ShotDescription]",
+        "characters": "List[CharacterInScene]",
+        "character_portraits_registry": "Dict",
+        "priority_shot_idxs": "List[int]"
+      },
+      "outputs": "生成所有帧图片，保存到工作目录",
+      "reuse_level": "B",
+      "score": 75,
+      "target_module": "services/FrameGenerationService.java",
+      "required_changes": [
+        "asyncio.Event 同步 → 数据库状态查询",
+        "本地路径 → 对象存储 URL",
+        "参考图选择逻辑保留",
+        "过渡视频生成逻辑（transition_video）可选保留"
+      ],
+      "risks": [
+        "依赖关系复杂（parent_shot_idx）",
+        "过渡视频生成耗时较长"
+      ],
+      "evidence": [
+        "文件路径: pipelines/script2video_pipeline.py 第 323-487 行",
+        "核心逻辑：首帧生成 → 尾帧生成（如需要）→ 其他镜头帧",
+        "使用 character_portraits_registry 作为参考图"
+      ]
+    },
+    {
+      "priority": 10,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["generate_video_for_single_shot"],
+      "callers": ["Script2VideoPipeline.__call__"],
+      "dependencies": ["tools.VideoGenerator", "asyncio.Event"],
+      "inputs": {
+        "shot_description": "ShotDescription"
+      },
+      "outputs": "生成视频，保存到 shots/{idx}/video.mp4",
+      "reuse_level": "B",
+      "score": 80,
+      "target_module": "services/VideoTaskService.submitShot()",
+      "required_changes": [
+        "等待帧生成完成：asyncio.Event.wait() → 查询数据库 shot.firstFrameUrl 是否存在",
+        "视频生成：直接调用 → 提交到 RabbitMQ",
+        "结果保存：本地文件 → 对象存储"
+      ],
+      "risks": ["任务提交和轮询逻辑需独立服务"],
+      "evidence": [
+        "文件路径: pipelines/script2video_pipeline.py 第 491-520 行",
+        "等待首帧/尾帧生成完成后才提交视频任务",
+        "prompt 组合：motion_desc + audio_desc"
+      ]
+    },
+    {
+      "priority": 11,
+      "source_file": "tools/video_generator_doubao_seedance_yunwu_api.py",
+      "symbols": ["VideoGeneratorDoubaoSeedanceYunwuAPI.create_video_generation_task"],
+      "callers": ["generate_single_video"],
+      "dependencies": ["aiohttp.ClientSession"],
+      "inputs": {
+        "prompt": "str",
+        "reference_image_paths": "List[str] (0-2张参考图)",
+        "resolution": "Literal['480p', '720p', '1080p']",
+        "fps": "Literal[16, 24]",
+        "duration": "Literal[5, 10]"
+      },
+      "outputs": "task_id (str)",
+      "reuse_level": "B",
+      "score": 65,
+      "target_module": "providers/toapis/SeedanceAdapter.createTask()",
+      "required_changes": [
+        "**关键**：URL 从 https://yunwu.ai/volc/v1/contents/generations/tasks 改为 ToAPIs 官方 Seedance 端点",
+        "鉴权方式：Bearer Token → ToAPIs 签名或 API Key",
+        "请求格式验证：模型名称、参数格式是否与 ToAPIs 一致",
+        "错误码映射：yunwu.ai 错误码 → ToAPIs 错误码"
+      ],
+      "risks": [
+        "**高风险**：yunwu.ai 是第三方中转，不能用于生产",
+        "ToAPIs 接口可能有差异，需完整对接测试"
+      ],
+      "evidence": [
+        "文件路径: tools/video_generator_doubao_seedance_yunwu_api.py 第 29-130 行",
+        "第 59 行硬编码 yunwu.ai 地址",
+        "t2v / ff2v / flf2v 模型选择逻辑可复用",
+        "重试机制：max_create_attempts=3，指数退避"
+      ]
+    },
+    {
+      "priority": 12,
+      "source_file": "tools/video_generator_doubao_seedance_yunwu_api.py",
+      "symbols": ["query_video_generation_task"],
+      "callers": ["generate_single_video"],
+      "dependencies": ["aiohttp.ClientSession", "asyncio.sleep"],
+      "inputs": {
+        "task_id": "str"
+      },
+      "outputs": "video_url (str)",
+      "reuse_level": "B",
+      "score": 70,
+      "target_module": "providers/toapis/SeedanceAdapter.pollTask()",
+      "required_changes": [
+        "URL 改为 ToAPIs 端点",
+        "轮询逻辑保留：poll_interval=2s, max_poll_attempts=300",
+        "状态映射：succeeded / failed → ToAPIs 状态字段",
+        "错误处理：连续失败 5 次抛异常"
+      ],
+      "risks": ["轮询频率过高可能触发 ToAPIs 限流"],
+      "evidence": [
+        "文件路径: tools/video_generator_doubao_seedance_yunwu_api.py 第 132-184 行",
+        "轮询最多 300 次 × 2 秒 = 10 分钟超时",
+        "consecutive_errors 机制防止网络抖动"
+      ]
+    },
+    {
+      "priority": 13,
+      "source_file": "agents/storyboard_artist.py",
+      "symbols": ["StoryboardArtist.design_storyboard"],
+      "callers": ["pipelines/script2video_pipeline.py:design_storyboard"],
+      "dependencies": ["langchain_core.prompts.ChatPromptTemplate", "langchain_core.output_parsers.PydanticOutputParser"],
+      "inputs": {
+        "script": "str",
+        "characters": "List[CharacterInScene]",
+        "user_requirement": "str",
+        "retry_timeout": "int (默认 150s)"
+      },
+      "outputs": "List[ShotBriefDescription]",
+      "reuse_level": "B",
+      "score": 70,
+      "target_module": "services/StoryboardService.generate()",
+      "required_changes": [
+        "Langchain ChatPromptTemplate → 手动构造 FluAPI HTTP 请求",
+        "PydanticOutputParser → JSON Schema 约束 + 手动解析",
+        "Prompt 模板翻译为梧曜 Prompt 库",
+        "retry_timeout → @Retryable 注解或手动重试"
+      ],
+      "risks": [
+        "Prompt 工程质量直接影响分镜质量",
+        "LLM 输出格式校验"
+      ],
+      "evidence": [
+        "文件路径: agents/storyboard_artist.py 第 15-69 行（System Prompt）",
+        "Prompt 包含详细的电影语言指导（镜头类型、角度、构图）",
+        "强调角色名称一致性（用尖括号标记，如 <Alice>）"
+      ]
+    },
+    {
+      "priority": 14,
+      "source_file": "agents/storyboard_artist.py",
+      "symbols": ["StoryboardArtist.decompose_visual_descriptions"],
+      "callers": ["pipelines/script2video_pipeline.py:decompose_visual_descriptions"],
+      "dependencies": ["langchain", "pydantic"],
+      "inputs": {
+        "shot_brief_desc": "ShotBriefDescription",
+        "characters": "List[CharacterInScene]",
+        "retry_timeout": "int"
+      },
+      "outputs": "ShotDescription (包含 ff_desc, lf_desc, motion_desc)",
+      "reuse_level": "B",
+      "score": 70,
+      "target_module": "services/ShotService.decompose()",
+      "required_changes": [
+        "Langchain → FluAPI 调用",
+        "Prompt 翻译（System Prompt 第 73-110 行）",
+        "variation_type 分类逻辑保留"
+      ],
+      "risks": ["首帧/尾帧/运动描述拆解准确性依赖 LLM"],
+      "evidence": [
+        "文件路径: agents/storyboard_artist.py 第 73-122 行",
+        "关键设计：首帧和尾帧必须是静态快照，不能包含动作",
+        "variation_type 判断：large（构图巨变）/ medium（新角色出现）/ small（微小变化）"
+      ]
+    },
+    {
+      "priority": 15,
+      "source_file": "agents/reference_image_selector.py",
+      "symbols": ["ReferenceImageSelector.select_reference_images_and_generate_prompt"],
+      "callers": ["pipelines/script2video_pipeline.py:generate_frames_for_single_camera"],
+      "dependencies": ["langchain", "PIL.Image"],
+      "inputs": {
+        "available_image_path_and_text_pairs": "List[Tuple[str, str]] (可用参考图及描述)",
+        "frame_description": "str (目标帧描述)"
+      },
+      "outputs": {
+        "reference_image_path_and_text_pairs": "List[Tuple[str, str]] (选中的参考图)",
+        "text_prompt": "str (生成 Prompt)"
+      },
+      "reuse_level": "B",
+      "score": 65,
+      "target_module": "services/ReferenceImageService.select()",
+      "required_changes": [
+        "Langchain Vision 模型调用 → FluAPI Vision 接口",
+        "图片编码：PIL → base64 或 URL",
+        "选择算法：LLM 打分 → 保留逻辑"
+      ],
+      "risks": ["参考图选择质量影响最终生成效果"],
+      "evidence": [
+        "文件路径: agents/reference_image_selector.py",
+        "核心逻辑：从多个候选参考图中选择最相关的",
+        "生成的 Prompt 组合参考图描述和目标帧描述"
+      ]
+    },
+    {
+      "priority": 16,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["construct_camera_tree"],
+      "callers": ["Script2VideoPipeline.__call__"],
+      "dependencies": ["agents.CameraImageGenerator.construct_camera_tree"],
+      "inputs": {
+        "shot_descriptions": "List[ShotDescription]"
+      },
+      "outputs": "List[Camera] (摄像机树)",
+      "reuse_level": "B",
+      "score": 70,
+      "target_module": "services/CameraTreeService.construct()",
+      "required_changes": [
+        "LLM 调用改为 FluAPI",
+        "树结构构建逻辑保留",
+        "parent_shot_idx 依赖关系验证"
+      ],
+      "risks": ["摄像机树构建失败会导致重复生成参考图"],
+      "evidence": [
+        "文件路径: pipelines/script2video_pipeline.py 第 590-612 行",
+        "先按 cam_idx 分组，再调用 LLM 构建父子关系",
+        "优化目标：复用父镜头首帧作为子镜头参考"
+      ]
+    },
+    {
+      "priority": 17,
+      "source_file": "pipelines/idea2video_pipeline.py",
+      "symbols": ["Idea2VideoPipeline.__call__"],
+      "callers": ["main_idea2video.py"],
+      "dependencies": [
+        "agents.Screenwriter",
+        "agents.CharacterExtractor",
+        "agents.CharacterPortraitsGenerator",
+        "pipelines.Script2VideoPipeline"
+      ],
+      "inputs": {
+        "idea": "str (用户创意)",
+        "user_requirement": "str",
+        "style": "str"
+      },
+      "outputs": "final_video_path",
+      "reuse_level": "B",
+      "score": 70,
+      "target_module": "workflows/video_creation/IdeaToVideoWorkflow.java",
+      "required_changes": [
+        "流程保留：idea → story → script → scenes → videos → concat",
+        "Screenwriter.develop_story() → FluAPI 调用",
+        "Screenwriter.write_script_based_on_story() → FluAPI 调用",
+        "每个场景调用 Script2VideoPipeline"
+      ],
+      "risks": ["Idea → Story → Script 质量依赖 LLM Prompt 工程"],
+      "evidence": [
+        "文件路径: pipelines/idea2video_pipeline.py 第 223-271 行",
+        "多场景支持：遍历 scene_scripts，每个场景独立生成视频",
+        "最终拼接所有场景视频"
+      ]
+    },
+    {
+      "priority": 18,
+      "source_file": "utils/video.py",
+      "symbols": ["download_video"],
+      "callers": ["interfaces/video_output.py:VideoOutput.save_url"],
+      "dependencies": ["requests", "utils.retry.download_retry"],
+      "inputs": {
+        "url": "str",
+        "save_path": "str"
+      },
+      "outputs": "None (下载到本地)",
+      "reuse_level": "B",
+      "score": 60,
+      "target_module": "services/MediaDownloadService.download()",
+      "required_changes": [
+        "requests → OkHttp 或 RestTemplate",
+        "@download_retry 装饰器 → @Retryable 注解",
+        "流式下载逻辑保留（iter_content(chunk_size=8192)）"
+      ],
+      "risks": ["大文件下载超时"],
+      "evidence": [
+        "文件路径: utils/video.py 第 8-23 行",
+        "timeout=(10, 300)：连接超时 10s，读超时 300s",
+        "使用 @download_retry 装饰器自动重试"
+      ]
+    },
+    {
+      "priority": 19,
+      "source_file": "agents/character_extractor.py",
+      "symbols": ["CharacterExtractor.extract_characters"],
+      "callers": [
+        "pipelines/script2video_pipeline.py:extract_characters",
+        "pipelines/idea2video_pipeline.py:extract_characters"
+      ],
+      "dependencies": ["langchain"],
+      "inputs": {
+        "script": "str (剧本或故事)"
+      },
+      "outputs": "List[CharacterInScene]",
+      "reuse_level": "B",
+      "score": 65,
+      "target_module": "services/CharacterService.extract()",
+      "required_changes": [
+        "Langchain → FluAPI 调用",
+        "Prompt 翻译",
+        "输出格式：JSON Schema 约束"
+      ],
+      "risks": ["角色识别准确性"],
+      "evidence": [
+        "文件路径: agents/character_extractor.py",
+        "提取角色的静态特征（面部、体型）和动态特征（服装）"
+      ]
+    },
+    {
+      "priority": 20,
+      "source_file": "tools/render_backend.py",
+      "symbols": ["RenderBackend.from_config"],
+      "callers": [
+        "pipelines/idea2video_pipeline.py:init_from_config",
+        "pipelines/script2video_pipeline.py:init_from_config"
+      ],
+      "dependencies": ["importlib", "utils.rate_limiter.RateLimiter"],
+      "inputs": {
+        "config": "Dict (YAML 配置)"
+      },
+      "outputs": "RenderBackend (包含 image_generator 和 video_generator)",
+      "reuse_level": "B",
+      "score": 65,
+      "target_module": "providers/ProviderFactory.java",
+      "required_changes": [
+        "importlib.import_module() → Spring Bean Factory 或 Java Reflection",
+        "class_path 动态加载 → @Component 自动扫描",
+        "RateLimiter → Guava RateLimiter 或 Resilience4j"
+      ],
+      "risks": ["动态加载类的安全性"],
+      "evidence": [
+        "文件路径: tools/render_backend.py 第 23-45 行",
+        "配置驱动实例化：image_generator.class_path → 动态加载类",
+        "支持 max_requests_per_minute / max_requests_per_day 限流"
+      ]
+    },
+    {
+      "priority": 21,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["plan_text_artifacts"],
+      "callers": ["Agent Loop 工作流"],
+      "dependencies": ["所有 Agent"],
+      "inputs": {
+        "script": "str",
+        "user_requirement": "str",
+        "style": "str",
+        "characters": "Optional[List[CharacterInScene]]"
+      },
+      "outputs": {
+        "characters": "List[CharacterInScene]",
+        "storyboard": "List[ShotBriefDescription]",
+        "shot_descriptions": "List[ShotDescription]",
+        "camera_tree": "List[Camera]"
+      },
+      "reuse_level": "C",
+      "score": 60,
+      "target_module": "无需迁移（前端已有交互）",
+      "required_changes": ["思想参考：分离文本规划和渲染执行"],
+      "risks": ["无"],
+      "evidence": [
+        "文件路径: pipelines/script2video_pipeline.py 第 108-176 行",
+        "设计用途：Agent Loop 交互时，先生成文本计划供用户审阅",
+        "梧曜前端已有创作工作区，可直接展示分镜"
+      ]
+    },
+    {
+      "priority": 22,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["本地文件断点恢复机制"],
+      "callers": ["所有生成方法"],
+      "dependencies": ["os.path.exists"],
+      "inputs": "文件路径",
+      "outputs": "如果文件存在则跳过生成",
+      "reuse_level": "C",
+      "score": 55,
+      "target_module": "思想参考：数据库状态字段",
+      "required_changes": [
+        "if os.path.exists(path) → if shot.status == COMPLETED",
+        "JSON 文件 → PostgreSQL 表",
+        "工作目录 → 对象存储"
+      ],
+      "risks": ["状态迁移复杂"],
+      "evidence": [
+        "遍布所有生成方法",
+        "例如：storyboard.json 存在则加载，否则生成"
+      ]
+    },
+    {
+      "priority": 23,
+      "source_file": "pipelines/script2video_pipeline.py",
+      "symbols": ["asyncio.Event 同步机制"],
+      "callers": ["generate_frames_for_single_camera", "generate_video_for_single_shot"],
+      "dependencies": ["asyncio.Event"],
+      "inputs": "event.wait() / event.set()",
+      "outputs": "任务间依赖同步",
+      "reuse_level": "C",
+      "score": 50,
+      "target_module": "思想参考：任务依赖表",
+      "required_changes": [
+        "self.frame_events[shot_idx]['first_frame'].wait() → 查询数据库 shot.first_frame_status",
+        "event.set() → 更新数据库状态",
+        "跨 Worker 同步：数据库轮询或消息通知"
+      ],
+      "risks": ["数据库轮询频率过高"],
+      "evidence": [
+        "文件路径: pipelines/script2video_pipeline.py 第 502-504 行",
+        "视频生成等待首帧/尾帧完成"
+      ]
+    },
+    {
+      "priority": 24,
+      "source_file": "working_dir 目录结构",
+      "symbols": ["working_dir/{scene_idx}/shots/{shot_idx}/"],
+      "callers": ["所有 Pipeline"],
+      "dependencies": ["os.makedirs"],
+      "inputs": "working_dir 根路径",
+      "outputs": "层级目录",
+      "reuse_level": "C",
+      "score": 50,
+      "target_module": "思想参考：对象存储路径规范",
+      "required_changes": [
+        "本地路径 → 对象存储路径：{bucket}/{tenant_id}/{project_id}/shots/{shot_idx}/first_frame.png"
+      ],
+      "risks": ["无"],
+      "evidence": [
+        "例如：.working_dir/scene_0/shots/0/first_frame.png"
+      ]
+    },
+    {
+      "priority": 25,
+      "source_file": "agents/storyboard_artist.py",
+      "symbols": ["System Prompt 模板"],
+      "callers": ["design_storyboard", "decompose_visual_descriptions"],
+      "dependencies": ["langchain_core.prompts.ChatPromptTemplate"],
+      "inputs": "script, characters, user_requirement",
+      "outputs": "Prompt 字符串",
+      "reuse_level": "C",
+      "score": 65,
+      "target_module": "思想参考：梧曜 Prompt 库",
+      "required_changes": [
+        "Langchain 模板语法 → 手动字符串替换或模板引擎（Thymeleaf/FreeMarker）",
+        "翻译为梧曜业务术语"
+      ],
+      "risks": ["Prompt 质量直接影响分镜质量"],
+      "evidence": [
+        "文件路径: agents/storyboard_artist.py 第 15-69 行",
+        "包含详细的电影语言指导（镜头类型、角度、运动）"
+      ]
+    },
+    {
+      "priority": 26,
+      "source_file": "main_agent.py",
+      "symbols": ["Agent Loop 交互逻辑"],
+      "callers": ["TUI / Web UI"],
+      "dependencies": ["agent_runtime"],
+      "inputs": "用户对话",
+      "outputs": "Agent 响应",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用（梧曜前端已有交互）",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["桌面端 Agent Loop，梧曜用 Vue 前端交互"]
+    },
+    {
+      "priority": 27,
+      "source_file": "agent_runtime/",
+      "symbols": ["会话管理、上下文压缩"],
+      "callers": ["Agent Loop"],
+      "dependencies": ["多个模块"],
+      "inputs": "会话历史",
+      "outputs": "压缩后上下文",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["桌面端特性"]
+    },
+    {
+      "priority": 28,
+      "source_file": "web/",
+      "symbols": ["ViMax Web UI"],
+      "callers": ["前端"],
+      "dependencies": ["Node.js"],
+      "inputs": "用户交互",
+      "outputs": "前端界面",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用（梧曜已有 Vue 前端）",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["ViMax 自带前端"]
+    },
+    {
+      "priority": 29,
+      "source_file": "vimax_benchmark/",
+      "symbols": ["评测工具"],
+      "callers": ["测试脚本"],
+      "dependencies": ["多个模块"],
+      "inputs": "测试数据",
+      "outputs": "评测报告",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["非生产链路"]
+    },
+    {
+      "priority": 30,
+      "source_file": "ui/",
+      "symbols": ["TUI 界面"],
+      "callers": ["CLI"],
+      "dependencies": ["终端库"],
+      "inputs": "键盘输入",
+      "outputs": "终端界面",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["非 Web 场景"]
+    },
+    {
+      "priority": 31,
+      "source_file": "所有硬编码本地路径",
+      "symbols": ["working_dir, character_dir, shot_dir"],
+      "callers": ["所有 Pipeline"],
+      "dependencies": ["os.path.join"],
+      "inputs": "本地路径",
+      "outputs": "文件操作",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "必须重写为对象存储",
+      "required_changes": ["本地路径 → MinIO/COS URL"],
+      "risks": ["高"],
+      "evidence": ["无租户隔离"]
+    },
+    {
+      "priority": 32,
+      "source_file": "utils/provider_presets.py",
+      "symbols": ["OpenRouter 预设配置"],
+      "callers": ["配置文件"],
+      "dependencies": ["配置字典"],
+      "inputs": "provider 名称",
+      "outputs": "预设配置",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用（梧曜用 FluAPI/ToAPIs）",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["梧曜不使用 OpenRouter"]
+    },
+    {
+      "priority": 33,
+      "source_file": "tests/",
+      "symbols": ["ViMax 测试用例"],
+      "callers": ["pytest"],
+      "dependencies": ["pytest"],
+      "inputs": "测试场景",
+      "outputs": "测试结果",
+      "reuse_level": "D",
+      "score": 0,
+      "target_module": "不复用（测试场景不同）",
+      "required_changes": ["无"],
+      "risks": ["无"],
+      "evidence": ["桌面端测试"]
+    }
+  ],
+  "summary": {
+    "top_5_candidates": [
+      {
+        "rank": 1,
+        "module": "interfaces/shot_description.py:ShotDescription",
+        "score": 95,
+        "level": "A",
+        "value": "视频镜头核心数据模型，包含首帧/尾帧/运动描述"
+      },
+      {
+        "rank": 2,
+        "module": "tools/protocols.py:ImageGenerator/VideoGenerator",
+        "score": 95,
+        "level": "A",
+        "value": "Provider 协议抽象，解耦业务逻辑与供应商调用"
+      },
+      {
+        "rank": 3,
+        "module": "interfaces/character.py:CharacterInScene",
+        "score": 90,
+        "level": "A",
+        "value": "角色一致性追踪数据模型"
+      },
+      {
+        "rank": 4,
+        "module": "interfaces/camera.py:Camera",
+        "score": 85,
+        "level": "A",
+        "value": "摄像机树结构，优化参考图生成"
+      },
+      {
+        "rank": 5,
+        "module": "utils/video.py:concatenate_video_files",
+        "score": 85,
+        "level": "A",
+        "value": "FFmpeg 视频拼接逻辑，确保进程清理"
+      }
+    ],
+    "must_rewrite_modules": [
+      "租户隔离与权限（Spring Security + RBAC）",
+      "商家资料快照（聚合 Merchant/Store/Brand 数据）",
+      "持久化任务队列（RabbitMQ + 数据库状态表）",
+      "对象存储集成（MinIO/COS/TOS）",
+      "幂等性与成本控制（Redis 幂等键 + 数据库事务）",
+      "RESTful API 层（Controller + DTO）",
+      "任务恢复机制（服务重启后恢复）",
+      "质检工作流（分辨率/时长/内容审核）"
+    ],
+    "estimated_effort": {
+      "a_level_direct_reuse": "15 小时",
+      "b_level_adaptation": "210 小时",
+      "must_rewrite": "300 小时",
+      "total": "525 小时（约 13 周，2 名后端工程师）"
+    },
+    "key_risks": [
+      "ToAPIs Seedance 官方端点与 yunwu.ai 差异需验证",
+      "本地文件状态管理迁移到数据库复杂度中等",
+      "多镜头并发可能触发 API 限流",
+      "Prompt 工程质量直接影响视频质量"
+    ],
+    "license_risk": "低（MIT 许可，允许商业使用和修改）"
+  }
+}
