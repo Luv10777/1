@@ -3,7 +3,7 @@ package com.wuyao.vimax.controller;
 import com.wuyao.vimax.dto.ApiResponse;
 import com.wuyao.vimax.dto.MerchantFactSnapshotResponse;
 import com.wuyao.vimax.entity.MerchantFactSnapshot;
-import com.wuyao.vimax.service.MerchantFactSnapshotService;
+import com.wuyao.vimax.service.MerchantSnapshotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MerchantFactSnapshotController {
 
-    private final MerchantFactSnapshotService snapshotService;
+    private final MerchantSnapshotService snapshotService;
 
     /**
      * 生成商家事实快照
