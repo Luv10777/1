@@ -3,12 +3,13 @@ package com.wuyao.vimax.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
  * 生成任务表
+ * 对应 SQL: infra/database/004_video_workflow_core.sql
  */
 @Entity
 @Table(name = "generation_tasks")
@@ -22,62 +23,46 @@ public class GenerationTask {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId = 1L;
 
-    @Column(name = "video_project_id", nullable = false)
-    private Long videoProjectId;
+    @Column(name = "workflow_run_id", nullable = false)
+    private Long workflowRunId;
 
-    @Column(name = "step_number", nullable = false)
-    private Integer stepNumber;
+    @Column(name = "step_id")
+    private Long stepId;
 
-    @Column(name = "step_name", length = 100, nullable = false)
-    private String stepName;
+    @Column(name = "idempotency_key", length = 100, nullable = false, unique = true)
+    private String idempotencyKey;
 
-    @Column(name = "step_type", length = 50, nullable = false)
-    private String stepType;
+    @Column(name = "task_type", length = 50, nullable = false)
+    private String taskType;
 
-    @Column(name = "input_data", columnDefinition = "JSONB")
-    private String inputData;
+    @Column(name = "model_capability", length = 50, nullable = false)
+    private String modelCapability;
 
-    @Column(name = "output_data", columnDefinition = "JSONB")
-    private String outputData;
+    @Column(name = "input_hash", length = 64, nullable = false)
+    private String inputHash;
 
-    @Column(name = "status", length = 50, nullable = false)
+    @Column(name = "status", length = 50)
     private String status = "PENDING";
 
-    @Column(name = "retry_count")
-    private Integer retryCount = 0;
+    @Column(name = "provider_request_id", length = 200)
+    private String providerRequestId;
 
-    @Column(name = "max_retries")
-    private Integer maxRetries = 3;
+    @Column(name = "provider_job_id", length = 200)
+    private String providerJobId;
 
-    @Column(name = "error_message", columnDefinition = "TEXT")
-    private String errorMessage;
+    @Column(name = "result_ref", length = 500)
+    private String resultRef;
+
+    @Column(name = "estimated_cost", precision = 10, scale = 4)
+    private BigDecimal estimatedCost;
+
+    @Column(name = "actual_cost", precision = 10, scale = 4)
+    private BigDecimal actualCost;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @Column(name = "started_at")
-    private LocalDateTime startedAt;
-
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
-
-    @Column(name = "requires_human_review")
-    private Boolean requiresHumanReview = false;
-
-    @Column(name = "human_reviewed_at")
-    private LocalDateTime humanReviewedAt;
-
-    @Column(name = "human_reviewed_by")
-    private Long humanReviewedBy;
-
-    @Column(name = "human_review_result", length = 20)
-    private String humanReviewResult;
-
-    @Column(name = "human_review_comment", columnDefinition = "TEXT")
-    private String humanReviewComment;
 }

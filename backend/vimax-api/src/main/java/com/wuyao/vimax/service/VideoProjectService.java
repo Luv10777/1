@@ -25,14 +25,14 @@ public class VideoProjectService {
      */
     @Transactional
     public VideoProject createProject(Long merchantId, String projectName,
-                                     String userInput, Long userId) {
+                                     String brief, Long userId) {
         log.info("创建视频项目: merchantId={}, name={}", merchantId, projectName);
 
         VideoProject project = new VideoProject();
         project.setMerchantId(merchantId);
         project.setProjectCode(generateProjectCode());
-        project.setProjectName(projectName);
-        project.setUserInput(userInput);
+        project.setName(projectName);
+        project.setBrief(brief);
         project.setStatus("DRAFT");
         project.setCreatedBy(userId);
 

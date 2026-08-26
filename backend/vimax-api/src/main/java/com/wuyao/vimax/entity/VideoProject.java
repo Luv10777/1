@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * 视频项目表
+ * 对应 SQL: infra/database/004_video_workflow_core.sql
  */
 @Entity
 @Table(name = "video_projects")
@@ -25,32 +26,35 @@ public class VideoProject {
     @Column(name = "merchant_id", nullable = false)
     private Long merchantId;
 
-    @Column(name = "project_code", length = 64, nullable = false, unique = true)
+    @Column(name = "project_code", length = 50, nullable = false, unique = true)
     private String projectCode;
 
-    @Column(name = "project_name", length = 200, nullable = false)
-    private String projectName;
+    @Column(name = "name", length = 200, nullable = false)
+    private String name;
 
-    @Column(name = "project_type", length = 50)
-    private String projectType;
+    @Column(name = "brief", columnDefinition = "TEXT", nullable = false)
+    private String brief;
 
-    @Column(name = "merchant_snapshot_id")
-    private Long merchantSnapshotId;
+    @Column(name = "target_platform", length = 50)
+    private String targetPlatform;
 
-    @Column(name = "user_input", columnDefinition = "TEXT")
-    private String userInput;
+    @Column(name = "aspect_ratio", length = 20)
+    private String aspectRatio;
 
-    @Column(name = "requirements", columnDefinition = "JSONB")
-    private String requirements;
+    @Column(name = "target_duration_seconds")
+    private Integer targetDurationSeconds;
 
-    @Column(name = "status", length = 50, nullable = false)
+    @Column(name = "video_count")
+    private Integer videoCount = 1;
+
+    @Column(name = "quality_mode", length = 20)
+    private String qualityMode = "STANDARD";
+
+    @Column(name = "status", length = 30, nullable = false)
     private String status = "DRAFT";
 
-    @Column(name = "current_step")
-    private Integer currentStep;
-
-    @Column(name = "progress")
-    private Integer progress = 0;
+    @Column(name = "created_by", nullable = false)
+    private Long createdBy;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -59,12 +63,6 @@ public class VideoProject {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @Column(name = "created_by")
-    private Long createdBy;
-
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;

@@ -5,10 +5,12 @@ import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
  * 工作流运行表
+ * 对应 SQL: infra/database/004_video_workflow_core.sql
  */
 @Entity
 @Table(name = "workflow_runs")
@@ -22,20 +24,44 @@ public class WorkflowRun {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId = 1L;
 
-    @Column(name = "video_project_id", nullable = false)
-    private Long videoProjectId;
+    @Column(name = "project_id", nullable = false)
+    private Long projectId;
 
-    @Column(name = "run_id", length = 50, nullable = false, unique = true)
-    private String runId;
+    @Column(name = "run_code", length = 50, nullable = false, unique = true)
+    private String runCode;
 
-    @Column(name = "status", length = 50, nullable = false)
-    private String status = "RUNNING";
+    @Column(name = "workflow_type", length = 50, nullable = false)
+    private String workflowType;
 
-    @Column(name = "current_step_name", length = 100)
-    private String currentStepName;
+    @Column(name = "merchant_fact_snapshot_id")
+    private Long merchantFactSnapshotId;
 
-    @Column(name = "paused_for_human_review")
-    private Boolean pausedForHumanReview = false;
+    @Column(name = "state", length = 50, nullable = false)
+    private String state = "DRAFT";
+
+    @Column(name = "progress")
+    private Integer progress = 0;
+
+    @Column(name = "estimated_cost_credits", precision = 10, scale = 2)
+    private BigDecimal estimatedCostCredits;
+
+    @Column(name = "reserved_credits", precision = 10, scale = 2)
+    private BigDecimal reservedCredits;
+
+    @Column(name = "actual_cost_credits", precision = 10, scale = 2)
+    private BigDecimal actualCostCredits;
+
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "failed_at")
+    private LocalDateTime failedAt;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
@@ -47,10 +73,4 @@ public class WorkflowRun {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
-
-    @Column(name = "failed_at")
-    private LocalDateTime failedAt;
 }
