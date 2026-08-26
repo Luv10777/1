@@ -1,12 +1,11 @@
 package com.wuyao.vimax.controller;
 
 import com.wuyao.vimax.dto.ApiResponse;
-import com.wuyao.vimax.dto.CreateAssetRequest;
 import com.wuyao.vimax.dto.GetUploadUrlRequest;
+import com.wuyao.vimax.dto.ConfirmUploadRequest;
 import com.wuyao.vimax.dto.UploadUrlResponse;
 import com.wuyao.vimax.entity.Asset;
 import com.wuyao.vimax.service.AssetService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +14,8 @@ import java.util.List;
 
 /**
  * 资产管理 Controller
+ *
+ * Phase 7: 前端集成API
  */
 @RestController
 @RequestMapping("/assets")
@@ -25,68 +26,75 @@ public class AssetController {
     private final AssetService assetService;
 
     /**
-     * 获取预签名上传 URL
+     * 获取上传URL
      */
     @PostMapping("/upload-url")
     public ApiResponse<UploadUrlResponse> getUploadUrl(
-            @Valid @RequestBody GetUploadUrlRequest request,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+            @RequestBody GetUploadUrlRequest request,
+            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId) {
 
-        log.info("收到上传 URL 请求：fileName={}, fileType={}", request.getFileName(), request.getFileType());
+        log.info("获取上传URL: fileName={}", request.getFileName());
 
         UploadUrlResponse response = assetService.getUploadUrl(request, userId);
-        return ApiResponse.success("上传 URL 生成成功", response);
+        return ApiResponse.success(response);
     }
 
     /**
-     * 创建资产记录
+     * 确认上传
      */
-    @PostMapping
-    public ApiResponse<Asset> createAsset(
-            @Valid @RequestBody CreateAssetRequest request,
-            @RequestParam String fileType,
-            @RequestParam String mimeType,
-            @RequestParam Long fileSize,
-            @RequestParam(required = false) Long merchantId,
-            @RequestHeader(value = "X-User-Id", required = false, defaultValue = "1") Long userId) {
+    @PostMapping("/confirm-upload")
+    public ApiResponse<Asset> confirmUpload(
+            @RequestBody ConfirmUploadRequest request,
+            @RequestHeader(value = "X-User-Id", defaultValue = "1") Long userId) {
 
-        log.info("创建资产记录：assetCode={}, name={}", request.getAssetCode(), request.getName());
+        log.info("确认上传: objectKey={}", request.getObjectKey());
 
-        Asset asset = assetService.createAsset(
-                request.getAssetCode(),
-                request.getName(),
-                fileType,
-                mimeType,
-                fileSize,
-                merchantId,
-                userId
+        Asset asset = assetService.confirmUpload(
+            request.getObjectKey(),
+            request.getAssetType(),
+            request.getAssetCategory(),
+            request.getFileName(),
+            userId
         );
 
-        return ApiResponse.success("资产创建成功", asset);
+        return ApiResponse.success(asset);
     }
 
     /**
-     * 查询资产列表
+     * 获取下载URL
      */
-    @GetMapping
-    public ApiResponse<List<Asset>> getAssets(
-            @RequestParam(required = false) Long merchantId,
-            @RequestParam(required = false) String type) {
+    @GetMapping("/{assetId}/download-url")
+    public ApiResponse<String> getDownloadUrl(@PathVariable Long assetId) {
+        log.info("获取下载URL: assetId={}", assetId);
 
-        log.info("查询资产列表：merchantId={}, type={}", merchantId, type);
-
-        List<Asset> assets = assetService.getAssetsByMerchant(merchantId, type);
-        return ApiResponse.success(assets);
+        String downloadUrl = assetService.getAssetDownloadUrl(assetId);
+        return ApiResponse.success(downloadUrl);
     }
 
     /**
      * 删除资产
      */
     @DeleteMapping("/{assetId}")
-    public ApiResponse<Void> deleteAsset(@PathVariable Long assetId) {
-        log.info("删除资产：assetId={}", assetId);
+    public ApiResponse<String> deleteAsset(@PathVariable Long assetId) {
+        log.info("删除资产: assetId={}", assetId);
 
         assetService.deleteAsset(assetId);
-        return ApiResponse.success("资产删除成功", null);
+        return ApiResponse.success("资产已删除");
+    }
+
+    /**
+     * 获取资产列表
+     */
+    @GetMapping
+    public ApiResponse<List<Asset>> listAssets(
+            @RequestParam(required = false) String assetType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+
+        log.info("获取资产列表: type={}, page={}, size={}", assetType, page, size);
+
+        // TODO: 实现分页查询
+        List<Asset> assets = List.of(); // 临时返回空列表
+        return ApiResponse.success(assets);
     }
 }
