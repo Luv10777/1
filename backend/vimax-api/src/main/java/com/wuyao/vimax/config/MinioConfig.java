@@ -2,6 +2,7 @@ package com.wuyao.vimax.config;
 
 import io.minio.MinioClient;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "minio")
 @Data
+@Slf4j
 public class MinioConfig {
 
     private String endpoint = "http://localhost:9000";
@@ -23,9 +25,15 @@ public class MinioConfig {
 
     @Bean
     public MinioClient minioClient() {
+        log.info("初始化 MinIO 客户端: endpoint={}", endpoint);
         return MinioClient.builder()
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
                 .build();
+    }
+
+    @Bean
+    public String minioBucket() {
+        return bucketAssets;
     }
 }
