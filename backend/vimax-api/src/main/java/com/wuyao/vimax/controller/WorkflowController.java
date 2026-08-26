@@ -47,11 +47,11 @@ public class WorkflowController {
      * 启动工作流
      */
     @PostMapping("/projects/{projectId}/start")
-    public ApiResponse<WorkflowRun> startWorkflow(@PathVariable Long projectId) {
+    public ApiResponse<String> startWorkflow(@PathVariable Long projectId) {
         log.info("启动工作流: projectId={}", projectId);
 
-        WorkflowRun run = workflowEngineService.startWorkflow(projectId);
-        return ApiResponse.success("工作流已启动", run);
+        workflowEngineService.startWorkflow(projectId);
+        return ApiResponse.success("工作流已启动");
     }
 
     /**
