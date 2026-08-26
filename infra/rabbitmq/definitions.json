@@ -1,0 +1,208 @@
+{
+  "rabbit_version": "3.13.0",
+  "rabbitmq_version": "3.13.0",
+  "product_name": "RabbitMQ",
+  "users": [
+    {
+      "name": "wuyao_admin",
+      "password_hash": "placeholder_will_be_set_by_env",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "wuyao"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "wuyao_admin",
+      "vhost": "wuyao",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "workflow.exchange",
+      "vhost": "wuyao",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "workflow.dlx",
+      "vhost": "wuyao",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
+    }
+  ],
+  "queues": [
+    {
+      "name": "workflow.planning",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.planning.dead",
+        "x-message-ttl": 3600000
+      }
+    },
+    {
+      "name": "workflow.reference-generation",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.reference-generation.dead"
+      }
+    },
+    {
+      "name": "workflow.reference-selection",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.reference-selection.dead"
+      }
+    },
+    {
+      "name": "workflow.video-submission",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.video-submission.dead"
+      }
+    },
+    {
+      "name": "workflow.video-monitoring",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.video-monitoring.dead"
+      }
+    },
+    {
+      "name": "workflow.quality",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.quality.dead"
+      }
+    },
+    {
+      "name": "workflow.composition",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.composition.dead"
+      }
+    },
+    {
+      "name": "workflow.finalization",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.dlx",
+        "x-dead-letter-routing-key": "workflow.finalization.dead"
+      }
+    },
+    {
+      "name": "workflow.planning.retry",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "workflow.exchange",
+        "x-dead-letter-routing-key": "workflow.planning",
+        "x-message-ttl": 60000
+      }
+    },
+    {
+      "name": "workflow.dead-letter",
+      "vhost": "wuyao",
+      "durable": true,
+      "auto_delete": false
+    }
+  ],
+  "bindings": [
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.planning",
+      "destination_type": "queue",
+      "routing_key": "workflow.planning"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.reference-generation",
+      "destination_type": "queue",
+      "routing_key": "workflow.reference.generation"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.reference-selection",
+      "destination_type": "queue",
+      "routing_key": "workflow.reference.selection"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.video-submission",
+      "destination_type": "queue",
+      "routing_key": "workflow.video.submission"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.video-monitoring",
+      "destination_type": "queue",
+      "routing_key": "workflow.video.monitoring"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.quality",
+      "destination_type": "queue",
+      "routing_key": "workflow.quality.#"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.composition",
+      "destination_type": "queue",
+      "routing_key": "workflow.composition"
+    },
+    {
+      "source": "workflow.exchange",
+      "vhost": "wuyao",
+      "destination": "workflow.finalization",
+      "destination_type": "queue",
+      "routing_key": "workflow.finalization"
+    },
+    {
+      "source": "workflow.dlx",
+      "vhost": "wuyao",
+      "destination": "workflow.dead-letter",
+      "destination_type": "queue",
+      "routing_key": "#"
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # PostgreSQL 数据库
+  # ============================================================================
+  postgres:
+    image: postgres:14-alpine
+    container_name: wuyao-postgres
+    environment:
+      POSTGRES_DB: wuyao_nexus
+      POSTGRES_USER: wuyao_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wuyao_dev_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.utf8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wuyao_user -d wuyao_nexus"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wuyao-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # Redis 缓存和分布式锁
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: wuyao-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-wuyao_redis_password} --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - wuyao-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # RabbitMQ 消息队列
+  # ============================================================================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: wuyao-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-wuyao_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-wuyao_rabbitmq_password}
+      RABBITMQ_DEFAULT_VHOST: wuyao
+      RABBITMQ_MANAGEMENT_ALLOW_WEB_ACCESS: "true"
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - wuyao-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # MinIO 对象存储
+  # ============================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: wuyao-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-wuyao_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-wuyao_minio_password}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - wuyao-network
+    restart: unless-stopped
+
+  # MinIO Client - 初始化桶
+  minio-init:
+    image: minio/mc:latest
+    container_name: wuyao-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set wuyao http://minio:9000 ${MINIO_ROOT_USER:-wuyao_minio_admin} ${MINIO_ROOT_PASSWORD:-wuyao_minio_password};
+      mc mb --ignore-existing wuyao/wuyao-assets;
+      mc mb --ignore-existing wuyao/wuyao-temp;
+      mc mb --ignore-existing wuyao/wuyao-backups;
+      mc anonymous set download wuyao/wuyao-assets;
+      mc ilm add wuyao/wuyao-temp --expiry-days 7;
+      echo 'MinIO buckets initialized successfully';
+      "
+    networks:
+      - wuyao-network
+
+  # ============================================================================
+  # Spring Boot Platform API (暂时注释，等Java代码完善后启用)
+  # ============================================================================
+  # platform-api:
+  #   build:
+  #     context: ../server
+  #     dockerfile: Dockerfile
+  #   container_name: wuyao-platform-api
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: docker
+  #     DATABASE_URL: jdbc:postgresql://postgres:5432/wuyao_nexus
+  #     DATABASE_USERNAME: wuyao_user
+  #     DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-wuyao_dev_password}
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     REDIS_PASSWORD: ${REDIS_PASSWORD:-wuyao_redis_password}
+  #     RABBITMQ_HOST: rabbitmq
+  #     RABBITMQ_PORT: 5672
+  #     RABBITMQ_USERNAME: ${RABBITMQ_USER:-wuyao_admin}
+  #     RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-wuyao_rabbitmq_password}
+  #     RABBITMQ_VHOST: wuyao
+  #     MINIO_ENDPOINT: http://minio:9000
+  #     MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-wuyao_minio_admin}
+  #     MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-wuyao_minio_password}
+  #     JWT_SECRET: ${JWT_SECRET}
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+  #     minio:
+  #       condition: service_healthy
+  #   networks:
+  #     - wuyao-network
+  #   restart: unless-stopped
+
+  # ============================================================================
+  # Python AI Worker (暂时注释，等Python代码完善后启用)
+  # ============================================================================
+  # ai-worker:
+  #   build:
+  #     context: ../apps/ai-worker
+  #     dockerfile: Dockerfile
+  #   container_name: wuyao-ai-worker
+  #   environment:
+  #     PLATFORM_GATEWAY_URL: http://platform-api:8080
+  #     RABBITMQ_HOST: rabbitmq
+  #     RABBITMQ_PORT: 5672
+  #     RABBITMQ_USERNAME: ${RABBITMQ_USER:-wuyao_admin}
+  #     RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-wuyao_rabbitmq_password}
+  #     RABBITMQ_VHOST: wuyao
+  #     DATABASE_URL: postgresql://wuyao_user:${POSTGRES_PASSWORD:-wuyao_dev_password}@postgres:5432/wuyao_nexus
+  #   depends_on:
+  #     - platform-api
+  #     - rabbitmq
+  #     - postgres
+  #   networks:
+  #     - wuyao-network
+  #   restart: unless-stopped
+  #   deploy:
+  #     replicas: 2
+
+# ============================================================================
+# 网络
+# ============================================================================
+networks:
+  wuyao-network:
+    driver: bridge
+
+# ============================================================================
+# 数据卷
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  minio_data:
+    driver: local
