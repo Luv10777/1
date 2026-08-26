@@ -98,3 +98,39 @@
 .sidebar .account-copy strong{font-size:13px}
 .sidebar .account-copy small{font-size:11px}
 .sidebar .account-menu button{font-size:12px}
+
+/* Desktop scale: fluid gutters, bounded wide-screen content, and aligned shell chrome. */
+.main-area{--shell-inline:clamp(26px,3vw,64px)}
+.topbar{padding-inline:var(--shell-inline)}
+.topbar-inner{width:100%;max-width:1680px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between}
+.page-scroll{padding:clamp(28px,2.4vw,44px) var(--shell-inline) clamp(30px,2.5vw,42px)}
+.page-scroll>*{width:100%;max-width:1680px;margin-inline:auto}
+
+@media(max-width:1180px){
+  .main-area{--shell-inline:26px}
+  .page-scroll{padding-top:32px;padding-bottom:32px}
+}
+
+@media(max-width:640px){
+  .main-area{--shell-inline:17px}
+  .page-scroll{padding-top:25px;padding-bottom:28px}
+}
+
+/* Compact vertical rhythm for common 720p/768p laptop displays. */
+@media(max-height:800px) and (min-width:861px){
+  .brand-lockup{height:72px;flex-basis:72px;padding-inline:18px}
+  .tenant-switcher{margin-top:11px;margin-bottom:7px;padding-block:8px}
+  .nav-group{margin-block:4px 6px}
+  .nav-group-trigger{height:36px}
+  .nav-group-items .nav-item{min-height:38px}
+  .sidebar-footer{padding:11px 14px}
+  .status-capsule{padding:8px}
+  .account-wrap{margin-top:7px}
+  .account-button{padding-block:5px}
+  .topbar{height:60px;flex-basis:60px}
+  .page-scroll{padding-top:22px;padding-bottom:24px}
+  .page-heading{margin-bottom:22px}
+  .pulse-hero{min-height:220px;padding:26px 30px}
+  .metric-card{min-height:138px;padding:17px}
+  .panel{padding:20px}
+}
