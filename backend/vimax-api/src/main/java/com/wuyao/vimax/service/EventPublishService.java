@@ -32,7 +32,7 @@ public class EventPublishService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("snapshotId", snapshot.getId());
             payload.put("merchantId", snapshot.getMerchantId());
-            payload.put("snapshotHash", snapshot.getSnapshotHash());
+            payload.put("snapshotCode", snapshot.getSnapshotCode());
 
             outboxEventService.createEvent(
                 "SNAPSHOT_CREATED",
