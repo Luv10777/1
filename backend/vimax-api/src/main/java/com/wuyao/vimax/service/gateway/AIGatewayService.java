@@ -1,5 +1,6 @@
 package com.wuyao.vimax.service.gateway;
 
+import com.wuyao.vimax.config.APIKeyConfig;
 import com.wuyao.vimax.entity.ProviderJob;
 import com.wuyao.vimax.repository.ProviderJobRepository;
 import lombok.RequiredArgsConstructor;
@@ -43,8 +44,8 @@ public class AIGatewayService {
         job.setModelCapability(modelCapability);
 
         if ("FLUAPI".equals(provider)) {
-            // TODO: 从配置读取 API Key
-            String apiKey = "mock_api_key";
+            // 使用真实的 API Key
+            String apiKey = APIKeyConfig.getFluApiTextKey();
             String jobId = fluAPIAdapter.submitTextGeneration(prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
@@ -72,8 +73,8 @@ public class AIGatewayService {
         job.setModelCapability(modelCapability);
 
         if ("FLUAPI".equals(provider)) {
-            // TODO: 从配置读取 API Key
-            String apiKey = "mock_api_key";
+            // 使用真实的 API Key
+            String apiKey = APIKeyConfig.getFluApiImageKey();
             String jobId = fluAPIAdapter.submitImageGeneration(prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
@@ -101,8 +102,8 @@ public class AIGatewayService {
         job.setModelCapability(modelCapability);
 
         if ("TOAPIS".equals(provider)) {
-            // TODO: 从配置读取 API Key
-            String apiKey = "mock_api_key";
+            // 使用真实的 API Key
+            String apiKey = APIKeyConfig.getToApisKey();
             String jobId = toAPIsAdapter.submitVideoGeneration(imageUrl, prompt, modelCapability, apiKey);
             job.setProviderJobId(jobId);
         }
@@ -143,12 +144,13 @@ public class AIGatewayService {
         log.debug("检查任务状态：jobId={}, provider={}, providerJobId={}",
                 job.getId(), job.getProvider(), job.getProviderJobId());
 
-        // TODO: 从配置中读取 API Key
-        String apiKey = "mock_api_key";
-
+        // 使用真实的 API Key
+        String apiKey;
         if ("FLUAPI".equals(job.getProvider())) {
+            apiKey = APIKeyConfig.getFluApiTextKey();
             fluAPIAdapter.checkJobStatus(job, apiKey);
         } else if ("TOAPIS".equals(job.getProvider())) {
+            apiKey = APIKeyConfig.getToApisKey();
             toAPIsAdapter.checkJobStatus(job, apiKey);
         }
 
