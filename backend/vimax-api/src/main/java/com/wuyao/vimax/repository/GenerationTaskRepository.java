@@ -17,23 +17,15 @@ public interface GenerationTaskRepository extends JpaRepository<GenerationTask, 
     /**
      * 查询项目的所有任务
      */
-    List<GenerationTask> findByVideoProjectIdOrderByStepNumberAsc(Long videoProjectId);
+    List<GenerationTask> findByWorkflowRunIdOrderByCreatedAtAsc(Long workflowRunId);
 
     /**
-     * 查询项目的当前任务
+     * 根据输入哈希查找任务（幂等性）
      */
-    Optional<GenerationTask> findByVideoProjectIdAndStatus(Long videoProjectId, String status);
+    Optional<GenerationTask> findByInputHash(String inputHash);
 
     /**
-     * 查询待人工审核的任务
+     * 根据幂等性Key查找任务
      */
-    @Query("SELECT t FROM GenerationTask t WHERE t.requiresHumanReview = true " +
-           "AND t.status = 'WAITING_HUMAN_REVIEW' " +
-           "ORDER BY t.createdAt ASC")
-    List<GenerationTask> findPendingHumanReview();
-
-    /**
-     * 查询项目的特定步骤
-     */
-    Optional<GenerationTask> findByVideoProjectIdAndStepNumber(Long videoProjectId, Integer stepNumber);
+    Optional<GenerationTask> findByIdempotencyKey(String idempotencyKey);
 }
