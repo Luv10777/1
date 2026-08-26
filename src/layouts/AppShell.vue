@@ -216,14 +216,16 @@ const logout = () => {
 
     <main class="main-area">
       <header class="topbar">
-        <button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button>
-        <div class="breadcrumb"><span>梧曜星枢</span><span class="breadcrumb-slash">/</span><strong>{{ route.meta.title || '运营总览' }}</strong></div>
-        <div class="topbar-actions">
-          <ThemeToggle />
-          <button class="help-button" aria-label="帮助中心">?</button>
-          <span class="topbar-divider" />
-          <button class="notification-button" aria-label="通知"><span class="notification-dot" />◔</button>
-          <button class="top-account" @click="accountOpen = !accountOpen"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span>{{ auth.user?.name || '林知夏' }}</span><span class="chevron">⌄</span></button>
+        <div class="topbar-inner">
+          <button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button>
+          <div class="breadcrumb"><span>梧曜星枢</span><span class="breadcrumb-slash">/</span><strong>{{ route.meta.title || '运营总览' }}</strong></div>
+          <div class="topbar-actions">
+            <ThemeToggle />
+            <button class="help-button" aria-label="帮助中心">?</button>
+            <span class="topbar-divider" />
+            <button class="notification-button" aria-label="通知"><span class="notification-dot" />◔</button>
+            <button class="top-account" @click="accountOpen = !accountOpen"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span>{{ auth.user?.name || '林知夏' }}</span><span class="chevron">⌄</span></button>
+          </div>
         </div>
       </header>
       <div ref="pageScroll" class="page-scroll"><slot /></div>
