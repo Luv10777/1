@@ -17,7 +17,8 @@
 .app-frame{height:100vh;height:100dvh;min-height:0;overflow:hidden}
 .sidebar{height:100%;min-height:0}
 .brand-lockup{flex:0 0 86px}
-.primary-nav{min-height:0;flex:1;overscroll-behavior:contain}
+.primary-nav{min-height:0;flex:1;overscroll-behavior:contain;scrollbar-width:none;-ms-overflow-style:none}
+.primary-nav::-webkit-scrollbar{display:none}
 .sidebar-footer{flex:0 0 auto}
 .main-area{height:100%;display:flex;flex-direction:column;overflow:hidden}
 .topbar{flex:0 0 66px}
@@ -67,31 +68,34 @@
 @media(max-width:640px){.theme-toggle{min-width:30px;width:30px;padding:0}.theme-toggle-label{display:none}.auth-theme-toggle{width:auto;min-width:62px;padding:0 9px}.auth-theme-toggle .theme-toggle-label{display:inline}}
 
 /* Collapsible navigation hierarchy */
-.nav-group{margin:8px 0 10px}
+.primary-nav{padding:8px 12px 18px}
+.nav-group{margin:2px 0}
 .nav-group-trigger{width:100%;height:32px;display:flex;align-items:center;gap:7px;padding:0 10px;border:0;border-radius:7px;color:#67657a;background:transparent;text-align:left;transition:color .18s ease,background .18s ease}
 .nav-group-trigger:hover{color:var(--ink-soft);background:rgba(255,255,255,.035)}
 .nav-group.has-active-item>.nav-group-trigger{color:#9d98e7}
+.nav-group-direct.router-link-active{color:#fff;background:rgba(98,91,246,.18);box-shadow:inset 0 0 0 1px rgba(98,91,246,.22)}
 .nav-group-trigger .nav-group-label{min-width:0;flex:1;margin:0;color:inherit;font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase}
 .nav-group-chevron{width:14px;color:var(--ink-muted);font-size:14px;line-height:1;text-align:center;transform:rotate(-90deg);transition:transform .2s ease,color .18s ease}
 .nav-group-chevron.expanded{transform:rotate(0)}
 .nav-group-items{display:grid;grid-template-rows:0fr;opacity:0;visibility:hidden;transition:grid-template-rows .22s ease,opacity .18s ease,visibility 0s linear .22s}
 .nav-group-items.expanded{grid-template-rows:1fr;opacity:1;visibility:visible;transition-delay:0s}
-.nav-group-items-inner{min-height:0;margin-left:8px;padding-left:5px;overflow:hidden;border-left:1px solid var(--line)}
-.nav-group-items .nav-item{padding-left:8px}
+.nav-group-items-inner{min-height:0;margin-left:10px;padding:2px 0 6px 8px;overflow:hidden;border-left:1px solid var(--line)}
+.nav-group-items .nav-item{padding:0 10px 0 12px}
+.nav-item-label{min-width:0;line-height:1.35}
 [data-theme='light'] .nav-group-trigger{color:#8a8899}
 [data-theme='light'] .nav-group-trigger:hover{color:var(--ink-soft);background:rgba(89,82,232,.05)}
 [data-theme='light'] .nav-group.has-active-item>.nav-group-trigger{color:#5e57c9}
+[data-theme='light'] .nav-group-direct.router-link-active{color:#4c46cb;background:rgba(89,82,232,.11);box-shadow:inset 0 0 0 1px rgba(89,82,232,.18)}
 
 /* Sidebar typography: keep dense navigation readable on standard displays. */
 .sidebar .brand-name{font-size:17px}
 .sidebar .brand-caption{font-size:9px}
 .sidebar .tenant-copy .eyebrow{font-size:10px}
 .sidebar .tenant-copy strong{font-size:13px}
-.nav-group-trigger{height:40px}
+.nav-group-trigger{height:42px;padding-inline:12px}
 .nav-group-trigger .nav-group-label{font-size:14px;font-weight:600;letter-spacing:.05em}
 .nav-group-chevron{font-size:16px}
-.nav-group-items .nav-item{min-height:42px;font-size:14px}
-.nav-group-items .nav-glyph{font-size:16px}
+.nav-group-items .nav-item{min-height:38px;font-size:13px;font-weight:500}
 .sidebar .status-capsule .eyebrow{font-size:9.5px}
 .sidebar .status-capsule strong{font-size:12px}
 .sidebar .status-time{font-size:10px}
@@ -103,6 +107,21 @@
 .main-area{--shell-inline:clamp(26px,3vw,64px)}
 .topbar{padding-inline:var(--shell-inline)}
 .topbar-inner{width:100%;max-width:1680px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between}
+.topbar-actions{margin-left:auto}
+.route-tabs{min-width:0;flex:0 0 42px;padding-inline:var(--shell-inline);overflow:hidden;border-bottom:1px solid var(--line);background:rgba(9,10,20,.68)}
+.route-tabs-inner{width:100%;height:100%;max-width:1680px;margin-inline:auto;overflow:hidden}
+.route-tabs-track{height:100%;display:flex;align-items:flex-end;gap:5px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none;overscroll-behavior-x:contain}
+.route-tabs-track::-webkit-scrollbar{display:none}
+.route-tab{height:34px;display:flex;align-items:center;flex:0 0 auto;max-width:220px;border:1px solid transparent;border-bottom:0;border-radius:9px 9px 0 0;color:var(--ink-muted);background:transparent;transition:color .18s ease,background .18s ease,border-color .18s ease}
+.route-tab:hover{color:var(--ink-soft);background:rgba(255,255,255,.035)}
+.route-tab.active{color:var(--ink);border-color:var(--line-strong);background:var(--night-panel)}
+.route-tab-link{min-width:0;max-width:178px;height:100%;display:flex;align-items:center;padding:0 11px 0 13px;overflow:hidden;font-size:12px;font-weight:500;text-overflow:ellipsis;white-space:nowrap}
+.route-tab-close{width:22px;height:22px;display:grid;place-items:center;flex:0 0 auto;margin-right:5px;padding:0;border:0;border-radius:6px;color:var(--ink-muted);background:transparent;font-size:16px;line-height:1}
+.route-tab-close:hover{color:var(--ink);background:rgba(255,255,255,.07)}
+[data-theme='light'] .route-tabs{background:rgba(244,245,251,.92)}
+[data-theme='light'] .route-tab:hover{background:rgba(89,82,232,.05)}
+[data-theme='light'] .route-tab.active{border-color:rgba(45,42,72,.16);background:#fff;box-shadow:0 -4px 14px rgba(42,39,68,.035)}
+[data-theme='light'] .route-tab-close:hover{background:rgba(89,82,232,.08)}
 .page-scroll{padding:clamp(28px,2.4vw,44px) var(--shell-inline) clamp(30px,2.5vw,42px)}
 .page-scroll>*{width:100%;max-width:1680px;margin-inline:auto}
 
@@ -113,6 +132,7 @@
 
 @media(max-width:640px){
   .main-area{--shell-inline:17px}
+  .route-tabs{display:none}
   .page-scroll{padding-top:25px;padding-bottom:28px}
 }
 
@@ -128,6 +148,8 @@
   .account-wrap{margin-top:7px}
   .account-button{padding-block:5px}
   .topbar{height:60px;flex-basis:60px}
+  .route-tabs{flex-basis:38px}
+  .route-tab{height:31px}
   .page-scroll{padding-top:22px;padding-bottom:24px}
   .page-heading{margin-bottom:22px}
   .pulse-hero{min-height:220px;padding:26px 30px}
