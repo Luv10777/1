@@ -167,26 +167,7 @@ CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_refresh_tokens_status ON refresh_tokens(status, expires_at);
 
--- 审计日志表
-CREATE TABLE audit_logs (
-    id BIGSERIAL PRIMARY KEY,
-    tenant_id BIGINT REFERENCES tenants(id),
-    user_id BIGINT REFERENCES users(id),
-    action VARCHAR(50) NOT NULL,
-    resource_type VARCHAR(50) NOT NULL,
-    resource_id VARCHAR(100),
-    details JSONB,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    status VARCHAR(20) CHECK (status IN ('SUCCESS', 'FAILED')),
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_audit_logs_tenant ON audit_logs(tenant_id, created_at);
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at);
-CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
-CREATE INDEX idx_audit_logs_action ON audit_logs(action, created_at);
+-- 注意：audit_logs 表已移至 005_video_workflow_support.sql，避免重复定义
 
 -- 插入系统权限
 INSERT INTO permissions (code, name, resource, action, description) VALUES

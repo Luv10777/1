@@ -29,45 +29,8 @@ CREATE INDEX idx_brands_tenant ON brands(tenant_id);
 CREATE INDEX idx_brands_merchant ON brands(merchant_id);
 CREATE INDEX idx_brands_status ON brands(status) WHERE deleted_at IS NULL;
 
--- 素材库表
-CREATE TABLE assets (
-    id BIGSERIAL PRIMARY KEY,
-    tenant_id BIGINT NOT NULL REFERENCES tenants(id),
-    merchant_id BIGINT REFERENCES merchants(id),
-    store_id BIGINT REFERENCES stores(id),
-    code VARCHAR(32) UNIQUE NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    type VARCHAR(20) NOT NULL CHECK (type IN ('IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT')),
-    category VARCHAR(50),
-    tags TEXT[],
-    file_url VARCHAR(500) NOT NULL,
-    file_size BIGINT,
-    mime_type VARCHAR(100),
-    width INTEGER,
-    height INTEGER,
-    duration INTEGER,
-    thumbnail_url VARCHAR(500),
-    source VARCHAR(50),
-    copyright_info TEXT,
-    license_file_url VARCHAR(500),
-    license_scope TEXT,
-    license_valid_from DATE,
-    license_valid_until DATE,
-    usage_count INTEGER DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'AVAILABLE' CHECK (status IN ('AVAILABLE', 'EXPIRED', 'DISABLED', 'DELETED')),
-    created_by BIGINT REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP
-);
-
-CREATE INDEX idx_assets_tenant ON assets(tenant_id);
-CREATE INDEX idx_assets_merchant ON assets(merchant_id);
-CREATE INDEX idx_assets_type ON assets(type);
-CREATE INDEX idx_assets_category ON assets(category);
-CREATE INDEX idx_assets_tags ON assets USING GIN(tags);
-CREATE INDEX idx_assets_status ON assets(status) WHERE deleted_at IS NULL;
-CREATE INDEX idx_assets_license_validity ON assets(license_valid_until) WHERE status = 'AVAILABLE';
+-- 注意：assets 表已移至 005_video_workflow_support.sql，避免重复定义
+-- 该表用于统一管理所有文件（参考图、生成图、视频等）
 
 -- 知识库表
 CREATE TABLE knowledge (
@@ -103,20 +66,8 @@ CREATE INDEX idx_knowledge_type ON knowledge(type);
 CREATE INDEX idx_knowledge_status ON knowledge(status, verified) WHERE deleted_at IS NULL;
 CREATE INDEX idx_knowledge_structured ON knowledge USING GIN(structured_data);
 
--- 知识切片表（用于向量检索）
-CREATE TABLE knowledge_chunks (
-    id BIGSERIAL PRIMARY KEY,
-    knowledge_id BIGINT NOT NULL REFERENCES knowledge(id) ON DELETE CASCADE,
-    chunk_index INTEGER NOT NULL,
-    content TEXT NOT NULL,
-    embedding vector(1536),
-    metadata JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(knowledge_id, chunk_index)
-);
-
-CREATE INDEX idx_chunks_knowledge ON knowledge_chunks(knowledge_id);
-CREATE INDEX idx_chunks_embedding ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops);
+-- 注意：knowledge_chunks 表已移至 005_video_workflow_support.sql
+-- 该表用于知识库的向量化检索，避免重复定义
 
 -- 作品库表
 CREATE TABLE works (
