@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { auth } from '../stores/auth'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -41,6 +42,7 @@ const submit = async () => {
     <div class="auth-orbit orbit-one" />
     <div class="auth-orbit orbit-two" />
     <section class="auth-panel">
+      <ThemeToggle class="auth-theme-toggle" />
       <div class="auth-brand">
         <div class="brand-mark large" aria-hidden="true"><span /><span /><span /></div>
         <div><p class="brand-name">梧曜星枢</p><p class="brand-caption">AI GROWTH OS <span>·</span> V0.1</p></div>
