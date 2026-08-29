@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const emit = defineEmits(['generate'])
 const mode = ref('single')
@@ -12,6 +13,7 @@ const selectedCount = ref(1)
 const platformGroup = ref('commerce')
 const selectedPlatform = ref('淘宝')
 const generated = ref(false)
+const router = useRouter()
 
 const productImages = [
   '/images/product-set-case-1.png',
@@ -93,6 +95,14 @@ const generate = () => {
   generated.value = true
   emit('generate', { prompt: prompt.value, ratio: selectedRatio.value, count: selectedCount.value, imageType: imageType.value, platform: selectedPlatform.value, uploadedFiles: uploadedFiles.value })
 }
+const switchWorkspace = (path) => {
+  if (path === router.currentRoute.value.path) return
+  if (typeof document.startViewTransition === 'function') {
+    document.startViewTransition(() => router.push(path))
+    return
+  }
+  router.push(path)
+}
 </script>
 
 <template>
@@ -154,6 +164,7 @@ const generate = () => {
     </aside>
 
     <div class="product-showcase">
+      <div class="image-workspace-switch video-mode-switch" role="group" aria-label="切换图片工作区"><button type="button" @click="switchWorkspace('/image/create/poster')"><span class="material-symbols-outlined">campaign</span>营销海报</button><button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/image/create/product-set')"><span class="material-symbols-outlined">grid_view</span>产品套图</button></div>
       <div class="product-showcase-glow" />
       <div class="product-showcase-copy"><h2>上传商品，轻松生成商品图</h2></div>
       <div class="product-wall" aria-hidden="true"><div v-for="(column, columnIndex) in wallColumns" :key="columnIndex" class="product-wall-column" :class="`product-wall-column-${columnIndex + 1}`"><img v-for="(image, index) in column" :key="`${columnIndex}-${index}`" :src="image" alt="" /></div></div>

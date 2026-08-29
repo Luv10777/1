@@ -19,12 +19,12 @@
 .product-mode-tabs{margin-top:18px}
 .product-type-tabs.local{grid-template-columns:repeat(2,1fr)}
 .product-upload-zone{min-height:172px}
-.product-showcase-copy{top:20px}
+.product-showcase-copy{top:78px}
 .product-showcase-copy h2{margin-bottom:0}
-.product-wall{top:112px}
+.product-wall{top:164px}
 .product-inspiration{padding-top:10px;padding-bottom:18px}
 .product-inspiration>p{display:none}
-@media(max-width:700px){.product-showcase-copy{top:24px}.product-wall{top:92px}}
+@media(max-width:700px){.product-showcase-copy{top:78px}.product-wall{top:146px}}
 
 /* Dark theme: follow the global [data-theme="dark"] token set while retaining the same layout. */
 [data-theme='dark'] .product-set-studio{background:#070914;color:var(--ink)}

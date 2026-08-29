@@ -10,6 +10,9 @@ import './product-set.css'
 import './consumer.css'
 import './billing.css'
 import './ecosystem.css'
+import './video-create.css'
+import './video-workbench.css'
+import './studio.css'
 
 theme.apply()
 

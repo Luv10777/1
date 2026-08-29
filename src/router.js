@@ -15,6 +15,9 @@ import AssetsView from './views/AssetsView.vue'
 import KnowledgeView from './views/KnowledgeView.vue'
 import WorksView from './views/WorksView.vue'
 import ImageCreateView from './views/ImageCreateView.vue'
+import VideoCreateView from './views/VideoCreateView.vue'
+import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
+import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -31,9 +34,11 @@ const routes = [
   { path: '/image/create', name: 'image-create', component: ImageCreateView, meta: { title: 'AI 图片创作', eyebrow: 'CONTENT TOOLS', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。', navGroup: 'content' } },
   { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { title: '营销海报', eyebrow: 'CONTENT TOOLS', icon: '✦', description: '为一次活动定下主视觉。', navGroup: 'content' } },
   { path: '/image/create/product-set', name: 'image-create-product-set', component: ImageCreateView, meta: { title: '产品套图', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '围绕同一件商品生成一组有秩序的画面。', navGroup: 'content' } },
-  { path: '/video/create', name: 'video-create', component: PlaceholderView, meta: { title: 'AI 视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
+  { path: '/video/create', name: 'video-create', component: VideoCreateView, meta: { title: 'AI 视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
+  { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { title: '视频工作台', eyebrow: 'CONTENT TOOLS', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
   { path: '/digital-human', name: 'digital-human', component: PlaceholderView, meta: { title: '真实画面 + AI 语音直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '组合真实画面和 AI 语音，建立可持续使用的直播内容模板。' } },
+  { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
   { path: '/merchants', name: 'merchants', component: PlaceholderView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
