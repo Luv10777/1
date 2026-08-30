@@ -13,6 +13,7 @@ import './ecosystem.css'
 import './video-create.css'
 import './video-workbench.css'
 import './studio.css'
+import './live-studio.css'
 
 theme.apply()
 

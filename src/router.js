@@ -18,6 +18,7 @@ import ImageCreateView from './views/ImageCreateView.vue'
 import VideoCreateView from './views/VideoCreateView.vue'
 import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
+import LiveStudioView from './views/LiveStudioView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -37,7 +38,7 @@ const routes = [
   { path: '/video/create', name: 'video-create', component: VideoCreateView, meta: { title: 'AI 视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
   { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { title: '视频工作台', eyebrow: 'CONTENT TOOLS', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
-  { path: '/digital-human', name: 'digital-human', component: PlaceholderView, meta: { title: '真实画面 + AI 语音直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '组合真实画面和 AI 语音，建立可持续使用的直播内容模板。' } },
+  { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { title: 'AI实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，AI 负责话术、声音克隆与弹幕自动回复。' } },
   { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
   { path: '/merchants', name: 'merchants', component: PlaceholderView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
