@@ -60,7 +60,7 @@ const navGroups = [
     items: [
       { name: 'image-create', label: 'AI 图片创作', path: '/image/create' },
       { name: 'video-create', label: 'AI 视频创作', path: '/video/create' },
-      { name: 'digital-human', label: '真实画面 + AI 语音直播', path: '/digital-human' },
+      { name: 'digital-human', label: 'AI实景直播', path: '/digital-human' },
       { name: 'copy-rewrite', label: '文案提取 / 仿写 / 重写', path: '/copy/rewrite' },
       { name: 'video-analyze', label: '视频反推', path: '/video/analyze' },
     ],
