@@ -11,6 +11,10 @@ const steps = [
   { key: 'launch', index: '04', label: '启动直播' },
 ]
 const activeStep = ref('voice')
+// 已完成过首次配置的老用户，默认直达启动步骤
+const hasInitialConfig = ref(true)
+const editingConfig = ref(false)
+const showDetailedSetup = computed(() => !hasInitialConfig.value || editingConfig.value)
 const scrollToStep = (key) => {
   activeStep.value = key
   document.getElementById(`ls-step-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -18,9 +22,9 @@ const scrollToStep = (key) => {
 
 /* ---------------- 01 声音克隆与角色 ---------------- */
 const voices = ref([
-  { id: 'v1', name: '老板娘·亲和', sample: '10s 样本 · 已训练', quality: 98, role: 'host', glyph: '林' },
-  { id: 'v2', name: '店长·稳重男声', sample: '12s 样本 · 已训练', quality: 95, role: 'cohost', glyph: '陈' },
-  { id: 'v3', name: '车间主管·实在', sample: '10s 样本 · 已训练', quality: 91, role: 'none', glyph: '赵' },
+  { id: 'v1', name: '老板娘·亲和', sample: '10s 样本 · 已训练', quality: 98, role: 'host', glyph: '林', builtin: true },
+  { id: 'v2', name: '店长·稳重男声', sample: '12s 样本 · 已训练', quality: 95, role: 'cohost', glyph: '陈', builtin: true },
+  { id: 'v3', name: '车间主管·实在', sample: '10s 样本 · 已训练', quality: 91, role: 'none', glyph: '赵', builtin: false },
 ])
 const playingVoice = ref('')
 let playTimer = null
@@ -35,28 +39,155 @@ const setRole = (voice, role) => {
   voice.role = voice.role === role ? 'none' : role
 }
 const rotateRoles = ref(true)
+const rotationEditing = ref(false)
+const rotationSelection = ref(['v1', 'v2'])
+const startRotationEdit = () => { rotationEditing.value = true }
+const confirmRotationEdit = () => {
+  if (rotationSelection.value.length < 2) {
+    window.alert('至少选择2个音色才能开启轮换')
+    return
+  }
+  rotateRoles.value = true
+  rotationEditing.value = false
+}
+const toggleRotationVoice = (voice) => {
+  if (!rotationEditing.value) return
+  const selected = rotationSelection.value.includes(voice.id)
+  if (selected) {
+    rotationSelection.value = rotationSelection.value.filter(id => id !== voice.id)
+  } else {
+    rotationSelection.value = [...rotationSelection.value, voice.id]
+  }
+}
+const voiceDialogOpen = ref(false)
+const voiceDialogMode = ref('edit')
+const voiceDialogVoice = ref(null)
+const voiceDialogName = ref('')
+const voiceDialogReplaceSample = ref(false)
+const openVoiceDialog = (voice, mode) => {
+  voiceDialogVoice.value = voice
+  voiceDialogMode.value = mode
+  voiceDialogName.value = voice.name
+  voiceDialogReplaceSample.value = false
+  voiceDialogOpen.value = true
+}
+const closeVoiceDialog = () => { voiceDialogOpen.value = false }
+const submitVoiceDialog = () => {
+  const voice = voiceDialogVoice.value
+  if (!voice) return
+  if (voiceDialogMode.value === 'edit') {
+    const name = voiceDialogName.value.trim()
+    if (name) {
+      voice.name = name
+      voice.glyph = name.slice(0, 1)
+    }
+    if (voiceDialogReplaceSample.value) voice.sample = '已替换样本 · 已训练'
+  } else {
+    voices.value = voices.value.filter(v => v.id !== voice.id)
+    rotationSelection.value = rotationSelection.value.filter(id => id !== voice.id)
+    if (rotationSelection.value.length < 2) rotateRoles.value = false
+  }
+  closeVoiceDialog()
+}
+const editVoice = (voice) => {
+  openVoiceDialog(voice, 'edit')
+}
+const removeVoice = (voice) => {
+  if (voice.builtin) return
+  openVoiceDialog(voice, 'delete')
+}
 const cloneOpen = ref(false)
 const cloneName = ref('')
+const cloneFileName = ref('')
 const recording = ref(false)
+const recordingPaused = ref(false)
 const recordSeconds = ref(0)
+const recordModalOpen = ref(false)
+const samplePreviewing = ref(false)
+const recordingScripts = [
+  '欢迎新进直播间的朋友，今天给大家带来的都是现磨纯手工好物，顺手包邮直送您家，品质看得见。',
+  '大家好，欢迎来到我们的直播间，门店和车间实景展示，喜欢的朋友可以放心下单。',
+  '今天为大家准备了几款超值好物，现做现发、用料扎实，感兴趣的朋友记得关注收藏。',
+  '感谢大家来到直播间，有任何问题都可以直接留言，我们会一一为大家解答。',
+]
+const microphones = ['内置麦克风', 'MacBook Pro 内置麦克风', 'AirPods Pro 麦克风', 'USB 电容麦克风', '蓝牙耳机麦克风']
+const selectedMicrophone = ref(microphones[0])
+const recordingScriptIndex = ref(0)
+const currentRecordingScript = computed(() => recordingScripts[recordingScriptIndex.value])
+const nextRecordingScript = () => { recordingScriptIndex.value = (recordingScriptIndex.value + 1) % recordingScripts.length }
 let recordTimer = null
-const toggleRecord = () => {
-  recording.value = !recording.value
+const openRecordingModal = () => { recordModalOpen.value = true }
+const closeRecordingModal = () => {
+  recording.value = false
+  recordingPaused.value = false
   clearInterval(recordTimer)
-  if (!recording.value) return
+  recordModalOpen.value = false
+  samplePreviewing.value = false
+}
+const submitRecording = () => {
+  recording.value = false
+  recordingPaused.value = false
+  clearInterval(recordTimer)
+  recordModalOpen.value = false
+  samplePreviewing.value = false
+}
+const toggleSamplePreview = () => {
+  samplePreviewing.value = !samplePreviewing.value
+  if (samplePreviewing.value) setTimeout(() => { samplePreviewing.value = false }, 2600)
+}
+const restartRecording = () => {
+  clearInterval(recordTimer)
   recordSeconds.value = 0
+  recordingPaused.value = false
+  recording.value = true
   recordTimer = setInterval(() => {
     recordSeconds.value += 1
     if (recordSeconds.value >= 10) { clearInterval(recordTimer); recording.value = false }
   }, 1000)
 }
+const pauseRecording = () => {
+  recording.value = false
+  recordingPaused.value = true
+  clearInterval(recordTimer)
+}
+const resumeRecording = () => {
+  recording.value = true
+  recordingPaused.value = false
+  clearInterval(recordTimer)
+  recordTimer = setInterval(() => {
+    recordSeconds.value += 1
+    if (recordSeconds.value >= 10) { clearInterval(recordTimer); recording.value = false; recordingPaused.value = false }
+  }, 1000)
+}
+const toggleRecord = () => {
+  if (recording.value) return pauseRecording()
+  if (recordingPaused.value) return resumeRecording()
+  restartRecording()
+}
+const recordingAction = () => {
+  if (recording.value) return pauseRecording()
+  if (recordSeconds.value >= 10) return submitRecording()
+  if (recordingPaused.value) return resumeRecording()
+  return restartRecording()
+}
 const saveClone = () => {
   const name = cloneName.value.trim() || `新音色 ${voices.value.length + 1}`
-  voices.value.push({ id: `v${Date.now()}`, name, sample: '10s 样本 · 训练中', quality: 0, role: 'none', glyph: name.slice(0, 1) })
+  const id = `v${Date.now()}`
+  voices.value.push({ id, name, sample: '10s 样本 · 训练中', quality: 0, role: 'none', glyph: name.slice(0, 1), builtin: false, training: true })
   cloneName.value = ''
+  cloneFileName.value = ''
   cloneOpen.value = false
   recordSeconds.value = 0
+  setTimeout(() => {
+    const voice = voices.value.find(v => v.id === id)
+    if (voice) { voice.training = false; voice.sample = '10s 样本 · 已训练'; voice.quality = 94 }
+  }, 15000)
 }
+const onCloneFile = (event) => {
+  const file = event.target.files?.[0]
+  if (file) cloneFileName.value = file.name
+}
+const cloneReady = computed(() => recordSeconds.value >= 10 || !!cloneFileName.value)
 const hostVoice = computed(() => voices.value.find(v => v.role === 'host'))
 
 /* ---------------- 02 话术与知识库 ---------------- */
@@ -118,6 +249,8 @@ const startLive = () => {
   if (roomState.value.level !== 'ok') return
   stage.value = 'live'
   elapsed.value = 0
+  const participants = rotationVoices.value
+  speakingVoiceId.value = participants[0]?.id || hostVoice.value?.id || ''
   startClock()
 }
 
@@ -128,6 +261,10 @@ const startClock = () => {
   clearInterval(clock)
   clock = setInterval(() => {
     elapsed.value += 1
+    if (rotateRoles.value && rotationVoices.value.length > 1) {
+      const idx = Math.floor(elapsed.value / 6) % rotationVoices.value.length
+      speakingVoiceId.value = rotationVoices.value[idx]?.id || speakingVoiceId.value
+    }
     if (elapsed.value % 4 === 0) pushDanmu()
     viewers.value = Math.max(40, viewers.value + Math.round((Math.random() - 0.42) * 18))
     trend.value = [...trend.value.slice(1), viewers.value]
@@ -140,6 +277,12 @@ const clockText = computed(() => {
   const m = String(Math.floor((elapsed.value % 3600) / 60)).padStart(2, '0')
   const s = String(elapsed.value % 60).padStart(2, '0')
   return `${h}:${m}:${s}`
+})
+const durationLabel = computed(() => {
+  if (elapsed.value < 60) return `${elapsed.value}秒`
+  const minutes = Math.floor(elapsed.value / 60)
+  const seconds = elapsed.value % 60
+  return `${minutes}分${seconds ? ` ${seconds}秒` : ''}`
 })
 const usedHours = computed(() => (elapsed.value / 3600))
 const remainHours = computed(() => Math.max(0, balanceHours.value - usedHours.value))
@@ -184,12 +327,23 @@ watch(() => feed.value.length, () => {
   requestAnimationFrame(() => { if (feedEl.value) feedEl.value.scrollTop = feedEl.value.scrollHeight })
 })
 const paused = ref(false)
+const endConfirmOpen = ref(false)
+const speakingVoiceId = ref('')
+const rotationVoices = computed(() => {
+  if (rotateRoles.value && rotationSelection.value.length >= 2) {
+    return rotationSelection.value.map(id => voices.value.find(v => v.id === id)).filter(Boolean)
+  }
+  return hostVoice.value ? [hostVoice.value] : voices.value.slice(0, 1)
+})
+const speakingVoice = computed(() => rotationVoices.value.find(v => v.id === speakingVoiceId.value) || rotationVoices.value[0] || hostVoice.value)
 const togglePause = () => {
   paused.value = !paused.value
   if (paused.value) clearInterval(clock)
   else startClock()
 }
+const requestEndLive = () => { endConfirmOpen.value = true }
 const endLive = () => {
+  endConfirmOpen.value = false
   clearInterval(clock)
   stage.value = 'review'
 }
@@ -207,6 +361,13 @@ const restart = () => {
   elapsed.value = 0
   interactions.value = 0
   activeStep.value = 'voice'
+  editingConfig.value = false
+  rotationEditing.value = false
+  paused.value = false
+  endConfirmOpen.value = false
+  recordModalOpen.value = false
+  recording.value = false
+  recordingPaused.value = false
 }
 
 onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearTimeout(playTimer) })
@@ -242,40 +403,57 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
     </section>
 
     <!-- 步骤导航 -->
-    <nav v-if="stage === 'setup'" class="ls-stepbar" aria-label="配置步骤">
+    <nav v-if="stage === 'setup' && showDetailedSetup" class="ls-stepbar" aria-label="配置步骤">
       <button v-for="s in steps" :key="s.key" type="button" class="ls-step-chip" :class="{ active: activeStep === s.key }" @click="scrollToStep(s.key)">
         <span class="mono">{{ s.index }}</span>{{ s.label }}
       </button>
+      <button v-if="hasInitialConfig && editingConfig" type="button" class="ls-ghost compact ls-collapse-config" @click="editingConfig = false">收起编辑</button>
     </nav>
 
     <template v-if="stage === 'setup'">
+      <section v-if="hasInitialConfig && !editingConfig" class="panel ls-setup-summary">
+        <div class="panel-heading"><div><p class="eyebrow">快速路径</p><h3>配置已就绪，直接开始直播</h3></div><button type="button" class="ls-ghost" @click="editingConfig = true">编辑配置</button></div>
+        <div class="ls-setup-summary-grid">
+          <span>当前音色 <strong>{{ hostVoice?.name || '未分配' }}</strong></span>
+          <span>知识库 <strong>{{ qaPairs.length }} 条</strong></span>
+          <span>促单节奏 <strong>{{ urgencyLabel.split(' · ')[0] }}</strong></span>
+          <span>轮换音色 <strong>{{ rotateRoles ? rotationSelection.length + ' 个' : '未开启' }}</strong></span>
+        </div>
+      </section>
       <!-- 01 声音克隆 -->
-      <section id="ls-step-voice" class="panel ls-section">
+      <section v-if="showDetailedSetup" id="ls-step-voice" class="panel ls-section">
         <div class="panel-heading">
           <div><p class="eyebrow">STEP 01</p><h3>主播人设与声音克隆</h3></div>
-          <label class="ls-switch"><input v-model="rotateRoles" type="checkbox"><span /><em>多角色轮换</em></label>
+          <div class="ls-step-heading-actions">
+            <button v-if="!rotationEditing" type="button" class="ls-ghost compact" @click="startRotationEdit">多角色配置</button>
+            <button v-else type="button" class="primary-button compact" @click="confirmRotationEdit">确认</button>
+          </div>
         </div>
         <p class="ls-section-note">主播负责主线讲解，助播负责接话与答疑。开启轮换后，系统会在每轮话术之间切换音色，让直播间听起来像两个人在配合。</p>
         <div class="ls-voice-grid">
-          <article v-for="voice in voices" :key="voice.id" class="ls-voice-card" :class="{ assigned: voice.role !== 'none' }">
+          <article v-for="voice in voices" :key="voice.id" class="ls-voice-card" :class="{ assigned: voice.role !== 'none', selected: rotationSelection.includes(voice.id), 'rotation-selected': rotationSelection.includes(voice.id) && rotateRoles }" @click="rotationEditing && toggleRotationVoice(voice)">
+            <div class="ls-voice-badge" :class="{ clone: !voice.builtin }">{{ voice.builtin ? '系统内置' : '我的克隆' }}</div>
+            <div v-if="!voice.builtin" class="ls-voice-manage"><button type="button" aria-label="编辑音色" @click.stop="editVoice(voice)">✎</button><button type="button" aria-label="删除音色" @click.stop="removeVoice(voice)">×</button></div>
             <div class="ls-voice-top">
               <span class="ls-voice-avatar">{{ voice.glyph }}</span>
               <div class="ls-voice-copy">
                 <strong>{{ voice.name }}</strong>
                 <small>{{ voice.sample }}</small>
               </div>
-              <button type="button" class="ls-play" :class="{ playing: playingVoice === voice.id }" :aria-label="`试听 ${voice.name}`" @click="previewVoice(voice.id)">
+            </div>
+            <div class="ls-wave-row">
+              <div class="ls-wave" :class="{ active: playingVoice === voice.id }">
+                <i v-for="n in 22" :key="n" :style="{ animationDelay: `${n * 55}ms` }" />
+              </div>
+              <button type="button" class="ls-play" :class="{ playing: playingVoice === voice.id }" :aria-label="`试听 ${voice.name}`" @click.stop="previewVoice(voice.id)">
                 {{ playingVoice === voice.id ? '❚❚' : '▶' }}
               </button>
             </div>
-            <div class="ls-wave" :class="{ active: playingVoice === voice.id }">
-              <i v-for="n in 22" :key="n" :style="{ animationDelay: `${n * 55}ms` }" />
-            </div>
             <div class="ls-voice-foot">
-              <span class="ls-quality">相似度 <i>{{ voice.quality ? voice.quality + '%' : '训练中' }}</i></span>
+              <span class="ls-quality" title="声纹还原度：克隆音色与原始样本的相似程度">声纹还原度 <i>{{ voice.quality ? voice.quality + '%' : '训练中' }}</i></span>
               <div class="ls-role-toggle">
-                <button type="button" :class="{ on: voice.role === 'host' }" @click="setRole(voice, 'host')">主播</button>
-                <button type="button" :class="{ on: voice.role === 'cohost' }" @click="setRole(voice, 'cohost')">助播</button>
+                <button type="button" :disabled="voice.training || !rotationEditing || !rotationSelection.includes(voice.id)" :class="{ on: voice.role === 'host', readonly: !rotationEditing && rotationSelection.includes(voice.id) }" @click.stop="setRole(voice, 'host')">主播</button>
+                <button type="button" :disabled="voice.training || !rotationEditing || !rotationSelection.includes(voice.id)" :class="{ on: voice.role === 'cohost', readonly: !rotationEditing && rotationSelection.includes(voice.id) }" @click.stop="setRole(voice, 'cohost')">助播</button>
               </div>
             </div>
           </article>
@@ -285,20 +463,20 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
               <button type="button" class="ls-clone-entry" @click="cloneOpen = true">
                 <span class="ls-clone-plus">＋</span>
                 <strong>新建声音克隆</strong>
-                <small>上传或录制 10 秒清晰人声即可</small>
+                <small>上传或录制清晰人声即可</small>
               </button>
             </template>
             <template v-else>
               <div class="ls-clone-form">
-                <label class="ls-field"><span>音色名称</span><input v-model="cloneName" type="text" placeholder="例如：老板娘·亲和"></label>
-                <div class="ls-record" :class="{ recording }">
-                  <button type="button" @click="toggleRecord">{{ recording ? '停止录制' : '开始录制' }}</button>
-                  <span class="mono">{{ recordSeconds }}s / 10s</span>
-                  <i class="ls-record-track"><b :style="{ width: `${recordSeconds * 10}%` }" /></i>
+                <label class="ls-field"><span>音色名称</span><input v-model="cloneName" type="text" placeholder="例如：门店客服·热情"></label>
+                <div class="ls-clone-inputs">
+                  <button type="button" class="ls-clone-source" @click="openRecordingModal"><span>🎙</span>{{ recordSeconds ? '重新录制' : '麦克风录制' }}</button>
+                  <label class="ls-clone-source"><span>📁</span>{{ cloneFileName || '上传音频文件' }}<input type="file" accept="audio/*" @change="onCloneFile"></label>
                 </div>
-                <p class="ls-hint">安静环境下正常语速朗读一段话即可，支持上传 wav / mp3 / m4a。</p>
+                <div v-if="cloneReady" class="ls-clone-file"><span>✓</span>{{ cloneFileName || '录音样本 · 10 秒' }}<small>已准备</small></div>
+                <p class="ls-clone-tip">💡 提示：安静环境下朗读 10~20 秒，效果最佳</p>
                 <div class="ls-clone-actions">
-                  <button type="button" class="primary-button compact" @click="saveClone">提交克隆</button>
+                  <button type="button" class="primary-button compact" :disabled="!cloneReady" @click="saveClone">开始克隆训练</button>
                   <button type="button" class="ls-ghost" @click="cloneOpen = false">取消</button>
                 </div>
               </div>
@@ -308,7 +486,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
       </section>
 
       <!-- 02 话术与知识库 -->
-      <section id="ls-step-script" class="ls-section ls-two-col">
+      <section v-if="showDetailedSetup" id="ls-step-script" class="ls-section ls-two-col">
         <article class="panel">
           <div class="panel-heading"><div><p class="eyebrow">STEP 02 / A</p><h3>商品信息与话术风格</h3></div></div>
 
@@ -374,7 +552,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
       </section>
 
       <!-- 03 套餐 -->
-      <section id="ls-step-balance" class="panel ls-section">
+      <section v-if="showDetailedSetup" id="ls-step-balance" class="panel ls-section">
         <div class="panel-heading"><div><p class="eyebrow">STEP 03</p><h3>云算力套餐与余额</h3></div></div>
         <div class="ls-balance-bar">
           <div class="ls-balance-main">
@@ -466,6 +644,41 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
           </button>
         </div>
       </section>
+      <div v-if="voiceDialogOpen" class="ls-modal-backdrop" role="presentation" @click.self="closeVoiceDialog">
+        <section class="ls-modal panel-dark" role="dialog" aria-modal="true" aria-labelledby="ls-voice-dialog-title">
+          <p class="eyebrow accent">{{ voiceDialogMode === 'edit' ? 'EDIT CLONED VOICE' : 'DELETE CLONED VOICE' }}</p>
+          <h3 id="ls-voice-dialog-title">{{ voiceDialogMode === 'edit' ? '编辑克隆音色' : '确定删除这个克隆音色吗？' }}</h3>
+          <template v-if="voiceDialogMode === 'edit'">
+            <label class="ls-field"><span>音色名称</span><input v-model="voiceDialogName" type="text" placeholder="例如：老板娘·亲和"></label>
+            <div class="ls-dialog-upload"><button type="button" class="ls-ghost compact" @click="voiceDialogReplaceSample = true">上传 / 录制新样本</button><span v-if="voiceDialogReplaceSample">已选择新样本（演示）</span></div>
+            <p class="ls-modal-copy">可在保存后继续使用当前音色；替换样本后会重新训练声纹。</p>
+          </template>
+          <template v-else>
+            <p class="ls-modal-copy">删除后无法恢复。<span v-if="voiceDialogVoice && rotationSelection.includes(voiceDialogVoice.id)">该音色正用于角色轮换，删除后将自动移出轮换列表。</span></p>
+          </template>
+          <div class="ls-modal-actions">
+            <button type="button" class="ls-ghost" @click="closeVoiceDialog">取消</button>
+            <button type="button" :class="voiceDialogMode === 'edit' ? 'primary-button compact' : 'ls-danger'" @click="submitVoiceDialog">{{ voiceDialogMode === 'edit' ? '保存修改' : '确认删除' }}</button>
+          </div>
+        </section>
+      </div>
+      <div v-if="recordModalOpen" class="ls-modal-backdrop" role="presentation" @click.self="closeRecordingModal">
+        <section class="ls-modal panel-dark ls-record-modal" role="dialog" aria-modal="true" aria-labelledby="ls-record-title">
+          <p class="eyebrow accent">VOICE SAMPLE / 10 SEC</p>
+          <div class="ls-record-modal-head"><h3 id="ls-record-title">录制声音样本</h3><label class="ls-record-device">🎙 <select v-model="selectedMicrophone" aria-label="选择录音麦克风"><option v-for="microphone in microphones" :key="microphone" :value="microphone">{{ microphone }}</option></select></label></div>
+          <div class="ls-script-box"><div class="ls-script-head"><span>请自然朗读下方文字</span><button type="button" class="ls-ghost compact" @click="nextRecordingScript">换一段 ↻</button></div><p>“{{ currentRecordingScript }}”</p></div>
+          <div class="ls-record ls-record-dialog" :class="{ recording }">
+            <span class="mono" :class="{ complete: recordSeconds >= 10 }">{{ recordSeconds >= 10 ? '✓ 样本已录满' : `${recordSeconds}s / 10s` }}</span>
+            <i class="ls-record-track"><b :style="{ width: `${recordSeconds * 10}%` }" /></i>
+          </div>
+          <div v-if="recordSeconds >= 10" class="ls-record-wave-row"><div class="ls-record-wave" :class="{ active: recording || samplePreviewing }"><i v-for="n in 18" :key="n" :style="{ animationDelay: `${n * 45}ms` }" /></div><button type="button" class="ls-ghost compact" @click="restartRecording">重新录制</button><button type="button" class="ls-play ls-sample-play" :class="{ playing: samplePreviewing }" @click="toggleSamplePreview">{{ samplePreviewing ? '❚❚' : '▶' }} 试听</button></div>
+          <div v-else class="ls-record-wave" :class="{ active: recording }"><i v-for="n in 18" :key="n" :style="{ animationDelay: `${n * 45}ms` }" /></div>
+          <div class="ls-modal-actions">
+            <button type="button" :class="recordSeconds >= 10 ? 'primary-button compact' : 'ls-ghost'" @click="recordingAction">{{ recording ? '暂停' : (recordSeconds >= 10 ? '提交' : (recordingPaused ? '继续录制' : '开始录制')) }}</button>
+            <button type="button" class="ls-ghost" @click="closeRecordingModal">取消</button>
+          </div>
+        </section>
+      </div>
     </template>
 
     <!-- 05 监控台 -->
@@ -474,10 +687,22 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
         <div class="ls-live-metric"><p class="eyebrow">直播时长</p><strong class="mono">{{ clockText }}</strong></div>
         <div class="ls-live-metric"><p class="eyebrow">算力消耗</p><strong class="mono">{{ usedHours.toFixed(2) }}h</strong><small>余 {{ remainHours.toFixed(1) }}h</small></div>
         <div class="ls-live-metric"><p class="eyebrow">弹幕互动</p><strong class="mono">{{ interactions }}</strong><small>AI 已回复 {{ feed.filter(f => f.type === 'ai').length }}</small></div>
-        <div class="ls-live-metric"><p class="eyebrow">播报音色</p><strong>{{ hostVoice?.name || '默认音色' }}</strong><small>{{ rotateRoles ? '双角色轮换中' : '单角色' }}</small></div>
+        <div class="ls-live-metric ls-live-voice-metric"><p class="eyebrow">播报音色</p>
+          <template v-if="rotateRoles && rotationVoices.length > 1">
+            <div class="ls-rotation-voices" aria-label="本轮参与播报的音色">
+              <div v-for="(voice, i) in rotationVoices" :key="voice.id" class="ls-rotation-voice" :class="{ active: speakingVoice?.id === voice.id }">
+                <span class="ls-rotation-index">{{ i + 1 }}</span><span class="ls-rotation-name">{{ voice.name }}</span>
+              </div>
+            </div>
+            <small>轮换播报中 · 当前 {{ speakingVoice?.name || '默认音色' }}</small>
+          </template>
+          <template v-else>
+            <strong>{{ hostVoice?.name || '默认音色' }}</strong><small>单角色</small>
+          </template>
+        </div>
         <div class="ls-live-actions">
-          <button type="button" class="ls-ghost" @click="togglePause">{{ paused ? '继续播报' : '暂停播报' }}</button>
-          <button type="button" class="ls-danger" @click="endLive">结束本场</button>
+          <button type="button" class="ls-ghost" :class="{ paused }" @click="togglePause">{{ paused ? '已暂停·点击恢复' : '暂停播报' }}</button>
+          <button type="button" class="ls-danger" @click="requestEndLive">结束本场</button>
         </div>
       </section>
 
@@ -521,6 +746,17 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
           </article>
         </div>
       </section>
+      <div v-if="endConfirmOpen" class="ls-modal-backdrop" role="presentation" @click.self="endConfirmOpen = false">
+        <section class="ls-modal panel-dark" role="dialog" aria-modal="true" aria-labelledby="ls-end-title">
+          <p class="eyebrow accent">END SESSION</p>
+          <h3 id="ls-end-title">确定结束本场直播？</h3>
+          <p class="ls-modal-copy">已直播 <strong>{{ durationLabel }}</strong>，已产生 <strong>{{ usedHours.toFixed(2) }}h</strong> 算力消耗。结束后将停止语音播报并生成复盘报告。</p>
+          <div class="ls-modal-actions">
+            <button type="button" class="ls-ghost" @click="endConfirmOpen = false">继续直播</button>
+            <button type="button" class="ls-danger" @click="endLive">确认结束</button>
+          </div>
+        </section>
+      </div>
     </template>
 
     <!-- 06 复盘 -->
@@ -538,6 +774,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
         </div>
         <div class="ls-review-actions">
           <RouterLink to="/analytics" class="primary-button compact">查看完整报告 <span>→</span></RouterLink>
+          <RouterLink to="/digital-human/history" class="text-link">查看本场弹幕与回复记录 <span>→</span></RouterLink>
           <button type="button" class="ls-ghost" @click="restart">再开一场</button>
         </div>
       </section>
