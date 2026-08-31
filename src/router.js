@@ -39,6 +39,7 @@ const routes = [
   { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { title: '视频工作台', eyebrow: 'CONTENT TOOLS', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
   { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { title: 'AI实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，AI 负责话术、声音克隆与弹幕自动回复。' } },
+  { path: '/digital-human/history', name: 'digital-human-history', component: PlaceholderView, meta: { title: '直播弹幕与回复记录', eyebrow: 'CONTENT TOOLS / LIVE HISTORY', icon: '◷', description: '查看本场直播中的观众弹幕与 AI 回复内容。历史记录页将在后续版本接入完整数据。' } },
   { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
   { path: '/merchants', name: 'merchants', component: PlaceholderView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
