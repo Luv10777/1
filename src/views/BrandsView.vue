@@ -1,504 +1,165 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { brandService } from '../services/brand'
-import Loading from '../components/Loading.vue'
-import Empty from '../components/Empty.vue'
+import { isDemoMode } from '../utils/config'
 
 const brands = ref([])
 const loading = ref(true)
-const showCreateModal = ref(false)
+const showModal = ref(false)
 const editingBrand = ref(null)
+const activeSection = ref('identity')
+const notice = ref('')
+const errors = ref({})
+const logoInput = ref(null)
+const miniQrInput = ref(null)
+const wechatQrInput = ref(null)
+const industryOpen = ref(false)
+const industryOptions = ['餐饮 / 茶饮', '美妆 / 个护', '服饰 / 鞋包', '家居 / 生活方式', '教育 / 服务', '科技 / 互联网', '其他']
+let sectionObserver
+let scrollFrame
 
-const form = reactive({
-  name: '',
-  positioning: '',
-  targetAudience: '',
-  languageStyle: '',
-  primaryColor: '#2D5016',
-  logoAssets: '',
-  platformStyles: ''
+const form = reactive({ name: '', industry: '', slogan: '', logoAssets: '', viGuidelines: '', miniProgramQr: '', wechatQr: '', intro: '', website: '', history: '', coreTeam: '', brandStory: '', culture: '', primaryColor: '#0f766e' })
+const sections = [
+  { id: 'identity', no: '01', label: '品牌识别', hint: '名称、赛道与 Slogan' },
+  { id: 'visual', no: '02', label: '视觉资产', hint: 'Logo、VI 与二维码' },
+  { id: 'story', no: '03', label: '品牌叙事', hint: '简介、历程与故事' },
+  { id: 'culture', no: '04', label: '团队与文化', hint: '核心团队与价值观' }
+]
+const completionFields = computed(() => [
+  form.name,
+  form.industry,
+  form.slogan,
+  form.logoAssets,
+  form.viGuidelines,
+  form.miniProgramQr,
+  form.wechatQr,
+  form.intro,
+  form.website,
+  form.history,
+  form.coreTeam,
+  form.brandStory,
+  form.culture
+])
+const completion = computed(() => {
+  const filled = completionFields.value.filter(value => typeof value === 'string' ? value.trim().length > 0 : Boolean(value)).length
+  return Math.round((filled / completionFields.value.length) * 100)
 })
 
-onMounted(async () => {
-  await loadBrands()
+onMounted(async () => { document.querySelector('.page-scroll')?.classList.add('brands-scroll'); document.addEventListener('click', closeIndustryMenu); await loadBrands() })
+watch(showModal, async (visible) => {
+  if (!visible) { sectionObserver?.disconnect(); sectionObserver = null; if (scrollFrame) cancelAnimationFrame(scrollFrame); return }
+  await nextTick()
+  setupSectionObserver()
 })
-
-async function loadBrands() {
-  loading.value = true
-  try {
-    const merchantId = 'merchant_1' // TODO: 从当前上下文获取
-    const response = await brandService.list(merchantId, { page: 0, size: 20 })
-    if (response.success) {
-      brands.value = response.data.items || []
-    }
-  } catch (error) {
-    console.error('加载品牌失败:', error)
-  } finally {
-    loading.value = false
+onBeforeUnmount(() => { sectionObserver?.disconnect(); if (scrollFrame) cancelAnimationFrame(scrollFrame); document.querySelector('.page-scroll')?.classList.remove('brands-scroll'); document.removeEventListener('click', closeIndustryMenu) })
+async function loadBrands() { loading.value = true; try { const response = await brandService.list('merchant_1', { page: 0, size: 20 }); if (response.success) brands.value = response.data.items || [] } catch (error) { notice.value = error.message || '加载品牌失败' } finally { loading.value = false } }
+function resetForm() { Object.assign(form, { name: '', industry: '', slogan: '', logoAssets: '', viGuidelines: '', miniProgramQr: '', wechatQr: '', intro: '', website: '', history: '', coreTeam: '', brandStory: '', culture: '', primaryColor: '#0f766e' }) }
+function openCreateModal() { editingBrand.value = null; resetForm(); errors.value = {}; notice.value = ''; activeSection.value = 'identity'; showModal.value = true }
+function openEditModal(brand) { editingBrand.value = brand; Object.assign(form, { ...form, ...brand, industry: brand.industry || brand.positioning || '', intro: brand.intro || '', slogan: brand.slogan || '', viGuidelines: brand.viGuidelines || '', miniProgramQr: brand.miniProgramQr || '', wechatQr: brand.wechatQr || '', history: brand.history || '', coreTeam: brand.coreTeam || '', brandStory: brand.brandStory || '', culture: brand.culture || '' }); errors.value = {}; notice.value = ''; activeSection.value = 'identity'; industryOpen.value = false; showModal.value = true }
+function closeIndustryMenu() { industryOpen.value = false }
+function selectIndustry(option) { form.industry = option; errors.value = { ...errors.value, industry: '' }; industryOpen.value = false }
+function handleIndustryKey(event) {
+  if (event.key === 'Escape') { industryOpen.value = false; return }
+  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); industryOpen.value = !industryOpen.value }
+  if (event.key === 'ArrowDown' && !industryOpen.value) { event.preventDefault(); industryOpen.value = true }
+}
+function readImage(event, key) { const file = event.target.files?.[0]; if (!file || !file.type.startsWith('image/')) return; form[key] = URL.createObjectURL(file); event.target.value = '' }
+function validate() { const next = {}; if (!form.name.trim()) next.name = '请填写品牌名'; if (!form.industry.trim()) next.industry = '请选择所属行业 / 赛道'; errors.value = next; return Object.keys(next).length === 0 }
+async function handleSubmit() { notice.value = ''; if (!validate()) { notice.value = '还有必填信息未完成，请检查标记项。'; return }; const payload = isDemoMode() ? { ...form, positioning: form.industry, targetAudience: form.intro, languageStyle: form.slogan } : { name: form.name, positioning: form.industry, targetAudience: form.intro, languageStyle: form.slogan, primaryColor: form.primaryColor, logoAssets: form.logoAssets }; try { if (editingBrand.value) await brandService.update(editingBrand.value.id, payload); else await brandService.create('merchant_1', payload); showModal.value = false; await loadBrands() } catch (error) { notice.value = error.message || '保存失败' } }
+async function handleDelete(brand) { if (!confirm(`确定要删除品牌“${brand.name}”吗？`)) return; try { await brandService.delete(brand.id); await loadBrands() } catch (error) { notice.value = error.message || '删除失败' } }
+function scrollToSection(id) {
+  activeSection.value = id
+  const root = document.querySelector('.brand-form')
+  const target = document.getElementById(id)
+  if (!root || !target) return
+  const start = root.scrollTop
+  const destination = Math.max(0, target.offsetTop - 12)
+  const distance = destination - start
+  if (Math.abs(distance) < 2) return
+  if (scrollFrame) cancelAnimationFrame(scrollFrame)
+  const startedAt = performance.now()
+  const duration = Math.min(420, Math.max(160, Math.abs(distance) * 0.32))
+  const ease = (progress) => 1 - Math.pow(1 - progress, 3)
+  const frame = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration)
+    root.scrollTop = start + distance * ease(progress)
+    if (progress < 1) scrollFrame = requestAnimationFrame(frame)
   }
+  scrollFrame = requestAnimationFrame(frame)
 }
-
-function openCreateModal() {
-  editingBrand.value = null
-  resetForm()
-  showCreateModal.value = true
+function setupSectionObserver() {
+  const root = document.querySelector('.brand-form')
+  if (!root) return
+  sectionObserver?.disconnect()
+  sectionObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter(entry => entry.isIntersecting)
+    if (!visible.length) return
+    const rootTop = root.getBoundingClientRect().top
+    visible.sort((a, b) => Math.abs(a.boundingClientRect.top - rootTop) - Math.abs(b.boundingClientRect.top - rootTop))
+    activeSection.value = visible[0].target.id
+  }, { root, rootMargin: '-8% 0px -68% 0px', threshold: [0, 0.18, 0.45, 0.8] })
+  root.querySelectorAll('.form-card[id]').forEach(section => sectionObserver.observe(section))
 }
-
-function openEditModal(brand) {
-  editingBrand.value = brand
-  Object.assign(form, {
-    name: brand.name,
-    positioning: brand.positioning || '',
-    targetAudience: brand.targetAudience || '',
-    languageStyle: brand.languageStyle || '',
-    primaryColor: brand.primaryColor || '#2D5016',
-    logoAssets: brand.logoAssets || '',
-    platformStyles: brand.platformStyles || ''
-  })
-  showCreateModal.value = true
-}
-
-function resetForm() {
-  form.name = ''
-  form.positioning = ''
-  form.targetAudience = ''
-  form.languageStyle = ''
-  form.primaryColor = '#2D5016'
-  form.logoAssets = ''
-  form.platformStyles = ''
-}
-
-async function handleSubmit() {
-  try {
-    const merchantId = 'merchant_1'
-    if (editingBrand.value) {
-      await brandService.update(editingBrand.value.id, form)
-    } else {
-      await brandService.create(merchantId, form)
-    }
-    showCreateModal.value = false
-    await loadBrands()
-  } catch (error) {
-    console.error('保存品牌失败:', error)
-    alert(error.message || '保存失败')
+function displayImage(src) {
+  if (typeof src !== 'string') return ''
+  const value = src.trim()
+  if (value.startsWith('{')) {
+    try { return displayImage(JSON.parse(value).primary || JSON.parse(value).logo || '') } catch { return '' }
   }
-}
-
-async function handleDelete(brand) {
-  if (!confirm(`确定要删除品牌"${brand.name}"吗？`)) return
-  try {
-    await brandService.delete(brand.id)
-    await loadBrands()
-  } catch (error) {
-    console.error('删除品牌失败:', error)
-    alert(error.message || '删除失败')
-  }
-}
-
-function getPlatformStyles(platformStyles) {
-  if (!platformStyles) return []
-  try {
-    const data = typeof platformStyles === 'string' ? JSON.parse(platformStyles) : platformStyles
-    return Object.entries(data).map(([key, value]) => ({ platform: key, style: value }))
-  } catch {
-    return []
-  }
+  return value.startsWith('blob:') || value.startsWith('http') || value.startsWith('data:') ? value : ''
 }
 </script>
 
 <template>
   <div class="brands-page">
-    <header class="page-header">
-      <div class="header-top">
-        <div class="title-group">
-          <span class="eyebrow mono">BRAND LIBRARY</span>
-          <h1>品牌库</h1>
-        </div>
-        <div class="header-actions">
-          <button class="primary-button" @click="openCreateModal">
-            <span>+</span> 新建品牌
-          </button>
-        </div>
-      </div>
-      <p class="header-desc">沉淀品牌定位、语言风格和视觉识别资产</p>
-    </header>
-
-    <Loading v-if="loading" text="加载品牌列表..." />
-
-    <Empty
-      v-else-if="brands.length === 0"
-      icon="◈"
-      title="暂无品牌"
-      description="创建第一个品牌规范，统一内容生成的风格"
-      action-text="新建品牌"
-      @action="openCreateModal"
-    />
-
-    <div v-else class="brands-grid">
-      <div v-for="brand in brands" :key="brand.id" class="brand-card">
-        <div class="brand-header">
-          <div class="brand-color" :style="{ background: brand.primaryColor }" />
-          <div class="brand-info">
-            <h3 class="brand-name">{{ brand.name }}</h3>
-            <span class="brand-code mono">{{ brand.code }}</span>
-          </div>
-        </div>
-
-        <div v-if="brand.positioning" class="brand-section">
-          <label>品牌定位</label>
-          <p>{{ brand.positioning }}</p>
-        </div>
-
-        <div v-if="brand.targetAudience" class="brand-section">
-          <label>目标人群</label>
-          <p>{{ brand.targetAudience }}</p>
-        </div>
-
-        <div v-if="brand.languageStyle" class="brand-section">
-          <label>语言风格</label>
-          <p>{{ brand.languageStyle }}</p>
-        </div>
-
-        <div v-if="getPlatformStyles(brand.platformStyles).length > 0" class="brand-section">
-          <label>平台风格</label>
-          <div class="platform-tags">
-            <span v-for="item in getPlatformStyles(brand.platformStyles)" :key="item.platform" class="platform-tag">
-              {{ item.platform }}
-            </span>
-          </div>
-        </div>
-
-        <div class="brand-actions">
-          <button class="link-button" @click="openEditModal(brand)">编辑</button>
-          <button class="link-button danger" @click="handleDelete(brand)">删除</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 创建/编辑模态框 -->
-    <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>{{ editingBrand ? '编辑品牌' : '新建品牌' }}</h2>
-          <button class="close-button" @click="showCreateModal = false">×</button>
-        </div>
-
-        <form class="modal-form" @submit.prevent="handleSubmit">
-          <div class="form-group">
-            <label>品牌名称 <span class="required">*</span></label>
-            <input v-model="form.name" type="text" placeholder="如：青岚茶事" required />
-          </div>
-
-          <div class="form-group">
-            <label>品牌定位</label>
-            <textarea v-model="form.positioning" rows="3" placeholder="新中式茶饮品牌，传承东方美学，融入现代生活方式" />
-          </div>
-
-          <div class="form-group">
-            <label>目标人群</label>
-            <textarea v-model="form.targetAudience" rows="2" placeholder="25-40岁都市白领，追求品质生活，注重健康养生" />
-          </div>
-
-          <div class="form-group">
-            <label>语言风格</label>
-            <textarea v-model="form.languageStyle" rows="2" placeholder="温和、雅致、有文化底蕴。避免过于口语化" />
-          </div>
-
-          <div class="form-group">
-            <label>主色调</label>
-            <div class="color-input-group">
-              <input v-model="form.primaryColor" type="color" class="color-picker" />
-              <input v-model="form.primaryColor" type="text" placeholder="#2D5016" class="color-text" />
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="secondary-button" @click="showCreateModal = false">取消</button>
-            <button type="submit" class="primary-button">{{ editingBrand ? '保存' : '创建' }}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <header class="brands-header"><div><p class="eyebrow">BRAND LIBRARY / 01</p><h1>品牌库</h1><p class="header-desc">把品牌的识别、叙事与文化沉淀成一份可被团队和 AI 准确引用的品牌档案。</p></div><button class="primary-button" @click="openCreateModal"><span>＋</span> 新建品牌</button></header>
+    <div v-if="notice && !showModal" class="page-notice">{{ notice }}</div>
+    <div v-if="loading" class="loading-state">正在加载品牌档案…</div>
+    <div v-else-if="brands.length" class="brand-list"><article v-for="brand in brands" :key="brand.id" class="brand-card"><div class="brand-card-top"><div class="brand-mark" :style="{ '--brand-color': brand.primaryColor || '#0f766e' }"><img v-if="displayImage(brand.logoAssets)" :src="displayImage(brand.logoAssets)" alt="品牌 Logo" /><span v-else>{{ (brand.name || '品').slice(0, 1) }}</span></div><div class="brand-card-title"><h2>{{ brand.name }}</h2><p>{{ brand.slogan || brand.languageStyle || '尚未填写 Slogan' }}</p></div><span class="brand-status">已启用</span></div><div class="brand-meta"><span>{{ brand.industry || brand.positioning || '未填写行业' }}</span><span v-if="brand.website">{{ brand.website }}</span><span v-if="brand.updatedAt">更新于 {{ new Date(brand.updatedAt).toLocaleDateString('zh-CN') }}</span></div><p v-if="brand.intro || brand.targetAudience" class="brand-intro">{{ brand.intro || brand.targetAudience }}</p><div class="brand-card-footer"><span class="asset-count">品牌档案 · {{ [brand.logoAssets, brand.viGuidelines, brand.miniProgramQr, brand.wechatQr].filter(Boolean).length }} 项视觉资产</span><div><button class="link-button" @click="openEditModal(brand)">编辑档案</button><button class="link-button danger" @click="handleDelete(brand)">删除</button></div></div></article></div>
+    <div v-else class="empty-state"><div class="empty-mark">✦</div><h2>建立你的第一份品牌档案</h2><p>先完成品牌名与所属赛道，其他内容可以稍后补充。</p><button class="primary-button" @click="openCreateModal">新建品牌</button></div>
+    <Transition name="brand-dialog" appear><div v-if="showModal" class="modal-overlay" @click.self="showModal = false"><section class="brand-modal"><header class="modal-header"><div><h2>{{ editingBrand ? '编辑品牌档案' : '新建品牌档案' }}</h2></div><button class="close-button" aria-label="关闭" @click="showModal = false">×</button></header><div class="modal-layout"><aside class="modal-aside"><div class="completion-card"><div class="completion-top"><span>资料完成度</span><strong>{{ completion }}%</strong></div><div class="completion-track"><i :style="{ width: `${completion}%` }" /></div></div><nav><p class="aside-label">PROFILE SECTIONS</p><button v-for="section in sections" :key="section.id" :class="{ active: activeSection === section.id }" @click="scrollToSection(section.id)"><span>{{ section.no }}</span><b>{{ section.label }}</b><small>{{ section.hint }}</small></button></nav><div class="aside-tip"><span>⌁</span><p>建议先上传 Logo，再补充品牌故事，AI 生成内容会更贴近你的品牌。</p></div></aside>
+      <form class="brand-form" @submit.prevent="handleSubmit">
+        <section id="identity" class="form-card"><div class="card-heading"><span class="step-number">01</span><div><p class="eyebrow">IDENTITY</p><h3>品牌识别</h3></div></div><div class="field-grid two-col"><label class="field"><span>品牌名 <b>*</b></span><input v-model="form.name" :class="{ invalid: errors.name }" placeholder="例如：青岚茶事" /><em v-if="errors.name">{{ errors.name }}</em></label><div class="field"><span>行业 / 赛道 <b>*</b></span><div class="custom-select" :class="{ open: industryOpen, invalid: errors.industry }" @click.stop><button class="custom-select-trigger" type="button" aria-haspopup="listbox" :aria-expanded="industryOpen" @click="industryOpen = !industryOpen" @keydown="handleIndustryKey"><span :class="{ placeholder: !form.industry }">{{ form.industry || '请选择行业' }}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4" /></svg></button><Transition name="select-pop"><div v-if="industryOpen" class="custom-select-menu" role="listbox"><button v-for="option in industryOptions" :key="option" type="button" role="option" :aria-selected="form.industry === option" :class="{ selected: form.industry === option }" @click="selectIndustry(option)"><span>{{ option }}</span><svg v-if="form.industry === option" viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 10.5 3 3 6-7" /></svg></button></div></Transition></div><em v-if="errors.industry">{{ errors.industry }}</em></div></div><label class="field"><span>Slogan</span><input v-model="form.slogan" placeholder="一句话说清品牌承诺，例如：一杯好茶，见天地" /><small>建议 8–24 字，便于广告与内容生成时引用</small></label></section>
+        <section id="visual" class="form-card"><div class="card-heading"><span class="step-number">02</span><div><p class="eyebrow">VISUAL SYSTEM</p><h3>视觉资产</h3></div></div><div class="upload-grid"><label class="upload-field"><span>品牌 Logo</span><div class="upload-box" :class="{ filled: displayImage(form.logoAssets) }" @click="logoInput?.click"><input ref="logoInput" type="file" accept="image/*" hidden @change="readImage($event, 'logoAssets')" /><img v-if="displayImage(form.logoAssets)" :src="displayImage(form.logoAssets)" alt="Logo 预览" /><template v-else><strong>＋</strong><b>上传 Logo</b><small>PNG / SVG，透明底更佳</small></template></div></label><label class="field"><span>VI 规范</span><textarea v-model="form.viGuidelines" rows="6" placeholder="记录品牌色、字体、留白和禁用场景等规范" /><small>可粘贴链接或简要描述，方便团队统一执行</small></label></div><div class="qr-grid"><label class="upload-field"><span>小程序二维码</span><div class="qr-box" :class="{ filled: displayImage(form.miniProgramQr) }" @click="miniQrInput?.click"><input ref="miniQrInput" type="file" accept="image/*" hidden @change="readImage($event, 'miniProgramQr')" /><img v-if="displayImage(form.miniProgramQr)" :src="displayImage(form.miniProgramQr)" alt="小程序二维码" /><template v-else><strong>⌘</strong><small>点击上传</small></template></div></label><label class="upload-field"><span>公众号二维码</span><div class="qr-box" :class="{ filled: displayImage(form.wechatQr) }" @click="wechatQrInput?.click"><input ref="wechatQrInput" type="file" accept="image/*" hidden @change="readImage($event, 'wechatQr')" /><img v-if="displayImage(form.wechatQr)" :src="displayImage(form.wechatQr)" alt="公众号二维码" /><template v-else><strong>⌘</strong><small>点击上传</small></template></div></label></div></section>
+        <section id="story" class="form-card"><div class="card-heading"><span class="step-number">03</span><div><p class="eyebrow">BRAND STORY</p><h3>品牌叙事</h3></div></div><label class="field"><span>品牌简介</span><textarea v-model="form.intro" rows="3" placeholder="用 2–3 句话介绍品牌是谁、为谁服务、解决什么问题" /></label><label class="field"><span>品牌网址</span><input v-model="form.website" type="url" placeholder="https://www.example.com" /></label><label class="field"><span>发展历程</span><textarea v-model="form.history" rows="4" placeholder="按年份记录重要节点，例如：2021 年成立 · 2023 年推出首家线下店" /></label><label class="field"><span>品牌故事</span><textarea v-model="form.brandStory" rows="4" placeholder="记录品牌诞生的契机、坚持与想带给用户的改变" /></label></section>
+        <section id="culture" class="form-card"><div class="card-heading"><span class="step-number">04</span><div><p class="eyebrow">TEAM & CULTURE</p><h3>团队与文化</h3></div></div><label class="field"><span>核心团队</span><textarea v-model="form.coreTeam" rows="3" placeholder="例如：创始人 / 主理人、设计负责人及其分工" /></label><label class="field"><span>企业文化</span><textarea v-model="form.culture" rows="4" placeholder="记录使命、愿景、价值观与团队工作方式" /></label></section>
+        <div class="form-footer"><p v-if="notice" class="form-notice">{{ notice }}</p><div><button type="button" class="ghost-button" @click="showModal = false">取消</button><button type="submit" class="primary-button">{{ editingBrand ? '保存修改' : '创建品牌' }}</button></div></div>
+      </form></div></section></div></Transition>
   </div>
 </template>
 
 <style scoped>
-.brands-page {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.title-group h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 8px 0 0 0;
-}
-
-.eyebrow {
-  font-size: 11px;
-  color: rgba(139, 92, 246, 0.8);
-  letter-spacing: 0.1em;
-}
-
-.header-desc {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-}
-
-.brands-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 20px;
-}
-
-.brand-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 12px;
-  padding: 20px;
-  transition: all 0.2s;
-}
-
-.brand-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(139, 92, 246, 0.4);
-}
-
-.brand-header {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.brand-color {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.brand-info {
-  flex: 1;
-}
-
-.brand-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 4px 0;
-}
-
-.brand-code {
-  font-size: 12px;
-  color: rgba(139, 92, 246, 0.7);
-}
-
-.brand-section {
-  margin-bottom: 16px;
-}
-
-.brand-section label {
-  display: block;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-.brand-section p {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.platform-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.platform-tag {
-  padding: 4px 10px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 4px;
-  font-size: 12px;
-  color: rgb(139, 92, 246);
-}
-
-.brand-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.link-button {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 6px;
-  color: rgb(139, 92, 246);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.link-button:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgb(139, 92, 246);
-}
-
-.link-button.danger {
-  color: rgb(239, 68, 68);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.link-button.danger:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgb(239, 68, 68);
-}
-
-/* Modal styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal-content {
-  background: rgb(17, 24, 39);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 12px;
-  max-width: 600px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.modal-header h2 {
-  font-size: 20px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 28px;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.close-button:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.modal-form {
-  padding: 24px;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.required {
-  color: rgb(239, 68, 68);
-}
-
-.form-group input[type="text"],
-.form-group textarea {
-  width: 100%;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: rgb(139, 92, 246);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.color-input-group {
-  display: flex;
-  gap: 12px;
-}
-
-.color-picker {
-  width: 60px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.color-text {
-  flex: 1;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
+:global(.page-scroll.brands-scroll){background:#f4f7f7;color:#152a2b}.brands-page{max-width:1400px;margin:0 auto;padding:24px 32px 72px;font-family:'Plus Jakarta Sans','PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;color:#1d3435}.brands-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:30px}.eyebrow{margin:0;color:#829496;font-size:10px;font-weight:700;letter-spacing:.14em}.brands-header h1{margin:9px 0 7px;font-size:34px;line-height:1.15;letter-spacing:-.04em;color:#122628}.header-desc{max-width:650px;margin:0;color:#657879;font-size:14px;line-height:1.65}.primary-button,.ghost-button,.link-button{font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}.primary-button{border:1px solid #0f766e;border-radius:9px;padding:11px 17px;color:#fff;background:#0f766e;box-shadow:0 6px 15px rgba(15,118,110,.18)}.primary-button:hover{background:#0b615c}.primary-button span{font-size:16px;margin-right:3px}.ghost-button{padding:11px 16px;border:1px solid #d9e2e0;border-radius:9px;color:#607474;background:#fff}.brand-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}.brand-card{padding:21px 22px 17px;border:1px solid #dfe8e6;border-radius:15px;background:#fff;box-shadow:0 5px 18px rgba(31,64,64,.045);transition:.2s}.brand-card:hover{transform:translateY(-2px);border-color:#9fcec6;box-shadow:0 10px 25px rgba(31,64,64,.08)}.brand-card-top{display:flex;align-items:center;gap:12px}.brand-mark{display:grid;place-items:center;width:50px;height:50px;border-radius:12px;color:#fff;background:var(--brand-color);font-size:21px;font-weight:800;overflow:hidden}.brand-mark img{width:100%;height:100%;object-fit:contain;background:#fff}.brand-card-title{min-width:0;flex:1}.brand-card-title h2{margin:0 0 5px;font-size:18px;color:#183233}.brand-card-title p{margin:0;color:#718384;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brand-status{padding:4px 8px;border-radius:99px;color:#0f766e;background:#e7f5f1;font-size:10px;font-weight:700}.brand-meta{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 12px;padding-top:14px;border-top:1px solid #edf1f0;color:#7a8b8b;font-size:11px}.brand-meta span+span{padding-left:10px;border-left:1px solid #dfe7e5}.brand-intro{margin:0 0 17px;color:#486263;font-size:12px;line-height:1.65}.brand-card-footer{display:flex;justify-content:space-between;align-items:center;gap:10px}.asset-count{color:#9aa9a8;font-size:10px}.link-button{padding:5px 8px;border:0;background:transparent;color:#0f766e}.link-button.danger{color:#bd6570}.empty-state,.loading-state{padding:86px 20px;text-align:center}.empty-state{border:1px dashed #c9dbd8;border-radius:15px;background:rgba(255,255,255,.58)}.empty-mark{margin-bottom:10px;color:#0f766e;font-size:32px}.empty-state h2{margin:0 0 8px;font-size:20px}.empty-state p,.loading-state{color:#718384;font-size:13px}.empty-state .primary-button{margin-top:18px}.page-notice{margin-bottom:16px;padding:11px 14px;border-radius:9px;color:#a85d63;background:#fff2f1;font-size:12px}
+.modal-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(24,42,42,.42);backdrop-filter:blur(5px)}.brand-modal{width:min(1080px,100%);max-height:92vh;overflow:hidden;border:1px solid #dbe8e5;border-radius:18px;background:#f7faf9;box-shadow:0 24px 70px rgba(21,48,47,.2)}.modal-header{display:flex;align-items:center;justify-content:space-between;padding:23px 28px 20px;border-bottom:1px solid #e3ecea;background:#fff}.modal-header h2{margin:6px 0 0;font-size:23px;letter-spacing:-.03em}.close-button{width:32px;height:32px;border:0;border-radius:8px;color:#748685;background:transparent;font-size:26px;cursor:pointer}.close-button:hover{background:#eef5f3;color:#183233}.modal-layout{display:grid;grid-template-columns:220px minmax(0,1fr);height:calc(92vh - 89px);min-height:0}.modal-aside{min-height:0;padding:22px 15px;overflow:auto;border-right:1px solid #e3ecea;background:#f1f7f5}.completion-card{padding:14px;border:1px solid #d5e8e3;border-radius:11px;background:#fff}.completion-top{display:flex;justify-content:space-between;align-items:center;color:#718282;font-size:11px}.completion-top strong{color:#0f766e;font-size:19px}.completion-track{height:6px;margin:12px 0 8px;border-radius:99px;background:#e3efec;overflow:hidden}.completion-track i{display:block;height:100%;border-radius:inherit;background:#0f766e;transition:.2s}.completion-card small{color:#8a9b9a;font-size:10px}.aside-label{margin:22px 10px 8px;color:#92a3a1;font-size:9px;font-weight:700;letter-spacing:.14em}.modal-aside nav button{display:grid;grid-template-columns:28px 1fr;gap:2px 8px;width:100%;padding:10px;border:0;border-radius:9px;text-align:left;color:#718281;background:transparent;cursor:pointer}.modal-aside nav button:hover,.modal-aside nav button.active{color:#0f766e;background:#e2f2ee}.modal-aside nav button span{grid-row:span 2;font-size:10px;font-weight:700}.modal-aside nav button b{font-size:12px}.modal-aside nav button small{font-size:10px;color:#91a09f}.aside-tip{display:flex;gap:7px;margin:18px 5px 0;padding:11px;border-radius:9px;color:#5d817c;background:#e7f4f1}.aside-tip span{font-size:17px}.aside-tip p{margin:0;font-size:10px;line-height:1.55}.brand-form{min-height:0;padding:20px 25px 28px;overflow:auto;scroll-behavior:smooth}.form-card{scroll-margin-top:15px;margin-bottom:15px;padding:21px 22px;border:1px solid #dfe9e7;border-radius:13px;background:#fff}.card-heading{display:flex;align-items:center;gap:10px;margin-bottom:20px}.step-number{display:grid;place-items:center;width:29px;height:29px;border-radius:8px;color:#0f766e;background:#e5f4f1;font-size:11px;font-weight:800}.card-heading h3{margin:4px 0 0;font-size:17px}.card-heading>small{margin-left:auto;color:#95a4a3;font-size:10px}.field-grid{display:grid;gap:16px}.two-col{grid-template-columns:1fr 1fr}.field,.upload-field{display:grid;gap:7px;margin:0 0 16px}.field>span,.upload-field>span{display:flex;align-items:center;gap:6px;color:#304747;font-size:12px;font-weight:700}.field b{color:#da6671}.field i,.upload-field i{color:#9aa9a8;font-size:10px;font-style:normal;font-weight:500}.field input,.field select,.field textarea{width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid #dbe6e4;border-radius:8px;outline:0;color:#234041;background:#fff;font:500 13px/1.5 inherit;transition:.15s;resize:vertical}.field input{height:40px}.field input:focus,.field select:focus,.field textarea:focus{border-color:#53a99d;box-shadow:0 0 0 3px rgba(42,157,143,.12)}.field input.invalid,.field select.invalid{border-color:#d96d78}.field small,.field em{color:#8b9b9a;font-size:10px;font-style:normal}.field em{color:#c95e69}.upload-grid{display:grid;grid-template-columns:190px 1fr;gap:18px}.upload-box{display:grid;place-items:center;align-content:center;min-height:148px;border:1px dashed #b8d0cb;border-radius:10px;color:#809391;background:#f8fbfa;cursor:pointer}.upload-box:hover,.qr-box:hover{border-color:#4ba89b;background:#f0faf7}.upload-box strong{color:#0f766e;font-size:27px}.upload-box b{margin-top:5px;font-size:12px}.upload-box small{margin-top:5px;font-size:10px}.upload-box img{width:100%;height:148px;object-fit:contain}.qr-grid{display:grid;grid-template-columns:190px 190px;gap:18px}.qr-box{display:grid;place-items:center;min-height:132px;border:1px dashed #b8d0cb;border-radius:10px;color:#78908e;background:#f8fbfa;cursor:pointer;text-align:center}.qr-box strong{font-size:25px;color:#0f766e}.qr-box small{font-size:10px}.qr-box img{width:100%;height:132px;object-fit:contain}.form-footer{display:flex;justify-content:space-between;align-items:center;padding:4px 2px}.form-footer>div{display:flex;gap:9px;margin-left:auto}.form-notice{margin:0;color:#c95e69;font-size:11px}
+@media (max-width:900px){.brands-page{padding:22px 20px 58px}.modal-layout{grid-template-columns:1fr}.modal-aside{display:none}.brand-form{max-height:calc(92vh - 89px)}}@media (max-width:620px){.brands-page{padding:18px 14px 48px}.brands-header{display:block}.brands-header .primary-button{margin-top:18px}.brands-header h1{font-size:30px}.brand-list{grid-template-columns:1fr}.brand-card-footer{align-items:flex-end;flex-direction:column}.brand-card-footer>div{width:100%;display:flex;justify-content:flex-end}.modal-overlay{padding:0}.brand-modal{max-height:100vh;height:100vh;border-radius:0}.modal-header{padding:18px 19px}.brand-form{padding:16px}.two-col,.upload-grid,.qr-grid{grid-template-columns:1fr}.form-card{padding:18px}.upload-box{min-height:130px}.upload-box img{height:130px}.form-footer{display:block}.form-footer>div{margin-top:12px;justify-content:flex-end}.form-footer .primary-button{flex:1}}@media(prefers-reduced-motion:reduce){.brand-card{transition:none}.brand-form{scroll-behavior:auto}}
+/* Brand archive typography and rhythm refinement */
+.brands-page{--brand-rounded-font:"YouYuan","Microsoft YaHei UI","Microsoft YaHei","Noto Sans SC",sans-serif;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.brands-header h1,.modal-header h2,.brand-card-title h2,.form-card h3{font-family:"Avenir Next","PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;font-weight:750}
+.brands-header h1{font-size:36px;letter-spacing:-.045em;line-height:1.18}.header-desc{font-size:13px;letter-spacing:.01em;line-height:1.75}.modal-header{padding:25px 30px 23px}.modal-header h2{font-size:24px;letter-spacing:-.035em}.brand-form{padding:24px 28px 34px}.form-card{padding:24px 25px;border-radius:15px}.card-heading{margin-bottom:22px}.card-heading h3{font-size:18px;letter-spacing:-.02em}.field>span,.upload-field>span{font-size:13px;letter-spacing:.01em}.field input,.field select,.field textarea{font-size:14px;line-height:1.6}.field input{height:42px}.field small,.field em{font-size:11px;line-height:1.5}.modal-aside{padding:24px 16px}.modal-aside nav button{padding:11px 10px}.modal-aside nav button b{font-size:13px}.modal-aside nav button small{font-size:11px}.completion-top{font-size:12px}.completion-top strong{font-size:20px}
+.field input,.field select,.field textarea,.custom-select-trigger,.custom-select-menu button{font-family:var(--brand-rounded-font);font-weight:400;letter-spacing:.012em}.field textarea{line-height:1.85}.custom-select-menu button{letter-spacing:.01em}.upload-box b,.upload-box small,.qr-box small{font-family:var(--brand-rounded-font);font-weight:400}.field input::placeholder,.field textarea::placeholder{font-family:var(--brand-rounded-font);font-weight:400;letter-spacing:.01em}
+.upload-grid,.qr-grid{align-items:start}.upload-grid>.field,.upload-grid>.upload-field,.qr-grid>.upload-field{align-self:start;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:7px}.upload-field>span,.field>span{display:flex;align-items:center;min-height:20px;height:20px;line-height:20px}.upload-box,.qr-box{margin-top:0}
+.upload-grid>* ,.qr-grid>*{margin-top:0!important;padding-top:0!important}
+.upload-box strong,.qr-box strong{font-family:"Noto Sans SC","Microsoft YaHei UI","Microsoft YaHei",sans-serif;font-weight:600;line-height:1;font-variation-settings:"wght" 600}.upload-box b,.qr-box small{font-family:"Noto Sans SC","Microsoft YaHei UI","Microsoft YaHei",sans-serif;font-weight:600;letter-spacing:.02em;line-height:1.45;font-variation-settings:"wght" 560;color:#426362}.upload-box small{font-size:11px;font-weight:500;letter-spacing:.035em;color:#718685;font-variation-settings:"wght" 500}.qr-box small{font-size:12px;font-weight:500;color:#567371;font-variation-settings:"wght" 500}
+.modal-aside nav button{transition:color .2s ease,background .24s ease,transform .24s cubic-bezier(.22,1,.36,1)}.modal-aside nav button:hover{transform:translateX(2px);background:#eaf7f4}.modal-aside nav button.active{transform:translateX(3px);background:#e2f2ee}
+.brand-dialog-enter-active,.brand-dialog-leave-active{transition:opacity .28s ease}.brand-dialog-enter-active .brand-modal,.brand-dialog-leave-active .brand-modal{transition:opacity .34s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1),filter .34s ease}.brand-dialog-enter-from,.brand-dialog-leave-to{opacity:0}.brand-dialog-enter-from .brand-modal{opacity:0;transform:translateY(18px) scale(.965);filter:blur(3px)}.brand-dialog-leave-to .brand-modal{opacity:0;transform:translateY(10px) scale(.985);filter:blur(2px)}.close-button,.primary-button,.ghost-button{transition:transform .2s cubic-bezier(.22,1,.36,1),background .2s ease,box-shadow .2s ease,border-color .2s ease}.close-button:hover{transform:rotate(7deg) scale(1.05)}.close-button:active,.primary-button:active,.ghost-button:active{transform:scale(.96)}.brand-dialog-enter-active .modal-header{animation:dialog-header-in .46s .08s both cubic-bezier(.22,1,.36,1)}.brand-dialog-enter-active .form-card{animation:dialog-card-in .5s both cubic-bezier(.22,1,.36,1);animation-delay:calc(var(--card-index, 0) * 45ms + 90ms)}@keyframes dialog-header-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}@keyframes dialog-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.custom-select{position:relative}.custom-select-trigger{display:flex;align-items:center;justify-content:space-between;width:100%;height:42px;padding:0 11px;border:1px solid #dbe6e4;border-radius:8px;outline:0;color:#234041;background:#fff;font:500 14px/1.6 inherit;cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}.custom-select-trigger:hover{border-color:#8fc9bf;background:#fbfefd}.custom-select.open .custom-select-trigger,.custom-select-trigger:focus-visible{border-color:#43a397;box-shadow:0 0 0 3px rgba(42,157,143,.12);background:#fff}.custom-select-trigger span.placeholder{color:#8b9b9a}.custom-select-trigger svg{width:17px;height:17px;fill:none;stroke:#315858;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .22s cubic-bezier(.22,1,.36,1),stroke .18s}.custom-select.open .custom-select-trigger svg{transform:rotate(180deg);stroke:#0f766e}.custom-select.invalid .custom-select-trigger{border-color:#d96d78}.custom-select-menu{position:absolute;z-index:20;top:calc(100% + 7px);left:0;right:0;padding:6px;border:1px solid #d5e7e3;border-radius:11px;background:rgba(255,255,255,.98);box-shadow:0 14px 30px rgba(25,70,67,.14),0 2px 5px rgba(25,70,67,.06);transform-origin:top center}.custom-select-menu button{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:36px;padding:0 10px;border:0;border-radius:7px;color:#466060;background:transparent;font:500 13px/1.4 inherit;text-align:left;cursor:pointer;transition:background .15s ease,color .15s ease,transform .15s ease}.custom-select-menu button:hover{color:#0f766e;background:#edf8f5;transform:translateX(2px)}.custom-select-menu button.selected{color:#0f766e;background:#e3f4ef;font-weight:700}.custom-select-menu button svg{width:16px;height:16px;fill:none;stroke:#0f766e;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.select-pop-enter-active,.select-pop-leave-active{transition:opacity .16s ease,transform .2s cubic-bezier(.22,1,.36,1)}.select-pop-enter-from,.select-pop-leave-to{opacity:0;transform:translateY(-6px) scale(.98)}
+/* Modal choreography: a soft backdrop, a weighted lift, and gentle content reveal. */
+.brand-dialog-enter-active,.brand-dialog-leave-active{transition:opacity .28s ease}
+.brand-dialog-enter-active .brand-modal,.brand-dialog-leave-active .brand-modal{transition:opacity .34s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1),filter .34s ease}
+.brand-dialog-enter-from,.brand-dialog-leave-to{opacity:0}
+.brand-dialog-enter-from .brand-modal{opacity:0;transform:translateY(18px) scale(.965);filter:blur(3px)}
+.brand-dialog-leave-to .brand-modal{opacity:0;transform:translateY(10px) scale(.985);filter:blur(2px)}
+.close-button,.primary-button,.ghost-button{transition:transform .2s cubic-bezier(.22,1,.36,1),background .2s ease,box-shadow .2s ease,border-color .2s ease}
+.close-button:hover{transform:rotate(7deg) scale(1.05)}
+.close-button:active,.primary-button:active,.ghost-button:active{transform:scale(.96)}
+.brand-dialog-enter-active .modal-header{animation:dialog-header-in .46s .08s both cubic-bezier(.22,1,.36,1)}
+.brand-dialog-enter-active .form-card{animation:dialog-card-in .5s both cubic-bezier(.22,1,.36,1)}
+.brand-dialog-enter-active .form-card:nth-of-type(1){animation-delay:.10s}.brand-dialog-enter-active .form-card:nth-of-type(2){animation-delay:.15s}.brand-dialog-enter-active .form-card:nth-of-type(3){animation-delay:.20s}.brand-dialog-enter-active .form-card:nth-of-type(4){animation-delay:.25s}
+@keyframes dialog-header-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}@keyframes dialog-card-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.brand-dialog-enter-active,.brand-dialog-leave-active,.brand-dialog-enter-active .brand-modal,.brand-dialog-leave-active .brand-modal{transition:none}.brand-dialog-enter-active .modal-header,.brand-dialog-enter-active .form-card{animation:none}}
+:global([data-theme='dark'] .brand-card){background:#141c27;border-color:#2b3d46;box-shadow:0 8px 24px rgba(0,0,0,.18)}:global([data-theme='dark'] .brand-card-title h2){color:#e9f3f1}:global([data-theme='dark'] .brand-card-title p),:global([data-theme='dark'] .brand-meta){color:#91aaa7}:global([data-theme='dark'] .brand-meta){border-top-color:#263741}:global([data-theme='dark'] .brand-meta span+span){border-left-color:#31444a}:global([data-theme='dark'] .brand-intro){color:#b2c7c4}:global([data-theme='dark'] .asset-count){color:#78928f}:global([data-theme='dark'] .empty-state){border-color:#31504d;background:#111a24}:global([data-theme='dark'] .empty-state h2){color:#e8f2f0}:global([data-theme='dark'] .modal-overlay){background:rgba(2,7,12,.68)}:global([data-theme='dark'] .brand-modal){background:#101821;border-color:#2b4149;box-shadow:0 24px 70px rgba(0,0,0,.45)}:global([data-theme='dark'] .modal-header){background:#121c26;border-bottom-color:#2a3a43}:global([data-theme='dark'] .modal-header h2){color:#e8f2f0}:global([data-theme='dark'] .modal-aside){background:#0f1a22;border-right-color:#2a3a43}:global([data-theme='dark'] .completion-card),:global([data-theme='dark'] .form-card){background:#15212b;border-color:#2e444c}:global([data-theme='dark'] .completion-top),:global([data-theme='dark'] .card-heading h3),:global([data-theme='dark'] .field>span),:global([data-theme='dark'] .upload-field>span){color:#dce9e7}:global([data-theme='dark'] .modal-aside nav button){color:#91aaa7}:global([data-theme='dark'] .modal-aside nav button:hover){background:#18372f}:global([data-theme='dark'] .modal-aside nav button.active){color:#7de0cf;background:#17453c}:global([data-theme='dark'] .modal-aside nav button small){color:#78928f}:global([data-theme='dark'] .aside-tip){background:#14352f;color:#9ed3c9}:global([data-theme='dark'] .aside-tip p){color:#a4beb9}:global([data-theme='dark'] .field input),:global([data-theme='dark'] .field select),:global([data-theme='dark'] .field textarea),:global([data-theme='dark'] .custom-select-trigger){color:#e0ecea;background:#111b24;border-color:#38505a}:global([data-theme='dark'] .field input::placeholder),:global([data-theme='dark'] .field textarea::placeholder){color:#718985}:global([data-theme='dark'] .custom-select-menu){background:#17232d;border-color:#36515a}:global([data-theme='dark'] .custom-select-menu button){color:#b7ccca}:global([data-theme='dark'] .custom-select-menu button:hover){color:#85dece;background:#194238}:global([data-theme='dark'] .custom-select-menu button.selected){color:#85dece;background:#1b5044}:global([data-theme='dark'] .ghost-button){color:#b4c5c3;background:#17232d;border-color:#38505a}
+:global([data-theme='dark'] .brands-header h1){color:#e9f3f1!important}
+:global([data-theme='dark'] .page-scroll.brands-scroll){background:#0b1019;color:#e8f2f0}
+:global([data-theme='dark']) .brands-page{color:#dce9e7}.brands-page{transition:color .25s ease}.brands-header h1{transition:color .25s ease}.brand-card,.empty-state{transition:background .25s ease,border-color .25s ease,box-shadow .25s ease,transform .2s ease}.brand-card-title h2{transition:color .25s ease}.brand-meta{transition:border-color .25s ease,color .25s ease}
+:global([data-theme='dark']) .brands-header h1,:global([data-theme='dark']) .brand-card-title h2{color:#e9f3f1}:global([data-theme='dark']) .header-desc,:global([data-theme='dark']) .brand-card-title p{color:#91aaa7}:global([data-theme='dark']) .brand-card,:global([data-theme='dark']) .form-card{background:#141c27;border-color:#2b3d46;box-shadow:0 8px 24px rgba(0,0,0,.18)}:global([data-theme='dark']) .brand-card:hover{border-color:#3e8f83;box-shadow:0 12px 30px rgba(0,0,0,.28)}:global([data-theme='dark']) .brand-meta{border-top-color:#263741;color:#91aaa7}:global([data-theme='dark']) .brand-meta span+span{border-left-color:#31444a}:global([data-theme='dark']) .brand-intro{color:#b2c7c4}:global([data-theme='dark']) .asset-count{color:#78928f}:global([data-theme='dark']) .empty-state{border-color:#31504d;background:#111a24}:global([data-theme='dark']) .empty-state h2{color:#e8f2f0}:global([data-theme='dark']) .modal-overlay{background:rgba(2,7,12,.68)}:global([data-theme='dark']) .brand-modal{background:#101821;border-color:#2b4149;box-shadow:0 24px 70px rgba(0,0,0,.45)}:global([data-theme='dark']) .modal-header{background:#121c26;border-bottom-color:#2a3a43}:global([data-theme='dark']) .modal-header h2{color:#e8f2f0}:global([data-theme='dark']) .modal-aside{background:#0f1a22;border-right-color:#2a3a43}:global([data-theme='dark']) .completion-card,:global([data-theme='dark']) .form-card{background:#15212b;border-color:#2e444c}:global([data-theme='dark']) .completion-top,:global([data-theme='dark']) .card-heading h3,:global([data-theme='dark']) .field>span,:global([data-theme='dark']) .upload-field>span{color:#dce9e7}:global([data-theme='dark']) .modal-aside nav button{color:#91aaa7}:global([data-theme='dark']) .modal-aside nav button:hover{background:#18372f}:global([data-theme='dark']) .modal-aside nav button.active{color:#7de0cf;background:#17453c}:global([data-theme='dark']) .modal-aside nav button small{color:#78928f}:global([data-theme='dark']) .aside-tip{background:#14352f;color:#9ed3c9}:global([data-theme='dark']) .aside-tip p{color:#a4beb9}:global([data-theme='dark']) .field input,:global([data-theme='dark']) .field select,:global([data-theme='dark']) .field textarea,:global([data-theme='dark']) .custom-select-trigger{color:#e0ecea;background:#111b24;border-color:#38505a}:global([data-theme='dark']) .field input::placeholder,:global([data-theme='dark']) .field textarea::placeholder{color:#718985}:global([data-theme='dark']) .field input:focus,:global([data-theme='dark']) .field select:focus,:global([data-theme='dark']) .field textarea:focus,:global([data-theme='dark']) .custom-select-trigger:focus-visible{background:#13232c;border-color:#54b9aa}:global([data-theme='dark']) .custom-select-trigger span.placeholder{color:#718985}:global([data-theme='dark']) .custom-select-menu{background:#17232d;border-color:#36515a;box-shadow:0 16px 34px rgba(0,0,0,.4)}:global([data-theme='dark']) .custom-select-menu button{color:#b7ccca}:global([data-theme='dark']) .custom-select-menu button:hover{color:#85dece;background:#194238}:global([data-theme='dark']) .custom-select-menu button.selected{color:#85dece;background:#1b5044}:global([data-theme='dark']) .ghost-button{color:#b4c5c3;background:#17232d;border-color:#38505a}:global([data-theme='dark']) .close-button{color:#9fb4b1}:global([data-theme='dark']) .close-button:hover{background:#20353b;color:#dff8f3}
 </style>

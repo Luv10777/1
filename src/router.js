@@ -7,6 +7,7 @@ import ForbiddenView from './views/ForbiddenView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import CreativeWorkspaceView from './views/CreativeWorkspaceView.vue'
 import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
+import StoreInfoView from './views/StoreInfoView.vue'
 import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
@@ -17,6 +18,7 @@ import WorksView from './views/WorksView.vue'
 import ImageCreateView from './views/ImageCreateView.vue'
 import VideoCreateView from './views/VideoCreateView.vue'
 import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
+import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
 
@@ -31,7 +33,7 @@ const routes = [
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', eyebrow: 'AI WORKSPACE', icon: '✦', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },
   { path: '/copy/extract', name: 'copy-extract', component: PlaceholderView, meta: { title: '文案提取', eyebrow: 'CONTENT TOOLS', icon: '↗', description: '从已有素材中提取可复用的卖点、语气与结构。' } },
   { path: '/copy/rewrite', name: 'copy-rewrite', component: PlaceholderView, meta: { title: '文案提取 / 仿写 / 重写', eyebrow: 'CONTENT TOOLS', icon: 'Aa', description: '从已有素材提取文案，在保留核心信息的基础上完成仿写与多平台重写。' } },
-  { path: '/video/analyze', name: 'video-analyze', component: PlaceholderView, meta: { title: '视频反推', eyebrow: 'CONTENT TOOLS', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },
+  { path: '/video/analyze', name: 'video-analyze', component: VideoAnalyzeView, meta: { title: '视频反推', eyebrow: 'CONTENT TOOLS', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },
   { path: '/image/create', name: 'image-create', component: ImageCreateView, meta: { title: 'AI 图片创作', eyebrow: 'CONTENT TOOLS', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。', navGroup: 'content' } },
   { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { title: '营销海报', eyebrow: 'CONTENT TOOLS', icon: '✦', description: '为一次活动定下主视觉。', navGroup: 'content' } },
   { path: '/image/create/product-set', name: 'image-create-product-set', component: ImageCreateView, meta: { title: '产品套图', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '围绕同一件商品生成一组有秩序的画面。', navGroup: 'content' } },
@@ -41,7 +43,7 @@ const routes = [
   { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { title: 'AI实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，AI 负责话术、声音克隆与弹幕自动回复。' } },
   { path: '/digital-human/history', name: 'digital-human-history', component: PlaceholderView, meta: { title: '直播弹幕与回复记录', eyebrow: 'CONTENT TOOLS / LIVE HISTORY', icon: '◷', description: '查看本场直播中的观众弹幕与 AI 回复内容。历史记录页将在后续版本接入完整数据。' } },
   { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
-  { path: '/merchants', name: 'merchants', component: PlaceholderView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
+  { path: '/merchants', name: 'merchants', component: StoreInfoView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },

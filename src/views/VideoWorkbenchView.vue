@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import Aurora from '../components/reactbits/Aurora.vue'
 import BlurText from '../components/reactbits/BlurText.vue'
 import ShinyText from '../components/reactbits/ShinyText.vue'
@@ -14,8 +14,11 @@ const fileInput = ref(null)
 const isGenerating = ref(false)
 const notice = ref('')
 const router = useRouter()
+const route = useRoute()
 const isMorphing = ref(false)
 let morphTimer
+
+if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) prompt.value = route.query.prompt
 
 const addFiles = (fileList) => {
   const images = Array.from(fileList || []).filter(file => file.type.startsWith('image/'))

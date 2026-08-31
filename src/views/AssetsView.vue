@@ -1,408 +1,69 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { isDemoMode } from '../utils/config'
-import Loading from '../components/Loading.vue'
-import Empty from '../components/Empty.vue'
+import { computed, ref } from 'vue'
+import { theme } from '../stores/theme'
+import { Archive, AudioLines, Check, ChevronDown, ChevronRight, Cloud, FileText, Folder, FolderOpen, Image as ImageIcon, MoreHorizontal, Play, Plus, Search, Upload, Video, X } from 'lucide-vue-next'
 
-const assets = ref([])
-const loading = ref(true)
-const filter = reactive({
-  type: 'all',
-  category: ''
-})
-
-const typeMap = {
-  IMAGE: '图片',
-  VIDEO: '视频',
-  AUDIO: '音频',
-  DOCUMENT: '文档'
-}
-
-onMounted(async () => {
-  await loadAssets()
-})
-
-async function loadAssets() {
-  loading.value = true
-  try {
-    if (isDemoMode()) {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      assets.value = [
-        {
-          id: 'asset_1',
-          code: 'A1724580000001',
-          name: '青岚茶事秋季新品海报',
-          type: 'IMAGE',
-          category: '营销素材',
-          fileUrl: '/demo/poster1.jpg',
-          thumbnailUrl: '/demo/thumb1.jpg',
-          width: 1080,
-          height: 1920,
-          fileSize: 2048000,
-          mimeType: 'image/jpeg',
-          usageCount: 12,
-          status: 'AVAILABLE',
-          createdAt: '2024-08-20T10:00:00Z'
-        },
-        {
-          id: 'asset_2',
-          code: 'A1724580000002',
-          name: '门店宣传视频素材',
-          type: 'VIDEO',
-          category: '品牌宣传',
-          fileUrl: '/demo/video1.mp4',
-          thumbnailUrl: '/demo/video-thumb1.jpg',
-          duration: 30,
-          fileSize: 15360000,
-          mimeType: 'video/mp4',
-          usageCount: 5,
-          status: 'AVAILABLE',
-          createdAt: '2024-08-22T14:00:00Z'
-        },
-        {
-          id: 'asset_3',
-          code: 'A1724580000003',
-          name: '产品介绍配音',
-          type: 'AUDIO',
-          category: '配音素材',
-          fileUrl: '/demo/audio1.mp3',
-          duration: 45,
-          fileSize: 1024000,
-          mimeType: 'audio/mpeg',
-          usageCount: 3,
-          status: 'AVAILABLE',
-          createdAt: '2024-08-23T09:00:00Z'
-        }
-      ]
-    }
-  } catch (error) {
-    console.error('加载素材失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-function formatFileSize(bytes) {
-  if (!bytes) return '-'
-  const mb = bytes / 1024 / 1024
-  if (mb < 1) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${mb.toFixed(1)} MB`
-}
-
-function formatDuration(seconds) {
-  if (!seconds) return '-'
-  const min = Math.floor(seconds / 60)
-  const sec = seconds % 60
-  return `${min}:${sec.toString().padStart(2, '0')}`
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN')
-}
-
-const filteredAssets = ref([])
-filteredAssets.value = assets.value
+const activeTab = ref('全部'); const searchQuery = ref(''); const selectedId = ref(null); const selectedIds = ref([]); const multiSelectMode = ref(false); const previewAsset = ref(null); const selectedFolder = ref('全部文件'); const showUpload = ref(false); const showNewFolder = ref(false); const folderName = ref(''); const showAllFolders = ref(false); const moveTarget = ref(''); const moveMenuOpen = ref(false)
+const tabs = [{ label:'全部', icon:Archive }, { label:'图片', icon:ImageIcon }, { label:'视频', icon:Video }, { label:'音频', icon:AudioLines }, { label:'文档', icon:FileText }]
+const folders = [{ id:'all', label:'全部文件', count:18, icon:Archive }, { id:'mine', label:'我的素材', count:12, icon:Folder }, { id:'shared', label:'团队共享', count:6, icon:FolderOpen }]
+const nestedFolders = ref([{ id:'2026 秋季营销', label:'2026 秋季营销', count:8, scope:'mine' }, { id:'品牌视觉', label:'品牌视觉', count:5, scope:'shared' }, { id:'产品图集', label:'产品图集', count:5, scope:'mine' }, { id:'社媒投放', label:'社媒投放', count:3, scope:'shared' }])
+const assets = ref([
+  { id:'folder-1', kind:'folder', name:'KV 主视觉', meta:'8 个项目 · 4.2 GB', folder:'2026 秋季营销', scope:'mine' }, { id:'folder-2', kind:'folder', name:'短视频分镜', meta:'12 个项目 · 1.8 GB', folder:'2026 秋季营销', scope:'mine' },
+  { id:'image-1', kind:'image', name:'茶园晨雾.jpg', meta:'2.4 MB · 昨天', folder:'2026 秋季营销', src:'/images/product-wall/sofa-texture.png', format:'JPG' }, { id:'image-2', kind:'image', name:'桂花乌龙-产品图.png', meta:'4.8 MB · 昨天', folder:'2026 秋季营销', src:'/images/product-wall/pasta-special.png', format:'PNG' }, { id:'image-3', kind:'image', name:'秋日礼盒-细节.jpg', meta:'3.1 MB · 8月28日', folder:'2026 秋季营销', src:'/images/product-wall/leather-look.png', format:'JPG' },
+  { id:'video-1', kind:'video', name:'秋日品牌片-30s.mp4', meta:'86.2 MB · 8月27日', folder:'2026 秋季营销', duration:'0:30', format:'MP4', src:'/images/product-wall/rug-benefits.jpg' }, { id:'video-2', kind:'video', name:'门店氛围-竖版.mp4', meta:'42.7 MB · 8月26日', folder:'2026 秋季营销', duration:'0:15', format:'MP4', src:'/images/product-wall/floral-nails.png' }, { id:'audio-1', kind:'audio', name:'品牌片-环境音.mp3', meta:'8.6 MB · 8月25日', folder:'2026 秋季营销', duration:'1:20', format:'MP3' }, { id:'doc-1', kind:'document', name:'秋季营销-素材清单.pdf', meta:'1.2 MB · 8月24日', folder:'2026 秋季营销', format:'PDF' },
+  { id:'loose-1', kind:'image', name:'临时拍摄-花絮.jpg', meta:'2.8 MB · 今天', folder:null, scope:'mine', src:'/images/product-wall/beef-pizza.png', format:'JPG' }, { id:'loose-2', kind:'image', name:'门店现场-未归档.png', meta:'5.6 MB · 昨天', folder:null, scope:'shared', src:'/images/product-wall/sink-product.png', format:'PNG' }
+])
+const visibleAssets = computed(() => { const q = searchQuery.value.trim().toLowerCase(); const types = { 图片:'image', 视频:'video', 音频:'audio', 文档:'document' }; const rootFolder = ['全部文件', '我的素材', '团队共享'].includes(selectedFolder.value); if (rootFolder) { const scope = selectedFolder.value === '我的素材' ? 'mine' : selectedFolder.value === '团队共享' ? 'shared' : null; const foldersInRoot = nestedFolders.value.filter(f => !scope || f.scope === scope).map(f => ({ id:`folder-${f.id}`, kind:'folder', name:f.label, meta:`${f.count} 个项目`, folder:f.id, scope:f.scope })); const looseAssets = assets.value.filter(a => !a.folder && (!scope || a.scope === scope) && (activeTab.value === '全部' || types[activeTab.value] === a.kind) && (!q || a.name.toLowerCase().includes(q))); return [...foldersInRoot, ...looseAssets] } return assets.value.filter(a => a.folder === selectedFolder.value && a.kind !== 'folder' && (activeTab.value === '全部' || types[activeTab.value] === a.kind) && (!q || a.name.toLowerCase().includes(q))) })
+const selectedCount = computed(() => selectedIds.value.length)
+const isRoot = computed(() => ['全部文件', '我的素材', '团队共享'].includes(selectedFolder.value))
+const sidebarFolders = computed(() => { const scope = selectedFolder.value === '我的素材' ? 'mine' : selectedFolder.value === '团队共享' ? 'shared' : null; return nestedFolders.value.filter(f => !scope || f.scope === scope) })
+const chooseFolder = f => { selectedFolder.value = f.label; activeTab.value = '全部'; selectedIds.value = [] }
+const toggleMultiSelect = () => { multiSelectMode.value = !multiSelectMode.value; selectedIds.value = []; selectedId.value = null }
+const toggleAssetSelection = id => { if (!multiSelectMode.value) { selectedId.value = selectedId.value === id ? null : id; return }; selectedIds.value = selectedIds.value.includes(id) ? selectedIds.value.filter(item => item !== id) : [...selectedIds.value, id] }
+const handleAssetClick = asset => { if (multiSelectMode.value) { toggleAssetSelection(asset.id); return }; if (asset.kind === 'folder') { selectedFolder.value = asset.folder; activeTab.value = '全部'; selectedIds.value = []; selectedId.value = null; return }; previewAsset.value = asset }
+const selectAllVisible = () => { selectedIds.value = selectedIds.value.length === visibleAssets.value.length ? [] : visibleAssets.value.map(a => a.id) }
+const clearSelection = () => { selectedIds.value = []; multiSelectMode.value = false }
+const moveSelected = () => { if (!moveTarget.value) return; assets.value.forEach(a => { if (selectedIds.value.includes(a.id)) a.folder = moveTarget.value }); clearSelection(); moveTarget.value = '' }
+const selectMoveTarget = target => { moveTarget.value = target; moveMenuOpen.value = false }
+const moveTargetLabel = computed(() => nestedFolders.value.find(f => f.id === moveTarget.value)?.label || '移动到文件夹…')
+const deleteSelected = () => { if (!selectedIds.value.length || !window.confirm(`确定删除选中的 ${selectedIds.value.length} 个项目吗？`)) return; const selectedFolderIds = selectedIds.value.filter(id => id.startsWith('folder-')).map(id => id.slice(7)); nestedFolders.value = nestedFolders.value.filter(f => !selectedFolderIds.includes(f.id)); assets.value = assets.value.filter(a => !selectedIds.value.includes(a.id) && !(a.folder && selectedFolderIds.includes(a.folder))); clearSelection() }
+const createFolder = () => { const n = folderName.value.trim(); if (!n) return; nestedFolders.value.push({ id:n, label:n, count:0, scope: selectedFolder.value === '团队共享' ? 'shared' : 'mine' }); folderName.value=''; showNewFolder.value=false }
 </script>
 
 <template>
-  <div class="assets-page">
-    <header class="page-header">
-      <div class="header-top">
-        <div class="title-group">
-          <span class="eyebrow mono">ASSET LIBRARY</span>
-          <h1>素材库</h1>
-        </div>
-        <div class="header-actions">
-          <button class="primary-button">
-            <span>↑</span> 上传素材
-          </button>
-        </div>
-      </div>
-      <p class="header-desc">统一管理图片、视频、音频与文档素材</p>
-    </header>
-
-    <section class="filter-bar">
-      <div class="filter-group">
-        <label>类型</label>
-        <select v-model="filter.type" class="filter-select">
-          <option value="all">全部类型</option>
-          <option value="IMAGE">图片</option>
-          <option value="VIDEO">视频</option>
-          <option value="AUDIO">音频</option>
-          <option value="DOCUMENT">文档</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>分类</label>
-        <input v-model="filter.category" type="text" class="filter-input" placeholder="输入分类筛选" />
-      </div>
-    </section>
-
-    <Loading v-if="loading" text="加载素材列表..." />
-
-    <Empty
-      v-else-if="assets.length === 0"
-      icon="□"
-      title="暂无素材"
-      description="上传第一个素材，开始构建内容资产库"
-      action-text="上传素材"
-    />
-
-    <div v-else class="assets-grid">
-      <div v-for="asset in assets" :key="asset.id" class="asset-card">
-        <div class="asset-preview">
-          <div v-if="asset.type === 'IMAGE'" class="preview-image">
-            <div class="placeholder-icon">🖼️</div>
-          </div>
-          <div v-else-if="asset.type === 'VIDEO'" class="preview-video">
-            <div class="placeholder-icon">▶️</div>
-            <span class="duration-badge">{{ formatDuration(asset.duration) }}</span>
-          </div>
-          <div v-else-if="asset.type === 'AUDIO'" class="preview-audio">
-            <div class="placeholder-icon">🎵</div>
-            <span class="duration-badge">{{ formatDuration(asset.duration) }}</span>
-          </div>
-          <div v-else class="preview-document">
-            <div class="placeholder-icon">📄</div>
-          </div>
-          <span class="type-badge">{{ typeMap[asset.type] }}</span>
-        </div>
-
-        <div class="asset-info">
-          <h3 class="asset-name">{{ asset.name }}</h3>
-          <span class="asset-code mono">{{ asset.code }}</span>
-
-          <div class="asset-meta">
-            <div class="meta-row">
-              <span class="label">分类</span>
-              <span class="value">{{ asset.category }}</span>
-            </div>
-            <div class="meta-row">
-              <span class="label">大小</span>
-              <span class="value">{{ formatFileSize(asset.fileSize) }}</span>
-            </div>
-            <div v-if="asset.width" class="meta-row">
-              <span class="label">尺寸</span>
-              <span class="value">{{ asset.width }}×{{ asset.height }}</span>
-            </div>
-            <div class="meta-row">
-              <span class="label">使用</span>
-              <span class="value">{{ asset.usageCount }}次</span>
-            </div>
-            <div class="meta-row">
-              <span class="label">上传</span>
-              <span class="value">{{ formatDate(asset.createdAt) }}</span>
-            </div>
-          </div>
-
-          <div class="asset-actions">
-            <button class="link-button">预览</button>
-            <button class="link-button">编辑</button>
-            <button class="link-button danger">删除</button>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="asset-library" :class="{ 'multi-select': multiSelectMode, 'theme-dark': !theme.isLight }">
+    <aside class="asset-sidebar">
+      <div class="sidebar-heading"><div><h1>素材库</h1></div><button class="sidebar-more"><MoreHorizontal :size="18" /></button></div>
+      <nav class="asset-nav"><button v-for="f in folders" :key="f.id" class="nav-row" :class="{ active:selectedFolder===f.label }" @click="chooseFolder(f)"><component :is="f.icon" :size="17" :stroke-width="1.8" /><span>{{ f.label }}</span><span class="nav-count">{{ f.count }}</span></button></nav>
+      <div class="sidebar-divider" /><div class="tree-heading"><span>文件夹</span><button class="tree-add" @click="showNewFolder=true"><Plus :size="15" /></button></div>
+      <div class="folder-tree"><button v-for="f in (showAllFolders ? nestedFolders : nestedFolders.slice(0,3))" :key="f.id" class="tree-row" :class="{ active:selectedFolder===f.id }" @click="selectedFolder=f.id"><ChevronRight :size="14" class="tree-chevron" /><Folder :size="16" :fill="selectedFolder===f.id ? 'currentColor' : 'none'" /><span>{{ f.label }}</span><span class="tree-count">{{ f.count }}</span></button></div>
+      <button class="show-all" @click="showAllFolders=!showAllFolders">{{ showAllFolders ? '收起文件夹' : '查看全部文件夹' }} <ChevronDown :size="14" /></button>
+      <div class="storage-card"><div class="storage-top"><span>存储空间</span><span>42%</span></div><div class="storage-track"><span /></div><p>42.8 GB <span>/ 100 GB</span></p></div>
+    </aside>
+    <main class="asset-main">
+      <header class="asset-toolbar"><div class="toolbar-left"><div class="breadcrumb"><button v-if="!isRoot" class="back-button" @click="selectedFolder='全部文件'"><ChevronRight :size="14" class="back-icon" />返回全部文件</button><span>素材库</span><ChevronRight :size="15" /><strong>{{ selectedFolder }}</strong></div><div class="tabs"><button v-for="t in tabs" :key="t.label" class="tab-pill" :class="{ active:activeTab===t.label }" @click="activeTab=t.label"><component :is="t.icon" :size="15" />{{ t.label }}</button></div></div><div class="toolbar-actions"><label class="search-box"><Search :size="17" /><input v-model="searchQuery" type="search" placeholder="搜索素材" /><kbd>⌘ K</kbd></label><button class="outline-btn" @click="showNewFolder=true"><Plus :size="16" />新建文件夹</button><button class="upload-btn" @click="showUpload=true"><Upload :size="16" />上传素材</button></div></header>
+      <section class="content-area"><Transition name="bulk-toolbar"><div v-if="multiSelectMode" class="bulk-toolbar"><div class="bulk-selection"><button class="select-toggle" :class="{ checked:selectedCount === visibleAssets.length && visibleAssets.length > 0 }" @click="selectAllVisible"><Check v-if="selectedCount === visibleAssets.length && visibleAssets.length > 0" :size="13" :stroke-width="3" /></button><strong>{{ selectedCount ? `已选择 ${selectedCount} 项` : '请选择素材' }}</strong><button class="bulk-link" @click="selectAllVisible">{{ selectedCount === visibleAssets.length ? '取消全选' : '全选当前' }}</button></div><div class="bulk-actions"><div class="move-dropdown" :class="{ open:moveMenuOpen }"><button class="move-trigger" type="button" @click="moveMenuOpen=!moveMenuOpen"><span>{{ moveTargetLabel }}</span><ChevronDown :size="15" /></button><Transition name="menu-fade"><div v-if="moveMenuOpen" class="move-menu"><button v-for="f in nestedFolders" :key="f.id" type="button" :class="{ active:moveTarget===f.id }" @click="selectMoveTarget(f.id)">{{ f.label }}<Check v-if="moveTarget===f.id" :size="14" /></button></div></Transition></div><button class="bulk-move" :disabled="!selectedCount || !moveTarget" @click="moveSelected"><Folder :size="15" />保存到文件夹</button><button class="bulk-delete" :disabled="!selectedCount" @click="deleteSelected"><Archive :size="15" />删除</button><button class="bulk-cancel" @click="clearSelection">取消</button></div></div></Transition><div class="content-head"><div><h2>{{ activeTab==='全部' ? selectedFolder : activeTab }}</h2><span>{{ visibleAssets.length }} 个项目</span></div><div class="head-actions"><button class="select-mode-btn" :class="{ active:multiSelectMode }" @click="toggleMultiSelect"><Check :size="14" />{{ multiSelectMode ? '退出批量管理' : '批量管理' }}</button></div></div>
+        <Transition name="folder-switch" mode="out-in"><div :key="`${selectedFolder}-${activeTab}`"><TransitionGroup :key="`${selectedFolder}-${activeTab}`" name="asset-grid" tag="div" class="asset-grid"><article v-for="(a,index) in visibleAssets" :key="a.id" class="asset-card" :style="{ transitionDelay: `${index * 35}ms` }" :class="{ selected:selectedId===a.id || selectedIds.includes(a.id), 'folder-card':a.kind==='folder' }" @click="handleAssetClick(a)"><div class="asset-thumb" :class="`thumb-${a.kind}`"><template v-if="a.kind==='folder'"><div class="folder-visual"><span class="folder-back" /><span class="folder-tab" /><span class="folder-sheet sheet-one" /><span class="folder-sheet sheet-two" /><span class="folder-sheet sheet-three" /><span class="folder-front" /><span class="folder-mark"><FolderOpen :size="19" :stroke-width="1.7" /></span></div><span class="folder-label">双击打开 <ChevronRight :size="12" /></span></template><template v-else-if="a.kind==='image'"><img :src="a.src" :alt="a.name" /><span class="format-badge">{{ a.format }}</span></template><template v-else-if="a.kind==='video'"><img :src="a.src" :alt="a.name" /><span class="play-badge"><Play :size="16" fill="currentColor" /></span><span class="format-badge">{{ a.duration }}</span></template><template v-else-if="a.kind==='audio'"><AudioLines :size="40" :stroke-width="1.3" /><span class="audio-wave"><i v-for="n in 14" :key="n" :style="{ height:`${18+(n%5)*5}px` }" /></span><span class="format-badge">{{ a.duration }}</span></template><template v-else><FileText :size="42" :stroke-width="1.3" /><span class="format-badge">{{ a.format }}</span></template><div class="thumb-overlay"><span>{{ a.kind==='folder' ? '打开' : '查看' }}</span></div><span v-if="a.kind !== 'folder'" class="check-box" :class="{ checked:selectedId===a.id || selectedIds.includes(a.id) }"><Check v-if="selectedId===a.id || selectedIds.includes(a.id)" :size="13" :stroke-width="3" /></span></div><div class="asset-copy"><h3>{{ a.name }}</h3><p>{{ a.meta }}</p></div></article></TransitionGroup></div></Transition>
+        <div v-if="!visibleAssets.length" class="empty-state"><div class="empty-icon"><Search :size="23" /></div><h3>没有找到匹配的素材</h3><p>尝试更换关键词或切换其他分类</p></div>
+      </section>
+    </main>
+    <Transition name="modal-fade"><div v-if="showUpload||showNewFolder" class="modal-backdrop" @click.self="showUpload=false;showNewFolder=false"><section class="modal-card"><button class="modal-close" @click="showUpload=false;showNewFolder=false"><X :size="18" /></button><template v-if="showUpload"><div class="modal-icon"><Upload :size="22" /></div><h3>上传素材</h3><p>将文件拖拽到这里，或选择电脑中的文件</p><button class="upload-modal-btn" @click="showUpload=false">选择文件 <Upload :size="16" /></button></template><template v-else><div class="modal-icon"><Folder :size="22" /></div><h3>新建文件夹</h3><input v-model="folderName" class="folder-input" autofocus placeholder="例如：新品拍摄" @keydown.enter="createFolder" /><button class="upload-modal-btn" @click="createFolder">创建文件夹 <Plus :size="16" /></button></template></section></div></Transition>
+    <Transition name="modal-fade"><div v-if="previewAsset" class="modal-backdrop" @click.self="previewAsset=null"><section class="preview-modal"><button class="modal-close" @click="previewAsset=null"><X :size="18" /></button><div class="preview-stage"><img v-if="previewAsset.src" :src="previewAsset.src" :alt="previewAsset.name" /><Video v-else-if="previewAsset.kind==='video'" :size="46" /><AudioLines v-else-if="previewAsset.kind==='audio'" :size="46" /><FileText v-else :size="46" /></div><h3>{{ previewAsset.name }}</h3><p>{{ previewAsset.meta }}</p></section></div></Transition>
   </div>
 </template>
 
 <style scoped>
-.assets-page {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.title-group h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 8px 0 0 0;
-}
-
-.eyebrow {
-  font-size: 11px;
-  color: rgba(139, 92, 246, 0.8);
-  letter-spacing: 0.1em;
-}
-
-.header-desc {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-}
-
-.filter-bar {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.1);
-  border-radius: 8px;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.filter-group label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 500;
-}
-
-.filter-select,
-.filter-input {
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-}
-
-.assets-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.asset-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.asset-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(139, 92, 246, 0.4);
-}
-
-.asset-preview {
-  position: relative;
-  width: 100%;
-  height: 180px;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.placeholder-icon {
-  font-size: 48px;
-  opacity: 0.5;
-}
-
-.type-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-}
-
-.duration-badge {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-  font-family: monospace;
-}
-
-.asset-info {
-  padding: 16px;
-}
-
-.asset-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 4px 0;
-  line-height: 1.4;
-}
-
-.asset-code {
-  font-size: 11px;
-  color: rgba(139, 92, 246, 0.7);
-}
-
-.asset-meta {
-  margin: 16px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.meta-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-}
-
-.meta-row .label {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.meta-row .value {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.asset-actions {
-  display: flex;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.link-button {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 6px;
-  color: rgb(139, 92, 246);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.link-button:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgb(139, 92, 246);
-}
-
-.link-button.danger {
-  color: rgb(239, 68, 68);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.link-button.danger:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgb(239, 68, 68);
-}
+.asset-library{--paper:#fbfcfe;--surface:#fff;--ink:#182230;--muted:#8a96a7;--line:#e7ebf0;--accent:#4b5ee8;--accent-soft:#eef0ff;--sidebar:#f7f8fb;min-height:calc(100vh - 66px);display:flex;margin:-38px -42px -34px;color:var(--ink);background:var(--paper);font-family:'Noto Sans SC',sans-serif}.asset-sidebar{width:224px;flex:0 0 224px;padding:33px 15px 24px;background:var(--sidebar);border-right:1px solid var(--line)}.sidebar-heading{display:flex;align-items:flex-start;justify-content:space-between;padding:0 10px 25px}.eyebrow{margin:0 0 7px;color:#a0a9b8;font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.16em}.sidebar-heading h1{margin:0;font-size:22px;letter-spacing:-.04em}.sidebar-more,.tree-add{display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:7px;color:#94a0b0;background:transparent}.sidebar-more:hover,.tree-add:hover{color:var(--ink);background:#e9edf4}.asset-nav{display:grid;gap:3px}.nav-row,.tree-row{width:100%;display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;border:0;border-radius:8px;color:#687588;background:transparent;text-align:left;font-size:12px;transition:all .18s ease}.nav-row:hover,.tree-row:hover{color:var(--ink);background:#eef1f6;transform:translateX(2px)}.nav-row.active,.tree-row.active{color:var(--accent);background:var(--accent-soft);font-weight:600}.nav-count,.tree-count{margin-left:auto;color:#a0a9b8;font:500 10px 'IBM Plex Mono',monospace}.sidebar-divider{height:1px;margin:25px 10px 20px;background:var(--line)}.tree-heading{display:flex;align-items:center;justify-content:space-between;padding:0 10px 8px;color:#a0a9b8;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}.folder-tree{display:grid;gap:2px}.tree-row{height:36px;gap:7px;padding-left:7px;font-size:11px}.tree-chevron{color:#aab3c0}.tree-row span:not(.tree-count){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.show-all{display:flex;align-items:center;gap:5px;margin:10px;padding:0;border:0;color:#a0a9b8;background:transparent;font-size:10px}.show-all:hover{color:var(--accent)}.storage-card{margin:28px 5px 0;padding:13px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.58)}.storage-top{display:flex;justify-content:space-between;color:#758195;font-size:10px}.storage-track{height:4px;margin:10px 0 8px;overflow:hidden;border-radius:9px;background:#e6eaf0}.storage-track span{display:block;width:42%;height:100%;border-radius:inherit;background:var(--accent)}.storage-card p{margin:0;color:var(--ink);font:600 11px 'IBM Plex Mono',monospace}.storage-card p span{color:#a5afbc;font-weight:400}.asset-main{min-width:0;flex:1;background:var(--paper)}.asset-toolbar{display:flex;justify-content:space-between;gap:20px;padding:29px 38px 19px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.72)}.toolbar-left{min-width:0;display:grid;gap:20px}.breadcrumb{display:flex;align-items:center;gap:7px;color:#9aa5b4;font-size:12px}.breadcrumb strong{color:var(--ink);font-weight:600}.breadcrumb svg{color:#c2c9d3}.tabs{display:flex;gap:4px}.tab-pill{display:inline-flex;align-items:center;gap:7px;height:31px;padding:0 12px;border:1px solid transparent;border-radius:999px;color:#7f8b9c;background:transparent;font-size:11px;transition:all .18s ease}.tab-pill:hover{color:var(--ink);background:#f1f3f7}.tab-pill.active{color:var(--accent);border-color:#dfe3ff;background:var(--accent-soft);font-weight:600}.toolbar-actions{display:flex;align-items:center;gap:8px;padding-top:1px}.search-box{display:flex;align-items:center;gap:7px;width:184px;height:34px;padding:0 9px;border:1px solid var(--line);border-radius:8px;color:#9ba6b4;background:#fff}.search-box input{min-width:0;flex:1;border:0;outline:0;color:var(--ink);background:transparent;font-size:11px}.search-box kbd{padding:2px 4px;border:1px solid #e8ebf0;border-radius:4px;color:#a7b0bd;background:#f8f9fb;font:9px 'IBM Plex Mono',monospace}.outline-btn,.upload-btn,.sort-btn,.drop-button,.upload-modal-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:34px;padding:0 12px;border-radius:8px;font-size:11px;transition:all .18s ease}.outline-btn{border:1px solid #dfe4eb;color:#687588;background:#fff}.outline-btn:hover{color:var(--ink);border-color:#c7cfdb;background:#f9fafc}.upload-btn,.upload-modal-btn{border:1px solid var(--accent);color:#fff;background:var(--accent);box-shadow:0 5px 12px rgba(75,94,232,.17)}.upload-btn:hover,.upload-modal-btn:hover{background:#3f51d2;transform:translateY(-1px)}.content-area{padding:29px 38px 44px}.content-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px}.content-head h2{display:inline;margin:0 10px 0 0;font-size:17px;letter-spacing:-.03em}.content-head span{color:#9aa5b4;font-size:11px}.sort-btn{border:0;color:#8c98a8;background:transparent}.asset-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:18px}.asset-card{overflow:hidden;border:1px solid rgba(220,226,234,.9);border-radius:12px;background:var(--surface);cursor:pointer;transition:all .2s ease}.asset-card:hover{border-color:#cbd3df;box-shadow:0 9px 24px rgba(31,42,61,.08);transform:translateY(-3px)}.asset-card.selected{border-color:#93a0f5;box-shadow:0 0 0 2px rgba(75,94,232,.14)}.asset-thumb{position:relative;aspect-ratio:1.08;display:grid;place-items:center;overflow:hidden;color:#aab4c2;background:#f0f3f7}.asset-thumb img{width:100%;height:100%;object-fit:cover;transition:transform .4s ease}.asset-card:hover .asset-thumb img{transform:scale(1.04)}.thumb-folder{color:#9aa6b6;background:linear-gradient(135deg,#f3f5f8,#e9edf3)}.thumb-folder svg{color:#7f8da3}.folder-label{position:absolute;bottom:16px;color:#8995a6;font-size:10px}.thumb-audio,.thumb-document{background:#f3f5f8}.thumb-document svg{color:#6f7c91}.format-badge,.play-badge{position:absolute;top:9px;right:9px;display:inline-flex;align-items:center;justify-content:center;min-width:27px;height:21px;padding:0 6px;border:1px solid rgba(255,255,255,.34);border-radius:5px;color:#fff;background:rgba(28,38,54,.55);backdrop-filter:blur(8px);font:500 9px 'IBM Plex Mono',monospace}.play-badge{top:50%;right:50%;width:34px;height:34px;margin:-17px -17px 0 0;border-radius:50%;background:rgba(15,23,42,.65)}.play-badge svg{margin-left:2px}.audio-wave{position:absolute;bottom:24px;display:flex;align-items:center;gap:3px;height:40px}.audio-wave i{width:3px;border-radius:4px;background:#7987a2}.thumb-document .format-badge{color:#586579;border-color:#dde3eb;background:rgba(255,255,255,.85)}.thumb-overlay{position:absolute;inset:0;display:grid;place-items:center;color:#fff;background:linear-gradient(180deg,rgba(14,22,39,.12),rgba(14,22,39,.56));opacity:0;transition:opacity .2s ease}.thumb-overlay span{padding:6px 10px;border:1px solid rgba(255,255,255,.55);border-radius:7px;background:rgba(255,255,255,.1);backdrop-filter:blur(6px);font-size:10px}.asset-card:hover .thumb-overlay{opacity:1}.check-box{position:absolute;top:9px;left:9px;display:grid;place-items:center;width:19px;height:19px;border:1px solid rgba(255,255,255,.7);border-radius:5px;color:#fff;background:rgba(22,31,48,.23);opacity:0;transition:all .18s ease}.asset-card:hover .check-box,.check-box.checked{opacity:1}.check-box.checked{border-color:var(--accent);background:var(--accent)}.asset-copy{padding:12px 13px 14px}.asset-copy h3{overflow:hidden;margin:0 0 6px;color:#394456;font-size:11px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}.asset-copy p{margin:0;color:#a0aab8;font-size:10px}.drop-zone{display:flex;align-items:center;gap:12px;min-height:82px;margin-top:25px;padding:0 17px;border:1px dashed #cbd3df;border-radius:11px;color:#7f8b9c;background:rgba(255,255,255,.54);cursor:pointer;transition:all .18s ease}.drop-zone:hover{border-color:#9aa7f0;background:#fafaff}.drop-icon,.empty-icon,.modal-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;color:var(--accent);background:var(--accent-soft)}.drop-zone strong{display:block;color:#576477;font-size:11px}.drop-zone p{margin:4px 0 0;color:#a1abb9;font-size:10px}.drop-button{margin-left:auto;border:1px solid #dfe4eb;color:#687588;background:#fff}.empty-state{display:grid;place-items:center;min-height:290px;text-align:center}.empty-state h3{margin:14px 0 5px;font-size:14px}.empty-state p{margin:0;color:#9aa5b4;font-size:11px}.modal-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:rgba(19,27,42,.3);backdrop-filter:blur(5px)}.modal-card{position:relative;width:min(360px,calc(100vw - 36px));display:grid;justify-items:center;padding:29px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 18px 50px rgba(31,42,61,.17);text-align:center}.modal-close{position:absolute;top:12px;right:12px;display:grid;place-items:center;width:28px;height:28px;border:0;border-radius:7px;color:#9aa5b4;background:transparent}.modal-card h3{margin:15px 0 6px;font-size:16px}.modal-card p{margin:0 0 18px;color:#929dac;font-size:11px}.upload-modal-btn{width:100%}.folder-input{width:100%;height:38px;margin:14px 0 18px;padding:0 11px;border:1px solid #dfe4eb;border-radius:8px;outline:0;color:var(--ink);font-size:12px}.asset-grid-enter-active,.asset-grid-leave-active{transition:all .34s cubic-bezier(.22,1,.36,1)}.asset-grid-enter-from{opacity:0;transform:translateY(10px)}.asset-grid-leave-to{opacity:0;transform:scale(.98)}.asset-grid-move{transition:transform .34s ease}.modal-fade-enter-active,.modal-fade-leave-active{transition:opacity .2s ease}.modal-fade-enter-from,.modal-fade-leave-to{opacity:0}@media(max-width:1250px){.asset-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.asset-toolbar{flex-direction:column}.toolbar-actions{justify-content:flex-start}}@media(max-width:860px){.asset-library{margin:-25px -17px -88px;min-height:calc(100vh - 60px)}.asset-sidebar{display:none}.asset-toolbar,.content-area{padding-inline:17px}.asset-toolbar{gap:16px;padding-top:22px}.toolbar-actions{flex-wrap:wrap}.search-box{flex:1;min-width:160px}.asset-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.drop-zone{align-items:flex-start;padding:13px}.drop-button{display:none}}@media(prefers-reduced-motion:reduce){.asset-card,.asset-thumb img,.thumb-overlay,.nav-row,.tree-row{transition:none}.asset-grid-enter-active,.asset-grid-leave-active,.asset-grid-move{transition:none}}
+.bulk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:-4px 0 18px;padding:10px 12px;border:1px solid #dce2f7;border-radius:10px;background:#f5f6ff}.bulk-selection,.bulk-actions,.head-actions{display:flex;align-items:center;gap:8px}.bulk-selection{color:#52607a;font-size:11px}.select-toggle{display:grid;place-items:center;width:18px;height:18px;padding:0;border:1px solid #b6c0d0;border-radius:5px;color:#fff;background:#fff}.select-toggle.checked{border-color:var(--accent);background:var(--accent)}.bulk-link{padding:0;border:0;color:var(--accent);background:transparent;font-size:10px}.move-select{height:30px;padding:0 24px 0 9px;border:1px solid #dfe4eb;border-radius:7px;outline:0;color:#687588;background:#fff;font-size:10px}.bulk-move,.bulk-delete,.bulk-cancel,.select-mode-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid #dfe4eb;border-radius:7px;color:#687588;background:#fff;font-size:10px}.bulk-move{border-color:#cdd4fb;color:var(--accent)}.bulk-delete{color:#c45565;border-color:#f0d8dc}.bulk-move:disabled,.bulk-delete:disabled{opacity:.45;cursor:not-allowed}.bulk-cancel{border-color:transparent;background:transparent}.select-mode-btn{color:#7f8b9c;background:transparent}.select-mode-btn.active{color:var(--accent);border-color:#dfe3ff;background:var(--accent-soft)}@media(max-width:860px){.bulk-toolbar{align-items:flex-start;flex-direction:column}.bulk-actions{width:100%;flex-wrap:wrap}.move-select{flex:1}.bulk-move,.bulk-delete{flex:1}.head-actions{gap:4px}}
+.folder-label{display:inline-flex;align-items:center;gap:3px}.back-button{display:inline-flex;align-items:center;gap:3px;margin-right:4px;padding:0;border:0;color:#8c98a8;background:transparent;font-size:11px}.back-button:hover{color:var(--accent)}.back-icon{transform:rotate(180deg);margin-right:1px}
+.folder-card{border-color:transparent!important;background:transparent!important;box-shadow:none!important;overflow:visible}.folder-card:hover{border-color:transparent!important;box-shadow:none!important;transform:translateY(-2px)}.folder-card .asset-thumb{min-height:126px;display:flex;align-items:center;justify-content:center;overflow:visible;background:transparent}.folder-card .folder-visual{position:relative;display:block!important;width:128px;height:102px;z-index:2;flex:0 0 auto;filter:drop-shadow(0 10px 9px rgba(57,73,101,.14));transition:transform .28s cubic-bezier(.22,1,.36,1)}.folder-card:hover .folder-visual{transform:translateY(-5px) rotate(-1deg)}.folder-back,.folder-front,.folder-tab,.folder-sheet{position:absolute;display:block}.folder-back{inset:12px 0 0;border-radius:9px 12px 13px 13px;background:linear-gradient(160deg,#cad6fa,#aebcf0);transform:skewY(-2deg)}.folder-tab{top:4px;left:8px;width:52px;height:20px;border-radius:8px 9px 0 0;background:#b8c7f5}.folder-sheet{left:13px;width:102px;height:67px;border-radius:6px;background:#fff;box-shadow:0 2px 5px rgba(69,83,111,.1)}.sheet-one{top:15px;transform:rotate(-8deg);opacity:.74}.sheet-two{top:13px;transform:rotate(4deg);opacity:.92}.sheet-three{top:13px;transform:rotate(-1deg)}.folder-front{right:0;bottom:0;left:0;height:74px;border-radius:7px 7px 13px 13px;background:linear-gradient(160deg,#afbef4,#91a4e8);box-shadow:inset 0 1px 0 rgba(255,255,255,.48)}.folder-mark{position:absolute;right:15px;bottom:15px;display:grid;place-items:center;width:30px;height:30px;border:1px solid rgba(255,255,255,.42);border-radius:8px;color:#fff;background:rgba(69,89,182,.4);backdrop-filter:blur(4px)}.folder-card .folder-label{display:none}.folder-card .thumb-overlay{display:none}.folder-card .asset-copy{padding:8px 2px 0}.folder-card .asset-copy h3{color:#34415a;font-size:12px}.folder-card .asset-copy p{color:#9aa8bc;font-size:10px}
+.folder-card .folder-mark{display:none!important}.folder-card.selected .folder-visual{transform:translateY(-4px) scale(1.04);filter:drop-shadow(0 0 0 rgba(75,94,232,0)) drop-shadow(0 12px 12px rgba(75,94,232,.25))}
+.asset-library:not(.multi-select) .check-box{display:none!important}.multi-select .check-box{opacity:1}.multi-select .folder-card .asset-thumb::after{content:'';position:absolute;top:9px;left:9px;width:19px;height:19px;border:1px solid rgba(150,163,190,.9);border-radius:5px;background:rgba(255,255,255,.86);z-index:3}.multi-select .folder-card.selected .asset-thumb::after{content:'✓';display:grid;place-items:center;border-color:var(--accent);color:#fff;background:var(--accent);font-size:13px;font-weight:700}.folder-card .folder-mark{display:none!important}.thumb-overlay{display:none!important}.preview-modal{position:relative;width:min(660px,calc(100vw - 34px));padding:18px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 20px 60px rgba(31,42,61,.2)}.preview-stage{display:grid;place-items:center;min-height:360px;overflow:hidden;border-radius:10px;color:#8491a6;background:#f3f5f8}.preview-stage img{width:100%;max-height:58vh;object-fit:contain}.preview-modal h3{margin:16px 2px 4px;color:var(--ink);font-size:14px}.preview-modal p{margin:0 2px;color:#929dac;font-size:11px}
+.folder-switch-enter-active,.folder-switch-leave-active{transition:opacity .42s cubic-bezier(.22,1,.36,1),transform .42s cubic-bezier(.22,1,.36,1)}.folder-switch-enter-from{opacity:0;transform:translateY(14px) scale(.992)}.folder-switch-leave-to{opacity:0;transform:translateY(-10px) scale(.996)}.folder-switch-enter-active .asset-card{animation:folder-card-in .5s cubic-bezier(.22,1,.36,1) both}.folder-switch-enter-active .asset-card:nth-child(1){animation-delay:.04s}.folder-switch-enter-active .asset-card:nth-child(2){animation-delay:.08s}.folder-switch-enter-active .asset-card:nth-child(3){animation-delay:.12s}.folder-switch-enter-active .asset-card:nth-child(4){animation-delay:.16s}.folder-switch-enter-active .asset-card:nth-child(5){animation-delay:.2s}.folder-switch-enter-active .asset-card:nth-child(6){animation-delay:.24s}@keyframes folder-card-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){.folder-switch-enter-active,.folder-switch-leave-active{transition:none}.folder-switch-enter-active .asset-card{animation:none}}
+.asset-library{font-family:'Noto Sans SC','Manrope',sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}.asset-library button,.asset-library input,.asset-library select{font-family:inherit}.asset-library h1,.asset-library h2,.asset-library h3,.asset-library strong{font-family:'Manrope','Noto Sans SC',sans-serif}.sidebar-heading h1{font-size:23px;font-weight:700;letter-spacing:-.055em}.breadcrumb{font-size:11px;letter-spacing:-.01em}.breadcrumb strong{font-weight:650}.content-head h2{font-size:18px;font-weight:700;letter-spacing:-.045em}.content-head span,.asset-copy p,.storage-card p,.nav-count,.tree-count{font-family:'Manrope','Noto Sans SC',sans-serif;letter-spacing:-.02em}.asset-copy h3{font-size:12px;font-weight:650;letter-spacing:-.025em}.asset-copy p{font-size:10px}.nav-row,.tree-row{font-size:12px;font-weight:500;letter-spacing:-.02em}.nav-row.active,.tree-row.active{font-weight:650}.tab-pill{height:35px;padding:0 14px;font-size:12px;font-weight:600;letter-spacing:-.035em;transition:color .2s ease,background .2s ease,border-color .2s ease,transform .2s cubic-bezier(.22,1,.36,1)}.tab-pill:active,.outline-btn:active,.upload-btn:active,.select-mode-btn:active,.bulk-move:active,.bulk-delete:active{transform:scale(.97)}.outline-btn,.upload-btn{height:37px;padding:0 14px;font-size:12px;font-weight:650;letter-spacing:-.03em;transition:color .2s ease,background .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s cubic-bezier(.22,1,.36,1)}.upload-btn{box-shadow:0 5px 13px rgba(75,94,232,.14)}.upload-btn:hover{box-shadow:0 8px 18px rgba(75,94,232,.2)}.search-box{height:37px;border-radius:9px}.search-box input{font-size:12px}.search-box:focus-within{border-color:#aab4f3;box-shadow:0 0 0 3px rgba(75,94,232,.1)}.select-mode-btn{height:37px;padding:0 13px;font-size:12px;font-weight:650;transition:all .2s cubic-bezier(.22,1,.36,1)}.sort-btn,.bulk-link,.bulk-cancel,.show-all{font-size:11px;font-weight:600}.bulk-toolbar{border-radius:11px;box-shadow:0 4px 14px rgba(75,94,232,.05)}.bulk-move,.bulk-delete,.bulk-cancel{height:33px;font-size:11px;font-weight:650;transition:all .2s cubic-bezier(.22,1,.36,1)}.modal-card h3,.preview-modal h3{font-family:'Manrope','Noto Sans SC',sans-serif;font-weight:700;letter-spacing:-.035em}.modal-card p,.preview-modal p{font-family:'Noto Sans SC',sans-serif;line-height:1.7}.folder-card .asset-copy h3{font-weight:650}.asset-library :focus-visible{outline:2px solid rgba(75,94,232,.45);outline-offset:2px}.asset-library button:focus:not(:focus-visible){outline:0}@media(prefers-reduced-motion:reduce){.tab-pill,.outline-btn,.upload-btn,.select-mode-btn,.bulk-move,.bulk-delete,.bulk-cancel{transition:none}}
+.bulk-selection strong{font-family:'Noto Sans SC',sans-serif;font-size:12px;font-weight:650;color:#42516a}.bulk-link{font-family:'Noto Sans SC',sans-serif;font-weight:650}
+.move-dropdown{position:relative;width:145px}.move-trigger{width:100%;height:32px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 9px;border:1px solid #dfe4eb;border-radius:7px;color:#687588;background:#fff;font:500 10px 'Noto Sans SC',sans-serif;text-align:left;transition:all .2s ease}.move-trigger:hover,.move-dropdown.open .move-trigger{border-color:#b6c1ee;color:#4755ba;box-shadow:0 0 0 3px rgba(75,94,232,.08)}.move-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.move-menu{position:absolute;right:0;left:0;top:calc(100% + 7px);z-index:20;overflow:hidden;padding:4px;border:1px solid #e1e6ef;border-radius:9px;background:#fff;box-shadow:0 12px 28px rgba(31,42,61,.13)}.move-menu button{width:100%;height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;border:0;border-radius:6px;color:#6d798b;background:transparent;font:500 10px 'Noto Sans SC',sans-serif;text-align:left;transition:all .16s ease}.move-menu button:hover{color:#4050c9;background:#f1f3ff}.move-menu button.active{color:#4050c9;background:#eef0ff;font-weight:650}.menu-fade-enter-active,.menu-fade-leave-active{transition:opacity .16s ease,transform .16s ease;transform-origin:top}.menu-fade-enter-from,.menu-fade-leave-to{opacity:0;transform:translateY(-4px) scale(.98)}
+.bulk-toolbar-enter-active,.bulk-toolbar-leave-active{transition:opacity .2s ease,transform .2s ease;will-change:opacity,transform}.bulk-toolbar-enter-from,.bulk-toolbar-leave-to{opacity:0;transform:translate3d(0,-6px,0)}.select-mode-btn{will-change:transform,background-color,color}.select-mode-btn svg{transition:transform .2s ease}.select-mode-btn.active svg{transform:scale(1.04)}.multi-select .check-box{animation:check-in .18s ease both}.multi-select .folder-card .asset-thumb::after{animation:check-in .18s ease both}@keyframes check-in{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.bulk-toolbar-enter-active,.bulk-toolbar-leave-active,.select-mode-btn svg{transition:none}.multi-select .check-box,.multi-select .folder-card .asset-thumb::after{animation:none}}
+:global([data-theme='dark']) .asset-library{--paper:#0d1018;--surface:#151a25;--ink:#eef2fb;--muted:#8e9aae;--line:rgba(210,220,240,.12);--accent:#8290ff;--accent-soft:rgba(104,119,255,.16);--sidebar:#10141e}.asset-library{transition:background-color .24s ease,color .24s ease}.asset-sidebar,.asset-main,.asset-toolbar,.asset-card,.storage-card,.search-box,.outline-btn,.move-trigger,.move-menu,.modal-card,.preview-modal,.drop-zone{transition:background-color .24s ease,border-color .24s ease,color .24s ease,box-shadow .24s ease}.dark .asset-card{}:global([data-theme='dark']) .asset-toolbar{background:rgba(15,19,29,.82)}:global([data-theme='dark']) .asset-sidebar{border-color:var(--line)}:global([data-theme='dark']) .nav-row,:global([data-theme='dark']) .tree-row{color:#a5b0c2}:global([data-theme='dark']) .nav-row:hover,:global([data-theme='dark']) .tree-row:hover{color:var(--ink);background:rgba(255,255,255,.06)}:global([data-theme='dark']) .nav-row.active,:global([data-theme='dark']) .tree-row.active{color:#b8c1ff;background:var(--accent-soft)}:global([data-theme='dark']) .nav-count,:global([data-theme='dark']) .tree-count,:global([data-theme='dark']) .content-head span,:global([data-theme='dark']) .asset-copy p{color:#7f8ca1}:global([data-theme='dark']) .asset-main{background:var(--paper)}:global([data-theme='dark']) .asset-card{border-color:rgba(192,204,229,.14);background:var(--surface)}:global([data-theme='dark']) .asset-card:hover{border-color:rgba(145,158,255,.46);box-shadow:0 12px 28px rgba(0,0,0,.28)}:global([data-theme='dark']) .asset-card.selected{border-color:#8996ff;box-shadow:0 0 0 2px rgba(130,144,255,.2)}:global([data-theme='dark']) .asset-copy h3,:global([data-theme='dark']) .folder-card .asset-copy h3{color:#e8edf7}:global([data-theme='dark']) .folder-card .asset-copy p{color:#8795ad}:global([data-theme='dark']) .thumb-folder{background:linear-gradient(145deg,#1a2235,#232e4d)}:global([data-theme='dark']) .folder-back{background:linear-gradient(160deg,#667be0,#4b5db4)}:global([data-theme='dark']) .folder-tab{background:#5a6dcc}:global([data-theme='dark']) .folder-front{background:linear-gradient(160deg,#6177df,#4357ad)}:global([data-theme='dark']) .folder-sheet{background:#e9edf6}:global([data-theme='dark']) .folder-mark{background:rgba(27,37,88,.5)}:global([data-theme='dark']) .thumb-audio,:global([data-theme='dark']) .thumb-document{background:#1a202c}:global([data-theme='dark']) .thumb-document svg,:global([data-theme='dark']) .thumb-audio>svg{color:#98a6bf}:global([data-theme='dark']) .search-box,:global([data-theme='dark']) .outline-btn,:global([data-theme='dark']) .move-trigger,:global([data-theme='dark']) .move-menu,:global([data-theme='dark']) .storage-card{border-color:rgba(192,204,229,.16);background:#151a25;color:#cbd4e4}:global([data-theme='dark']) .search-box input,:global([data-theme='dark']) .move-trigger{color:#dce4f2}:global([data-theme='dark']) .search-box kbd{border-color:rgba(192,204,229,.16);background:#1b2230;color:#8896aa}:global([data-theme='dark']) .bulk-toolbar{border-color:rgba(130,144,255,.24);background:rgba(93,108,220,.12)}:global([data-theme='dark']) .bulk-selection{color:#cbd4e4}:global([data-theme='dark']) .bulk-move{background:#1b2340;border-color:rgba(130,144,255,.42);color:#b9c2ff}:global([data-theme='dark']) .bulk-delete{background:#241a24;border-color:rgba(224,130,145,.3);color:#e89aa8}:global([data-theme='dark']) .modal-backdrop{background:rgba(3,6,14,.68)}:global([data-theme='dark']) .modal-card,:global([data-theme='dark']) .preview-modal{border-color:rgba(192,204,229,.16);background:#151a25}:global([data-theme='dark']) .modal-card h3,:global([data-theme='dark']) .preview-modal h3{color:#eef2fb}:global([data-theme='dark']) .modal-card p,:global([data-theme='dark']) .preview-modal p{color:#95a2b6}:global([data-theme='dark']) .folder-input{border-color:rgba(192,204,229,.18);color:#eef2fb;background:#0f141f}:global([data-theme='dark']) .preview-stage{background:#0f141f}:global([data-theme='dark']) .empty-state h3{color:#e7ecf6}:global([data-theme='dark']) .empty-state p{color:#8996aa}:global([data-theme='dark']) .move-menu button{color:#aab5c7}:global([data-theme='dark']) .move-menu button:hover,:global([data-theme='dark']) .move-menu button.active{color:#c6ceff;background:rgba(105,119,255,.18)}
+.theme-dark{--paper:#0d1018;--surface:#151a25;--ink:#eef2fb;--muted:#8e9aae;--line:rgba(210,220,240,.12);--accent:#8290ff;--accent-soft:rgba(104,119,255,.16);--sidebar:#10141e}.theme-dark .asset-toolbar{background:rgba(15,19,29,.82)}.theme-dark .asset-card{border-color:rgba(192,204,229,.14);background:var(--surface)}.theme-dark .asset-copy h3{color:#e8edf7}.theme-dark .asset-copy p,.theme-dark .content-head span{color:#7f8ca1}.theme-dark .asset-sidebar{border-color:var(--line)}.theme-dark .nav-row,.theme-dark .tree-row{color:#a5b0c2}.theme-dark .nav-row:hover,.theme-dark .tree-row:hover{color:var(--ink);background:rgba(255,255,255,.06)}.theme-dark .nav-row.active,.theme-dark .tree-row.active{color:#b8c1ff;background:var(--accent-soft)}.theme-dark .thumb-folder{background:linear-gradient(145deg,#1a2235,#232e4d)}.theme-dark .folder-back{background:linear-gradient(160deg,#667be0,#4b5db4)}.theme-dark .folder-tab{background:#5a6dcc}.theme-dark .folder-front{background:linear-gradient(160deg,#6177df,#4357ad)}.theme-dark .folder-sheet{background:#e9edf6}.theme-dark .thumb-audio,.theme-dark .thumb-document{background:#1a202c}.theme-dark .search-box,.theme-dark .outline-btn,.theme-dark .move-trigger,.theme-dark .move-menu,.theme-dark .storage-card{border-color:rgba(192,204,229,.16);background:#151a25;color:#cbd4e4}.theme-dark .search-box input,.theme-dark .move-trigger{color:#dce4f2}.theme-dark .search-box kbd{border-color:rgba(192,204,229,.16);background:#1b2230;color:#8896aa}.theme-dark .bulk-toolbar{border-color:rgba(130,144,255,.24);background:rgba(93,108,220,.12)}.theme-dark .bulk-selection{color:#cbd4e4}.theme-dark .bulk-move{background:#1b2340;border-color:rgba(130,144,255,.42);color:#b9c2ff}.theme-dark .bulk-delete{background:#241a24;border-color:rgba(224,130,145,.3);color:#e89aa8}.theme-dark .modal-backdrop{background:rgba(3,6,14,.68)}.theme-dark .modal-card,.theme-dark .preview-modal{border-color:rgba(192,204,229,.16);background:#151a25}.theme-dark .modal-card h3,.theme-dark .preview-modal h3{color:#eef2fb}.theme-dark .modal-card p,.theme-dark .preview-modal p{color:#95a2b6}.theme-dark .folder-input{border-color:rgba(192,204,229,.18);color:#eef2fb;background:#0f141f}.theme-dark .preview-stage{background:#0f141f}.theme-dark .move-menu button{color:#aab5c7}.theme-dark .move-menu button:hover,.theme-dark .move-menu button.active{color:#c6ceff;background:rgba(105,119,255,.18)}
 </style>
