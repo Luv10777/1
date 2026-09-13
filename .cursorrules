@@ -1,0 +1,6 @@
+本仓库的约定见 CLAUDE.md，请先读那个文件。
+
+要点：
+- backend/growth-api/ 是唯一的后端主干，新功能写这里
+- legacy/ 是已放弃的旧实现，禁止参考其代码风格、接口约定和表结构
+- 前端请求统一走 src/utils/request.js，不要在组件里直接 fetch 或硬编码后端地址
