@@ -17,6 +17,10 @@ public interface TaskHandler {
     /** 任务类型，全局唯一。建议用 模块_动作，例如 ASSET_PROBE、IMAGE_GENERATE。 */
     String type();
 
-    /** 返回值会写进 tasks.result。抛异常即视为失败，框架按 max_attempts 重试。 */
+    /**
+     * 返回值写进 tasks.result。框架会重试，不能假设只执行一次。
+     * 调供应商或扣费时使用 task.id 派生稳定幂等键，不使用 attempts 派生业务幂等键。
+     * 租约只保护任务状态回写，不能撤销已经发生的外部副作用。
+     */
     Map<String, Object> handle(Task task);
 }

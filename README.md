@@ -18,20 +18,30 @@
 
 ## 本地运行
 
-```bash
-# 1. 依赖服务
-docker compose -f backend/growth-api/docker-compose.yml up -d
-
-# 2. 后端（验证码打在后端控制台，不真发短信）
-cd backend/growth-api && mvn spring-boot:run
-
-# 3. 前端
-npm install && npm run dev
+```powershell
+# 后端：生成本地配置与随机 JWT 密钥，初始化依赖后启动
+cd backend/growth-api
+./scripts/init-local.ps1
+docker compose up -d
+docker compose wait minio-init
+mvn spring-boot:run
 ```
+
+另一个终端从仓库根目录启动前端：
+
+```bash
+npm install
+npm run dev
+```
+
+Java 21、Maven 和 Docker 为后端前置依赖。Linux/macOS 启动方法、独立 worker 命令
+与两人按模块协作规则见后端 README。后端默认不执行任务，需要另起 worker。
 
 前端 <http://localhost:4173>，`/api` 已代理到后端 8080，无需额外配置。
 
 ## 提交前
+
+后端改动在 `backend/growth-api` 执行 `mvn verify`，需要 Docker。
 
 ```bash
 npm test && npm run lint && npm run typecheck && npm run build

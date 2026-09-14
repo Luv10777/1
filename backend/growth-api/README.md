@@ -1,136 +1,165 @@
 # growth-api · 后端主干
 
-梧曜星枢 AI 商家增长平台的后端骨架。`common/` 和 `iam/` 已完成并验证通过，
-`asset/` 是给各模块照抄的参考实现。
+Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租户隔离、任务调度和对象存储。
+本文更新于 2026-09-14，说明当前接口边界和两人协作方式。
 
-> 旧的 `server/`（com.wuyao.nexus）和 `backend/vimax-api`（com.wuyao.vimax）都不再演进，
-> 保留只为查阅。新功能一律写在本项目里。
+## 安装与启动
 
----
+需要 Java 21、Maven 3.9 和已启动的 Docker。以下命令在 `backend/growth-api` 目录运行，
+避免加载错误目录中的 `.env`。
 
-## 快速开始
+Windows PowerShell：
 
-```bash
-docker compose up -d          # postgres + redis + minio
-cp .env.example .env          # 填 JWT_SECRET
+```powershell
+./scripts/init-local.ps1
+docker compose up -d
+docker compose wait minio-init
 mvn spring-boot:run
 ```
 
-两个进程，同一个 jar：
+`init-local.ps1` 会生成随机 JWT 密钥，已有 `.env` 时保留原配置。
+首次运行需等待 PostgreSQL 健康检查通过；可用 `docker compose ps` 检查。
+
+Linux/macOS：
 
 ```bash
-# api 进程
-java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=false
+cp .env.example .env
+printf '\nJWT_SECRET=%s\n' "$(openssl rand -base64 48)" >> .env
+docker compose up -d
+docker compose wait minio-init
+mvn spring-boot:run
+```
 
-# worker 进程
+`.env` 使用 Java properties 语法，值不要加引号。应用通过
+`spring.config.import` 加载它，操作系统环境变量优先级更高。
+示例中的数据库和 MinIO 密码仅用于本地；生产使用独立凭证和最小权限账户。
+
+`JWT_SECRET` 必须是至少 32 字节的随机字符串。空值、短密钥和旧的公开默认密钥均阻止启动。
+更换密钥会使已有令牌失效。控制台短信发送器只用于本地开发，真实短信供应商仍需接入。
+
+如果本地已有服务占用默认端口，在 `.env` 设置 `POSTGRES_PORT`、`REDIS_PORT`、
+`MINIO_PORT`、`MINIO_CONSOLE_PORT`，同时把 `DB_URL` 和 `MINIO_ENDPOINT` 改为对应端口。
+
+## 使用
+
+默认只启动 API，地址为 [本地 API](http://localhost:8080)。
+需要后台任务时，再启动一个 worker；两个进程使用同一数据库和配置。
+
+```bash
+mvn package
+java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=false
+```
+
+另一个终端：
+
+```bash
 java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --server.port=8090
 ```
 
-它们不互相调接口，只通过 `tasks` 表协作。
-
----
-
-## 八条约定（改之前先商量，这是并行开发的地基）
-
-| # | 约定 | 在哪 |
-|---|------|------|
-| 1 | 统一响应 `{code, message, data}`，成功 code=200 | `common/web/ApiResponse` |
-| 2 | 统一分页 `{items, page, size, total, totalPages}`，入参 page 从 0 开始 | `common/web/PageResult` |
-| 3 | 错误码按模块分号段 | `common/web/ErrorCode` |
-| 4 | 认证只走 `Authorization: Bearer <jwt>` | `common/security/JwtAuthFilter` |
-| 5 | **租户只从 JWT 取，接口一律不接受前端传 tenantId** | `common/tenant/TenantContext` |
-| 6 | 异步活儿一律实现 `TaskHandler`，不要各写各的调度 | `common/task/TaskHandler` |
-| 7 | 文件预签名直传，不经过后端 | `common/storage/ObjectStorage` |
-| 8 | 业务代码只认能力别名，不出现供应商名字 | `common/gateway/ModelAlias` |
-
-错误码号段：
-```
-1000-1999 通用    2000-2999 iam      3000-3999 asset     4000-4999 content
-5000-5999 cs      6000-6999 publish  7000-7999 analytics 8000-8999 geo
-9000-9999 billing
-```
-
----
-
-## 加一个模块
-
-以 `asset/` 为模板，四步：
-
-**1. 建表**（`src/main/resources/db/migration/V?__你的模块.sql`）
-
-抄 `V3__asset.sql`。业务表三件事一件不能少：
-
-```sql
-tenant_id BIGINT NOT NULL REFERENCES tenants(id),   -- 1
-...
-ALTER TABLE 你的表 ENABLE ROW LEVEL SECURITY;        -- 2
-ALTER TABLE 你的表 FORCE  ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON 你的表             -- 3
-    USING      (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::bigint)
-    WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::bigint);
-```
-
-**2. 建包** `com.wuyao.growth.你的模块`，里面自己分 entity / repository / service / controller。
-只在自己的包里动，两个人不会冲突。
-
-**3. Controller** 抄 `AssetController`：方法签名里没有 tenantId，不写 try-catch，返回 ApiResponse。
-
-**4. 异步任务**（可选）实现 `TaskHandler`，用 `taskService.submit(...)` 提交。
-
----
-
-## 两个机制值得先看懂
-
-### 租户隔离靠数据库，不靠人记得
-
-`AssetRepository` 里**没有一个方法带 tenantId 参数**，连 `findById` 都没有租户判断。
-但拿别家的 id 去查，返回的是"不存在"——因为 `TenantConnectionProvider`
-在每次取连接时把租户号写进了会话变量，PostgreSQL 的行级安全策略据此过滤。
-
-**实测**：商家 A 拿商家 B 的素材 id 调 confirm 接口 → `{"code":3001,"message":"素材不存在"}`，
-B 的数据一个字节没变。
-
-意味着某个 Repository 方法忘了写租户条件，也不会漏数据。
-
-### 任务分发靠行锁，不需要消息队列
-
-`TaskRepository.claimBatch` 那句 `FOR UPDATE SKIP LOCKED` 是整套调度的核心：
-别的 worker 锁住的行直接跳过，不排队。所以 worker 起几个都行，同一行只会被一个进程拿到。
-
-因此 `TaskWorker` 用 `@Scheduled` 是安全的，**不需要 ShedLock 之类的分布式锁**。
-
-顺带解决：延迟任务（`run_after`）、退避重试（`attempts` + 指数退避）、
-崩溃回收（`lease_expires_at` 过期自动放回）、队列隔离（`queue` 字段）。
-
-队列隔离第一天就要用起来——视频任务 20 分钟、图片任务 30 秒，混在一个队列里视频会把图片堵死：
+不同队列可使用不同 worker 进程：
 
 ```bash
-java -jar app.jar --growth.worker.enabled=true --growth.worker.queues=IMAGE
-java -jar app.jar --growth.worker.enabled=true --growth.worker.queues=VIDEO
+java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --growth.worker.queues=VIDEO --server.port=8091
 ```
 
----
+## 配置与任务语义
 
-## 已验证 / 未验证
+| 配置 | 默认值 | 含义 |
+|---|---|---|
+| `growth.worker.enabled` | `false` | API 默认不执行后台任务 |
+| `growth.worker.batch-size` | `5` | 每轮每队列最多处理数量；每次只领取一条 |
+| `growth.worker.lease` | `30m` | 执行租约时长 |
+| `growth.worker.heartbeat-interval` | `10000` ms | 独立线程续租间隔 |
+| `growth.worker.poll-interval` | `2000` ms | 一轮执行结束到下一轮的间隔 |
 
-跑起来实测通过的：
+租约必须大于两个心跳间隔。调度器为执行、续租、回收分别保留线程容量。
+`FOR UPDATE SKIP LOCKED` 保护领取事务；它不提供外部业务“恰好执行一次”的保证。
 
-- Flyway 4 个迁移全部执行
-- 未登录访问受保护接口 → 1401
-- 手机号格式校验 → 1400
-- 验证码限流（1 分钟 1 条）→ 2001
-- 错误验证码 → 2003
-- 登录即注册，自动建租户
-- refresh 轮换，旧 token 立刻失效 → 2005
-- **跨租户越权被数据库挡住 → 3001，且对方数据未被修改**
-- 任务提交 → worker 抢占 → 执行 → 回写 SUCCEEDED，幂等键生效
+任务按“至少一次”执行设计：崩溃或租约失效后可能重试。
+`attempts` 是执行轮次，续租和完成/失败回写必须带领取时的轮次；旧轮次无权修改任务状态。
+过期回收遵守退避和 `max_attempts`，达到上限后进入 `FAILED`。
 
-**未验证**：MinIO 预签名（本地没起 MinIO，只验证了失败时返回 1503 而不是裸 500）。
-`EchoProviderAdapter` 是占位实现，不发任何网络请求。
+供应商调用、扣费和业务写入仍需幂等。使用 `task.id` 派生稳定的业务幂等键，
+不要使用每次变化的 `attempts`。任务状态保护无法撤销已发生的外部副作用。
 
-## 已知待办
+`TaskService.submit` 与业务操作共用事务；相同租户和幂等键并发提交会返回同一任务。
+不同业务动作不要复用同一个幂等键。不要在长时间外部调用期间持有业务数据库事务。
 
-- `UserDetailsServiceAutoConfiguration` 未排除，启动日志会打印一条无用的 generated password
-- `AiGateway` 目前取第一个可用适配器，选型/降级/计量策略待实现
-- `AssetProbeHandler` 只打日志，没真去读文件头解析宽高时长
-- 尚无单元测试
+## 接口与模块约定
+
+| 约定 | 入口 |
+|---|---|
+| 统一响应 `{code, message, data}`，成功 code=200 | `common/web/ApiResponse` |
+| 分页 `{items, page, size, total, totalPages}`，page 从零开始 | `common/web/PageResult` |
+| 错误码按模块分号段 | `common/web/ErrorCode` |
+| 认证只走 `Authorization: Bearer <jwt>` | `common/security/JwtAuthFilter` |
+| 租户只从 JWT 获取，业务接口不接受 tenantId | `common/tenant/TenantContext` |
+| 异步任务实现 TaskHandler，文件预签名直传 | `common/task`、`common/storage` |
+| 模型调用只认能力别名 | `common/gateway/ModelAlias` |
+
+错误码：1000–1999 通用，2000–2999 IAM，3000–3999 素材，4000–4999 内容，
+5000–5999 客服，6000–6999 发布，7000–7999 分析，8000–8999 GEO，9000–9999 计费。
+
+### 认证
+
+验证码只接受最新一条，成功消费后不能再次使用，也不会重新启用旧验证码。
+连续失败五次后拒绝继续校验；计数独立提交，不随登录事务回滚。
+发送限流按手机号串行检查。刷新令牌通过行锁保证同一个令牌只有一个轮换请求成功。
+
+### 素材参考模块
+
+`asset/` 展示预签名上传、确认、分页和任务提交。新模块可参考其分层，
+但必须定义自己完整的业务契约，不能直接复制占位行为。
+
+上传流程：调用 `POST /api/assets/upload-url`，前端向返回地址 PUT 文件，
+再调用 `POST /api/assets/{id}/confirm`。确认接口只在对象存在时返回 `READY`。
+
+`sizeBytes` 可省略；提供时必须非负并与对象存储返回的大小一致。
+落库大小取自对象存储。`sha256` 字段仅兼容旧请求，格式校验后也不会作为可信哈希保存。
+服务端尚未计算 SHA-256；宽高和时长解析也未实现。探测任务只验证文件存在，
+结果明确返回 `objectVerified=true, probed=false`。
+
+素材分页限制 `size` 在 1–100 之间。重复确认已就绪素材返回已有记录，不重复创建任务。
+
+### 租户表与迁移
+
+业务表必须包含 `tenant_id`、启用并强制 RLS、配置 tenant isolation policy；
+完整示例见 `src/main/resources/db/migration/V3__asset.sql`。
+IAM 和任务表属于系统级表，访问时必须由服务层约束身份和作用域。
+
+应用数据库账户使用受 RLS 约束的 `growth_app`，不要用迁移管理员账户运行应用。
+迁移管理员与应用账户使用独立配置。生产预先创建应用角色和独立密码；
+历史 V1 脚本中的本地角色密码不能作为生产密码。
+
+## 协作与验证
+
+每个功能使用独立分支和小批量 PR。一个业务模块由一个人负责 Controller、DTO、
+Service、Repository、迁移及测试；公共层指定主要维护人，接口修改由双方一起审查。
+
+模块间通过公开的 Service/DTO 调用，不直接依赖对方 Repository 或 Entity。
+新增模块前，在 PR 中明确接口、状态变化、错误码、任务类型和依赖关系。
+前后端先对齐这些契约，再分别实现。
+
+创建 Flyway 脚本前双方登记下一个版本号，并先同步主干，避免重复版本。
+已合并的迁移不修改。当前 V1–V4 保持不变，后续变更新增迁移。
+
+后端检查：
+
+```bash
+mvn verify
+```
+
+测试需要 Docker，会自动创建并清理独立 PostgreSQL 16 和 MinIO。
+覆盖认证并发、任务幂等与事务回滚、租约及重试上限、长任务续租、
+真实对象上传确认、参数校验和跨租户读写。GitHub Actions 使用 Java 21 执行同一检查。
+Docker 不可用时测试失败，不会静默跳过。
+
+根目录的前端检查仍是 `npm test`、`npm run lint`、`npm run typecheck` 和
+`npm run build`。CI 配置提交后还需在 GitHub 将后端检查设为分支保护必需项。
+
+## 能力边界与许可
+
+`EchoProviderAdapter` 仍是占位适配器。真实供应商、计费、完整媒体元数据解析，
+以及其他业务模块不属于本次公共基础修复的交付范围。
+
+嘉兴市梧曜科技有限公司版权所有。
