@@ -1,57 +1,78 @@
-import { reactive, computed } from 'vue'
+import { reactive } from 'vue'
 import { authService } from '../services/auth'
-import { isDemoMode } from '../utils/config'
-
-const STORAGE_KEY = 'wuyao-ai-auth'
-const TOKEN_KEY = 'wuyao-ai-token'
-const saved = localStorage.getItem(STORAGE_KEY)
-const savedToken = localStorage.getItem(TOKEN_KEY)
+import { readTokens, readUser, writeTokens, writeUser, clearAll } from '../utils/tokenStore'
 
 const state = reactive({
-  user: saved ? JSON.parse(saved) : null,
-  token: savedToken ? JSON.parse(savedToken) : null,
-  mode: isDemoMode() ? 'demo' : 'production',
+  user: readUser(),
+  token: readTokens(),
+  mode: 'production',
   cooldown: 0,
   loading: false,
 })
 
 let timer
 
+function persistSession(data) {
+  const tokens = {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    expiresIn: data.expiresIn,
+    expiresAt: Date.now() + data.expiresIn * 1000,
+  }
+  state.token = tokens
+  writeTokens(tokens)
+
+  const user = {
+    id: data.user.userId,
+    tenantId: data.user.tenantId,
+    phone: data.user.phone,
+    name: data.user.name || `用户${data.user.phone.slice(-4)}`,
+    roles: ['user'],
+  }
+  state.user = user
+  writeUser(user)
+  return user
+}
+
 export const auth = {
   state,
-  isAuthenticated: computed(() => Boolean(state.user && state.token)),
+  /**
+   * 用 getter 而不是 computed()。
+   * computed() 返回的是 ref 对象，在 router.beforeEach 这类普通 JS 里
+   * 忘了写 .value 就永远是 truthy —— 路由守卫会形同虚设。
+   * getter 在模板和 JS 里都直接拿到布尔值，且读的是 reactive state，响应式不受影响。
+   */
+  get isAuthenticated() {
+    return Boolean(state.user && state.token?.accessToken)
+  },
   get user() {
     return state.user
   },
   get token() {
     return state.token
   },
+  get tenantId() {
+    return state.user?.tenantId ?? null
+  },
 
   async sendCode(phone) {
-    if (!/^1\d{10}$/.test(phone)) {
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
       throw new Error('请输入有效的 11 位手机号')
     }
     if (state.cooldown > 0) return
 
-    try {
-      const response = await authService.sendCode(phone)
+    await authService.sendCode(phone)
 
-      // 启动倒计时
-      state.cooldown = 60
-      clearInterval(timer)
-      timer = setInterval(() => {
-        state.cooldown -= 1
-        if (state.cooldown <= 0) clearInterval(timer)
-      }, 1000)
-
-      return response
-    } catch (error) {
-      throw new Error(error.message || '验证码发送失败')
-    }
+    state.cooldown = 60
+    clearInterval(timer)
+    timer = setInterval(() => {
+      state.cooldown -= 1
+      if (state.cooldown <= 0) clearInterval(timer)
+    }, 1000)
   },
 
   async login(phone, code) {
-    if (!/^1\d{10}$/.test(phone)) {
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
       throw new Error('请输入有效的 11 位手机号')
     }
     if (!/^\d{6}$/.test(code)) {
@@ -60,34 +81,24 @@ export const auth = {
 
     state.loading = true
     try {
-      const response = await authService.login(phone, code)
-
-      if (response.success && response.data) {
-        // 保存Token
-        const tokenData = {
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken,
-          expiresIn: response.data.expiresIn,
-          expiresAt: Date.now() + response.data.expiresIn * 1000
-        }
-        state.token = tokenData
-        localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData))
-
-        // 保存用户信息
-        const user = {
-          id: response.data.user.id,
-          phone: response.data.user.phone,
-          name: response.data.user.name || `用户${phone.slice(-4)}`,
-          avatarUrl: response.data.user.avatarUrl,
-          roles: ['user'],
-        }
-        state.user = user
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-      }
-    } catch (error) {
-      throw new Error(error.message || '登录失败')
+      const data = await authService.login(phone, code)
+      return persistSession(data)
     } finally {
       state.loading = false
+    }
+  },
+
+  /** 刷新页面后校验会话是否还有效，顺便把用户信息对齐服务端。 */
+  async restore() {
+    if (!state.token?.accessToken) return false
+    try {
+      const me = await authService.getCurrentUser()
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone }
+      writeUser(state.user)
+      return true
+    } catch {
+      this.clearSession()
+      return false
     }
   },
 
@@ -95,13 +106,15 @@ export const auth = {
     try {
       await authService.logout()
     } catch (error) {
-      console.warn('登出请求失败:', error)
+      console.warn('登出请求失败，本地会话仍会清除:', error.message)
     }
+    this.clearSession()
+  },
 
+  clearSession() {
     state.user = null
     state.token = null
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(TOKEN_KEY)
+    clearAll()
   },
 
   hasRole(role) {
@@ -109,9 +122,6 @@ export const auth = {
   },
 
   getAuthHeader() {
-    if (state.token?.accessToken) {
-      return `Bearer ${state.token.accessToken}`
-    }
-    return null
-  }
+    return state.token?.accessToken ? `Bearer ${state.token.accessToken}` : null
+  },
 }
