@@ -33,6 +33,14 @@
 
 加新模块照 `backend/growth-api/src/main/java/com/wuyao/growth/asset/` 的结构写。
 
+公共基础修复后的协作规则：
+
+- 每个业务模块指定负责人，`common/` 和 `iam/` 的接口变更双方审查。
+- 模块间通过公开 Service/DTO 交互，不跨模块调用 Repository 或复用 Entity。
+- 新建 Flyway 版本前先同步主干并登记编号，已合并迁移不修改。
+- `TaskHandler` 按至少一次执行设计，外部副作用使用稳定幂等键。
+- 后端改动必须在 `backend/growth-api` 运行 `mvn verify`，需要 Docker。
+
 ## 前端
 
 - 认证已接通真实后端；品牌 / 素材 / 知识 / 作品等模块后端尚未实现，仍返回演示数据

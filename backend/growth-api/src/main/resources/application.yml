@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:./.env[.properties]
   application:
     name: growth-api
 
@@ -43,7 +45,7 @@ server:
 growth:
   jwt:
     # 至少 32 字节。生产必须用环境变量注入。
-    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    secret: ${JWT_SECRET:}
     access-ttl: 1h
     refresh-ttl: 30d
   sms:
@@ -60,10 +62,12 @@ growth:
     presign-ttl: 15m
   worker:
     # api 进程设 false，worker 进程设 true。同一个 jar，两条启动命令。
-    enabled: ${WORKER_ENABLED:true}
+    enabled: ${WORKER_ENABLED:false}
     queues: DEFAULT,IMAGE,VIDEO
     poll-interval: 2000
     batch-size: 5
+    lease: 30m
+    heartbeat-interval: 10000
 
 management:
   endpoints.web.exposure.include: health,info

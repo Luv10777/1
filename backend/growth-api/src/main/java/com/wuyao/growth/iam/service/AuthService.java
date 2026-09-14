@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -37,7 +38,6 @@ import java.util.HexFormat;
 public class AuthService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final int MAX_VERIFY_ATTEMPTS = 5;
 
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
@@ -45,6 +45,8 @@ public class AuthService {
     private final SmsCodeRepository smsCodeRepository;
     private final SmsSender smsSender;
     private final JwtService jwtService;
+    private final LoginCodeVerifier codeVerifier;
+    private final TransactionTemplate transactions;
 
     @Value("${growth.sms.code-length:6}")
     private int codeLength;
@@ -60,6 +62,8 @@ public class AuthService {
 
     @Transactional
     public void sendCode(String phone, String ip) {
+        // 同一手机号的限流检查和写入必须串行，防止并发请求同时通过计数检查。
+        smsCodeRepository.lockPhone(phone);
         Instant now = Instant.now();
         if (smsCodeRepository.countByPhoneAndCreatedAtAfter(phone, now.minusSeconds(60)) >= perMinute) {
             throw BizException.of(ErrorCode.SMS_TOO_FREQUENT, "发送过于频繁，请稍后再试");
@@ -79,28 +83,14 @@ public class AuthService {
         smsSender.sendLoginCode(phone, code);
     }
 
-    @Transactional
     public AuthDtos.TokenPair login(String phone, String code, String ip, String userAgent, String deviceId) {
-        SmsCode record = smsCodeRepository.findLatestUnconsumed(phone, "LOGIN")
-                .orElseThrow(() -> BizException.of(ErrorCode.CODE_INVALID, "请先获取验证码"));
-
-        if (record.getExpiresAt().isBefore(Instant.now())) {
-            throw BizException.of(ErrorCode.CODE_EXPIRED, "验证码已过期");
-        }
-        if (record.getAttempts() >= MAX_VERIFY_ATTEMPTS) {
-            throw BizException.of(ErrorCode.CODE_INVALID, "尝试次数过多，请重新获取");
-        }
-        record.setAttempts(record.getAttempts() + 1);
-        if (!MessageDigest.isEqual(sha256(code).getBytes(StandardCharsets.UTF_8),
-                record.getCodeHash().getBytes(StandardCharsets.UTF_8))) {
-            throw BizException.of(ErrorCode.CODE_INVALID, "验证码不正确");
-        }
-        record.setConsumedAt(Instant.now());
-
-        User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
-        user.setLastLoginAt(Instant.now());
-
-        return issueTokens(user, ip, userAgent, deviceId);
+        codeVerifier.verifyAndConsume(phone, code);
+        // 校验结束后才开启账户事务，避免每个并发登录占用两条数据库连接。
+        return transactions.execute(status -> {
+            User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
+            user.setLastLoginAt(Instant.now());
+            return issueTokens(user, ip, userAgent, deviceId);
+        });
     }
 
     /** 刷新即轮换：老的立刻作废，防止 refresh token 被重复使用。 */
@@ -115,7 +105,6 @@ public class AuthService {
                 .orElseThrow(() -> BizException.of(ErrorCode.REFRESH_TOKEN_INVALID, "登录已失效，请重新登录"));
 
         if (stored.getExpiresAt().isBefore(Instant.now())) {
-            stored.setStatus("EXPIRED");
             throw BizException.of(ErrorCode.REFRESH_TOKEN_INVALID, "登录已过期，请重新登录");
         }
         stored.setStatus("ROTATED");
