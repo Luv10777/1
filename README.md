@@ -175,9 +175,7 @@ src/
 
 ## 文档
 
-- [PROJECT_MEMORY.md](PROJECT_MEMORY.md) - 项目长期记忆
-- [docs/project-status.md](docs/project-status.md) - 项目状态
-- [docs/phase2-progress.md](docs/phase2-progress.md) - 第二阶段进度
+- [backend/growth-api/README.md](backend/growth-api/README.md) - 当前后端主干、启动方式与能力边界
 - [DESIGN.md](DESIGN.md) - 视觉设计
 - [CHANGELOG.md](CHANGELOG.md) - 变更日志
 
@@ -194,9 +192,9 @@ src/
 ## 技术栈
 
 - **前端**: Vue 3, Vite, Vue Router
-- **计划后端**: Java 21 + Spring Boot 3
-- **计划数据库**: PostgreSQL + Redis
-- **计划消息队列**: RabbitMQ
+- **当前后端**: `backend/growth-api`，Java 21 + Spring Boot 3
+- **后端基础设施**: PostgreSQL + Redis + MinIO，配置见后端目录
+- **任务调度**: 当前后端使用数据库任务队列
 - **计划对象存储**: MinIO / 腾讯云COS / 火山TOS
 - **计划AI适配**: FluAPI、ToAPIs
 
