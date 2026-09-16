@@ -54,3 +54,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# growth-api
+backend/growth-api/target/

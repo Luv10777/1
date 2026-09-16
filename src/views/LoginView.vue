@@ -16,7 +16,7 @@ const sendCode = async () => {
   error.value = ''
   try {
     await auth.sendCode(form.phone)
-    notice.value = '验证码已发送，演示环境可填写任意 6 位数字。'
+    notice.value = '验证码已发送，请查收短信。'
   } catch (err) {
     error.value = err.message
   }
@@ -65,7 +65,7 @@ const submit = async () => {
         <p v-if="notice" class="form-message success">{{ notice }}</p>
         <button class="primary-button login-submit" type="submit" :disabled="busy">{{ busy ? '正在进入…' : '进入梧曜星枢' }}<span>→</span></button>
       </form>
-      <div class="auth-footnote"><span class="status-pulse" /> 当前为 Mock 认证模式 <span class="auth-footnote-separator">·</span> 数据仅用于演示</div>
+      <div class="auth-footnote"><span class="status-pulse" /> 手机号验证码登录 <span class="auth-footnote-separator">·</span> 未注册的手机号将自动创建账号</div>
       <p class="legal-copy">登录即代表你同意《用户协议》和《隐私政策》<br /><span>需要帮助？联系平台管理员</span></p>
     </section>
     <aside class="auth-aside">

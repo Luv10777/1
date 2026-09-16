@@ -1,183 +1,56 @@
 # 梧曜星枢 · AI 商家增长平台
 
-**嘉兴市梧曜科技有限公司**  
-**产品：梧曜星枢 / WUYAO NEXUS**
+**嘉兴市梧曜科技有限公司 · WUYAO NEXUS**
 
-梧曜星枢是面向商家和门店的 AI 内容增长工作台。
+面向本地生活商家的 AI 内容增长工作台。
 
-## 当前状态
+## 仓库结构
 
-- **分支**: `feat/phase-1-functional-foundation`
-- **GitHub**: https://github.com/Luv10777/1
-- **运行模式**: 演示模式（Demo Mode）
-- **最新提交**: 阶段一工程基础修复完成
+| 目录 | 说明 |
+|------|------|
+| `src/` | 前端 Vue 3 + Vite |
+| `backend/growth-api/` | **后端主干**，Java 21 + Spring Boot 3.5.16 |
+| `docs/` | 设计文档，`adr/` 记录架构决策 |
+| `legacy/` | 已退休的旧实现，只为查阅保留，不参与构建 |
+
+协作约定见 [CLAUDE.md](CLAUDE.md)，后端的八条共享约定见
+[backend/growth-api/README.md](backend/growth-api/README.md)。
 
 ## 本地运行
+
+```powershell
+# 后端：生成本地配置与随机 JWT 密钥，初始化依赖后启动
+cd backend/growth-api
+./scripts/init-local.ps1
+docker compose up -d
+docker compose wait minio-init
+mvn spring-boot:run
+```
+
+另一个终端从仓库根目录启动前端：
 
 ```bash
 npm install
 npm run dev
 ```
 
-默认开发地址：http://localhost:4173/
+Java 21、Maven 和 Docker 为后端前置依赖。Linux/macOS 启动方法、独立 worker 命令
+与两人按模块协作规则见后端 README。后端默认不执行任务，需要另起 worker。
 
-生产构建：
+前端 <http://localhost:4173>，`/api` 已代理到后端 8080，无需额外配置。
 
-```bash
-npm run build
-npm run preview
-```
+## 提交前
 
-## 质量检查
-
-提交前必须全部通过：
+后端改动在 `backend/growth-api` 执行 `mvn verify`，需要 Docker。
 
 ```bash
-npm test          # 38个测试全部通过
-npm run lint      # ESLint检查通过
-npm run typecheck # TypeScript类型检查通过
-npm run build     # 生产构建成功
+npm test && npm run lint && npm run typecheck && npm run build
 ```
 
-## 演示登录
+## 当前进度
 
-- **手机号**: 任意11位、以`1`开头的手机号
-- **验证码**: 任意6位数字
-- **认证模式**: `VITE_AUTH_MODE=mock`
-
-## 已完成能力
-
-### 阶段一：工程基础（✅ 已完成）
-
-- ✅ TypeScript 配置和类型检查
-- ✅ ESLint Flat Config 配置
-- ✅ 标准目录结构（api、components、stores、types、utils、services）
-- ✅ 统一请求封装和错误处理（`utils/request.js`）
-- ✅ 环境配置管理（`utils/config.js`）
-- ✅ 表单验证工具（`utils/validator.js`）
-- ✅ 通用工具函数（`utils/index.js`）
-- ✅ API客户端模块（`api/index.js`）
-- ✅ 通用组件库：
-  - Loading（加载状态）
-  - Empty（空状态）
-  - ErrorState（错误状态）
-  - StatusBadge（状态徽章）
-  - ConfirmDialog（确认对话框）
-- ✅ 删除虚假的 FluAPI/ToAPIs READY 状态
-- ✅ 明确标识演示模式
-- ✅ 单元测试基础（38个测试通过）
-- ✅ 包命名修正（wuyuo → wuyao）
-
-### 前期已完成
-
-- Vue 3 + Vite + Vue Router 工程基础
-- 深色"星枢控制台"视觉系统
-- Mock 登录态和路由守卫
-- 22个业务路由和页面框架
-- 领域契约和工作流状态机
-- Mock 工作流编排器
-- 一句话创作工作区原型
-
-## 当前架构
-
-```
-src/
-├── api/              # API客户端（auth、merchant、store、brand等）
-├── components/       # 通用组件（Loading、Empty、ErrorState等）
-├── domain/           # 领域逻辑和业务契约
-├── layouts/          # 页面布局（AppShell）
-├── stores/           # 状态管理（auth、creative、billing等）
-├── types/            # 类型定义
-├── utils/            # 工具函数（request、config、validator等）
-├── views/            # 业务页面
-├── App.vue
-├── main.js
-└── router.js
-```
-
-## 演示模式说明
-
-当前项目运行在**演示模式**下：
-
-- ✅ 前端工程完整，可本地运行和构建
-- ✅ 领域契约和业务逻辑已定义
-- ✅ 所有测试通过，代码质量基线建立
-- ⚠️ **未配置后端API**（`VITE_API_BASE_URL`为空）
-- ⚠️ **未配置AI模型**（FluAPI、ToAPIs等）
-- ⚠️ **未配置对象存储**
-- ⚠️ **使用Mock登录**（`VITE_AUTH_MODE=mock`）
-
-所有API调用会明确提示"演示模式"或"未配置"，**不会伪造真实业务数据**。
-
-## 待完成能力（阶段二至七）
-
-### 阶段二：登录、权限和商家基础
-- [ ] 手机验证码登录（服务端）
-- [ ] JWT Token 和 Refresh Token
-- [ ] 多租户、用户、角色、权限模型
-- [ ] 商家与门店管理
-- [ ] 数据库表结构（PostgreSQL）
-- [ ] Redis 会话管理
-
-### 阶段三：四大资源库
-- [ ] 品牌库（品牌定位、视觉资产、语言风格）
-- [ ] 素材库（图片、视频、音频，预签名直传）
-- [ ] 知识库（文档解析、向量化、结构化提取）
-- [ ] 作品库（生成结果、审核流程、发布追踪）
-
-### 阶段四：统一AI模型网关与任务中心
-- [ ] Provider接口抽象（FluAPI、ToAPIs适配器）
-- [ ] 模型别名路由（TEXT_FAST、IMAGE_PRIMARY等）
-- [ ] 异步任务管理（RabbitMQ）
-- [ ] 成本预估与额度管理
-- [ ] Webhook回调与状态轮询
-- [ ] 任务失败重试和取消机制
-
-### 阶段五：一句话批量内容生成
-- [ ] 意图识别和Prompt优化
-- [ ] CampaignPlan JSON生成与校验
-- [ ] 内容变量矩阵（商品×角度×钩子×场景）
-- [ ] 成本确认和批量执行
-- [ ] 图片/视频质量检测
-- [ ] 人工审核流程
-
-### 阶段六：补齐全部菜单模块
-- [ ] 模型对话
-- [ ] 文案提取/重写
-- [ ] 视频结构分析
-- [ ] AI图片/视频创作
-- [ ] 数字人播报
-- [ ] 评论与AI客服
-- [ ] 内容发布与运营分析
-- [ ] 清除所有PlaceholderView
-
-### 阶段七：视觉统一、测试覆盖和交付
-- [ ] 设计系统一致性
-- [ ] 完整测试覆盖
-- [ ] 部署文档
-- [ ] 环境变量清单
-- [ ] 创建Pull Request
-
-## 生产边界
-
-当前**不具备生产能力**：
-
-- ❌ 无后端API（Spring Boot需开发）
-- ❌ 无数据库（PostgreSQL需配置）
-- ❌ 无真实AI模型接入
-- ❌ 无对象存储
-- ❌ 无消息队列（RabbitMQ）
-- ❌ 无真实用户认证
-- ❌ 无多租户数据隔离
-- ❌ 无支付和计费
-
-**真实API Key、OAuth凭证和商家生产数据不得写入Git。**
-
-## 文档
-
-- [backend/growth-api/README.md](backend/growth-api/README.md) - 当前后端主干、启动方式与能力边界
-- [DESIGN.md](DESIGN.md) - 视觉设计
-- [CHANGELOG.md](CHANGELOG.md) - 变更日志
+已跑通并验证的能力、以及明确未接通的部分，见 [PROJECT_MEMORY.md](PROJECT_MEMORY.md)。
+该文件只记录经过实际运行验证的事实。
 
 ## 开发原则
 
@@ -191,12 +64,13 @@ src/
 
 ## 技术栈
 
-- **前端**: Vue 3, Vite, Vue Router
-- **当前后端**: `backend/growth-api`，Java 21 + Spring Boot 3
-- **后端基础设施**: PostgreSQL + Redis + MinIO，配置见后端目录
-- **任务调度**: 当前后端使用数据库任务队列
-- **计划对象存储**: MinIO / 腾讯云COS / 火山TOS
-- **计划AI适配**: FluAPI、ToAPIs
+- **前端**：Vue 3、Vite、Vue Router
+- **后端**：Java 21、Spring Boot 3.5.16、Spring Security、Flyway
+- **数据库**：PostgreSQL（行级安全做租户隔离，pgvector 备用于知识检索）
+- **缓存**：Redis
+- **异步调度**：PostgreSQL 任务表 + `FOR UPDATE SKIP LOCKED`（不使用消息队列）
+- **对象存储**：S3 协议，开发用 MinIO，生产用腾讯云 COS / 火山 TOS
+- **AI 供应商**：经能力网关接入，业务代码只认能力别名
 
 ## 许可
 
