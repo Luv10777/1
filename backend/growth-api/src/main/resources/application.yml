@@ -24,6 +24,9 @@ spring:
     # 迁移用超级用户跑，应用连接用受 RLS 约束的 growth_app
     user: ${DB_MIGRATE_USER:${DB_USER:growth_app}}
     password: ${DB_MIGRATE_PASSWORD:${DB_PASSWORD:}}
+    placeholders:
+      # V1 用它创建应用角色，必须和 spring.datasource.password 一致
+      app_db_password: ${DB_PASSWORD:growth_dev_local}
 
   data:
     redis:

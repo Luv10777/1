@@ -11,6 +11,7 @@
 | `src/` | 前端 Vue 3 + Vite |
 | `backend/growth-api/` | **后端主干**，Java 21 + Spring Boot 3.5.16 |
 | `docs/` | 设计文档，`adr/` 记录架构决策 |
+| `deploy/` | 测试服务器部署配置 |
 | `legacy/` | 已退休的旧实现，只为查阅保留，不参与构建 |
 
 协作约定见 [CLAUDE.md](CLAUDE.md)，后端的八条共享约定见
@@ -30,6 +31,16 @@ npm install && npm run dev
 ```
 
 前端 <http://localhost:4173>，`/api` 已代理到后端 8080，无需额外配置。
+
+## 部署到测试服务器
+
+一台机器跑全套（PostgreSQL / Redis / MinIO / api / worker / Nginx），
+从买服务器到能访问的完整步骤见 [deploy/README.md](deploy/README.md)。
+
+```bash
+cp deploy/.env.example deploy/.env   # 填口令和公网 IP
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+```
 
 ## 提交前
 

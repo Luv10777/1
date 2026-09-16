@@ -10,10 +10,14 @@
 
 -- 应用连接用的角色。故意不给 BYPASSRLS，也不是表 owner，
 -- 这样即使业务代码忘了加租户条件，数据库也不会返回别家的数据。
+-- 口令由 Flyway 占位符注入，取自 DB_PASSWORD 环境变量。
+-- 不要把真实口令写进这个文件——它会进 Git。
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'growth_app') THEN
-        CREATE ROLE growth_app LOGIN PASSWORD 'growth_dev_local';
+        CREATE ROLE growth_app LOGIN PASSWORD '${app_db_password}';
+    ELSE
+        ALTER ROLE growth_app WITH PASSWORD '${app_db_password}';
     END IF;
 END
 $$;

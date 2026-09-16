@@ -8,6 +8,7 @@
 | `backend/growth-api/` | **唯一的后端主干**。新功能全写这里 |
 | `legacy/` | 已退休的旧实现，只为查阅保留 |
 | `docs/` | 设计文档。`adr/` 记录架构决策的来龙去脉 |
+| `deploy/` | 测试服务器部署（Docker Compose 全栈），步骤见 `deploy/README.md` |
 
 ## ⛔ legacy/ 目录
 
