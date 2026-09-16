@@ -1,405 +1,113 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { isDemoMode } from '../utils/config'
-import Loading from '../components/Loading.vue'
-import Empty from '../components/Empty.vue'
-import StatusBadge from '../components/StatusBadge.vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ArrowUpRight, Check, Clock3, Download, Edit3, FileText, Image as ImageIcon, LayoutGrid, List, MapPin, Plus, Search, SlidersHorizontal, Sparkles, Video, X, WandSparkles } from 'lucide-vue-next'
 
-const works = ref([])
-const loading = ref(true)
-const filter = reactive({
-  reviewStatus: 'all',
-  type: 'all'
-})
-
-const typeMap = {
-  IMAGE: '图片',
-  VIDEO: '视频',
-  TEXT: '文案',
-  MIXED: '混合'
-}
-
-const statusMap = {
-  DRAFT: { label: '草稿', color: 'info' },
-  PENDING: { label: '待审核', color: 'warning' },
-  APPROVED: { label: '已通过', color: 'success' },
-  REJECTED: { label: '已驳回', color: 'error' },
-  PUBLISHED: { label: '已发布', color: 'success' }
-}
-
-onMounted(async () => {
-  await loadWorks()
-})
-
-async function loadWorks() {
-  loading.value = true
-  try {
-    if (isDemoMode()) {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      works.value = [
-        {
-          id: 'work_1',
-          code: 'W1724580000001',
-          title: '秋季新品推广海报',
-          type: 'IMAGE',
-          reviewStatus: 'PUBLISHED',
-          coverUrl: '/demo/work1.jpg',
-          workflowId: 'poster_gen_v1',
-          generationCost: 0.05,
-          createdAt: '2024-08-20T10:00:00Z',
-          publishedAt: '2024-08-20T15:00:00Z'
-        },
-        {
-          id: 'work_2',
-          code: 'W1724580000002',
-          title: '门店宣传短视频',
-          type: 'VIDEO',
-          reviewStatus: 'APPROVED',
-          coverUrl: '/demo/work2.jpg',
-          workflowId: 'video_gen_v1',
-          generationCost: 2.50,
-          createdAt: '2024-08-22T14:00:00Z'
-        },
-        {
-          id: 'work_3',
-          code: 'W1724580000003',
-          title: '小红书种草文案',
-          type: 'TEXT',
-          reviewStatus: 'PENDING',
-          workflowId: 'text_gen_v1',
-          generationCost: 0.02,
-          createdAt: '2024-08-24T09:00:00Z'
-        }
-      ]
-    }
-  } catch (error) {
-    console.error('加载作品失败:', error)
-  } finally {
-    loading.value = false
+const router = useRouter()
+const mockWorks = [
+  { id: 'nebula-01', title: '城市夜游 · 光影叙事短片', date: '2026-08-30', type: 'video', typeLabel: 'AI 视频', status: 'generating', statusLabel: '星枢运作中', tags: ['城市文旅', '60s 竖屏'], summary: '让城市灯火成为主角，穿行于夜色与人群之间。', tone: 'violet', progress: 68, prompt: '夜幕下的城市文旅宣传片，镜头从街巷灯火缓慢推进，穿过人群与霓虹，最后停在江边的城市天际线。电影感，克制高级，竖屏 9:16。', references: ['城市夜景参考.jpg', '品牌色板.png'], model: 'Nebula Video 2.1', size: '1080 × 1920 px', duration: '00:12', seed: '842193' },
+  { id: 'nebula-02', title: '春日限定 · 手冲咖啡主视觉', date: '2026-08-29', type: 'image', typeLabel: 'AI 生图', status: 'completed', statusLabel: '已完成', tags: ['新品上市', '视觉海报'], summary: '以晨雾、陶土与咖啡香气，构成一张有呼吸感的海报。', tone: 'amber', prompt: '春日限定手冲咖啡海报，晨雾感自然光，陶土色桌面，咖啡器具与新鲜烘焙豆，留出右上角标题空间，杂志感静物摄影。', references: ['咖啡杯产品照.jpg', '门店 Logo.svg'], model: 'Nebula Image Pro', size: '2048 × 2732 px', duration: '—', seed: '381204' },
+  { id: 'nebula-03', title: '小红书探店笔记 · 叙事版', date: '2026-08-28', type: 'copy', typeLabel: '营销文案', status: 'completed', statusLabel: '已完成', tags: ['小红书', '第一人称'], summary: '把一次普通的探店，写成值得收藏的周末路线。', tone: 'blue' },
+  { id: 'nebula-04', title: '门店经营体检 · 八月诊断报告', date: '2026-08-27', type: 'diagnosis', typeLabel: '探店诊断', status: 'completed', statusLabel: '已完成', tags: ['经营分析', '行动建议'], summary: '从客流、内容与转化三条链路，找到本月最值得投入的动作。', tone: 'green', diagnosis: { score: '78', level: '稳步增长', summary: '门店自然客流保持增长，但内容发布与到店转化之间仍有明显断层。建议优先补齐“周末场景 + 真实顾客反馈”两类内容。', metrics: [{ label: '内容活跃度', value: '86', change: '+12%' }, { label: '到店转化', value: '64', change: '+4%' }, { label: '复购意向', value: '71', change: '+8%' }], actions: ['每周发布 2 条真实探店内容', '将会员权益前置到短视频前三秒', '为高意向顾客配置到店提醒'] } },
+  { id: 'nebula-05', title: '秋日新品 · 系列封面组图', date: '2026-08-25', type: 'image', typeLabel: 'AI 生图', status: 'completed', statusLabel: '已完成', tags: ['系列物料', '品牌资产'], summary: '同一套光线与构图，保持品牌资产在不同场景中的秩序感。', tone: 'rose' },
+  { id: 'nebula-06', title: '三分钟读懂 · 门店会员权益', date: '2026-08-24', type: 'video', typeLabel: '数字人视频', status: 'generating', statusLabel: '星枢运作中', tags: ['会员运营', '口播动画'], summary: '将复杂的权益说明，转译成清晰、轻量、可分享的内容。', tone: 'cyan', progress: 34, editorPath: '/digital-human/studio', prompt: '请用亲和、可信的店长口吻，介绍门店会员权益，突出首次到店礼、积分兑换和生日礼遇。', references: ['店长形象参考.png', '会员权益卡.png'], model: 'Digital Human Studio', size: '1080 × 1920 px', duration: '00:30', seed: '619204' },
+]
+const filters = [{ key: 'all', label: '全部作品' }, { key: 'video', label: 'AI 视频' }, { key: 'image', label: 'AI 生图' }, { key: 'copy', label: '营销文案' }, { key: 'diagnosis', label: '探店诊断' }]
+const activeFilter = ref('all'); const searchQuery = ref(''); const layout = ref('grid')
+const filteredWorks = computed(() => { const query = searchQuery.value.trim().toLowerCase(); return mockWorks.filter((work) => (activeFilter.value === 'all' || work.type === activeFilter.value) && (!query || `${work.title} ${work.summary} ${work.tags.join(' ')}`.toLowerCase().includes(query))) })
+const typeIcon = { video: Video, image: ImageIcon, copy: FileText, diagnosis: MapPin }
+const toneClasses = { violet: 'tone-violet', amber: 'tone-amber', blue: 'tone-blue', green: 'tone-green', rose: 'tone-rose', cyan: 'tone-cyan' }
+const reEdit = () => router.push('/creative')
+const selectedWork = ref(null)
+const openDetails = (work) => { selectedWork.value = work }
+const closeDetails = () => { selectedWork.value = null }
+const editWork = async (work) => {
+  const path = work.editorPath || (work.type === 'digital-human' ? '/digital-human/studio' : work.type === 'video' ? '/video/workbench' : work.type === 'image' ? '/image/create/poster' : work.type === 'diagnosis' ? '/analytics/diagnosis' : '/copy/rewrite')
+  const query = { workId: work.id, prompt: work.prompt || work.summary, assets: work.references?.join('|') || '', ratio: work.size?.includes('1920') ? '9:16' : undefined, duration: work.duration?.replace('00:', '') || undefined }
+  closeDetails()
+  await nextTick()
+  const navigate = () => router.push({ path, query })
+  if (typeof document.startViewTransition === 'function') {
+    document.startViewTransition(navigate)
+  } else {
+    document.documentElement.classList.add('route-transitioning')
+    window.setTimeout(() => {
+      navigate()
+      window.setTimeout(() => document.documentElement.classList.remove('route-transitioning'), 380)
+    }, 90)
   }
 }
-
-function getStatusConfig(status) {
-  return statusMap[status] || { label: status, color: 'info' }
-}
-
-function formatCost(cost) {
-  return cost ? `¥${cost.toFixed(2)}` : '-'
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN')
-}
+const handleModalKeydown = (event) => { if (event.key === 'Escape') closeDetails() }
+onMounted(() => window.addEventListener('keydown', handleModalKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 </script>
 
 <template>
-  <div class="works-page">
-    <header class="page-header">
-      <div class="header-top">
-        <div class="title-group">
-          <span class="eyebrow mono">WORKS LIBRARY</span>
-          <h1>作品库</h1>
-        </div>
+  <div class="works-library">
+    <header class="works-header">
+      <div class="works-heading">
+        <div class="works-title-copy"><h1>星枢作品库</h1><p class="works-subtitle">每一次生成，都是一颗可追溯、可复用的内容星体。</p></div>
+        <button class="new-work-button" type="button" @click="reEdit"><Plus :size="16" stroke-width="1.8" /> 新建创作</button>
       </div>
-      <p class="header-desc">查看已生成、审核中和已发布的内容作品</p>
+      <div class="works-toolbar">
+        <div class="filter-tabs" role="tablist" aria-label="作品类型筛选"><button v-for="filter in filters" :key="filter.key" class="filter-tab" :class="{ active: activeFilter === filter.key }" type="button" role="tab" :aria-selected="activeFilter === filter.key" @click="activeFilter = filter.key">{{ filter.label }}</button></div>
+        <div class="toolbar-actions"><label class="search-field"><Search :size="16" stroke-width="1.8" aria-hidden="true" /><input v-model="searchQuery" type="search" placeholder="搜索作品标题或标签" aria-label="搜索作品" /></label><button class="icon-control" type="button" aria-label="筛选设置"><SlidersHorizontal :size="17" stroke-width="1.8" /></button><div class="layout-switch" role="group" aria-label="切换布局"><button :class="{ active: layout === 'grid' }" type="button" aria-label="网格布局" @click="layout = 'grid'"><LayoutGrid :size="16" /></button><button :class="{ active: layout === 'list' }" type="button" aria-label="列表布局" @click="layout = 'list'"><List :size="17" /></button></div></div>
+      </div>
     </header>
-
-    <section class="filter-bar">
-      <div class="filter-group">
-        <label>审核状态</label>
-        <select v-model="filter.reviewStatus" class="filter-select">
-          <option value="all">全部状态</option>
-          <option value="DRAFT">草稿</option>
-          <option value="PENDING">待审核</option>
-          <option value="APPROVED">已通过</option>
-          <option value="REJECTED">已驳回</option>
-          <option value="PUBLISHED">已发布</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>作品类型</label>
-        <select v-model="filter.type" class="filter-select">
-          <option value="all">全部类型</option>
-          <option value="IMAGE">图片</option>
-          <option value="VIDEO">视频</option>
-          <option value="TEXT">文案</option>
-          <option value="MIXED">混合</option>
-        </select>
-      </div>
+    <div class="library-meta"><span>共 {{ filteredWorks.length }} 件作品</span><span class="meta-divider" /><span><span class="live-dot" /> {{ mockWorks.filter(work => work.status === 'generating').length }} 个任务正在生成</span></div>
+    <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
+      <article v-for="(work, index) in filteredWorks" :key="work.id" class="work-card" :class="`card-${work.tone}`" :style="{ '--stagger': `${index * 55}ms` }" tabindex="0" @click="openDetails(work)" @keydown.enter="openDetails(work)">
+        <div class="work-thumb" :class="toneClasses[work.tone]"><div class="thumb-noise" /><div class="thumb-content"><component :is="typeIcon[work.type]" :size="21" stroke-width="1.5" /><span>{{ work.typeLabel }}</span><strong>{{ work.summary }}</strong></div><div v-if="work.type === 'video'" class="thumb-timeline"><span /><span /><span /><span /><span /></div><div v-else-if="work.type === 'image'" class="thumb-shape" /><div v-else class="thumb-lines"><i /><i /><i /></div><div class="thumb-overlay"><button class="download-button" type="button" aria-label="下载作品" @click.stop><Download :size="17" stroke-width="1.8" /></button></div><div class="status-pill" :class="work.status"><span v-if="work.status === 'generating'" class="status-pulse" /><Check v-else :size="12" stroke-width="2.2" /> {{ work.statusLabel }}</div></div>
+        <div class="work-body"><div class="work-title-row"><h2>{{ work.title }}</h2><button class="more-button" type="button" aria-label="查看详情" @click.stop="openDetails(work)"><ArrowUpRight :size="16" stroke-width="1.7" /></button></div><div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ work.date }}</div><div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div><div v-if="work.status === 'generating'" class="generation-progress"><div><span>生成中</span><strong>{{ work.progress }}%</strong></div><div class="progress-track"><span :style="{ width: `${work.progress}%` }" /></div></div></div>
+      </article>
     </section>
+    <div v-if="!filteredWorks.length" class="empty-state"><Sparkles :size="24" stroke-width="1.5" /><strong>没有找到匹配的作品</strong><span>试试其他关键词，或切换到全部作品。</span></div>
 
-    <Loading v-if="loading" text="加载作品列表..." />
-
-    <Empty
-      v-else-if="works.length === 0"
-      icon="⌁"
-      title="暂无作品"
-      description="通过创意工作台生成第一个作品"
-    />
-
-    <div v-else class="works-grid">
-      <div v-for="work in works" :key="work.id" class="work-card">
-        <div class="work-preview">
-          <div class="placeholder-preview">
-            <span class="preview-icon">{{ typeMap[work.type] === '图片' ? '🖼️' : typeMap[work.type] === '视频' ? '🎬' : '📝' }}</span>
-          </div>
-          <span class="type-badge">{{ typeMap[work.type] }}</span>
-        </div>
-
-        <div class="work-info">
-          <div class="work-header">
-            <div class="work-meta">
-              <h3 class="work-title">{{ work.title }}</h3>
-              <span class="work-code mono">{{ work.code }}</span>
-            </div>
-            <StatusBadge :status="getStatusConfig(work.reviewStatus).color" :text="getStatusConfig(work.reviewStatus).label" />
-          </div>
-
-          <div class="work-details">
-            <div class="detail-item">
-              <span class="label">工作流</span>
-              <span class="value mono">{{ work.workflowId }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="label">成本</span>
-              <span class="value">{{ formatCost(work.generationCost) }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="label">创建时间</span>
-              <span class="value">{{ formatDate(work.createdAt) }}</span>
-            </div>
-            <div v-if="work.publishedAt" class="detail-item">
-              <span class="label">发布时间</span>
-              <span class="value">{{ formatDate(work.publishedAt) }}</span>
-            </div>
-          </div>
-
-          <div class="work-actions">
-            <button class="link-button">预览</button>
-            <button v-if="work.reviewStatus === 'PENDING'" class="link-button">审核</button>
-            <button v-if="work.reviewStatus === 'APPROVED'" class="link-button success">发布</button>
-            <button class="link-button danger">删除</button>
-          </div>
-        </div>
-      </div>
+    <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
+      <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
+        <header class="detail-header"><div><p class="detail-eyebrow"><WandSparkles :size="14" /> {{ selectedWork.typeLabel }} / HISTORY</p><h2>{{ selectedWork.title }}</h2><p class="detail-date">生成于 {{ selectedWork.date }} · {{ selectedWork.statusLabel }}</p></div><button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button></header>
+        <div v-if="selectedWork.type === 'diagnosis'" class="diagnosis-detail"><div class="diagnosis-score"><span>本次诊断评分</span><strong>{{ selectedWork.diagnosis.score }}</strong><em>{{ selectedWork.diagnosis.level }}</em></div><div class="diagnosis-summary">{{ selectedWork.diagnosis.summary }}</div><div class="diagnosis-metrics"><div v-for="metric in selectedWork.diagnosis.metrics" :key="metric.label"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><em>{{ metric.change }}</em></div></div><div class="detail-block"><h3>建议行动</h3><ul><li v-for="action in selectedWork.diagnosis.actions" :key="action">{{ action }}</li></ul></div></div>
+        <div v-else class="generation-detail"><div class="detail-preview" :class="toneClasses[selectedWork.tone]"><component :is="typeIcon[selectedWork.type]" :size="30" stroke-width="1.4" /><span>{{ selectedWork.typeLabel }}</span><strong>{{ selectedWork.summary }}</strong></div><div class="detail-block"><h3>生成输入</h3><p class="prompt-copy">{{ selectedWork.prompt }}</p></div><div class="detail-block"><h3>参考素材 <small>{{ selectedWork.references.length }} 个文件</small></h3><div class="reference-list"><span v-for="reference in selectedWork.references" :key="reference"><ImageIcon :size="14" /> {{ reference }}</span></div></div><div class="parameter-grid"><div><span>模型</span><strong>{{ selectedWork.model }}</strong></div><div><span>画布尺寸</span><strong>{{ selectedWork.size }}</strong></div><div><span>时长</span><strong>{{ selectedWork.duration }}</strong></div><div><span>随机种子</span><strong>{{ selectedWork.seed }}</strong></div></div></div>
+        <footer class="detail-footer"><span>作品 ID · {{ selectedWork.id }}</span><div><button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button><button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 编辑</button></div></footer>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
-.works-page {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.title-group h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 8px 0 0 0;
-}
-
-.eyebrow {
-  font-size: 11px;
-  color: rgba(139, 92, 246, 0.8);
-  letter-spacing: 0.1em;
-}
-
-.header-desc {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-}
-
-.filter-bar {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.1);
-  border-radius: 8px;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.filter-group label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 500;
-}
-
-.filter-select {
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.works-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-}
-
-.work-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.work-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(139, 92, 246, 0.4);
-}
-
-.work-preview {
-  position: relative;
-  width: 100%;
-  height: 180px;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.placeholder-preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.preview-icon {
-  font-size: 48px;
-  opacity: 0.5;
-}
-
-.type-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 4px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 500;
-}
-
-.work-info {
-  padding: 16px;
-}
-
-.work-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.work-meta {
-  flex: 1;
-}
-
-.work-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  margin: 0 0 4px 0;
-  line-height: 1.4;
-}
-
-.work-code {
-  font-size: 11px;
-  color: rgba(139, 92, 246, 0.7);
-}
-
-.work-details {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.detail-item .label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.detail-item .value {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.work-actions {
-  display: flex;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.link-button {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 6px;
-  color: rgb(139, 92, 246);
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.link-button:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgb(139, 92, 246);
-}
-
-.link-button.success {
-  color: rgb(34, 197, 94);
-  border-color: rgba(34, 197, 94, 0.3);
-}
-
-.link-button.success:hover {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgb(34, 197, 94);
-}
-
-.link-button.danger {
-  color: rgb(239, 68, 68);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.link-button.danger:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgb(239, 68, 68);
-}
+.works-library{--paper:#f7f7f5;--surface:rgba(255,255,255,.8);--ink:#191919;--muted:#757575;--line:#e5e5e2;min-height:100%;padding:10px 0 40px;color:var(--ink);background:radial-gradient(circle at 12% -8%,rgba(226,232,240,.55),transparent 28%),var(--paper)}.works-header{margin-bottom:22px}.works-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:12px 2px 24px;border-bottom:1px solid var(--line)}.works-kicker{display:flex;align-items:center;gap:8px;margin:0 0 15px;color:#8a8a86;font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.14em}.kicker-dot,.live-dot{width:6px;height:6px;border-radius:50%;background:#202020;box-shadow:0 0 0 4px rgba(32,32,32,.08)}.works-heading h1{margin:0;font:700 clamp(30px,4vw,44px)/1.1 'Plus Jakarta Sans','Noto Sans SC',sans-serif;letter-spacing:-.06em}.works-subtitle{margin:11px 0 0;color:var(--muted);font-size:13px}.new-work-button{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 15px;border:1px solid #202020;border-radius:9px;color:#fff;background:#202020;font-size:12px;transition:transform .2s ease,background .2s ease}.new-work-button:hover{transform:translateY(-1px);background:#3b3b3b}.works-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0 0}.filter-tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap}.filter-tab{min-height:32px;padding:0 11px;border:1px solid transparent;border-radius:7px;color:#8b8b88;background:transparent;font-size:12px;transition:all .18s ease}.filter-tab:hover{color:#30302e;background:#ececea}.filter-tab.active{color:#202020;border-color:#d9d9d5;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04)}.toolbar-actions{display:flex;align-items:center;gap:8px}.search-field{display:flex;align-items:center;gap:8px;width:min(240px,27vw);height:34px;padding:0 10px;border:1px solid var(--line);border-radius:8px;color:#989894;background:rgba(255,255,255,.62)}.search-field:focus-within{border-color:#a2a2a0;box-shadow:0 0 0 3px rgba(0,0,0,.04)}.search-field input{width:100%;border:0;outline:0;color:#333;background:transparent;font-size:11px}.search-field input::placeholder{color:#a0a09c}.icon-control,.layout-switch button{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:8px;color:#8d8d89;background:rgba(255,255,255,.62);transition:all .18s ease}.icon-control:hover,.layout-switch button:hover{color:#242424;border-color:#cfcfcb}.layout-switch{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.55)}.layout-switch button{width:29px;height:27px;border:0;background:transparent}.layout-switch button.active{color:#202020;background:#fff;box-shadow:0 2px 7px rgba(0,0,0,.08)}.library-meta{display:flex;align-items:center;gap:10px;margin:0 0 14px;color:#92928d;font:500 10px 'IBM Plex Mono',monospace}.meta-divider{width:1px;height:12px;background:#d7d7d2}.library-meta .live-dot{display:inline-block;margin:0 5px 1px 0;width:5px;height:5px;background:#6e9b77;box-shadow:0 0 0 3px rgba(110,155,119,.12)}.works-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.work-card{overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 4px 14px rgba(0,0,0,.025);opacity:0;animation:card-in .55s cubic-bezier(.22,1,.36,1) var(--stagger) forwards;transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}.work-card:hover{transform:translateY(-4px);border-color:#d3d3cf;box-shadow:0 16px 30px rgba(0,0,0,.08)}.work-thumb{position:relative;min-height:210px;overflow:hidden;isolation:isolate}.tone-violet{background:#dcdaf6;color:#2c2860}.tone-amber{background:#eee2c9;color:#5d481f}.tone-blue{background:#d6e6ef;color:#254c62}.tone-green{background:#dbe8de;color:#315b43}.tone-rose{background:#efd9dc;color:#633a40}.tone-cyan{background:#d1e5e2;color:#245853}.thumb-noise{position:absolute;inset:0;opacity:.18;background-image:radial-gradient(rgba(255,255,255,.95) .6px,transparent .6px);background-size:7px 7px;mix-blend-mode:soft-light}.thumb-content{position:absolute;inset:32px 26px auto;display:grid;gap:12px;max-width:210px;z-index:1}.thumb-content span{font:600 10px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em;opacity:.65}.thumb-content strong{font:600 16px/1.45 'Plus Jakarta Sans','Noto Sans SC',sans-serif;letter-spacing:-.03em}.thumb-timeline{position:absolute;left:24px;right:24px;bottom:24px;display:flex;align-items:flex-end;gap:5px;height:32px;opacity:.45}.thumb-timeline span{flex:1;border-radius:3px 3px 0 0;background:currentColor}.thumb-timeline span:nth-child(1){height:35%}.thumb-timeline span:nth-child(2){height:65%}.thumb-timeline span:nth-child(3){height:48%}.thumb-timeline span:nth-child(4){height:90%}.thumb-timeline span:nth-child(5){height:72%}.thumb-shape{position:absolute;right:-25px;bottom:-45px;width:190px;height:190px;border:1px solid currentColor;border-radius:50%;opacity:.22;box-shadow:0 0 0 20px rgba(255,255,255,.16),0 0 0 40px rgba(255,255,255,.12)}.thumb-lines{position:absolute;right:26px;bottom:28px;display:grid;gap:7px;width:90px;opacity:.38}.thumb-lines i{display:block;height:5px;border-radius:99px;background:currentColor}.thumb-lines i:nth-child(2){width:68%}.thumb-lines i:nth-child(3){width:82%}.status-pill{position:absolute;top:14px;right:14px;display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border:1px solid rgba(255,255,255,.55);border-radius:99px;color:rgba(35,35,35,.72);background:rgba(255,255,255,.5);backdrop-filter:blur(10px);font-size:10px;z-index:3}.status-pill.generating{color:#346b45}.status-pulse{width:6px;height:6px;border-radius:50%;background:#4f9c67;box-shadow:0 0 0 3px rgba(79,156,103,.15);animation:pulse 1.8s ease-out infinite}.thumb-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(31,31,31,.16);opacity:0;backdrop-filter:blur(3px);transition:opacity .22s ease}.work-card:hover .thumb-overlay{opacity:1}.reedit-button{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 13px;border:1px solid rgba(255,255,255,.75);border-radius:8px;color:#202020;background:rgba(255,255,255,.85);font-size:11px;box-shadow:0 5px 14px rgba(0,0,0,.1);transition:transform .18s ease}.reedit-button:hover{transform:translateY(-1px)}.download-button{position:absolute;top:14px;left:14px;display:grid;place-items:center;width:30px;height:30px;border:1px solid rgba(255,255,255,.65);border-radius:8px;color:#252525;background:rgba(255,255,255,.72)}.work-body{padding:16px 17px 17px}.work-title-row{display:flex;align-items:flex-start;gap:8px}.work-title-row h2{flex:1;min-width:0;margin:0;font:600 14px/1.45 'Plus Jakarta Sans','Noto Sans SC',sans-serif;letter-spacing:-.02em}.more-button{display:grid;place-items:center;flex:0 0 auto;width:26px;height:26px;margin-top:-4px;border:0;color:#a1a19d;background:transparent}.more-button:hover{color:#202020}.work-date{display:flex;align-items:center;gap:5px;margin-top:9px;color:#9a9a96;font:10px 'IBM Plex Mono',monospace}.work-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:13px}.work-tags span{padding:4px 7px;border:1px solid #e7e7e2;border-radius:5px;color:#777772;background:#fbfbfa;font-size:10px}.generation-progress{margin-top:14px}.generation-progress>div:first-child{display:flex;justify-content:space-between;margin-bottom:6px;color:#8b8b86;font:10px 'IBM Plex Mono',monospace}.generation-progress strong{color:#4f7959;font-weight:500}.progress-track{height:3px;overflow:hidden;border-radius:99px;background:#e4e8e3}.progress-track span{display:block;height:100%;border-radius:inherit;background:#68a077;transition:width .3s ease}.list-layout{grid-template-columns:1fr}.list-layout .work-card{display:grid;grid-template-columns:260px 1fr}.list-layout .work-thumb{min-height:160px}.list-layout .work-body{display:flex;flex-direction:column;justify-content:center}.empty-state{display:grid;place-items:center;gap:8px;padding:84px 20px;border:1px dashed #d9d9d4;border-radius:14px;color:#93938d;text-align:center}.empty-state strong{color:#484844;font-size:14px}.empty-state span{font-size:12px}@keyframes card-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(79,156,103,.35)}70%{box-shadow:0 0 0 6px rgba(79,156,103,0)}100%{box-shadow:0 0 0 0 rgba(79,156,103,0)}}
+.detail-scrim{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:24px;background:rgba(18,18,18,.38);backdrop-filter:blur(8px);animation:modal-fade .18s ease-out}.detail-modal{width:min(720px,100%);max-height:min(760px,calc(100vh - 48px));overflow:auto;border:1px solid rgba(255,255,255,.72);border-radius:16px;background:rgba(252,252,250,.97);box-shadow:0 24px 80px rgba(0,0,0,.2);animation:modal-rise .24s cubic-bezier(.22,1,.36,1)}.detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:24px 26px 20px;border-bottom:1px solid #ebebe7}.detail-eyebrow{display:flex;align-items:center;gap:6px;margin:0 0 10px;color:#7d7d78;font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.1em}.detail-header h2{margin:0;color:#1f1f1d;font:650 21px/1.3 'Plus Jakarta Sans','Noto Sans SC',sans-serif;letter-spacing:-.04em}.detail-date{margin:8px 0 0;color:#969691;font:10px 'IBM Plex Mono',monospace}.close-modal{display:grid;place-items:center;width:32px;height:32px;border:1px solid #e2e2de;border-radius:8px;color:#777772;background:#fff}.generation-detail,.diagnosis-detail{padding:22px 26px 24px}.detail-preview{display:grid;gap:10px;min-height:150px;padding:22px;border-radius:11px;overflow:hidden}.detail-preview span{font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.1em;opacity:.66}.detail-preview strong{max-width:440px;font:600 18px/1.45 'Plus Jakarta Sans','Noto Sans SC',sans-serif}.detail-block{margin-top:22px}.detail-block h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:#373733;font-size:12px}.detail-block h3 small{color:#a1a19b;font:500 10px 'IBM Plex Mono',monospace}.prompt-copy{margin:0;padding:13px 14px;border:1px solid #e8e8e3;border-radius:9px;color:#62625d;background:#fbfbf9;font-size:12px;line-height:1.7}.reference-list{display:flex;flex-wrap:wrap;gap:8px}.reference-list span{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid #e5e5e1;border-radius:8px;color:#676762;background:#fff;font-size:11px}.parameter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:22px}.parameter-grid div,.diagnosis-metrics>div{display:grid;gap:7px;padding:12px;border:1px solid #e9e9e4;border-radius:9px;background:#fff}.parameter-grid span,.diagnosis-metrics span{color:#a1a19b;font:10px 'IBM Plex Mono',monospace}.parameter-grid strong{overflow:hidden;color:#42423e;font-size:11px;text-overflow:ellipsis;white-space:nowrap}.diagnosis-score{display:flex;align-items:center;gap:14px;padding:17px 18px;border:1px solid #dfe9e1;border-radius:11px;background:#f3f8f3}.diagnosis-score span{color:#6c7e70;font-size:11px}.diagnosis-score strong{color:#356643;font:700 34px/1 'Plus Jakarta Sans',sans-serif}.diagnosis-score em{padding:5px 8px;border-radius:99px;color:#3d714b;background:#dfeee1;font-size:10px;font-style:normal}.diagnosis-summary{margin-top:16px;color:#575752;font-size:13px;line-height:1.8}.diagnosis-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.diagnosis-metrics strong{color:#282825;font:650 22px 'Plus Jakarta Sans',sans-serif}.diagnosis-metrics em{color:#579066;font:500 10px 'IBM Plex Mono',monospace;font-style:normal}.detail-block ul{display:grid;gap:8px;margin:0;padding:0;list-style:none}.detail-block li{position:relative;padding-left:17px;color:#575752;font-size:12px}.detail-block li:before{content:'→';position:absolute;left:0;color:#6b9c76}.detail-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 26px;border-top:1px solid #ebebe7;color:#a0a09a;font:10px 'IBM Plex Mono',monospace}.detail-footer>div{display:flex;gap:8px}.secondary-modal-button,.primary-modal-button{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;border-radius:7px;font-size:11px}.secondary-modal-button{border:1px solid #e0e0db;color:#777772;background:#fff}.primary-modal-button{border:1px solid #232323;color:#fff;background:#232323}@keyframes modal-fade{from{opacity:0}to{opacity:1}}@keyframes modal-rise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media (max-width:1100px){.works-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:720px){.works-heading,.works-toolbar{align-items:flex-start;flex-direction:column}.new-work-button{align-self:flex-start}.toolbar-actions{width:100%}.search-field{width:100%;flex:1}.works-grid{grid-template-columns:1fr}.works-library{padding-top:0}.list-layout .work-card{display:block}.list-layout .work-thumb{min-height:210px}.detail-scrim{padding:12px}.detail-modal{max-height:calc(100vh - 24px);border-radius:13px}.detail-header,.generation-detail,.diagnosis-detail{padding-left:18px;padding-right:18px}.parameter-grid{grid-template-columns:repeat(2,1fr)}.diagnosis-metrics{grid-template-columns:1fr}.detail-footer{padding-left:18px;padding-right:18px;align-items:flex-start;flex-direction:column}.detail-footer>div{width:100%}.detail-footer button{flex:1}}@media (prefers-reduced-motion:reduce){.work-card,.status-pulse,.detail-scrim,.detail-modal{animation:none}.work-card{opacity:1}.work-card:hover,.new-work-button:hover,.reedit-button:hover{transform:none}}
+.filter-tab.active{color:#202020;border-color:transparent;background:transparent;box-shadow:none;font-weight:600}
+.works-heading{padding-top:4px;padding-bottom:20px;align-items:center}
+.works-title-copy{display:grid;gap:8px}
+.works-title-copy h1{font-size:clamp(32px,3.4vw,42px);line-height:1.08}
+.works-title-copy .works-subtitle{margin:0;font-size:12px;line-height:1.55}
+.new-work-button{align-self:center}
+.works-header{margin-bottom:18px}
+.works-toolbar{padding-top:13px}
+.library-meta{margin-bottom:12px}
+.works-library{view-transition-name:works-library}
+:global(::view-transition-old(root)){animation:works-page-out .22s ease both}
+:global(::view-transition-new(root)){animation:works-page-in .36s cubic-bezier(.22,1,.36,1) both}
+:global(::view-transition-old(works-library)){animation:works-page-out .22s ease both}
+:global(::view-transition-new(works-library)){animation:works-page-in .36s cubic-bezier(.22,1,.36,1) both}
+:global(html.route-transitioning .main-area){opacity:.08;transform:translateY(-4px);transition:opacity .18s ease,transform .18s ease}
+ :global(html:not(.route-transitioning) .main-area){transition:opacity .28s ease,transform .28s ease}
+@keyframes works-page-out{to{opacity:0;transform:translateY(-5px)}}@keyframes works-page-in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+.work-card{border-color:rgba(210,210,207,.8);background:rgba(248,248,246,.72);box-shadow:0 6px 18px rgba(35,35,32,.045),inset 0 0 0 1px rgba(255,255,255,.42)}
+.work-card .work-body{background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.62));}
+.work-card.card-violet .work-body{background:linear-gradient(180deg,rgba(232,230,249,.54),rgba(247,246,252,.72))}.work-card.card-amber .work-body{background:linear-gradient(180deg,rgba(245,236,215,.58),rgba(250,248,241,.74))}.work-card.card-blue .work-body{background:linear-gradient(180deg,rgba(224,237,244,.58),rgba(247,250,251,.74))}.work-card.card-green .work-body{background:linear-gradient(180deg,rgba(229,239,231,.58),rgba(247,250,247,.74))}.work-card.card-rose .work-body{background:linear-gradient(180deg,rgba(244,227,230,.58),rgba(251,247,248,.74))}.work-card.card-cyan .work-body{background:linear-gradient(180deg,rgba(222,239,236,.58),rgba(247,251,250,.74))}
+.work-card:hover{border-color:rgba(190,190,186,.95);box-shadow:0 16px 30px rgba(35,35,32,.08),inset 0 0 0 1px rgba(255,255,255,.52)}
+.works-library{background:transparent;box-shadow:none}
+:global([data-theme='dark'] .works-library){--paper:#0f1115;--surface:rgba(27,30,36,.86);--ink:#edf0f4;--muted:#9da6b3;--line:#2a3038;background:transparent;color:var(--ink)}
+:global([data-theme='dark'] .works-title-copy h1),:global([data-theme='dark'] .work-title-row h2){color:#edf0f4}
+:global([data-theme='dark'] .works-subtitle),:global([data-theme='dark'] .library-meta),:global([data-theme='dark'] .work-date){color:#98a2ae}
+:global([data-theme='dark'] .filter-tab){color:#8f99a6}.filter-tab:hover{color:#dce2e8;background:#20252d}:global([data-theme='dark'] .filter-tab.active){color:#f2f4f7}
+:global([data-theme='dark'] .search-field),:global([data-theme='dark'] .icon-control),:global([data-theme='dark'] .layout-switch),:global([data-theme='dark'] .layout-switch button){border-color:#2f3741;color:#9ca7b3;background:rgba(24,28,34,.82)}:global([data-theme='dark'] .search-field input){color:#e7ebef}:global([data-theme='dark'] .search-field input::placeholder){color:#737e8b}
+:global([data-theme='dark'] .layout-switch button.active){color:#f4f6f8;background:#2a3038;box-shadow:none}
+:global([data-theme='dark'] .work-card){border-color:#2d353e;background:rgba(25,29,35,.9);box-shadow:0 8px 22px rgba(0,0,0,.2),inset 0 0 0 1px rgba(255,255,255,.025)}:global([data-theme='dark'] .work-card .work-body){background:linear-gradient(180deg,rgba(33,38,45,.72),rgba(24,28,34,.88))}:global([data-theme='dark'] .work-card.card-violet .work-body){background:linear-gradient(180deg,rgba(50,48,76,.68),rgba(25,29,38,.9))}:global([data-theme='dark'] .work-card.card-amber .work-body){background:linear-gradient(180deg,rgba(70,59,39,.68),rgba(30,30,30,.9))}:global([data-theme='dark'] .work-card.card-blue .work-body){background:linear-gradient(180deg,rgba(40,62,74,.68),rgba(24,30,35,.9))}:global([data-theme='dark'] .work-card.card-green .work-body){background:linear-gradient(180deg,rgba(40,63,48,.68),rgba(24,31,27,.9))}:global([data-theme='dark'] .work-card.card-rose .work-body){background:linear-gradient(180deg,rgba(69,45,50,.68),rgba(31,27,30,.9))}:global([data-theme='dark'] .work-card.card-cyan .work-body){background:linear-gradient(180deg,rgba(36,65,64,.68),rgba(23,31,31,.9))}
+:global([data-theme='dark'] .work-tags span){border-color:#343c46;color:#aab3bf;background:rgba(35,40,47,.9)}:global([data-theme='dark'] .more-button){color:#8e98a4}:global([data-theme='dark'] .more-button:hover){color:#eef2f5}
+:global([data-theme='dark'] .empty-state){border-color:#303843;color:#8e99a6;background:rgba(22,26,32,.72)}:global([data-theme='dark'] .empty-state strong){color:#dce3e9}
+:global([data-theme='dark'] .detail-modal){border-color:#303943;background:rgba(20,24,30,.98)}:global([data-theme='dark'] .detail-header),:global([data-theme='dark'] .detail-footer){border-color:#2c343e}:global([data-theme='dark'] .detail-header h2),:global([data-theme='dark'] .detail-block h3){color:#e7edf2}:global([data-theme='dark'] .detail-date),:global([data-theme='dark'] .detail-footer){color:#8f9aa6}:global([data-theme='dark'] .prompt-copy),:global([data-theme='dark'] .parameter-grid div),:global([data-theme='dark'] .reference-list span),:global([data-theme='dark'] .diagnosis-metrics>div){border-color:#303943;color:#b4bec8;background:#1a2027}:global([data-theme='dark'] .parameter-grid strong),:global([data-theme='dark'] .diagnosis-metrics strong){color:#e1e8ed}:global([data-theme='dark'] .parameter-grid span),:global([data-theme='dark'] .diagnosis-metrics span),:global([data-theme='dark'] .detail-block h3 small){color:#8d98a4}:global([data-theme='dark'] .diagnosis-summary),:global([data-theme='dark'] .detail-block li){color:#b6c0c8}:global([data-theme='dark'] .diagnosis-score){border-color:#315345;background:#172a25}:global([data-theme='dark'] .diagnosis-score span){color:#93b09f}:global([data-theme='dark'] .diagnosis-score strong){color:#b2e0bf}:global([data-theme='dark'] .diagnosis-score em){color:#a8d8b5;background:#244434}
 </style>

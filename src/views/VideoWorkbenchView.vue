@@ -10,6 +10,7 @@ const prompt = ref('')
 const format = ref('9:16')
 const duration = ref(10)
 const assets = ref([])
+const importedAssets = ref([])
 const fileInput = ref(null)
 const isGenerating = ref(false)
 const notice = ref('')
@@ -19,6 +20,9 @@ const isMorphing = ref(false)
 let morphTimer
 
 if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) prompt.value = route.query.prompt
+if (typeof route.query.ratio === 'string' && ['9:16', '16:9'].includes(route.query.ratio)) format.value = route.query.ratio
+if (typeof route.query.duration === 'string' && Number(route.query.duration)) duration.value = Math.min(15, Math.max(5, Number(route.query.duration)))
+if (typeof route.query.assets === 'string' && route.query.assets.trim()) importedAssets.value = route.query.assets.split('|').filter(Boolean)
 
 const addFiles = (fileList) => {
   const images = Array.from(fileList || []).filter(file => file.type.startsWith('image/'))
@@ -55,7 +59,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         <div class="video-form-section">
           <div class="video-form-heading flex justify-between items-center mb-3">
             <h2 class="text-sm font-semibold text-gray-800">添加商品或套餐图</h2>
-            <span class="text-xs text-gray-400">{{ assets.length }} 张</span>
+          <span class="text-xs text-gray-400">{{ assets.length + importedAssets.length }} 张</span>
           </div>
           <button class="video-upload-zone w-full h-32 bg-gray-50 rounded-2xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/30 transition-all flex flex-col items-center justify-center gap-2 group" type="button" @click="fileInput?.click()" @dragover.prevent @drop="handleDrop">
             <span class="material-symbols-outlined text-indigo-500 group-hover:scale-110 transition-transform">add_photo_alternate</span>
@@ -63,7 +67,8 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
             <small class="text-xs text-gray-400">支持 JPG、PNG · 可拖拽上传</small>
           </button>
           <input ref="fileInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleFileChange">
-          <div v-if="assets.length" class="video-asset-strip flex overflow-x-auto gap-2 mt-3">
+          <div v-if="assets.length || importedAssets.length" class="video-asset-strip flex overflow-x-auto gap-2 mt-3">
+            <div v-for="name in importedAssets" :key="`imported-${name}`" class="video-asset-thumb video-asset-thumb-imported relative"><span class="material-symbols-outlined">image</span><small>{{ name }}</small></div>
             <div v-for="asset in assets" :key="asset.id" class="video-asset-thumb relative">
               <img :src="asset.url" :alt="asset.name">
               <button type="button" aria-label="删除图片" @click="removeAsset(asset)">×</button>

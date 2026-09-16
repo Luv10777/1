@@ -159,6 +159,7 @@
 [data-theme='dark'] .video-upload-zone small{color:#71717a}
 [data-theme='dark'] .video-asset-thumb img{border-color:#3f3f46}
 [data-theme='dark'] .video-asset-thumb button{border-color:#111113;background:#3f3f46}
+.video-asset-thumb-imported{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid #e1e1ea;border-radius:9px;color:#756bda;background:#f5f3ff;text-align:center}.video-asset-thumb-imported .material-symbols-outlined{font-size:20px}.video-asset-thumb-imported small{width:66px;overflow:hidden;color:#77768c;font-size:8px;text-overflow:ellipsis;white-space:nowrap}
 [data-theme='dark'] .video-textarea-shell{border-color:#2f2f35;background:#18181b}
 [data-theme='dark'] .video-textarea-shell:focus-within{border-color:#818cf8;background:#1c1c20;box-shadow:0 0 0 4px rgba(99,102,241,.18)}
 [data-theme='dark'] .video-textarea-shell textarea{color:#f4f4f5;background:transparent}

@@ -1,9 +1,11 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 /* ---------------- 全局阶段：配置 → 开播引导 → 监控台 → 复盘 ---------------- */
 const stage = ref('setup') // setup | live | review
+const route = useRoute()
 const steps = [
   { key: 'voice', index: '01', label: '人设与声音' },
   { key: 'script', index: '02', label: '话术与知识库' },
@@ -199,6 +201,13 @@ const libraryProducts = [
 ]
 const pickedProduct = ref('p1')
 const manualProduct = ref({ name: '', price: '', points: '' })
+onMounted(() => {
+  if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) {
+    productSource.value = 'manual'
+    manualProduct.value.points = route.query.prompt
+    editingConfig.value = true
+  }
+})
 
 const toneGroups = [
   { key: 'opening', label: '开场', options: ['门店实景寒暄', '直接报价', '悬念提问'] },
