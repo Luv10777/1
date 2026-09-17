@@ -11,6 +11,24 @@ defineProps({
 
 const route = useRoute()
 const router = useRouter()
+// Keep the authorization center's required light/blue palette local to its routes.
+const accountCenterShell = `
+  [--ink:#0f172a] [--ink-soft:#475569] [--ink-muted:#64748b] [--night:#f8fafc] [--night-panel:#ffffff]
+  [--violet:#2563eb] [--violet-bright:#2563eb] [--cyan:#2563eb] [--green:#10b981] [--line:#e2e8f0] [--line-strong:#cbd5e1]
+  bg-slate-50! text-slate-800! [color-scheme:light]
+  [&_.page-scroll]:p-0! [&_.page-scroll]:bg-slate-50! [&_.page-scroll>*]:max-w-none! max-[860px]:[&_.page-scroll]:pb-20!
+  [&_.sidebar]:bg-white! [&_.topbar]:bg-white! [&_.route-tabs]:bg-slate-50! [&_.route-tabs]:border-slate-200!
+  [&_.nav-item]:text-slate-500! [&_.nav-item:hover]:bg-slate-50! [&_.nav-item.active]:bg-blue-50! [&_.nav-item.active]:text-blue-600! [&_.nav-item.active]:shadow-none!
+  [&_.nav-group-trigger]:text-slate-500! [&_.nav-group-trigger:hover]:bg-slate-50! [&_.has-active-item>.nav-group-trigger]:text-blue-600!
+  [&_.brand-mark_span]:bg-blue-600! [&_.tenant-avatar]:bg-blue-600! [&_.tenant-avatar]:bg-none! [&_.user-avatar]:bg-blue-600! [&_.user-avatar]:bg-none!
+  [&_.tenant-switcher]:bg-slate-50! [&_.tenant-switcher]:border-slate-200! [&_.brand-name]:text-slate-900!
+  [&_.sidebar-create-button]:bg-blue-600! [&_.sidebar-create-button:hover]:bg-blue-500! [&_.sidebar-create-button]:border-blue-600! [&_.sidebar-create-button]:shadow-none!
+  [&_.status-capsule]:bg-emerald-50! [&_.status-capsule]:border-emerald-100! [&_.status-capsule_strong]:text-emerald-700!
+  [&_.route-tab.active]:bg-white! [&_.route-tab.active]:text-blue-600! [&_.route-tab.active]:border-slate-200! [&_.route-tab.active]:shadow-none! [&_.route-tab:hover]:bg-white! [&_.route-tab-close:hover]:bg-slate-100!
+  [&_.topbar-search:hover]:bg-blue-50! [&_.topbar-search:hover]:border-blue-200! [&_.account-menu]:bg-white! [&_.account-menu_button:hover]:bg-slate-50! [&_.account-menu_button:hover]:text-slate-900!
+  [&_.mobile-bottom-nav]:bg-white! [&_.mobile-bottom-primary]:bg-blue-600! [&_.mobile-bottom-primary]:border-blue-600! [&_.mobile-bottom-primary]:shadow-none!
+  [&_.quick-search]:bg-white! [&_.quick-search]:border-slate-200! [&_.quick-search-result:hover]:bg-blue-50! [&_.quick-search-result-mark]:text-blue-600!
+`
 const menuOpen = ref(false)
 const accountOpen = ref(false)
 const pageScroll = ref(null)
@@ -45,7 +63,7 @@ const navGroups = [
     items: [
       { name: 'analytics', label: '各平台数据看板', path: '/analytics' },
       { name: 'diagnosis', label: 'AI 诊断报告', path: '/analytics/diagnosis' },
-      { name: 'analytics-platforms', label: '关联平台管理', path: '/analytics/platforms' },
+      { name: 'analytics-platforms', label: '数据接口管理', path: '/analytics/platforms' },
     ],
   },
   {
@@ -207,7 +225,7 @@ const logout = () => {
 </script>
 
 <template>
-  <div class="app-frame">
+  <div class="app-frame" :class="route.meta.accountCenter ? accountCenterShell : ''">
     <div class="mobile-scrim" :class="{ 'is-visible': menuOpen }" @click="closeMenu" />
     <aside class="sidebar" :class="{ 'is-open': menuOpen }">
       <div class="brand-lockup">
@@ -306,7 +324,7 @@ const logout = () => {
               <span class="topbar-search-label">搜索页面</span>
               <kbd>⌘ K</kbd>
             </button>
-            <ThemeToggle />
+            <ThemeToggle v-if="!route.meta.accountCenter" />
             <button class="help-button" aria-label="帮助中心">?</button>
             <button class="notification-button" aria-label="通知"><span class="notification-dot" />◔</button>
           </div>

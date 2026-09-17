@@ -14,6 +14,7 @@ const fixtures = {
 export function commerceSnapshot(account, store, record) {
   const base = { packages: [], merchantName: record?.merchantName || '', source: 'demo' }
   if (!account || account.platform !== '抖音') return { ...base, state: 'no_account' }
+  if (Array.isArray(account.permissions) && !account.permissions.includes('团购券挂载')) return { ...base, state: 'permission_missing' }
   if (!record) return { ...base, state: 'not_connected' }
   if (!record.authorized) return { ...base, state: 'expired' }
   if (record.error) return { ...base, state: 'error' }
