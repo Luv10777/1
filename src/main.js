@@ -15,6 +15,7 @@ import './video-workbench.css'
 import './video-analyze.css'
 import './studio.css'
 import './live-studio.css'
+import './publishing.css'
 
 theme.apply()
 
