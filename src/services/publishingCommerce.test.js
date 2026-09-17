@@ -34,3 +34,9 @@ test('demo adapter distinguishes enabled, unopened and unknown accounts', async 
   assert.equal((await loadAccountCommerce({ id: 'dy-main', platform: '抖音' }, '炭火烧鸟·钱江店')).state, 'empty')
   assert.equal((await loadAccountCommerce({ id: 'new', platform: '抖音' }, '炭火烧鸟·湖滨店')).state, 'not_connected')
 })
+
+test('revoking voucher permission hides even an enabled merchant package list', async () => {
+  const result = await loadAccountCommerce({ id: 'dy-main', platform: '抖音', permissions: ['视频/图文发布'] }, '炭火烧鸟·湖滨店')
+  assert.equal(result.state, 'permission_missing')
+  assert.deepEqual(result.packages, [])
+})

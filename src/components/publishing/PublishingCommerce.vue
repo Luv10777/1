@@ -16,6 +16,7 @@ const account = computed(() => douyinAccounts.value.find(a => a.id === selectedA
 const accountOptions = computed(() => douyinAccounts.value.map(item => ({ value: item.id, label: item.name, description: selections.value[item.id] ? '已选择团购套餐' : item.handle })))
 const hint = computed(() => ({
   no_account: ['请先选择抖音发布账号', '团购套餐来自账号关联的商家，仅挂载到对应抖音账号。'],
+  permission_missing: ['尚未授予团购券挂载权限', '请在关联平台管理中重新授权并勾选团购券挂载权限。'],
   not_connected: ['尚未连接商家套餐', '当前账号未接入抖音商家授权及套餐接口，暂时无法读取套餐。'],
   not_enabled: ['该账号尚未开通团购', '请先在抖音来客开通本地生活团购服务并上架套餐，再刷新。'],
   empty: ['当前门店暂无可用套餐', '该账号在所选门店没有可挂载套餐，请检查门店或在抖音来客上架套餐后刷新。'],
@@ -63,7 +64,7 @@ onBeforeUnmount(() => { generation++ })
     <PublishingSelect v-if="douyinAccounts.length" id="commerce-account" v-model="selectedAccountId" label="团购套餐所属抖音账号" :options="accountOptions"><template #icon><Store :size="16" /></template></PublishingSelect>
     <p v-if="account" class="pub-commerce-source">{{ account.name }} · {{ store }}<span>示例账号数据，尚未同步真实抖音套餐</span></p>
     <div v-if="loading" class="pub-commerce-message" role="status"><LoaderCircle class="pub-loading" :size="19" /><div><b>正在读取商家套餐</b></div></div>
-    <div v-else-if="result.state !== 'ready'" class="pub-commerce-message" role="status"><CircleAlert :size="20" /><div><b>{{ hint[0] }}</b><p>{{ hint[1] }}</p><button v-if="result.state === 'error'" class="draft-btn" @click="refresh">重新读取</button><RouterLink v-if="result.state === 'expired' || result.state === 'not_connected'" to="/publishing/platforms">前往关联平台管理</RouterLink></div></div>
+    <div v-else-if="result.state !== 'ready'" class="pub-commerce-message" role="status"><CircleAlert :size="20" /><div><b>{{ hint[0] }}</b><p>{{ hint[1] }}</p><button v-if="result.state === 'error'" class="draft-btn" @click="refresh">重新读取</button><RouterLink v-if="['expired', 'not_connected', 'permission_missing'].includes(result.state)" to="/publishing/platforms">前往关联平台管理</RouterLink></div></div>
     <template v-else>
       <p class="pub-commerce-owner"><Store :size="14" />{{ result.merchantName }} · {{ result.packages.length }} 个可选套餐</p>
       <div class="bundle-list"><button v-for="bundle in result.packages" :key="bundle.id" class="bundle-card" :class="{ selected: selections[selectedAccountId]?.id === bundle.id }" :aria-pressed="selections[selectedAccountId]?.id === bundle.id" @click="choose(bundle)"><span class="bundle-check"><Check v-if="selections[selectedAccountId]?.id === bundle.id" :size="11" /></span><span><b>{{ bundle.name }}</b><small><del>{{ bundle.original }}</del> <strong>{{ bundle.price }}</strong> · 佣金 {{ bundle.commission }}</small></span></button></div>

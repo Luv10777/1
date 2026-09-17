@@ -22,6 +22,7 @@ import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
 import PublishingView from './views/PublishingView.vue'
+const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -53,10 +54,10 @@ const routes = [
   { path: '/publishing', name: 'publishing', component: PublishingView, meta: { title: '内容发布', eyebrow: 'OPERATIONS', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/publishing/matrix', name: 'matrix-publishing', component: PlaceholderView, meta: { title: '矩阵发布', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '▦', description: '统一编排多个平台和账号的内容发布任务。' } },
   { path: '/publishing/plan', name: 'publishing-plan', component: PlaceholderView, meta: { title: '发布计划', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '◷', description: '规划内容日历、发布时间和审核节点。' } },
-  { path: '/publishing/platforms', name: 'publishing-platforms', component: PlaceholderView, meta: { title: '关联平台管理', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '⌁', description: '管理用于内容发布的平台账号和授权状态。' } },
+  { path: '/publishing/platforms', name: 'publishing-platforms', component: PlatformAccountsView, meta: { title: '关联平台管理', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '⌁', accountCenter: true, description: '管理用于内容发布的平台账号和授权状态。' } },
   { path: '/analytics', name: 'analytics', component: PlaceholderView, meta: { title: '各平台数据看板', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '汇总各平台的内容、门店与活动增长表现。' } },
   { path: '/analytics/diagnosis', name: 'diagnosis', component: PlaceholderView, meta: { title: 'AI 诊断报告', eyebrow: 'OPERATIONS ANALYTICS', icon: '✦', description: '通过 AI 识别运营问题、增长机会和建议动作。' } },
-  { path: '/analytics/platforms', name: 'analytics-platforms', component: PlaceholderView, meta: { title: '关联平台管理', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌁', description: '管理用于数据分析的平台连接与同步状态。' } },
+  { path: '/analytics/platforms', name: 'analytics-platforms', component: PlaceholderView, meta: { title: '数据接口管理', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '管理运营分析的数据接口、指标读取授权与数据同步状态。' } },
   { path: '/acquisition', name: 'acquisition', component: PlaceholderView, meta: { title: '获客中心', eyebrow: 'CUSTOMER ACQUISITION', icon: '◎', description: '集中承接获客渠道、潜在客户和转化动作；具体功能将在业务范围明确后逐步开放。' } },
   { path: '/service/messages', name: 'messages', component: PlaceholderView, meta: { title: '私信会话', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合各平台私信，集中查看并处理客户会话。' } },
   { path: '/service/rules', name: 'service-rules', component: PlaceholderView, meta: { title: '客服规则配置', eyebrow: 'CUSTOMER SERVICE', icon: '⌘', description: '配置智能回复范围、审核条件和客服升级规则。' } },

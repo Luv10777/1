@@ -1,5 +1,7 @@
 <script setup>
 import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { useRoute } from 'vue-router';
+import { usePlatformAccounts } from '../stores/platformAccounts';
 import { usePublishingVideo } from "../composables/usePublishingVideo";
 import { usePublishingAttachments, IMAGE_LIMIT } from "../composables/usePublishingAttachments";
 import { assetSource } from "../stores/assetLibrary";
@@ -9,7 +11,7 @@ import PublishingCommerce from "../components/publishing/PublishingCommerce.vue"
 import PublishingSelect from "../components/publishing/PublishingSelect.vue";
 import '../publishing-media.css';
 import { auth } from "../stores/auth";
-import { platforms, accounts, tags } from "../data/publishing";
+import { platforms, tags } from "../data/publishing";
 import {
   Check,
   Clock3,
@@ -136,7 +138,9 @@ function captureCover() {
 }
 function clearVideo() { removeVideo(); cover.value = ""; }
 const aiBusy = ref("");
-const localAccounts = ref([...accounts]);
+const route = useRoute();
+const { publishingAccounts: localAccounts, refreshTime } = usePlatformAccounts();
+const accountClock = setInterval(refreshTime, 30000);
 const savedKey = computed(
   () => `wuyao-publishing-v1-${auth.user?.id || "local"}`,
 );
@@ -195,6 +199,7 @@ const canPublish = computed(
   () =>
     hasMedia.value && !mediaBusy.value && !aiBusy.value &&
     selectedAccounts.value.length > 0 &&
+    selectedAccounts.value.every(id => localAccounts.value.some(a => a.id === id)) &&
     title.value.trim().length > 0 &&
     title.value.length <= titleLimit.value &&
     body.value.trim().length > 0 &&
@@ -306,7 +311,6 @@ try {
       poi,
       comment,
       selectedAccounts,
-      localAccounts,
       activePlatform,
       scheduleMode,
       scheduledAt,
@@ -322,6 +326,22 @@ try {
 } catch {
   /* Ignore an unreadable local draft and keep usable fixture defaults. */
 }
+if (!platforms.some(platform => platform.id === activePlatform.value)) activePlatform.value = platforms[0].id;
+watch(localAccounts, list => {
+  selectedAccounts.value = selectedAccounts.value.filter(id => list.some(a => a.id === id));
+}, { immediate: true });
+watch(() => route.query.accountId, id => {
+  if (!id) return;
+  const account = localAccounts.value.find(a => a.id === id);
+  if (!account) {
+    selectedAccounts.value = [];
+    announce('该账号不存在、授权已失效或缺少发布权限，请前往关联平台管理检查。');
+    return;
+  }
+  selectedAccounts.value = [account.id];
+  activePlatform.value = account.platform;
+  previewPlatform.value = account.platform;
+}, { immediate: true });
 const replaceCover = (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -343,6 +363,7 @@ const replaceCover = (event) => {
   event.target.value = "";
 };
 const publish = () => {
+  refreshTime();
   if (
     scheduleMode.value === "later" &&
     new Date(scheduledAt.value).getTime() <= Date.now()
@@ -368,9 +389,10 @@ const publish = () => {
   }, 800);
 };
 watch(activePlatform, (value) => {
-  if (value !== "视频号") previewPlatform.value = value;
+  previewPlatform.value = value;
 });
 onBeforeUnmount(() => {
+  clearInterval(accountClock);
   libraryAbort.abort();
   clearTimeout(noticeTimer);
   clearTimeout(actionTimer);
@@ -469,6 +491,7 @@ onBeforeUnmount(() => {
               /><span>{{ account.avatar }}</span></span><span class="account-info"><b>{{ account.name }}</b><small class="pub-account-handle">{{ account.handle }}</small><span class="pub-account-meta"><span class="pub-fan-count font-mono font-medium">{{ account.fans }}<span>粉丝</span></span></span><em><span class="status-dot" /> {{ account.status }}</em></span><span class="check-box"><Check v-if="selectedAccounts.includes(account.id)" :size="13" /></span>
             </button>
           </div>
+          <p v-if="!activeAccounts.length" class="pub-music-note">此平台暂无具备发布权限的账号，<RouterLink to="/publishing/platforms">前往关联平台管理绑定或续期</RouterLink>。</p>
         </div>
 
         <div class="pub-section asset-section" :aria-busy="mediaBusy">
