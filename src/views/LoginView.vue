@@ -73,8 +73,10 @@ async function sendCode() {
   if (!checkAgreement()) return
   sending.value = true
   try {
-    await auth.sendCode(form.phone.trim())
-    notice.value = '验证码已发送，请查收短信。'
+    const result = await auth.sendCode(form.phone.trim())
+    notice.value = result.developmentMode
+      ? '当前为本地调试模式，不会发送短信。验证码请在后端控制台查看。'
+      : '验证码短信已提交发送，请留意手机短信，5 分钟内有效。'
     await nextTick()
     pageForm.value?.querySelector('#login-code')?.focus()
   } catch (err) {

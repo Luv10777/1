@@ -61,7 +61,7 @@ public class AuthService {
     private int perDay;
 
     @Transactional
-    public void sendCode(String phone, String ip) {
+    public AuthDtos.SendCodeResult sendCode(String phone, String ip) {
         // 同一手机号的限流检查和写入必须串行，防止并发请求同时通过计数检查。
         smsCodeRepository.lockPhone(phone);
         Instant now = Instant.now();
@@ -81,6 +81,7 @@ public class AuthService {
         smsCodeRepository.save(record);
 
         smsSender.sendLoginCode(phone, code);
+        return new AuthDtos.SendCodeResult(smsSender.developmentMode(), 60, codeTtl.toSeconds());
     }
 
     public AuthDtos.TokenPair login(String phone, String code, String ip, String userAgent, String deviceId) {

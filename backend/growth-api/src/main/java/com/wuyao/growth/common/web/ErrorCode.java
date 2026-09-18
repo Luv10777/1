@@ -34,6 +34,8 @@ public enum ErrorCode {
     CODE_EXPIRED(2004),
     REFRESH_TOKEN_INVALID(2005),
     PHONE_INVALID(2006),
+    SMS_NOT_CONFIGURED(2007),
+    SMS_SEND_FAILED(2008),
 
     // ---- asset ----
     ASSET_NOT_FOUND(3001),

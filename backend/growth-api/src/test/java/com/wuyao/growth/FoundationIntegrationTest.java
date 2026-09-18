@@ -8,6 +8,8 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.iam.dto.AuthDtos;
 import com.wuyao.growth.iam.service.AuthService;
+import com.wuyao.growth.iam.service.SmsSender;
+import com.wuyao.growth.common.web.ErrorCode;
 import io.minio.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,8 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -38,6 +42,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -51,7 +56,7 @@ class FoundationIntegrationTest {
             .withDatabaseName("growth_test").withUsername("growth_owner").withPassword("test_owner_password");
 
     @Container
-    static final GenericContainer<?> MINIO = new GenericContainer<>("minio/minio:latest")
+    static final GenericContainer<?> MINIO = new GenericContainer<>("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z")
             .withEnv("MINIO_ROOT_USER", "testadmin").withEnv("MINIO_ROOT_PASSWORD", "testadmin123")
             .withCommand("server /data").withExposedPorts(9000)
             .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000));
@@ -72,6 +77,7 @@ class FoundationIntegrationTest {
     }
 
     @Autowired AuthService auth;
+    @MockitoBean SmsSender smsSender;
     @Autowired JwtService jwt;
     @Autowired TaskService tasks;
     @Autowired TaskRepository taskRepository;
@@ -136,6 +142,52 @@ class FoundationIntegrationTest {
         }));
         assertThat(outcomes).containsExactlyInAnyOrder(200, 2001);
         assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void sentCodeCanLoginOnceAndIsNeverReturnedBySendEndpoint() throws Exception {
+        mvc.perform(post("/api/auth/send-code").contentType("application/json")
+                        .content("{\"phone\":\"13800000001\"}"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.developmentMode").value(false))
+                .andExpect(jsonPath("$.data.retryAfterSeconds").value(60))
+                .andExpect(jsonPath("$.data.expiresInSeconds").value(300))
+                .andExpect(jsonPath("$.data.code").doesNotExist());
+        var sent = ArgumentCaptor.forClass(String.class);
+        verify(smsSender).sendLoginCode(eq("13800000001"), sent.capture());
+        assertThat(sent.getValue()).matches("[0-9]{6}");
+        assertThat(owner.queryForObject("SELECT code_hash FROM sms_codes", String.class))
+                .hasSize(64).isNotEqualTo(sent.getValue());
+        String loginBody = "{\"phone\":\"13800000001\",\"code\":\"" + sent.getValue() + "\"}";
+        mvc.perform(post("/api/auth/login").contentType("application/json").content(loginBody))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
+        mvc.perform(post("/api/auth/login").contentType("application/json").content(loginBody))
+                .andExpect(jsonPath("$.code").value(2003));
+    }
+
+    @Test
+    void failedSendRollsBackCodeAndAllowsRetry() throws Exception {
+        doThrow(BizException.of(ErrorCode.SMS_SEND_FAILED, "短信发送失败")).doNothing()
+                .when(smsSender).sendLoginCode(anyString(), anyString());
+        mvc.perform(post("/api/auth/send-code").contentType("application/json")
+                        .content("{\"phone\":\"13800000001\"}"))
+                .andExpect(jsonPath("$.code").value(2008));
+        assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isZero();
+        assertThat(auth.sendCode("13800000001", "127.0.0.1").developmentMode()).isFalse();
+        assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void developmentSendIsExplicitAndExpiredCodesAreRejected() throws Exception {
+        when(smsSender.developmentMode()).thenReturn(true);
+        mvc.perform(post("/api/auth/send-code").contentType("application/json")
+                        .content("{\"phone\":\"13800000001\"}"))
+                .andExpect(jsonPath("$.data.developmentMode").value(true));
+        var sent = ArgumentCaptor.forClass(String.class);
+        verify(smsSender).sendLoginCode(eq("13800000001"), sent.capture());
+        owner.update("UPDATE sms_codes SET expires_at=now()-interval '1 second'");
+        assertThat(code(() -> login("13800000001", sent.getValue()))).isEqualTo(2004);
     }
 
     @Test
