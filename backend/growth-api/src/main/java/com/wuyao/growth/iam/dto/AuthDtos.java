@@ -2,6 +2,7 @@ package com.wuyao.growth.iam.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 /** 认证相关的入参出参。放一个文件里，省得为四个 record 建四个文件。 */
 public final class AuthDtos {
@@ -28,6 +29,13 @@ public final class AuthDtos {
     }
 
     public record RefreshRequest(@NotBlank(message = "refreshToken 不能为空") String refreshToken) {
+    }
+
+    public record PasswordLoginRequest(
+            @NotBlank(message = "账号不能为空")
+            @Pattern(regexp = "^[^\\s]{2,64}$", message = "账号格式不正确") String account,
+            @NotBlank(message = "密码不能为空")
+            @Size(min = 8, max = 64, message = "密码长度需为 8–64 位") String password) {
     }
 
     public record UserInfo(Long userId, Long tenantId, String phone, String name) {

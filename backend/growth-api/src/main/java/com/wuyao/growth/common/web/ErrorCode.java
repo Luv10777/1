@@ -36,6 +36,7 @@ public enum ErrorCode {
     PHONE_INVALID(2006),
     SMS_NOT_CONFIGURED(2007),
     SMS_SEND_FAILED(2008),
+    PASSWORD_INVALID(2009),
 
     // ---- asset ----
     ASSET_NOT_FOUND(3001),

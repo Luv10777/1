@@ -18,8 +18,20 @@ public class User {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private String phone;
+
+    @Column(length = 64)
+    private String username;
+
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
+    @Column(name = "password_failed_attempts", nullable = false)
+    private Integer passwordFailedAttempts = 0;
+
+    @Column(name = "password_locked_until")
+    private Instant passwordLockedUntil;
 
     @Column(length = 80)
     private String name;

@@ -31,6 +31,13 @@ public class AuthController {
                 http.getHeader("User-Agent"), http.getHeader("X-Device-Id")));
     }
 
+    @PostMapping("/password-login")
+    public ApiResponse<AuthDtos.TokenPair> passwordLogin(@Valid @RequestBody AuthDtos.PasswordLoginRequest req,
+                                                        HttpServletRequest http) {
+        return ApiResponse.ok(authService.loginWithPassword(req.account(), req.password(), clientIp(http),
+                http.getHeader("User-Agent"), http.getHeader("X-Device-Id")));
+    }
+
     @PostMapping("/refresh")
     public ApiResponse<AuthDtos.TokenPair> refresh(@Valid @RequestBody AuthDtos.RefreshRequest req,
                                                    HttpServletRequest http) {
@@ -48,7 +55,7 @@ public class AuthController {
     /** 当前登录者。注意 tenantId 从 token 来，前端不需要也不允许传。 */
     @GetMapping("/me")
     public ApiResponse<AuthDtos.UserInfo> me(@AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(new AuthDtos.UserInfo(me.userId(), me.tenantId(), me.phone(), null));
+        return ApiResponse.ok(authService.currentUser(me.userId()));
     }
 
     private String clientIp(HttpServletRequest req) {

@@ -22,6 +22,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -142,6 +144,76 @@ class FoundationIntegrationTest {
         }));
         assertThat(outcomes).containsExactlyInAnyOrder(200, 2001);
         assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void passwordAccountWithoutPhoneCanLoginRestoreAndRefresh() throws Exception {
+        Long userId = seedPasswordAccount();
+        var result = mvc.perform(post("/api/auth/password-login").contentType("application/json")
+                        .content("{\"account\":\"IntegrationUser\",\"password\":\"integration-password\"}"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.user.name").value("IntegrationUser"))
+                .andExpect(jsonPath("$.data.user.phone").doesNotExist())
+                .andExpect(jsonPath("$.data.user.passwordHash").doesNotExist())
+                .andReturn();
+        var tokens = new ObjectMapper().readTree(result.getResponse().getContentAsString()).get("data");
+        String access = tokens.get("accessToken").asText();
+        assertThat(jwt.parse(access, "access").userId()).isEqualTo(userId);
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + access))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.name").value("IntegrationUser"));
+        assertThat(auth.refresh(tokens.get("refreshToken").asText(), null, null, null).user().userId())
+                .isEqualTo(userId);
+        verifyNoInteractions(smsSender);
+    }
+
+    @Test
+    void passwordFailuresPersistAndLockExpires() {
+        Long userId = seedPasswordAccount();
+        for (int i = 0; i < 5; i++) {
+            assertThat(code(() -> passwordLogin("wrong-password"))).isEqualTo(2009);
+        }
+        assertThat(owner.queryForObject("SELECT password_failed_attempts FROM users WHERE id=?", Integer.class, userId))
+                .isEqualTo(5);
+        assertThat(code(() -> passwordLogin("integration-password"))).isEqualTo(2009);
+        owner.update("UPDATE users SET password_locked_until=now()-interval '1 second' WHERE id=?", userId);
+        assertThat(passwordLogin("integration-password").user().userId()).isEqualTo(userId);
+        assertThat(owner.queryForObject("SELECT password_failed_attempts FROM users WHERE id=?", Integer.class, userId))
+                .isZero();
+    }
+
+    @Test
+    void unknownDisabledAndMalformedPasswordLoginsDoNotCreateAccounts() throws Exception {
+        assertThat(code(() -> passwordLogin("integration-password"))).isEqualTo(2009);
+        assertThat(owner.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        Long userId = seedPasswordAccount();
+        owner.update("UPDATE users SET status='DISABLED' WHERE id=?", userId);
+        assertThat(code(() -> passwordLogin("integration-password"))).isEqualTo(2009);
+        mvc.perform(post("/api/auth/password-login").contentType("application/json")
+                        .content("{\"account\":\"IntegrationUser\",\"password\":\"short\"}"))
+                .andExpect(jsonPath("$.code").value(1400));
+        assertThat(owner.queryForObject("SELECT count(*) FROM refresh_tokens", Integer.class)).isZero();
+    }
+
+    @Test
+    void concurrentWrongPasswordsCannotLoseFailureCounts() throws Exception {
+        Long userId = seedPasswordAccount();
+        for (int i = 0; i < 3; i++) assertThat(code(() -> passwordLogin("wrong-password"))).isEqualTo(2009);
+        assertThat(concurrent(() -> code(() -> passwordLogin("wrong-password"))))
+                .containsExactly(2009, 2009);
+        assertThat(owner.queryForObject("SELECT password_failed_attempts FROM users WHERE id=?", Integer.class, userId))
+                .isEqualTo(5);
+        assertThat(code(() -> passwordLogin("integration-password"))).isEqualTo(2009);
+    }
+
+    private Long seedPasswordAccount() {
+        return owner.queryForObject("INSERT INTO users(tenant_id,username,name,password_hash) VALUES (?,?,?,?) RETURNING id",
+                Long.class, tenantA, "IntegrationUser", "IntegrationUser",
+                new BCryptPasswordEncoder(12).encode("integration-password"));
+    }
+
+    private AuthDtos.TokenPair passwordLogin(String password) {
+        return auth.loginWithPassword("IntegrationUser", password, "127.0.0.1", "integration-test", null);
     }
 
     @Test
