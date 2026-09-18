@@ -18,10 +18,9 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/send-code")
-    public ApiResponse<Void> sendCode(@Valid @RequestBody AuthDtos.SendCodeRequest req,
+    public ApiResponse<AuthDtos.SendCodeResult> sendCode(@Valid @RequestBody AuthDtos.SendCodeRequest req,
                                       HttpServletRequest http) {
-        authService.sendCode(req.phone(), clientIp(http));
-        return ApiResponse.ok();
+        return ApiResponse.ok(authService.sendCode(req.phone(), clientIp(http)));
     }
 
     @PostMapping("/login")

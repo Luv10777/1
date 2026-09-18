@@ -15,6 +15,11 @@ public class ConsoleSmsSender implements SmsSender {
 
     @Override
     public void sendLoginCode(String phone, String code) {
-        log.warn("【开发模式】{} 的登录验证码是 {} —— 生产环境不会打印", phone, code);
+        log.warn("【开发模式，不发送短信】{} 的登录验证码是 {}", phone, code);
+    }
+
+    @Override
+    public boolean developmentMode() {
+        return true;
     }
 }

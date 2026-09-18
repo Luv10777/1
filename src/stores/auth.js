@@ -61,14 +61,15 @@ export const auth = {
     }
     if (state.cooldown > 0) return
 
-    await authService.sendCode(phone)
+    const result = await authService.sendCode(phone)
 
-    state.cooldown = 60
+    state.cooldown = result.retryAfterSeconds
     clearInterval(timer)
     timer = setInterval(() => {
       state.cooldown -= 1
       if (state.cooldown <= 0) clearInterval(timer)
     }, 1000)
+    return result
   },
 
   async login(phone, code) {
