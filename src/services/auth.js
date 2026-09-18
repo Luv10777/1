@@ -17,6 +17,14 @@ export const authService = {
     return post('/api/auth/login', { phone, code })
   },
 
+  loginWithPassword(account, password) {
+    const endpoint = import.meta.env.VITE_PASSWORD_LOGIN_ENDPOINT
+    if (!endpoint || !endpoint.startsWith('/api/')) {
+      throw new Error('密码登录暂未开放，请使用验证码登录。')
+    }
+    return post(endpoint, { account, password })
+  },
+
   refreshToken(refreshToken) {
     return post('/api/auth/refresh', { refreshToken })
   },
