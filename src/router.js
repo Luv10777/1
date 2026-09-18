@@ -23,6 +23,7 @@ import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
 import PublishingView from './views/PublishingView.vue'
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
+const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -53,7 +54,7 @@ const routes = [
   { path: '/reviews', name: 'reviews', component: PlaceholderView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },
   { path: '/publishing', name: 'publishing', component: PublishingView, meta: { title: '内容发布', eyebrow: 'OPERATIONS', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/publishing/matrix', name: 'matrix-publishing', component: PlaceholderView, meta: { title: '矩阵发布', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '▦', description: '统一编排多个平台和账号的内容发布任务。' } },
-  { path: '/publishing/plan', name: 'publishing-plan', component: PlaceholderView, meta: { title: '发布计划', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '◷', description: '规划内容日历、发布时间和审核节点。' } },
+  { path: '/publishing/plan', name: 'publishing-plan', component: PublishingPlanView, meta: { title: '发布计划', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '◷', accountCenter: true, description: '根据商圈流量波段，自动匹配内容并按时分发。' } },
   { path: '/publishing/platforms', name: 'publishing-platforms', component: PlatformAccountsView, meta: { title: '关联平台管理', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '⌁', accountCenter: true, description: '管理用于内容发布的平台账号和授权状态。' } },
   { path: '/analytics', name: 'analytics', component: PlaceholderView, meta: { title: '各平台数据看板', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '汇总各平台的内容、门店与活动增长表现。' } },
   { path: '/analytics/diagnosis', name: 'diagnosis', component: PlaceholderView, meta: { title: 'AI 诊断报告', eyebrow: 'OPERATIONS ANALYTICS', icon: '✦', description: '通过 AI 识别运营问题、增长机会和建议动作。' } },
