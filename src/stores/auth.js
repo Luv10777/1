@@ -26,7 +26,7 @@ function persistSession(data) {
     id: data.user.userId,
     tenantId: data.user.tenantId,
     phone: data.user.phone,
-    name: data.user.name || `用户${data.user.phone.slice(-4)}`,
+    name: data.user.name || (data.user.phone ? `用户${data.user.phone.slice(-4)}` : '用户'),
     roles: ['user'],
   }
   state.user = user
@@ -104,7 +104,7 @@ export const auth = {
     if (!state.token?.accessToken) return false
     try {
       const me = await authService.getCurrentUser()
-      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone }
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name }
       writeUser(state.user)
       return true
     } catch {

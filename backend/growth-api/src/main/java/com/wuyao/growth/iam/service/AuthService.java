@@ -46,6 +46,7 @@ public class AuthService {
     private final SmsSender smsSender;
     private final JwtService jwtService;
     private final LoginCodeVerifier codeVerifier;
+    private final PasswordLoginVerifier passwordVerifier;
     private final TransactionTemplate transactions;
 
     @Value("${growth.sms.code-length:6}")
@@ -92,6 +93,25 @@ public class AuthService {
             user.setLastLoginAt(Instant.now());
             return issueTokens(user, ip, userAgent, deviceId);
         });
+    }
+
+    public AuthDtos.TokenPair loginWithPassword(String account, String password, String ip,
+                                                String userAgent, String deviceId) {
+        Long userId = passwordVerifier.verify(account, password);
+        return transactions.execute(status -> {
+            User user = userRepository.findById(userId)
+                    .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                    .orElseThrow(() -> BizException.of(ErrorCode.PASSWORD_INVALID, "账号不可用"));
+            user.setLastLoginAt(Instant.now());
+            return issueTokens(user, ip, userAgent, deviceId);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public AuthDtos.UserInfo currentUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "用户不存在"));
+        return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName());
     }
 
     /** 刷新即轮换：老的立刻作废，防止 refresh token 被重复使用。 */
