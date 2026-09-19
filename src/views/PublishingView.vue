@@ -41,6 +41,29 @@ import {
 } from "lucide-vue-next";
 
 const activePlatform = ref("抖音");
+const studioStep = ref(0);
+const copyVersion = ref('烟火日常');
+const copyVariants = ['烟火日常', '匠心手艺', '市井趣味'];
+function selectCopyVersion(version) {
+  if (aiBusy.value || publishing.value) return;
+  copyVersion.value = version;
+  const place = poi.value;
+  const samples = {
+    '烟火日常': [`${place}的日常`, `街巷里的${place}，也有值得慢慢记录的日常。带上朋友，留点时间给一顿好饭。出发前请确认门店营业时间。`],
+    '匠心手艺': [`在${place}，看见用心`, `一道菜背后的准备，值得多看一眼。记录${place}的手艺与细节，让这份用心被更多人看见。请根据实拍素材核实制作过程。`],
+    '市井趣味': [`去${place}坐坐`, `今天的快乐清单：约个朋友，找张桌子，到${place}坐一会儿。你的下班小据点是哪家店？`],
+  };
+  [title.value, body.value] = samples[version];
+  title.value = title.value.slice(0, titleLimit.value);
+  announce('已切换本地示例文案，请结合门店真实情况编辑。');
+}
+async function dropMedia(event) {
+  if (mediaBusy.value || publishing.value) return;
+  const files = Array.from(event.dataTransfer?.files || []);
+  if (!files.length) return;
+  if (files[0].type.startsWith('video/')) { mediaType.value = 'video'; if (await selectVideo(files[0])) cover.value = ''; }
+  else { mediaType.value = 'image'; await addPictures(files); }
+}
 const previewPlatform = ref("抖音");
 const scheduleMode = ref("now");
 const selectedAccounts = ref(["dy-main", "xhs-main"]);
@@ -154,8 +177,8 @@ const body = ref(
 );
 const poi = ref("炭火烧鸟·湖滨店");
 const poiOptions = [
-  { value: '炭火烧鸟·湖滨店', label: '炭火烧鸟·湖滨店', description: '湖滨商圈 · 东坡路 7 号' },
-  { value: '炭火烧鸟·钱江店', label: '炭火烧鸟·钱江店', description: '钱江商圈 · 钱江路 88 号' },
+  { value: '炭火烧鸟·湖滨店', label: '炭火烧鸟·湖滨店', description: '抖音地点 · 湖滨商圈 · 东坡路 7 号' },
+  { value: '炭火烧鸟·钱江店', label: '炭火烧鸟·钱江店', description: '高德地点参考 · 钱江商圈 · 钱江路 88 号' },
 ];
 
 const activeAccounts = computed(() =>
@@ -401,13 +424,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="publishing-page antialiased font-sans selection:bg-blue-100 selection:text-blue-900"
+    :data-studio-step="studioStep" class="publishing-page antialiased font-sans selection:bg-blue-100 selection:text-blue-900"
   >
     <header class="pub-header">
       <div class="pub-header-left">
         <div class="pub-title-block">
           <h1 class="text-xl font-bold tracking-tight">
-            内容发布 <span class="title-slash">/</span> 微调工作台
+            内容刊印 <span class="title-slash">/</span> 把烟火带到更远的地方
           </h1>
         </div>
       </div>
@@ -427,8 +450,75 @@ onBeforeUnmount(() => {
     <input ref="imageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden @change="uploadPictures" />
     <input ref="musicInput" type="file" accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/aac,.mp3,.wav,.m4a,.ogg,.aac" hidden @change="uploadMusic" />
     <PublishingAssetPicker ref="assetPicker" :kind="pickerKind" :limit="pickerLimit" :busy="libraryBusy" :error="libraryError" @select="chooseLibrary" />
+    <p class="studio-demo-note">演示工作台 · 文案为本地示例，发布仅预演；不会向真实平台发送。</p>
+    <nav class="studio-mobile-steps" aria-label="刊印步骤"><button v-for="(label, index) in ['素材', '文案与挂载', '预览']" :key="label" :aria-current="studioStep === index ? 'step' : undefined" @click="studioStep = index">0{{ index + 1 }} {{ label }}</button></nav>
     <main class="pub-grid">
-      <section class="editor-column" tabindex="0" aria-label="发布内容编辑区">
+      <section class="studio-upload-column" tabindex="0" aria-label="素材上传区">
+        <div class="pub-section asset-section" :aria-busy="mediaBusy" @dragover.prevent @drop.prevent="dropMedia">
+          <div class="section-heading">
+            <div>
+              <h2 class="flex items-center gap-2"><Images :size="18" aria-hidden="true" />作品核心素材</h2>
+              <p>{{ mediaType === 'video' ? '视频作品' : `图文作品 · ${pictures.length} / ${IMAGE_LIMIT} 张图片` }}</p>
+            </div>
+            <div class="asset-actions">
+              <button class="pub-upload-primary" :disabled="mediaBusy || publishing || (mediaType === 'image' && pictures.length >= IMAGE_LIMIT)" @click="uploadLocal">
+                <LoaderCircle v-if="mediaBusy" class="pub-loading" :size="14" /><Upload v-else :size="14" />
+                {{ mediaBusy ? '正在读取…' : '本地上传' }}
+              </button>
+              <button :disabled="mediaBusy || publishing || (mediaType === 'image' && pictures.length >= IMAGE_LIMIT)" @click="openLibrary()"><FolderOpen :size="14" />从素材库选择</button>
+            </div>
+          </div>
+          <div class="pub-media-tabs" role="group" aria-label="作品类型">
+            <button :aria-pressed="mediaType === 'video'" :disabled="mediaBusy || publishing" @click="mediaType = 'video'"><Video :size="15" />视频</button>
+            <button :aria-pressed="mediaType === 'image'" :disabled="mediaBusy || publishing" @click="mediaType = 'image'"><Images :size="15" />图文</button>
+          </div>
+          <div v-if="!hasMedia" class="pub-upload-zone pub-upload-empty">
+            <component :is="mediaType === 'video' ? Video : Images" :size="26" /><strong>{{ mediaType === 'video' ? '拖入作品视频' : '拖入作品图片' }}</strong>
+            <span>{{ mediaType === 'video' ? 'MP4 / MOV / WebM · 最大 500 MB' : `JPG / PNG / WebP · 单张 20 MB · 最多 ${IMAGE_LIMIT} 张` }}</span>
+            <div class="asset-actions"><button :disabled="mediaBusy" @click="uploadLocal"><Upload :size="14" />本地上传</button><button :disabled="mediaBusy" @click="openLibrary()"><FolderOpen :size="14" />从素材库选择</button></div>
+          </div>
+          <div v-else-if="mediaType === 'video'" class="pub-video-file">
+            <Video :size="24" /><div>
+              <b>{{ videoInfo.name }}</b><div class="spec-row">
+                <span>{{ durationLabel }}</span><span>{{ videoInfo.width }} × {{ videoInfo.height }}</span><span>{{ (videoInfo.size / 1024 / 1024).toFixed(1) }} MB</span>
+              </div>
+            </div>
+            <button aria-label="移除视频" :disabled="mediaBusy || publishing" @click="clearVideo"><Trash2 :size="17" /></button>
+          </div>
+          <div v-else class="pub-picture-grid">
+            <div v-for="(picture, index) in pictures" :key="picture.id" class="pub-picture-item">
+              <button class="pub-picture-select" :aria-label="`预览第 ${index + 1} 张图片`" :aria-pressed="activePicture === index" @click="activePicture = index"><img :src="picture.url" :alt="picture.name" /><span>{{ index === 0 ? '封面' : index + 1 }}</span></button>
+              <div class="pub-picture-actions"><button :disabled="index === 0 || mediaBusy" :aria-label="`前移第 ${index + 1} 张图片`" title="向前移" @click="movePicture(index, -1); activePicture = index - 1"><ArrowLeft :size="13" /></button><button :disabled="index === pictures.length - 1 || mediaBusy" :aria-label="`后移第 ${index + 1} 张图片`" title="向后移" @click="movePicture(index, 1); activePicture = index + 1"><ArrowRight :size="13" /></button><button :disabled="mediaBusy" :aria-label="`删除第 ${index + 1} 张图片`" title="删除图片" @click="removePicture(picture.id)"><Trash2 :size="13" /></button></div>
+            </div>
+          </div>
+          <p v-if="videoError && mediaType === 'video'" class="pub-error" role="alert">{{ videoError }}</p>
+          <p v-if="attachmentsError" class="pub-error" role="alert">{{ attachmentsError }}</p>
+          <div v-if="mediaType === 'video'" class="pub-cover-tools">
+            <button v-if="cover" class="pub-cover-thumb" aria-label="放大预览封面" @click="coverDialog?.showModal()"><img :src="cover" alt="当前作品封面" /><ZoomIn :size="15" /></button>
+            <div>
+              <b>作品封面</b><p>{{ cover ? '已设置封面，右侧仍显示原视频。' : '可截取视频当前帧，或单独上传封面。' }}</p>
+              <div class="asset-actions">
+                <button :disabled="!videoUrl || videoBusy" @click="captureCover"><Image :size="14" />截取当前帧</button>
+                <button @click="coverInput?.click()"><Upload :size="14" />{{ cover ? '替换封面' : '上传封面' }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pub-section pub-music-section">
+          <div class="section-heading"><div><h2 class="flex items-center gap-2"><Music2 :size="18" />背景音乐</h2><p>视频与图文均可配乐</p></div><span class="selection-count">可选</span></div>
+          <div class="asset-actions"><button :disabled="mediaBusy" @click="musicInput?.click()"><Upload :size="14" />上传音乐</button><button :disabled="mediaBusy" @click="openLibrary('audio')"><FolderOpen :size="14" />素材库音乐</button></div>
+          <p v-if="attachmentsError" class="pub-error" role="alert">{{ attachmentsError }}</p>
+          <div v-if="music" class="pub-music-editor">
+            <div class="pub-music-track"><Music2 :size="22" /><div><b>{{ music.name }}</b><small>{{ Math.floor(music.duration / 60) }}:{{ String(Math.floor(music.duration % 60)).padStart(2, '0') }}</small></div><button class="pub-icon-button" :aria-label="musicPlaying ? '暂停配乐试听' : '试听配乐'" :title="musicPlaying ? '暂停试听' : '试听配乐'" @click="phonePreview?.toggleMusic()"><Pause v-if="musicPlaying" :size="17" /><Play v-else :size="17" /></button><button class="pub-icon-button" aria-label="移除背景音乐" title="移除音乐" :disabled="mediaBusy" @click="removeMusic"><X :size="17" /></button></div>
+            <div class="pub-music-settings"><label>配乐音量 <output>{{ musicVolume }}%</output><input v-model.number="musicVolume" type="range" min="0" max="100" aria-label="配乐音量" /></label><label v-if="mediaType === 'video'">视频原声 <output>{{ originalVolume }}%</output><input v-model.number="originalVolume" type="range" min="0" max="100" aria-label="视频原声音量" /></label><label>音乐起点 <output>{{ musicStart }} 秒</output><input v-model.number="musicStart" type="range" min="0" :max="Math.max(0, Math.floor(music.duration - 1))" step="1" aria-label="音乐起播位置" /></label></div>
+          </div>
+          <p class="pub-music-note">使用自有或已获授权的音频。平台曲库与发布混音尚未接入，当前可在此试听效果。</p>
+        </div>
+
+        <div class="feature-tags pub-section"><h2>AI 店铺特征</h2><p>识别服务待接入。上传素材后，可先手动标注门店特征。</p><label>特征标签<input class="pub-input" placeholder="例如：街边小馆、炭火、手作" /></label></div>
+      </section>
+      <section class="editor-column" tabindex="0" aria-label="文案与本地化挂载">
         <div class="pub-section platform-section">
           <div class="section-heading">
             <div>
@@ -494,68 +584,6 @@ onBeforeUnmount(() => {
           <p v-if="!activeAccounts.length" class="pub-music-note">此平台暂无具备发布权限的账号，<RouterLink to="/publishing/platforms">前往关联平台管理绑定或续期</RouterLink>。</p>
         </div>
 
-        <div class="pub-section asset-section" :aria-busy="mediaBusy">
-          <div class="section-heading">
-            <div>
-              <h2 class="flex items-center gap-2"><Images :size="18" aria-hidden="true" />作品核心素材</h2>
-              <p>{{ mediaType === 'video' ? '视频作品' : `图文作品 · ${pictures.length} / ${IMAGE_LIMIT} 张图片` }}</p>
-            </div>
-            <div class="asset-actions">
-              <button class="pub-upload-primary" :disabled="mediaBusy || publishing || (mediaType === 'image' && pictures.length >= IMAGE_LIMIT)" @click="uploadLocal">
-                <LoaderCircle v-if="mediaBusy" class="pub-loading" :size="14" /><Upload v-else :size="14" />
-                {{ mediaBusy ? '正在读取…' : '本地上传' }}
-              </button>
-              <button :disabled="mediaBusy || publishing || (mediaType === 'image' && pictures.length >= IMAGE_LIMIT)" @click="openLibrary()"><FolderOpen :size="14" />从素材库选择</button>
-            </div>
-          </div>
-          <div class="pub-media-tabs" role="group" aria-label="作品类型">
-            <button :aria-pressed="mediaType === 'video'" :disabled="mediaBusy || publishing" @click="mediaType = 'video'"><Video :size="15" />视频</button>
-            <button :aria-pressed="mediaType === 'image'" :disabled="mediaBusy || publishing" @click="mediaType = 'image'"><Images :size="15" />图文</button>
-          </div>
-          <div v-if="!hasMedia" class="pub-upload-zone pub-upload-empty">
-            <component :is="mediaType === 'video' ? Video : Images" :size="26" /><strong>{{ mediaType === 'video' ? '添加作品视频' : '添加作品图片' }}</strong>
-            <span>{{ mediaType === 'video' ? 'MP4 / MOV / WebM · 最大 500 MB' : `JPG / PNG / WebP · 单张 20 MB · 最多 ${IMAGE_LIMIT} 张` }}</span>
-            <div class="asset-actions"><button :disabled="mediaBusy" @click="uploadLocal"><Upload :size="14" />本地上传</button><button :disabled="mediaBusy" @click="openLibrary()"><FolderOpen :size="14" />从素材库选择</button></div>
-          </div>
-          <div v-else-if="mediaType === 'video'" class="pub-video-file">
-            <Video :size="24" /><div>
-              <b>{{ videoInfo.name }}</b><div class="spec-row">
-                <span>{{ durationLabel }}</span><span>{{ videoInfo.width }} × {{ videoInfo.height }}</span><span>{{ (videoInfo.size / 1024 / 1024).toFixed(1) }} MB</span>
-              </div>
-            </div>
-            <button aria-label="移除视频" :disabled="mediaBusy || publishing" @click="clearVideo"><Trash2 :size="17" /></button>
-          </div>
-          <div v-else class="pub-picture-grid">
-            <div v-for="(picture, index) in pictures" :key="picture.id" class="pub-picture-item">
-              <button class="pub-picture-select" :aria-label="`预览第 ${index + 1} 张图片`" :aria-pressed="activePicture === index" @click="activePicture = index"><img :src="picture.url" :alt="picture.name" /><span>{{ index === 0 ? '封面' : index + 1 }}</span></button>
-              <div class="pub-picture-actions"><button :disabled="index === 0 || mediaBusy" :aria-label="`前移第 ${index + 1} 张图片`" title="向前移" @click="movePicture(index, -1); activePicture = index - 1"><ArrowLeft :size="13" /></button><button :disabled="index === pictures.length - 1 || mediaBusy" :aria-label="`后移第 ${index + 1} 张图片`" title="向后移" @click="movePicture(index, 1); activePicture = index + 1"><ArrowRight :size="13" /></button><button :disabled="mediaBusy" :aria-label="`删除第 ${index + 1} 张图片`" title="删除图片" @click="removePicture(picture.id)"><Trash2 :size="13" /></button></div>
-            </div>
-          </div>
-          <p v-if="videoError && mediaType === 'video'" class="pub-error" role="alert">{{ videoError }}</p>
-          <p v-if="attachmentsError" class="pub-error" role="alert">{{ attachmentsError }}</p>
-          <div v-if="mediaType === 'video'" class="pub-cover-tools">
-            <button v-if="cover" class="pub-cover-thumb" aria-label="放大预览封面" @click="coverDialog?.showModal()"><img :src="cover" alt="当前作品封面" /><ZoomIn :size="15" /></button>
-            <div>
-              <b>作品封面</b><p>{{ cover ? '已设置封面，右侧仍显示原视频。' : '可截取视频当前帧，或单独上传封面。' }}</p>
-              <div class="asset-actions">
-                <button :disabled="!videoUrl || videoBusy" @click="captureCover"><Image :size="14" />截取当前帧</button>
-                <button @click="coverInput?.click()"><Upload :size="14" />{{ cover ? '替换封面' : '上传封面' }}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="pub-section pub-music-section">
-          <div class="section-heading"><div><h2 class="flex items-center gap-2"><Music2 :size="18" />背景音乐</h2><p>视频与图文均可配乐</p></div><span class="selection-count">可选</span></div>
-          <div class="asset-actions"><button :disabled="mediaBusy" @click="musicInput?.click()"><Upload :size="14" />上传音乐</button><button :disabled="mediaBusy" @click="openLibrary('audio')"><FolderOpen :size="14" />素材库音乐</button></div>
-          <p v-if="attachmentsError" class="pub-error" role="alert">{{ attachmentsError }}</p>
-          <div v-if="music" class="pub-music-editor">
-            <div class="pub-music-track"><Music2 :size="22" /><div><b>{{ music.name }}</b><small>{{ Math.floor(music.duration / 60) }}:{{ String(Math.floor(music.duration % 60)).padStart(2, '0') }}</small></div><button class="pub-icon-button" :aria-label="musicPlaying ? '暂停配乐试听' : '试听配乐'" :title="musicPlaying ? '暂停试听' : '试听配乐'" @click="phonePreview?.toggleMusic()"><Pause v-if="musicPlaying" :size="17" /><Play v-else :size="17" /></button><button class="pub-icon-button" aria-label="移除背景音乐" title="移除音乐" :disabled="mediaBusy" @click="removeMusic"><X :size="17" /></button></div>
-            <div class="pub-music-settings"><label>配乐音量 <output>{{ musicVolume }}%</output><input v-model.number="musicVolume" type="range" min="0" max="100" aria-label="配乐音量" /></label><label v-if="mediaType === 'video'">视频原声 <output>{{ originalVolume }}%</output><input v-model.number="originalVolume" type="range" min="0" max="100" aria-label="视频原声音量" /></label><label>音乐起点 <output>{{ musicStart }} 秒</output><input v-model.number="musicStart" type="range" min="0" :max="Math.max(0, Math.floor(music.duration - 1))" step="1" aria-label="音乐起播位置" /></label></div>
-          </div>
-          <p class="pub-music-note">使用自有或已获授权的音频。平台曲库与发布混音尚未接入，当前可在此试听效果。</p>
-        </div>
-
         <div class="pub-section copy-section">
           <div class="section-heading">
             <div>
@@ -565,6 +593,7 @@ onBeforeUnmount(() => {
               <p>针对{{ activePlatform }}的内容规范，实时同步右侧预览。</p>
             </div>
           </div>
+          <div class="copy-version-tabs" aria-label="文案风格"><button v-for="version in copyVariants" :key="version" :aria-pressed="copyVersion === version" :disabled="!!aiBusy || publishing" @click="selectCopyVersion(version)">{{ version }}</button></div>
           <div class="pub-field-heading">
             <label class="field-label" for="title">作品标题</label>
             <button type="button" class="pub-field-generate" aria-label="AI 智能生成作品标题" aria-controls="title" :aria-busy="aiBusy === '生成作品标题'" :disabled="!!aiBusy || publishing" title="根据当前门店生成标题（本地演示）" @click="runAction('生成作品标题')">
@@ -620,7 +649,7 @@ onBeforeUnmount(() => {
               <h2 class="flex items-center gap-2">
                 <Store :size="18" aria-hidden="true" />本地生活专属挂载
               </h2>
-              <p>把门店与团购套餐挂到内容里，承接到店转化。</p>
+              <p>这不是流量，这是生意。关联抖音门店 POI 与团购套餐，承接到店转化。</p>
             </div>
             <span class="commerce-badge"><MapPin :size="13" /> 商业闭环</span>
           </div>
@@ -690,9 +719,10 @@ onBeforeUnmount(() => {
                 @click="previewPlatform = '小红书'"
               >
                 小红书
-              </button>
+              </button><button :class="{ active: previewPlatform === '视频号' }" @click="previewPlatform = '视频号'">视频号</button>
             </div>
           </div>
+          <div v-if="previewPlatform === '小红书'" class="xhs-feed" aria-label="小红书双列封面预览"><article v-for="(picture, index) in (pictures.length ? pictures.slice(0, 4) : cover ? [{ url: cover, name: title }] : [])" :key="picture.url"><img :src="picture.url" :alt="picture.name || title" /><strong>{{ title || '封面标题' }}</strong><small>{{ currentAccount?.name || '门店账号' }} · {{ index + 1 }}</small></article><p v-if="!pictures.length && !cover">上传图片或设置视频封面，即可查看双列信息流效果。</p></div>
           <PublishingPhone
             ref="phonePreview"
             :video-url="mediaType === 'video' ? videoUrl : ''"
@@ -718,31 +748,31 @@ onBeforeUnmount(() => {
           <p v-if="!canPublish" class="pub-error">
             {{ !hasMedia ? "请先添加视频或图片，再确认发布。" : "请选择账号，填写正文与有效标题；定时发布需选择未来时间。" }}
           </p>
-          <div class="publish-bar">
-            <button class="draft-btn" @click="runAction('草稿保存')">
-              存为草稿
-            </button><button
-              class="publish-btn"
-              :disabled="publishing || !canPublish"
-              :aria-busy="publishing"
-              @click="publish"
-            >
-              {{
-                publishing
-                  ? "正在预演…"
-                  : `确认发布至 ${selectedAccounts.length} 个账号`
-              }}
-              <LoaderCircle
-                v-if="publishing"
-                class="pub-loading"
-                :size="16"
-                aria-hidden="true"
-              /><Send v-else :size="16" aria-hidden="true" />
-            </button>
-          </div>
         </div>
       </aside>
     </main>
+    <div class="publish-bar studio-bottom-bar">
+      <label class="studio-schedule">刊印时间<select v-model="scheduleMode" aria-label="刊印时间"><option value="now">立即发布</option><option value="later">定时发布</option></select><input v-if="scheduleMode === 'later'" v-model="scheduledAt" type="datetime-local" aria-label="定时刊印日期" /></label><button class="draft-btn" @click="runAction('草稿保存')">
+        存为草稿
+      </button><button
+        class="publish-btn"
+        :disabled="publishing || !canPublish"
+        :aria-busy="publishing"
+        @click="publish"
+      >
+        {{
+          publishing
+            ? "正在预演…"
+            : `一键刊印全网 · ${selectedAccounts.length} 个账号`
+        }}
+        <LoaderCircle
+          v-if="publishing"
+          class="pub-loading"
+          :size="16"
+          aria-hidden="true"
+        /><Send v-else :size="16" aria-hidden="true" />
+      </button>
+    </div>
     <dialog
       ref="coverDialog"
       class="pub-cover-dialog"

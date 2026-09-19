@@ -1,6 +1,6 @@
-# 梧曜星枢 · AI 商家增长平台
+# 一方志 · AI 商家增长平台
 
-**嘉兴市梧曜科技有限公司 · WUYAO NEXUS**
+**嘉兴市一方志科技有限公司 · WUYAO NEXUS**
 
 面向本地生活商家的 AI 内容增长工作台。
 
@@ -59,7 +59,7 @@ npm test && npm run lint && npm run typecheck && npm run build
 3. **API Key和密钥只能在服务端**
 4. **所有AI任务必须进入任务中心**
 5. **所有生成结果必须进入作品库**
-6. **保持深空科技感视觉风格**
+6. **遵循一方志宣纸、墨青与朱砂视觉规范**
 7. **提交前必须通过lint、typecheck、test、build**
 
 ## 技术栈
@@ -74,4 +74,4 @@ npm test && npm run lint && npm run typecheck && npm run build
 
 ## 许可
 
-嘉兴市梧曜科技有限公司版权所有
+嘉兴市一方志科技有限公司版权所有

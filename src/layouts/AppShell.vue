@@ -1,50 +1,27 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { auth } from '../stores/auth'
-import RouteTabs from '../components/RouteTabs.vue'
+import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
-
-defineProps({
-  // The shell intentionally owns global navigation while pages own their content.
-})
+import { auth } from '../stores/auth'
+import { selectedStore, stores } from '../stores/merchantContext'
 
 const route = useRoute()
 const router = useRouter()
-// Keep the authorization center's required light/blue palette local to its routes.
-const accountCenterShell = `
-  [--ink:#0f172a] [--ink-soft:#475569] [--ink-muted:#64748b] [--night:#f8fafc] [--night-panel:#ffffff]
-  [--violet:#2563eb] [--violet-bright:#2563eb] [--cyan:#2563eb] [--green:#10b981] [--line:#e2e8f0] [--line-strong:#cbd5e1]
-  bg-slate-50! text-slate-800! [color-scheme:light]
-  [&_.page-scroll]:p-0! [&_.page-scroll]:bg-slate-50! [&_.page-scroll>*]:max-w-none! max-[860px]:[&_.page-scroll]:pb-20!
-  [&_.sidebar]:bg-white! [&_.topbar]:bg-white! [&_.route-tabs]:bg-slate-50! [&_.route-tabs]:border-slate-200!
-  [&_.nav-item]:text-slate-500! [&_.nav-item:hover]:bg-slate-50! [&_.nav-item.active]:bg-blue-50! [&_.nav-item.active]:text-blue-600! [&_.nav-item.active]:shadow-none!
-  [&_.nav-group-trigger]:text-slate-500! [&_.nav-group-trigger:hover]:bg-slate-50! [&_.has-active-item>.nav-group-trigger]:text-blue-600!
-  [&_.brand-mark_span]:bg-blue-600! [&_.tenant-avatar]:bg-blue-600! [&_.tenant-avatar]:bg-none! [&_.user-avatar]:bg-blue-600! [&_.user-avatar]:bg-none!
-  [&_.tenant-switcher]:bg-slate-50! [&_.tenant-switcher]:border-slate-200! [&_.brand-name]:text-slate-900!
-  [&_.sidebar-create-button]:bg-blue-600! [&_.sidebar-create-button:hover]:bg-blue-500! [&_.sidebar-create-button]:border-blue-600! [&_.sidebar-create-button]:shadow-none!
-  [&_.status-capsule]:bg-emerald-50! [&_.status-capsule]:border-emerald-100! [&_.status-capsule_strong]:text-emerald-700!
-  [&_.route-tab.active]:bg-white! [&_.route-tab.active]:text-blue-600! [&_.route-tab.active]:border-slate-200! [&_.route-tab.active]:shadow-none! [&_.route-tab:hover]:bg-white! [&_.route-tab-close:hover]:bg-slate-100!
-  [&_.topbar-search:hover]:bg-blue-50! [&_.topbar-search:hover]:border-blue-200! [&_.account-menu]:bg-white! [&_.account-menu_button:hover]:bg-slate-50! [&_.account-menu_button:hover]:text-slate-900!
-  [&_.mobile-bottom-nav]:bg-white! [&_.mobile-bottom-primary]:bg-blue-600! [&_.mobile-bottom-primary]:border-blue-600! [&_.mobile-bottom-primary]:shadow-none!
-  [&_.quick-search]:bg-white! [&_.quick-search]:border-slate-200! [&_.quick-search-result:hover]:bg-blue-50! [&_.quick-search-result-mark]:text-blue-600!
-`
 const menuOpen = ref(false)
+const collapsed = ref(false)
 const accountOpen = ref(false)
+const searchOpen = ref(false)
+const search = ref('')
 const pageScroll = ref(null)
+const keyboard = (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); searchOpen.value = true }
+  if (event.key === 'Escape') { searchOpen.value = false; menuOpen.value = false; accountOpen.value = false }
+}
+onMounted(() => window.addEventListener('keydown', keyboard))
+onBeforeUnmount(() => window.removeEventListener('keydown', keyboard))
+watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll.value?.scrollTo({ top: 0 }) })
+
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
-const quickSearchOpen = ref(false)
-const quickSearch = ref('')
-
-const quickSearchItems = [
-  { name: 'dashboard', label: '大屏总览', path: '/dashboard' },
-  { name: 'creative', label: '一句话创作', path: '/creative' },
-  { name: 'analytics', label: '各平台数据看板', path: '/analytics' },
-  { name: 'publishing', label: '内容发布', path: '/publishing' },
-  { name: 'assets', label: '素材库', path: '/assets' },
-  { name: 'tasks', label: '任务中心', path: '/tasks' },
-]
-
 const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'auto_awesome', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
 const navItemIcons = { dashboard: 'dashboard', creative: 'auto_awesome', analytics: 'monitoring', diagnosis: 'insights', 'analytics-platforms': 'link', acquisition: 'person_search', 'image-create': 'image', 'video-create': 'movie', 'digital-human': 'record_voice_over', 'copy-rewrite': 'edit_note', 'video-analyze': 'query_stats', publishing: 'publish', 'matrix-publishing': 'hub', 'publishing-plan': 'calendar_month', 'publishing-platforms': 'link', messages: 'chat', reviews: 'reviews', 'service-rules': 'rule', 'geo-brand': 'location_on', 'geo-services': 'workspace_premium', 'geo-keywords': 'key', 'geo-visibility': 'visibility', merchants: 'storefront', brands: 'branding_watermark', assets: 'folder', knowledge: 'menu_book', works: 'gallery_thumbnail', billing: 'card_membership', 'merchant-alliance': 'handshake', notifications: 'notifications', tasks: 'task_alt', settings: 'settings', help: 'help_outline' }
 
@@ -168,27 +145,6 @@ const expandedGroups = ref(getInitialExpandedGroups())
 const isActive = (name) => route.name === name
 const isGroupActive = (group) => isActive(group.name) || route.meta.navGroup === group.key || group.items?.some(item => isActive(item.name))
 const isGroupExpanded = (key) => expandedGroups.value.has(key)
-const closeMenu = () => { menuOpen.value = false }
-const openQuickSearch = () => { quickSearchOpen.value = true }
-const closeQuickSearch = () => { quickSearchOpen.value = false; quickSearch.value = '' }
-const filteredQuickSearchItems = () => {
-  const query = quickSearch.value.trim().toLowerCase()
-  if (!query) return quickSearchItems
-  return quickSearchItems.filter(item => item.label.toLowerCase().includes(query) || item.name.includes(query))
-}
-const goToQuickSearchItem = (path) => { router.push(path); closeQuickSearch() }
-
-const handleQuickSearchShortcut = (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault()
-    openQuickSearch()
-  }
-  if (event.key === 'Escape' && quickSearchOpen.value) closeQuickSearch()
-}
-
-onMounted(() => window.addEventListener('keydown', handleQuickSearchShortcut))
-onBeforeUnmount(() => window.removeEventListener('keydown', handleQuickSearchShortcut))
-
 const saveExpandedGroups = () => {
   try {
     localStorage.setItem(NAV_STORAGE_KEY, JSON.stringify([...expandedGroups.value]))
@@ -198,6 +154,12 @@ const saveExpandedGroups = () => {
 }
 
 const toggleGroup = (key) => {
+  if (collapsed.value) {
+    collapsed.value = false
+    expandedGroups.value = new Set([...expandedGroups.value, key])
+    saveExpandedGroups()
+    return
+  }
   const nextGroups = new Set(expandedGroups.value)
   if (nextGroups.has(key)) nextGroups.delete(key)
   else nextGroups.add(key)
@@ -212,32 +174,24 @@ const expandActiveGroup = () => {
   saveExpandedGroups()
 }
 
-watch(() => route.fullPath, async () => {
-  expandActiveGroup()
-  await nextTick()
-  pageScroll.value?.scrollTo({ top: 0, left: 0 })
-})
-
-const logout = () => {
-  auth.logout()
-  router.push({ name: 'login' })
-}
+const searchItems = computed(() => navGroups.flatMap(group => group.items || [group]).filter(item => {
+  const query = search.value.trim().toLowerCase()
+  return !query || item.label.toLowerCase().includes(query)
+}))
+const closeMenu = () => { menuOpen.value = false }
+const logout = () => { auth.logout(); router.push({ name: 'login' }) }
 </script>
 
 <template>
-  <div class="app-frame" :class="route.meta.accountCenter ? accountCenterShell : ''">
+  <div class="app-frame paper-app">
     <div class="mobile-scrim" :class="{ 'is-visible': menuOpen }" @click="closeMenu" />
-    <aside class="sidebar" :class="{ 'is-open': menuOpen }">
-      <div class="brand-lockup">
-        <div class="brand-mark" aria-hidden="true"><span /><span /><span /></div>
-        <div>
-          <p class="brand-name">梧曜星枢</p>
-          <p class="brand-caption">AI GROWTH OS <span>·</span> V0.1</p>
-        </div>
+    <aside class="sidebar paper-sidebar" :class="{ 'is-open': menuOpen, 'is-collapsed': collapsed }">
+      <div class="brand-lockup paper-brand">
+        <RouterLink to="/dashboard" class="brand-link" aria-label="一方志总览"><span class="brand-mark seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="brand-copy"><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
         <button class="icon-button sidebar-close" aria-label="关闭导航" @click="closeMenu">×</button>
       </div>
-
-      <nav class="primary-nav" aria-label="主导航">
+      <div class="tenant-switcher paper-tenant"><span class="tenant-avatar">青</span><span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span><span class="chevron">⌄</span></div>
+      <nav class="primary-nav paper-nav" aria-label="主导航">
         <div
           v-for="group in navGroups"
           :key="group.key"
@@ -247,6 +201,8 @@ const logout = () => {
           <RouterLink
             v-if="group.path"
             :to="group.path"
+            :aria-label="group.label"
+            :title="group.label"
             class="nav-group-trigger nav-group-direct"
             @click="closeMenu"
           >
@@ -257,7 +213,9 @@ const logout = () => {
             <button
               class="nav-group-trigger"
               type="button"
-              :aria-expanded="isGroupExpanded(group.key)"
+              :aria-expanded="!collapsed && isGroupExpanded(group.key)"
+              :aria-label="group.label"
+              :title="group.label"
               :aria-controls="`nav-group-${group.key}`"
               @click="toggleGroup(group.key)"
             >
@@ -266,17 +224,18 @@ const logout = () => {
               <span class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true">⌄</span>
             </button>
             <div
+              v-show="!collapsed && isGroupExpanded(group.key)"
               :id="`nav-group-${group.key}`"
               class="nav-group-items"
               :class="{ expanded: isGroupExpanded(group.key) }"
-              :aria-hidden="!isGroupExpanded(group.key)"
+              :aria-hidden="collapsed || !isGroupExpanded(group.key)"
             >
               <div class="nav-group-items-inner">
                 <RouterLink
                   v-for="item in group.items"
                   :key="item.name"
                   :to="item.path"
-                  class="nav-item"
+                  class="nav-item paper-nav-item"
                   :class="{ active: isActive(item.name) }"
                   @click="closeMenu"
                 >
@@ -290,73 +249,13 @@ const logout = () => {
         </div>
       </nav>
 
-      <div class="sidebar-footer">
-        <RouterLink to="/creative" class="sidebar-create-button"><span class="material-symbols-outlined" aria-hidden="true">add</span><span>新建创作任务</span></RouterLink>
-        <div class="status-capsule">
-          <span class="status-pulse" />
-          <div>
-            <span class="eyebrow">星枢状态舱</span>
-            <strong>所有系统运行中</strong>
-          </div>
-          <span class="mono status-time">99.9%</span>
-        </div>
-        <div class="account-wrap">
-          <button class="account-button" @click="accountOpen = !accountOpen">
-            <span class="user-avatar">{{ auth.user?.initials || '林' }}</span>
-            <span class="account-copy"><strong>{{ auth.user?.name || '林知夏' }}</strong><small>{{ auth.user?.role || '运营管理员' }}</small></span>
-            <span class="chevron">⌄</span>
-          </button>
-          <div v-if="accountOpen" class="account-menu">
-            <button @click="router.push('/settings'); accountOpen = false">账户设置</button>
-            <button @click="logout">退出登录</button>
-          </div>
-        </div>
-      </div>
+      <div class="sidebar-footer paper-sidebar-footer"><RouterLink to="/creative" class="sidebar-create-button" @click="closeMenu"><span>＋</span><span>新建创作任务</span></RouterLink><div class="status-capsule paper-status"><span class="status-pulse" /><div><small>方志编撰中...</small><strong>AI 提炼烟火中</strong></div></div><div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ auth.user?.initials || '林' }}</span><span class="account-copy"><strong>{{ auth.user?.name || '林知夏' }}</strong><small>{{ auth.user?.role || '运营管理员' }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div></div>
     </aside>
-
-    <main class="main-area">
-      <header class="topbar">
-        <div class="topbar-inner">
-          <button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button>
-          <div class="topbar-actions">
-            <button class="topbar-search" type="button" aria-label="打开快速导航" @click="openQuickSearch">
-              <span class="topbar-search-icon" aria-hidden="true">⌕</span>
-              <span class="topbar-search-label">搜索页面</span>
-              <kbd>⌘ K</kbd>
-            </button>
-            <ThemeToggle v-if="!route.meta.accountCenter" />
-            <button class="help-button" aria-label="帮助中心">?</button>
-            <button class="notification-button" aria-label="通知"><span class="notification-dot" />◔</button>
-          </div>
-        </div>
-      </header>
-      <RouteTabs />
+    <main class="main-area paper-main">
+      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStore" class="header-store" aria-label="切换门店"><option v-for="store in stores" :key="store">{{ store }}</option></select><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span class="top-account-name">{{ auth.user?.name || '林知夏' }}</span></button></div></div></header>
       <div ref="pageScroll" class="page-scroll"><slot /></div>
-      <div v-if="quickSearchOpen" class="quick-search-scrim" @click="closeQuickSearch">
-        <section class="quick-search" role="dialog" aria-modal="true" aria-label="快速导航" @click.stop>
-          <div class="quick-search-head">
-            <span class="quick-search-icon" aria-hidden="true">⌕</span>
-            <input v-model="quickSearch" autofocus type="search" placeholder="搜索页面或功能" @keydown.esc="closeQuickSearch" @keydown.enter="filteredQuickSearchItems()[0] && goToQuickSearchItem(filteredQuickSearchItems()[0].path)">
-            <kbd>ESC</kbd>
-          </div>
-          <div class="quick-search-results">
-            <button v-for="item in filteredQuickSearchItems()" :key="item.name" type="button" class="quick-search-result" @click="goToQuickSearchItem(item.path)">
-              <span class="quick-search-result-mark">↗</span>
-              <span>{{ item.label }}</span>
-              <span class="quick-search-result-path">{{ item.path }}</span>
-            </button>
-            <p v-if="!filteredQuickSearchItems().length" class="quick-search-empty">没有匹配的页面</p>
-          </div>
-        </section>
-      </div>
-      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航">
-        <RouterLink to="/dashboard" :class="{ active: route.name === 'dashboard' }"><span class="material-symbols-outlined">dashboard</span><span>总览</span></RouterLink>
-        <RouterLink to="/creative" :class="{ active: route.name === 'creative' }"><span class="material-symbols-outlined">auto_awesome</span><span>创作</span></RouterLink>
-        <RouterLink to="/creative" class="mobile-bottom-primary"><span class="material-symbols-outlined">add</span></RouterLink>
-        <RouterLink to="/assets" :class="{ active: route.name === 'assets' }"><span class="material-symbols-outlined">folder</span><span>素材</span></RouterLink>
-        <RouterLink to="/analytics" :class="{ active: route.name === 'analytics' }"><span class="material-symbols-outlined">monitoring</span><span>分析</span></RouterLink>
-      </nav>
+      <div v-if="searchOpen" class="quick-search-scrim" @click="searchOpen = false"><section class="quick-search paper-search-modal" role="dialog" aria-modal="true" @click.stop><div class="quick-search-head"><span>⌕</span><input v-model="search" autofocus type="search" placeholder="搜索页面或功能" @keydown.esc="searchOpen = false" /><kbd>ESC</kbd></div><div class="quick-search-results"><RouterLink v-for="item in searchItems" :key="item.path" :to="item.path" class="quick-search-result" @click="searchOpen = false"><span>{{ item.icon }}</span><span>{{ item.label }}</span><span class="quick-search-result-path">{{ item.path }}</span></RouterLink><p v-if="!searchItems.length" class="quick-search-empty">没有匹配的页面</p></div></section></div>
+      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/dashboard" :class="{ active: route.name === 'dashboard' }"><span>⌂</span><small>总览</small></RouterLink><RouterLink to="/creative" :class="{ active: route.name === 'creative' }"><span>✎</span><small>创作</small></RouterLink><RouterLink to="/creative" class="mobile-bottom-primary"><span>＋</span></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span>▤</span><small>方志库</small></RouterLink><RouterLink to="/analytics" :class="{ active: route.name === 'analytics' }"><span>⌁</span><small>数据</small></RouterLink></nav>
     </main>
   </div>
 </template>
-

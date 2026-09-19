@@ -8,7 +8,7 @@
  */
 
 export const config = {
-  appName: import.meta.env.VITE_APP_NAME || '梧曜星枢 AI 商家增长平台',
+  appName: import.meta.env.VITE_APP_NAME || '一方志 AI 商家增长平台',
   appEnv: import.meta.env.VITE_APP_ENV || 'development',
   // 留空表示同源。开发环境由 vite 代理转发到后端，不需要填。
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',

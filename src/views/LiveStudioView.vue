@@ -739,7 +739,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
           <article class="panel ls-chart-card">
             <div class="panel-heading"><div><p class="eyebrow">观看人数</p><h3>{{ viewers }}<small> 人在线</small></h3></div></div>
             <svg class="ls-spark" viewBox="0 0 100 36" preserveAspectRatio="none" role="img" aria-label="观看人数曲线">
-              <polyline :points="trendPath" fill="none" stroke="var(--violet-bright)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+              <polyline :points="trendPath" fill="none" stroke="var(--cinnabar-bright)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
             </svg>
             <p class="ls-chart-foot mono">近 24 分钟趋势</p>
           </article>

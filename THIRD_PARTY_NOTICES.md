@@ -31,4 +31,4 @@ PostgreSQL JDBC、jjwt、MinIO SDK、Lombok 等）以库的形式使用，各自
 
 ---
 
-嘉兴市梧曜科技有限公司
+嘉兴市一方志科技有限公司

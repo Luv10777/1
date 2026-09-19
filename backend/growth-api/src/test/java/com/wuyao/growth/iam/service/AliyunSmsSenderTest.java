@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
 class AliyunSmsSenderTest {
     private final Client client = mock(Client.class);
     private final ObjectMapper json = new ObjectMapper();
-    private final AliyunSmsSender sender = new AliyunSmsSender(client, "梧曜科技", "SMS_TEST", json);
+    private final AliyunSmsSender sender = new AliyunSmsSender(client, "一方志科技", "SMS_TEST", json);
 
     @Test
     void sendsTemplateWithLeadingZeroAndNoAutomaticRetry() throws Exception {
@@ -31,7 +31,7 @@ class AliyunSmsSenderTest {
         var runtime = ArgumentCaptor.forClass(RuntimeOptions.class);
         verify(client).sendSmsWithOptions(request.capture(), runtime.capture());
         assertThat(request.getValue().getPhoneNumbers()).isEqualTo("13800000001");
-        assertThat(request.getValue().getSignName()).isEqualTo("梧曜科技");
+        assertThat(request.getValue().getSignName()).isEqualTo("一方志科技");
         assertThat(request.getValue().getTemplateCode()).isEqualTo("SMS_TEST");
         assertThat(json.readTree(request.getValue().getTemplateParam()).get("code").asText()).isEqualTo("012345");
         assertThat(runtime.getValue().getAutoretry()).isFalse();

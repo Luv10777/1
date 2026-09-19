@@ -31,8 +31,8 @@ defineProps({
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid rgba(139, 92, 246, 0.2);
-  border-top-color: rgb(139, 92, 246);
+  border: 3px solid rgba(195,154,143, 0.2);
+  border-top-color: rgb(195,154,143);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

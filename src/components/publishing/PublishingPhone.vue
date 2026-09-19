@@ -89,6 +89,7 @@ defineExpose({ captureFrame, toggleMusic })
       <div class="phone-island" />
       <div class="phone-screen pub-video-screen">
         <div class="pub-device-status" aria-hidden="true"><span>9:41</span><span>5G ▮▮▮</span></div>
+        <div class="platform-preview-title" :class="{ 'is-redbook': previewPlatform === '小红书' }"><span>{{ previewPlatform === '抖音' ? '关注 · 推荐' : previewPlatform === '小红书' ? '关注 · 发现 · 同城' : '朋友 · 关注 · 推荐' }}</span><b>{{ previewPlatform }}</b></div>
         <div class="pub-video-canvas">
           <video v-if="videoUrl && !playbackError" :key="videoUrl" ref="player" :src="videoUrl" class="pub-preview-video" aria-label="作品视频预览" controls playsinline preload="auto" @loadedmetadata="player.volume = originalVolume / 100" @playing="videoPlaying" @pause="pauseMusic" @waiting="pauseMusic" @seeking="pauseMusic" @seeked="syncMusic(); !player.paused && playMusic()" @ratechange="soundtrack && (soundtrack.playbackRate = player.playbackRate)" @ended="pauseMusic" @error="onPlaybackError" />
           <img v-else-if="currentPicture" :src="currentPicture.url" :alt="currentPicture.name" class="pub-preview-picture" />

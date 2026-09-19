@@ -234,7 +234,7 @@ filteredTasks.value = tasks.value
 
 .eyebrow {
   font-size: 11px;
-  color: rgba(139, 92, 246, 0.8);
+  color: rgba(195,154,143, 0.8);
   letter-spacing: 0.1em;
 }
 
@@ -255,7 +255,7 @@ filteredTasks.value = tasks.value
   margin-bottom: 24px;
   padding: 16px;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(195,154,143, 0.1);
   border-radius: 8px;
 }
 
@@ -288,7 +288,7 @@ filteredTasks.value = tasks.value
 
 .task-card {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(195,154,143, 0.2);
   border-radius: 12px;
   padding: 20px;
   transition: all 0.2s;
@@ -296,7 +296,7 @@ filteredTasks.value = tasks.value
 
 .task-card:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(139, 92, 246, 0.4);
+  border-color: rgba(195,154,143, 0.4);
 }
 
 .task-header {
@@ -314,7 +314,7 @@ filteredTasks.value = tasks.value
 
 .task-code {
   font-size: 13px;
-  color: rgba(139, 92, 246, 0.9);
+  color: rgba(195,154,143, 0.9);
 }
 
 .task-type {
@@ -361,7 +361,7 @@ filteredTasks.value = tasks.value
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, rgb(139, 92, 246), rgb(168, 85, 247));
+  background: linear-gradient(90deg, rgb(195,154,143), rgb(193,151,139));
   transition: width 0.3s;
 }
 
@@ -383,17 +383,17 @@ filteredTasks.value = tasks.value
 .link-button {
   padding: 6px 12px;
   background: transparent;
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  border: 1px solid rgba(195,154,143, 0.3);
   border-radius: 6px;
-  color: rgb(139, 92, 246);
+  color: rgb(195,154,143);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .link-button:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgb(139, 92, 246);
+  background: rgba(195,154,143, 0.1);
+  border-color: rgb(195,154,143);
 }
 
 .link-button.danger {

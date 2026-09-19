@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { authorizationStatus, canPublishAccount, createMockAccounts, filterAccounts, remainingDays } from './platformAccounts.js'
+import { authorizationStatus, canPublishAccount, createMockAccounts, filterAccounts, remainingDays, permissionOptions } from './platformAccounts.js'
 
 const now = Date.parse('2026-09-17T00:00:00Z')
 test('fixtures match five accounts, three platforms and one renewal warning', () => {
@@ -31,4 +31,12 @@ test('platform and trimmed, case-insensitive account search combine without chan
   assert.equal(filterAccounts(list, '视频号', ' 7740912 ').length, 2)
   assert.equal(filterAccounts(list, '全部', 'no-such-account').length, 0)
   assert.equal(list.length, 5)
+})
+
+test('local-life accounts never enter the social-video publishing queue', () => {
+  const example = createMockAccounts(now)[0]
+  for (const platform of ['美团', '大众点评']) {
+    assert.ok(!permissionOptions(platform).includes('视频/图文发布'))
+    assert.equal(canPublishAccount({ ...example, platform }, now), false)
+  }
 })

@@ -22,6 +22,12 @@ watch(accountList, list => {
   catch { storageError.value = '浏览器存储不可用，当前修改仅在本次会话保留。' }
 }, { deep: true, flush: 'sync', immediate: true })
 
+for (const account of accountList.value) {
+  if (account.id === 'wx-main' && account.avatar === '枢') {
+    account.avatar = '志'
+    account.name = '一方志生活精选'
+  }
+}
 const now = ref(Date.now())
 const publishingAccounts = computed(() => accountList.value.filter(a => canPublishAccount(a, now.value)).map(a => ({
   ...a, status: authorizationStatus(a, now.value) === 'expiring' ? '即将到期 · 演示' : '授权有效 · 演示',
