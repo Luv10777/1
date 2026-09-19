@@ -1,10 +1,10 @@
 import { ref } from 'vue'
 
-const STORAGE_KEY = 'wuyao-nexus-theme'
+const STORAGE_KEY = 'yifangzhi-theme'
 const VALID_THEMES = new Set(['light', 'dark'])
 
 function getInitialTheme() {
-  if (typeof window === 'undefined') return 'dark'
+  if (typeof window === 'undefined') return 'light'
 
   try {
     const savedTheme = window.localStorage.getItem(STORAGE_KEY)
@@ -13,7 +13,7 @@ function getInitialTheme() {
     // Storage can be unavailable in private or restricted browser contexts.
   }
 
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  return 'light'
 }
 
 const current = ref(getInitialTheme())
@@ -21,7 +21,9 @@ const current = ref(getInitialTheme())
 function apply(themeName = current.value) {
   if (typeof document === 'undefined') return
   document.documentElement.dataset.theme = themeName
+  document.documentElement.classList.toggle('dark', themeName === 'dark')
   document.documentElement.style.colorScheme = themeName
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeName === 'dark' ? '#14181C' : '#F8F6F3')
 }
 
 function set(themeName) {

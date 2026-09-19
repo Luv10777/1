@@ -17,6 +17,7 @@ import './video-analyze.css'
 import './studio.css'
 import './live-studio.css'
 import './publishing.css'
+import './brand.css'
 
 theme.apply()
 

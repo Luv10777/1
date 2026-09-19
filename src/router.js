@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { auth } from './stores/auth'
 import LoginView from './views/LoginView.vue'
 import DashboardView from './views/DashboardView.vue'
+import AnalyticsView from './views/AnalyticsView.vue'
 import PlaceholderView from './views/PlaceholderView.vue'
 import ForbiddenView from './views/ForbiddenView.vue'
 import NotFoundView from './views/NotFoundView.vue'
@@ -31,8 +32,8 @@ const routes = [
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
   { path: '/ecosystem', name: 'ecosystem', component: EcosystemView, meta: { title: '生态与治理', eyebrow: 'OPEN ECOSYSTEM' }, },
-  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '大屏总览', eyebrow: 'TODAY / OPERATIONS' } },
-  { path: '/creative', name: 'creative', component: CreativeWorkspaceView, meta: { title: '一句话创作', eyebrow: 'AI WORKSPACE' } },
+  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '经营总览', eyebrow: 'TODAY / OPERATIONS' } },
+  { path: '/creative', name: 'creative', component: CreativeWorkspaceView, meta: { title: '内容创作', eyebrow: 'AI WORKSPACE' } },
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', eyebrow: 'AI WORKSPACE', icon: '✦', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },
   { path: '/copy/extract', name: 'copy-extract', component: PlaceholderView, meta: { title: '文案提取', eyebrow: 'CONTENT TOOLS', icon: '↗', description: '从已有素材中提取可复用的卖点、语气与结构。' } },
   { path: '/copy/rewrite', name: 'copy-rewrite', component: PlaceholderView, meta: { title: '文案提取 / 仿写 / 重写', eyebrow: 'CONTENT TOOLS', icon: 'Aa', description: '从已有素材提取文案，在保留核心信息的基础上完成仿写与多平台重写。' } },
@@ -50,13 +51,13 @@ const routes = [
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
-  { path: '/works', name: 'works', component: WorksView, meta: { title: '作品库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
+  { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
   { path: '/reviews', name: 'reviews', component: PlaceholderView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },
   { path: '/publishing', name: 'publishing', component: PublishingView, meta: { title: '内容发布', eyebrow: 'OPERATIONS', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/publishing/matrix', name: 'matrix-publishing', component: PlaceholderView, meta: { title: '矩阵发布', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '▦', description: '统一编排多个平台和账号的内容发布任务。' } },
   { path: '/publishing/plan', name: 'publishing-plan', component: PublishingPlanView, meta: { title: '发布计划', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '◷', accountCenter: true, description: '根据商圈流量波段，自动匹配内容并按时分发。' } },
-  { path: '/publishing/platforms', name: 'publishing-platforms', component: PlatformAccountsView, meta: { title: '关联平台管理', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '⌁', accountCenter: true, description: '管理用于内容发布的平台账号和授权状态。' } },
-  { path: '/analytics', name: 'analytics', component: PlaceholderView, meta: { title: '各平台数据看板', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '汇总各平台的内容、门店与活动增长表现。' } },
+  { path: '/publishing/platforms', name: 'publishing-platforms', component: PlatformAccountsView, meta: { title: '账号矩阵', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '⌁', accountCenter: true, description: '管理用于内容发布的平台账号和授权状态。' } },
+  { path: '/analytics', name: 'analytics', component: AnalyticsView, meta: { title: '到店转化数据', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '汇总各平台的内容、门店与活动增长表现。' } },
   { path: '/analytics/diagnosis', name: 'diagnosis', component: PlaceholderView, meta: { title: 'AI 诊断报告', eyebrow: 'OPERATIONS ANALYTICS', icon: '✦', description: '通过 AI 识别运营问题、增长机会和建议动作。' } },
   { path: '/analytics/platforms', name: 'analytics-platforms', component: PlaceholderView, meta: { title: '数据接口管理', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '管理运营分析的数据接口、指标读取授权与数据同步状态。' } },
   { path: '/acquisition', name: 'acquisition', component: PlaceholderView, meta: { title: '获客中心', eyebrow: 'CUSTOMER ACQUISITION', icon: '◎', description: '集中承接获客渠道、潜在客户和转化动作；具体功能将在业务范围明确后逐步开放。' } },

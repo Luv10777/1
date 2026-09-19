@@ -1,8 +1,9 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, Sparkles, Workflow, ChartNoAxesCombined, X, LoaderCircle } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
 import { auth } from '../stores/auth'
+import { theme } from '../stores/theme'
 import { accountError, codeError, passwordError, phoneError, safeRedirect } from '../utils/authValidation.js'
 
 const router = useRouter()
@@ -154,20 +155,25 @@ function useSmsInstead() {
   <main class="access-page">
     <section class="access-entry" aria-labelledby="access-title">
       <header class="access-header">
-        <a class="access-brand" href="/login" aria-label="梧曜星枢首页">
-          <span class="access-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span><strong>梧曜星枢</strong><small>AI GROWTH OS</small></span>
+        <a class="access-brand" href="/login" aria-label="一方志首页">
+          <span class="access-mark" aria-hidden="true">志</span>
+          <span><strong>一方志</strong><small>为每一方商家立传</small></span>
         </a>
-        <div class="access-register">
-          <span>{{ isRegister ? '已有账号？' : '没有账号？' }}</span>
-          <button type="button" :disabled="actionBusy" @click="toggleRegistration">{{ isRegister ? '立即登录' : '立即注册' }}<ArrowUpRight :size="13" aria-hidden="true" /></button>
+        <div class="access-header-actions">
+          <div class="access-register">
+            <span>{{ isRegister ? '已有账号？' : '没有账号？' }}</span>
+            <button type="button" :disabled="actionBusy" @click="toggleRegistration">{{ isRegister ? '立即登录' : '立即注册' }}<ArrowUpRight :size="13" aria-hidden="true" /></button>
+          </div>
+          <button class="access-theme-toggle" type="button" :aria-label="theme.isLight ? '切换到深色模式' : '切换到浅色模式'" :title="theme.isLight ? '切换到深色模式' : '切换到浅色模式'" @click="theme.toggle()">
+            <component :is="theme.isLight ? Moon : Sun" :size="18" aria-hidden="true" />
+          </button>
         </div>
       </header>
       <div class="access-form-area">
         <div class="access-intro">
           <p class="access-kicker">{{ isRegister ? 'YOUR NEXT CHAPTER' : 'WELCOME BACK' }}<span /></p>
-          <h1 id="access-title">{{ isRegister ? '开启你的增长之旅' : '欢迎回到梧曜星枢' }}</h1>
-          <p>{{ isRegister ? '一个账号，连接灵感与增长的每一步。' : '连接你的灵感，让增长从这里发生。' }}</p>
+          <h1 id="access-title">{{ isRegister ? '从一方烟火开始' : '欢迎回到一方志' }}</h1>
+          <p>{{ isRegister ? '一个账号，记录门店的每一天。' : '记录一方水土，讲述万家故事。' }}</p>
         </div>
         <div v-if="!isRegister" class="access-tabs" role="tablist" aria-label="登录方式" @keydown="tabKeydown">
           <span class="access-tab-indicator" :class="{ 'is-password': activeTab === 'password' }" aria-hidden="true" />
@@ -191,14 +197,14 @@ function useSmsInstead() {
                       </select>
                       <span aria-hidden="true">{{ form.country }}<ChevronDown :size="13" /></span>
                     </div>
-                    <input id="login-phone" v-model="form.phone" class="focus:ring-2 focus:ring-blue-500" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="请输入手机号" :disabled="actionBusy" :aria-invalid="Boolean(errors.phone)" :aria-describedby="errors.phone ? 'phone-error' : undefined" @input="errors.phone = ''" @blur="form.phone && (errors.phone = phoneError(form.phone, form.country))" />
+                    <input id="login-phone" v-model="form.phone" class="focus:ring-2 focus:ring-brand-primary" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="请输入手机号" :disabled="actionBusy" :aria-invalid="Boolean(errors.phone)" :aria-describedby="errors.phone ? 'phone-error' : undefined" @input="errors.phone = ''" @blur="form.phone && (errors.phone = phoneError(form.phone, form.country))" />
                   </div>
                   <p v-if="errors.phone" id="phone-error" class="access-field-error">{{ errors.phone }}</p>
                 </div>
                 <div class="access-field">
                   <label for="login-code">短信验证码</label>
                   <div class="access-input-shell" :class="{ 'has-error': errors.code }">
-                    <input id="login-code" v-model="form.code" class="focus:ring-2 focus:ring-blue-500" name="code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="请输入 6 位验证码" :disabled="busy" :aria-invalid="Boolean(errors.code)" :aria-describedby="errors.code ? 'code-error' : undefined" @input="errors.code = ''" />
+                    <input id="login-code" v-model="form.code" class="focus:ring-2 focus:ring-brand-primary" name="code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="请输入 6 位验证码" :disabled="busy" :aria-invalid="Boolean(errors.code)" :aria-describedby="errors.code ? 'code-error' : undefined" @input="errors.code = ''" />
                     <button type="button" class="access-send" :disabled="actionBusy || auth.state.cooldown > 0" @click="sendCode">{{ sending ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}</button>
                   </div>
                   <p v-if="errors.code" id="code-error" class="access-field-error">{{ errors.code }}</p>
@@ -208,14 +214,14 @@ function useSmsInstead() {
                 <div class="access-field">
                   <label for="login-account">用户名 / 手机号</label>
                   <div class="access-input-shell" :class="{ 'has-error': errors.account }">
-                    <input id="login-account" v-model="form.account" class="focus:ring-2 focus:ring-blue-500" name="username" autocomplete="username" placeholder="请输入用户名或手机号" :disabled="busy" :aria-invalid="Boolean(errors.account)" :aria-describedby="errors.account ? 'account-error' : undefined" @input="errors.account = ''" />
+                    <input id="login-account" v-model="form.account" class="focus:ring-2 focus:ring-brand-primary" name="username" autocomplete="username" placeholder="请输入用户名或手机号" :disabled="busy" :aria-invalid="Boolean(errors.account)" :aria-describedby="errors.account ? 'account-error' : undefined" @input="errors.account = ''" />
                   </div>
                   <p v-if="errors.account" id="account-error" class="access-field-error">{{ errors.account }}</p>
                 </div>
                 <div class="access-field">
                   <div class="access-label-row"><label for="login-password">密码</label><button type="button" @click="openDialog('forgot')">忘记密码？</button></div>
                   <div class="access-input-shell" :class="{ 'has-error': errors.password }">
-                    <input id="login-password" v-model="form.password" class="focus:ring-2 focus:ring-blue-500" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="请输入 8–64 位密码" :disabled="busy" :aria-invalid="Boolean(errors.password)" :aria-describedby="errors.password ? 'password-error' : undefined" @input="errors.password = ''" />
+                    <input id="login-password" v-model="form.password" class="focus:ring-2 focus:ring-brand-primary" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="请输入 8–64 位密码" :disabled="busy" :aria-invalid="Boolean(errors.password)" :aria-describedby="errors.password ? 'password-error' : undefined" @input="errors.password = ''" />
                     <button class="access-eye" type="button" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><component :is="showPassword ? EyeOff : Eye" :size="18" aria-hidden="true" /></button>
                   </div>
                   <p v-if="errors.password" id="password-error" class="access-field-error">{{ errors.password }}</p>
@@ -244,28 +250,12 @@ function useSmsInstead() {
           <p v-if="errors.agreed" id="agreement-error" class="access-field-error" role="alert">{{ errors.agreed }}</p>
         </div>
       </div>
-      <footer class="access-footer"><ShieldCheck :size="14" aria-hidden="true" /><span>梧曜星枢 · 让每一次创作，成为增长的起点</span></footer>
+      <footer class="access-footer"><ShieldCheck :size="14" aria-hidden="true" /><span>一方志 · 为每一方商家立传</span></footer>
     </section>
-    <aside class="access-board hidden md:flex" aria-label="梧曜星枢 AI 增长操作系统">
-      <div class="access-board-grid" aria-hidden="true" />
-      <div class="access-board-top"><span><i /> 灵感有迹，增长有序</span><span class="access-board-index">WU YAO / 01</span></div>
-      <div class="access-board-content">
-        <div class="access-network" aria-hidden="true">
-          <div class="access-orbit orbit-outer" /><div class="access-orbit orbit-middle" /><div class="access-orbit orbit-inner" />
-          <div class="access-network-axis axis-horizontal" /><div class="access-network-axis axis-vertical" />
-          <svg class="access-connections" viewBox="0 0 520 370" fill="none"><path d="M108 112H176L260 185M412 115H347L260 185M260 185L337 278H403M260 185L182 278H110" stroke="#4987DB" stroke-opacity=".5" stroke-dasharray="4 6" /><circle cx="176" cy="112" r="3" fill="#83B7FF" /><circle cx="337" cy="278" r="3" fill="#83B7FF" /></svg>
-          <div class="access-core-halo" />
-          <div class="access-core"><span class="access-core-symbol"><i /><i /><i /></span><strong>星枢</strong><small>GROWTH ENGINE</small></div>
-          <div class="access-node node-inspiration"><span><Sparkles :size="18" /></span><div><strong>捕捉灵感</strong><small>INSPIRATION</small></div></div>
-          <div class="access-node node-content"><span><Workflow :size="18" /></span><div><strong>内容共创</strong><small>CREATION</small></div></div>
-          <div class="access-node node-growth"><span><ChartNoAxesCombined :size="18" /></span><div><strong>持续增长</strong><small>GROWTH</small></div></div>
-          <span class="access-orbit-dot dot-one" /><span class="access-orbit-dot dot-two" /><span class="access-orbit-dot dot-three" />
-          <span class="access-coordinate">IDEA → IMPACT</span>
-        </div>
-        <div class="access-board-copy"><p>从一个灵感，到每一次增长</p><h2>把灵感，变成<br /><span>可复用的增长节奏。</span></h2><p class="access-board-description">让品牌、内容与 AI 协同，<br class="access-tablet-break" />把每一个好想法，变成持续发生的行动。</p></div>
-        <div class="access-board-features"><span>品牌资产</span><i /><span>智能创作</span><i /><span>增长协同</span></div>
-      </div>
-      <div class="access-board-bottom"><span>YOUR IDEAS. CONNECTED.</span><span>梧曜星枢 <ArrowUpRight :size="13" /></span></div>
+    <aside class="access-board" aria-label="记录一方水土，讲述万家故事">
+      <div class="access-board-top"><span>一方志 —— 为每一方商家立传</span><span>商家故事 / 壹</span></div>
+      <div class="access-story"><div class="access-poem"><p>一方水土，一方志。</p><p>为每一方商家立传。</p></div><figure><img src="/images/publishing/restaurant.jpg" alt="暖灯下的街边小店，桌椅静候来客" /><figcaption>市井日常 · 每一间小店，都值得被看见</figcaption></figure></div>
+      <div class="access-board-bottom"><span>记录一方水土，讲述万家故事</span><span class="story-seal">志</span></div>
     </aside>
     <dialog ref="dialog" class="access-dialog" aria-labelledby="access-dialog-title" @click="event => event.target === dialog && dialog.close()">
       <button class="access-dialog-close" type="button" aria-label="关闭" @click="dialog.close()"><X :size="20" /></button>

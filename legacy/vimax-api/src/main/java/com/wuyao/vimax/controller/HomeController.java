@@ -20,7 +20,7 @@ public class HomeController {
     @GetMapping
     public ApiResponse<Map<String, Object>> home() {
         Map<String, Object> info = new HashMap<>();
-        info.put("name", "梧曜星枢 ViMax API");
+        info.put("name", "一方志 ViMax API");
         info.put("version", "0.0.1-SNAPSHOT");
         info.put("description", "企业级 AI 视频工作流改造项目");
         info.put("endpoints", Map.of(

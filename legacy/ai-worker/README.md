@@ -1,6 +1,6 @@
 # Python AI Worker
 
-梧曜星枢 ViMax AI 视频工作流执行器
+一方志 ViMax AI 视频工作流执行器
 
 ## 架构
 

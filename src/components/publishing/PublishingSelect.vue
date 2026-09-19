@@ -41,7 +41,8 @@ function position() {
   panel.value.dataset.side = upward ? 'top' : 'bottom'
 }
 function schedulePosition(event) {
-  if (event && panel.value?.contains(event.target)) return
+  // ResizeObserver supplies entries, while resize events target Window.
+  if (event?.target instanceof Node && panel.value?.contains(event.target)) return
   cancelAnimationFrame(frame)
   frame = requestAnimationFrame(position)
 }

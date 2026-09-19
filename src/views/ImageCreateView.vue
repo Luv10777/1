@@ -26,7 +26,7 @@ const workflow = computed(() => isProductSet.value ? {
   eyebrow: '营销海报 / 01',
   title: '营销海报',
   description: '把活动信息转成一张能被看懂、记住并行动的门店主视觉，适配小红书、朋友圈与线下物料。',
-  accent: 'violet',
+  accent: 'cinnabar',
   icon: '✦',
   ratios: ['3:4', '4:3', '9:16'],
   countLabel: '1 张 / 次',
@@ -48,7 +48,7 @@ const goGenerate = () => {
     </div>
 
     <section v-if="isLanding" class="workflow-grid">
-      <RouterLink to="/image/create/poster" class="workflow-card workflow-card-violet">
+      <RouterLink to="/image/create/poster" class="workflow-card workflow-card-cinnabar">
         <div class="workflow-card-copy"><h3>营销海报</h3><p>一键生成高转化率的节日促销、活动预热与品牌宣发视觉素材。</p><div class="workflow-tags"><span>活动主视觉</span><span>门店促销</span><span>社媒传播</span></div></div>
         <PhotoStack :images="['/images/marketing-poster-case-1.png', '/images/marketing-poster-case-2.png', '/images/marketing-poster-case-3.png']" alt="节日营销海报案例" />
       </RouterLink>
