@@ -62,7 +62,11 @@ public class AliyunSmsSender implements SmsSender {
             if (response == null || response.getStatusCode() == null || response.getStatusCode() != 200
                     || response.getBody() == null || !"OK".equals(response.getBody().getCode())) {
                 // 不输出供应商原始报文，其中可能包含手机号或请求参数。
-                log.warn("阿里云未受理验证码短信请求");
+                var body = response == null ? null : response.getBody();
+                log.warn("阿里云未受理验证码短信请求: httpStatus={} providerCode={} requestId={}",
+                        response == null ? null : response.getStatusCode(),
+                        diagnosticValue(body == null ? null : body.getCode()),
+                        diagnosticValue(body == null ? null : body.getRequestId()));
                 throw BizException.of(ErrorCode.SMS_SEND_FAILED, "短信发送失败，请稍后重试或联系管理员");
             }
         } catch (BizException e) {
@@ -71,5 +75,9 @@ public class AliyunSmsSender implements SmsSender {
             log.warn("阿里云短信调用失败，异常类型={}", e.getClass().getSimpleName());
             throw BizException.of(ErrorCode.SMS_SEND_FAILED, "短信发送暂未成功，请稍后重试");
         }
+    }
+
+    private static String diagnosticValue(String value) {
+        return value != null && value.matches("[A-Za-z0-9_.-]{1,100}") ? value : "unavailable";
     }
 }

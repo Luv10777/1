@@ -9,6 +9,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -17,6 +20,7 @@ import java.net.SocketTimeoutException;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AliyunSmsSenderTest {
     private final Client client = mock(Client.class);
     private final ObjectMapper json = new ObjectMapper();
@@ -90,5 +94,16 @@ class AliyunSmsSenderTest {
 
     private SendSmsResponse response(String code) {
         return new SendSmsResponse().setStatusCode(200).setBody(new SendSmsResponseBody().setCode(code));
+    }
+
+    @Test
+    void rejectionLogsDiagnosticIdentifiersWithoutRequestOrMessage(CapturedOutput output) throws Exception {
+        var rejected = response("isv.SMS_SIGNATURE_ILLEGAL");
+        rejected.getBody().setRequestId("request-123").setMessage("private-provider-message");
+        when(client.sendSmsWithOptions(any(), any())).thenReturn(rejected);
+        assertThatThrownBy(() -> sender.sendLoginCode("13800000001", "012345"))
+                .isInstanceOf(BizException.class);
+        assertThat(output.getOut()).contains("isv.SMS_SIGNATURE_ILLEGAL", "request-123")
+                .doesNotContain("13800000001", "012345", "private-provider-message");
     }
 }
