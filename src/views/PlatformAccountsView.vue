@@ -74,12 +74,12 @@ onBeforeUnmount(() => { clearInterval(clock); clearTimeout(noticeTimer) })
 </script>
 
 <template>
-  <section class="account-center-page min-h-full bg-bg-subtle p-8 font-sans text-brand-primary antialiased [font-family:Inter,-apple-system,BlinkMacSystemFont,'PingFang_SC','Segoe_UI',sans-serif]!  max-sm:p-4">
-    <div class="mx-auto max-w-[1500px]">
+  <section class="account-center-page min-h-full bg-bg-canvas font-sans text-brand-primary antialiased   ">
+    <div class="w-full">
       <header class="mb-7 flex flex-wrap items-start justify-between gap-5">
         <div>
           <div class="mb-3 flex items-center gap-2 text-xs font-medium text-brand-muted"><span>全网发布</span><span>/</span><span class="text-brand-accent-ink">账号授权中心</span></div>
-          <h1 class="m-0 text-[28px] font-semibold tracking-tight text-brand-primary">账号矩阵</h1>
+          <h1 class="m-0 font-serif text-[28px] font-semibold tracking-normal text-brand-primary">账号矩阵</h1>
           <p class="mb-0 mt-2 text-sm leading-6 text-brand-muted">统一管理多端社交媒体与本地生活账号授权，保障 AI 自动分发链路畅通</p>
         </div>
         <button :class="[primaryButton, 'mt-6 max-sm:mt-0']" @click="openConnect()"><Plus :size="17" />绑定互通</button>
@@ -139,7 +139,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearTimeout(noticeTimer) })
     <AccountConnectModal :open="isConnectModalOpen" :initial-platform="connectPlatform" :account="renewingAccount" @close="isConnectModalOpen = false" @complete="connect" />
     <div class="fixed bottom-8 left-1/2 z-[100] max-w-[90vw] -translate-x-1/2" role="status" aria-live="polite"><div v-if="notice" class="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm text-white shadow-xl"><CheckCircle2 :size="17" class="shrink-0 text-emerald-400" />{{ notice }}</div></div>
 
-    <Dialog :open="!!inspectedAccount || !!disconnectAccount" class="relative z-[80] font-sans text-brand-primary [font-family:Inter,-apple-system,BlinkMacSystemFont,'PingFang_SC','Segoe_UI',sans-serif] " @close="inspectedAccount = null; disconnectAccount = null">
+    <Dialog :open="!!inspectedAccount || !!disconnectAccount" class="relative z-[80] font-sans text-brand-primary  " @close="inspectedAccount = null; disconnectAccount = null">
       <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" /><div class="fixed inset-0 flex items-center justify-center overflow-y-auto p-4">
         <DialogPanel class="w-full max-w-md rounded-md bg-bg-surface p-6 shadow-paper-elevated">
           <template v-if="inspectedAccount">

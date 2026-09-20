@@ -119,32 +119,34 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         </div>
       </div>
 
-      <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[format === '9:16' ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">
-        <div class="device-static-border" :class="format === '9:16' ? 'is-phone-border' : 'is-browser-border'" aria-hidden="true" />
+      <div class="video-device-stage">
+        <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[format === '9:16' ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">
+          <div class="device-static-border" :class="format === '9:16' ? 'is-phone-border' : 'is-browser-border'" aria-hidden="true" />
 
-        <div class="device-screen relative z-10 w-full h-full bg-[#0A0A0B] flex flex-col justify-center items-center overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="format === '9:16' ? 'rounded-[calc(2.5rem-2px)]' : 'rounded-[calc(0.75rem-2px)]'">
-          <div class="device-phone-ui absolute inset-0 pointer-events-none transition-opacity duration-500" :class="format === '9:16' ? 'is-visible' : 'is-hidden'">
-            <div class="device-island absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full shadow-[inset_0_-1px_2px_rgba(255,255,255,0.1)] z-30" />
-            <div class="device-home absolute bottom-3 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-white/20 rounded-full z-30" />
-          </div>
+          <div class="device-screen relative z-10 w-full h-full bg-[#0A0A0B] flex flex-col justify-center items-center overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="format === '9:16' ? 'rounded-[calc(2.5rem-2px)]' : 'rounded-[calc(0.75rem-2px)]'">
+            <div class="device-phone-ui absolute inset-0 pointer-events-none transition-opacity duration-500" :class="format === '9:16' ? 'is-visible' : 'is-hidden'">
+              <div class="device-island absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full shadow-[inset_0_-1px_2px_rgba(255,255,255,0.1)] z-30" />
+              <div class="device-home absolute bottom-3 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-white/20 rounded-full z-30" />
+            </div>
 
-          <div class="device-mac-ui absolute top-0 left-0 w-full h-10 bg-white/[0.02] border-b border-white/5 flex items-center px-4 gap-1.5 pointer-events-none z-30 transition-opacity duration-500" :class="format === '16:9' ? 'is-visible' : 'is-hidden'">
-            <div class="device-dot device-dot-red w-2.5 h-2.5 rounded-full" />
-            <div class="device-dot device-dot-yellow w-2.5 h-2.5 rounded-full" />
-            <div class="device-dot device-dot-green w-2.5 h-2.5 rounded-full" />
-          </div>
+            <div class="device-mac-ui absolute top-0 left-0 w-full h-10 bg-white/[0.02] border-b border-white/5 flex items-center px-4 gap-1.5 pointer-events-none z-30 transition-opacity duration-500" :class="format === '16:9' ? 'is-visible' : 'is-hidden'">
+              <div class="device-dot device-dot-red w-2.5 h-2.5 rounded-full" />
+              <div class="device-dot device-dot-yellow w-2.5 h-2.5 rounded-full" />
+              <div class="device-dot device-dot-green w-2.5 h-2.5 rounded-full" />
+            </div>
 
-          <div class="device-state-content relative z-20 flex flex-col items-center gap-4 mt-8">
-            <span class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
-              <svg v-if="!isGenerating" class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
-              <svg v-else class="w-12 h-12 device-loading-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
-            </span>
-            <div class="device-copy text-center space-y-2">
-              <Transition name="device-state" mode="out-in">
-                <strong v-if="isGenerating" key="loading" class="text-lg font-medium text-gray-200 tracking-wide"><span>✨ 方志编撰中...</span></strong>
-                <strong v-else key="idle" class="text-lg font-medium text-gray-200 tracking-wide"><span>你的故事将在这里成片</span></strong>
-              </Transition>
-              <p class="text-xs text-gray-500 transition-opacity duration-300" :class="isGenerating ? 'opacity-0' : 'opacity-100'">添加素材并描述需求，开始生成</p>
+            <div class="device-state-content relative z-20 flex flex-col items-center gap-4 mt-8">
+              <span class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
+                <svg v-if="!isGenerating" class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
+                <svg v-else class="w-12 h-12 device-loading-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+              </span>
+              <div class="device-copy text-center space-y-2">
+                <Transition name="device-state" mode="out-in">
+                  <strong v-if="isGenerating" key="loading" class="text-lg font-medium text-gray-200 tracking-wide"><span>✨ 方志编撰中...</span></strong>
+                  <strong v-else key="idle" class="text-lg font-medium text-gray-200 tracking-wide"><span>你的故事将在这里成片</span></strong>
+                </Transition>
+                <p class="text-xs text-gray-500 transition-opacity duration-300" :class="isGenerating ? 'opacity-0' : 'opacity-100'">添加素材并描述需求，开始生成</p>
+              </div>
             </div>
           </div>
         </div>
