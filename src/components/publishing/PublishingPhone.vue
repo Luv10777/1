@@ -83,37 +83,39 @@ defineExpose({ captureFrame, toggleMusic })
 </script>
 
 <template>
-  <div ref="previewStage" class="phone-wrap pub-video-stage" :style="{ '--phone-width': phoneSize.width + 'px', '--phone-height': phoneSize.height + 'px' }">
+  <div ref="previewStage" class="phone-wrap pub-video-stage" :style="{ '--phone-width': phoneSize.width + 'px', '--phone-height': phoneSize.height + 'px', '--phone-scale': phoneSize.width / 320 }">
     <audio v-if="music" :key="music.url" ref="soundtrack" :src="music.url" preload="auto" loop @loadedmetadata="syncMusic" @timeupdate="soundtrack.currentTime < musicStart && (soundtrack.currentTime = musicStart)" @play="musicActive = true; emit('music-playing', true)" @pause="musicActive = false; emit('music-playing', false)" @error="musicError" />
-    <div class="phone">
-      <div class="phone-island" />
-      <div class="phone-screen pub-video-screen">
-        <div class="pub-device-status" aria-hidden="true"><span>9:41</span><span>5G ▮▮▮</span></div>
-        <div class="platform-preview-title" :class="{ 'is-redbook': previewPlatform === '小红书' }"><span>{{ previewPlatform === '抖音' ? '关注 · 推荐' : previewPlatform === '小红书' ? '关注 · 发现 · 同城' : '朋友 · 关注 · 推荐' }}</span><b>{{ previewPlatform }}</b></div>
-        <div class="pub-video-canvas">
-          <video v-if="videoUrl && !playbackError" :key="videoUrl" ref="player" :src="videoUrl" class="pub-preview-video" aria-label="作品视频预览" controls playsinline preload="auto" @loadedmetadata="player.volume = originalVolume / 100" @playing="videoPlaying" @pause="pauseMusic" @waiting="pauseMusic" @seeking="pauseMusic" @seeked="syncMusic(); !player.paused && playMusic()" @ratechange="soundtrack && (soundtrack.playbackRate = player.playbackRate)" @ended="pauseMusic" @error="onPlaybackError" />
-          <img v-else-if="currentPicture" :src="currentPicture.url" :alt="currentPicture.name" class="pub-preview-picture" />
-          <div v-else class="pub-video-empty">
-            <component :is="mediaType === 'image' ? Images : Video" :size="32" :stroke-width="1.5" />
-            <strong>{{ playbackError ? '视频暂时无法播放' : '在这里预览你的作品' }}</strong>
-            <p>{{ mediaType === 'image' ? '添加图片，预览图文效果。' : '添加视频，预览完整画面。' }}</p>
-            <button type="button" :disabled="uploading" @click="emit('upload')"><Upload :size="15" />{{ uploading ? '正在读取…' : '本地上传' }}</button>
-            <button type="button" class="pub-phone-library" :disabled="uploading" @click="emit('library')"><FolderOpen :size="15" />从素材库选择</button>
-          </div>
-          <div v-if="hasMedia && !playbackError && showOverlay" class="pub-platform-overlay" aria-label="平台发布效果示意">
-            <div class="pub-overlay-copy">
-              <b>@{{ currentAccount?.name }}</b>
-              <p>{{ previewPlatform === '小红书' ? title : displayBody }}</p>
-              <span><MapPin :size="12" />{{ poi }}</span>
+    <div class="pub-phone-fit">
+      <div class="phone">
+        <div class="phone-island" />
+        <div class="phone-screen pub-video-screen">
+          <div class="pub-device-status" aria-hidden="true"><span>9:41</span><span>5G ▮▮▮</span></div>
+          <div class="platform-preview-title" :class="{ 'is-redbook': previewPlatform === '小红书' }"><span>{{ previewPlatform === '抖音' ? '关注 · 推荐' : previewPlatform === '小红书' ? '关注 · 发现 · 同城' : '朋友 · 关注 · 推荐' }}</span><b>{{ previewPlatform }}</b></div>
+          <div class="pub-video-canvas">
+            <video v-if="videoUrl && !playbackError" :key="videoUrl" ref="player" :src="videoUrl" class="pub-preview-video" aria-label="作品视频预览" controls playsinline preload="auto" @loadedmetadata="player.volume = originalVolume / 100" @playing="videoPlaying" @pause="pauseMusic" @waiting="pauseMusic" @seeking="pauseMusic" @seeked="syncMusic(); !player.paused && playMusic()" @ratechange="soundtrack && (soundtrack.playbackRate = player.playbackRate)" @ended="pauseMusic" @error="onPlaybackError" />
+            <img v-else-if="currentPicture" :src="currentPicture.url" :alt="currentPicture.name" class="pub-preview-picture" />
+            <div v-else class="pub-video-empty">
+              <component :is="mediaType === 'image' ? Images : Video" :size="32" :stroke-width="1.5" />
+              <strong>{{ playbackError ? '视频暂时无法播放' : '在这里预览你的作品' }}</strong>
+              <p>{{ mediaType === 'image' ? '添加图片，预览图文效果。' : '添加视频，预览完整画面。' }}</p>
+              <button type="button" :disabled="uploading" @click="emit('upload')"><Upload :size="15" />{{ uploading ? '正在读取…' : '本地上传' }}</button>
+              <button type="button" class="pub-phone-library" :disabled="uploading" @click="emit('library')"><FolderOpen :size="15" />从素材库选择</button>
             </div>
-            <div class="pub-overlay-actions" aria-hidden="true"><Heart :size="20" /><MessageCircle :size="20" /></div>
+            <div v-if="hasMedia && !playbackError && showOverlay" class="pub-platform-overlay" aria-label="平台发布效果示意">
+              <div class="pub-overlay-copy">
+                <b>@{{ currentAccount?.name }}</b>
+                <p>{{ previewPlatform === '小红书' ? title : displayBody }}</p>
+                <span><MapPin :size="12" />{{ poi }}</span>
+              </div>
+              <div class="pub-overlay-actions" aria-hidden="true"><Heart :size="20" /><MessageCircle :size="20" /></div>
+            </div>
           </div>
-        </div>
-        <div v-if="pictures.length" class="pub-image-pager"><button aria-label="上一张图片" :disabled="pictureIndex === 0" @click="emit('picture-change', pictureIndex - 1)"><ChevronLeft :size="16" /></button><span>{{ pictureIndex + 1 }} / {{ pictures.length }}</span><button aria-label="下一张图片" :disabled="pictureIndex >= pictures.length - 1" @click="emit('picture-change', pictureIndex + 1)"><ChevronRight :size="16" /></button></div>
-        <div v-if="music" class="pub-phone-music"><Music2 :size="12" /><span>{{ music.name }}</span><span v-if="musicActive" class="pub-music-playing">播放中</span></div>
-        <div class="pub-device-toolbar">
-          <span>{{ showOverlay ? '发布效果' : mediaType === 'image' ? '图文预览' : '原片预览' }}</span>
-          <button type="button" :disabled="!hasMedia || playbackError" :aria-pressed="showOverlay" @click="showOverlay = !showOverlay">{{ showOverlay ? '隐藏平台信息' : '显示平台信息' }}</button>
+          <div v-if="pictures.length" class="pub-image-pager"><button aria-label="上一张图片" :disabled="pictureIndex === 0" @click="emit('picture-change', pictureIndex - 1)"><ChevronLeft :size="16" /></button><span>{{ pictureIndex + 1 }} / {{ pictures.length }}</span><button aria-label="下一张图片" :disabled="pictureIndex >= pictures.length - 1" @click="emit('picture-change', pictureIndex + 1)"><ChevronRight :size="16" /></button></div>
+          <div v-if="music" class="pub-phone-music"><Music2 :size="12" /><span>{{ music.name }}</span><span v-if="musicActive" class="pub-music-playing">播放中</span></div>
+          <div class="pub-device-toolbar">
+            <span>{{ showOverlay ? '发布效果' : mediaType === 'image' ? '图文预览' : '原片预览' }}</span>
+            <button type="button" :disabled="!hasMedia || playbackError" :aria-pressed="showOverlay" @click="showOverlay = !showOverlay">{{ showOverlay ? '隐藏平台信息' : '显示平台信息' }}</button>
+          </div>
         </div>
       </div>
     </div>

@@ -108,6 +108,9 @@ const switchWorkspace = (path) => {
 <template>
   <section class="product-set-studio" aria-label="产品套图工作区">
     <aside class="product-control-panel">
+      <header class="product-panel-head">
+        <h1>产品套图</h1><p>从一件好物，写起门店的故事。</p>
+      </header>
       <div class="product-mode-tabs" role="tablist" aria-label="生成模式">
         <button type="button" role="tab" :aria-selected="mode === 'single'" :class="{ active: mode === 'single' }" @click="mode = 'single'">单次生成</button>
         <button type="button" role="tab" :aria-selected="mode === 'batch'" :class="{ active: mode === 'batch' }" @click="mode = 'batch'">批量生成</button>
@@ -116,9 +119,9 @@ const switchWorkspace = (path) => {
       <div class="product-form-scroll">
         <section class="product-form-section">
           <div class="product-section-label"><strong>上传商品图</strong><small>{{ uploadedFiles.length ? `已选择 ${uploadedFiles.length} 张` : '最多 6 张' }}</small></div>
-          <label class="product-upload-zone" @dragover.prevent @drop.prevent="onFile">
+          <label class="product-upload-zone" tabindex="0" @keydown.enter.prevent="openFilePicker" @keydown.space.prevent="openFilePicker" @dragover.prevent @drop.prevent="onFile">
             <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" multiple @change="onFile" />
-            <span class="product-upload-icon">＋</span>
+            <span class="product-upload-icon material-symbols-outlined" aria-hidden="true">add_photo_alternate</span>
             <strong>{{ uploadedFiles.length ? `已上传 ${uploadedFiles.length} 张商品图` : '上传清晰的商品图' }}</strong>
             <small>支持 JPG、PNG、WEBP，建议大于 1000px</small>
             <span class="product-upload-action" @click.prevent="openFilePicker">从本地选择</span>
@@ -157,17 +160,20 @@ const switchWorkspace = (path) => {
       </div>
 
       <footer class="product-control-footer">
+        <p class="product-demo-note">演示模式 · 生成服务尚未接通</p>
         <div class="product-save-line"><span>保存到</span><strong>作品库</strong><button type="button" aria-label="修改保存位置">修改</button></div>
         <div class="product-footer-actions"><button type="button" class="product-reset" @click="reset">重置</button><button type="button" class="product-generate" :class="{ ready: uploadedFiles.length }" @click="generate">立即生成 <span>→</span></button></div>
-        <p v-if="generated" class="product-generated-note"><i /> 已加入生成队列，可在作品库查看</p>
+        <p v-if="generated" class="product-generated-note" role="status">已记录本次配置；尚未提交生成任务。</p>
       </footer>
     </aside>
 
     <div class="product-showcase">
-      <div class="image-workspace-switch video-mode-switch" role="group" aria-label="切换图片工作区"><button type="button" @click="switchWorkspace('/image/create/poster')"><span class="material-symbols-outlined">campaign</span>营销海报</button><button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/image/create/product-set')"><span class="material-symbols-outlined">grid_view</span>产品套图</button></div>
-      <div class="product-showcase-glow" />
-      <div class="product-showcase-copy"><h2>上传商品，轻松生成商品图</h2></div>
+      <div class="product-showcase-head">
+        <div class="product-showcase-copy"><h2>让一件好物，有自己的故事。</h2><p>上传商品照片，将主图、细节与场景，编成一组有温度的画面。</p></div>
+        <div class="image-workspace-switch video-mode-switch" role="group" aria-label="切换图片工作区"><button type="button" @click="switchWorkspace('/image/create/poster')"><span class="material-symbols-outlined">campaign</span>营销海报</button><button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/image/create/product-set')"><span class="material-symbols-outlined">grid_view</span>产品套图</button></div>
+      </div>
       <div class="product-wall" aria-hidden="true"><div v-for="(column, columnIndex) in wallColumns" :key="columnIndex" class="product-wall-column" :class="`product-wall-column-${columnIndex + 1}`"><img v-for="(image, index) in column" :key="`${columnIndex}-${index}`" :src="image" alt="" /></div></div>
+      <footer class="product-showcase-footer"><img src="/images/brand/yifangzhi-mark.png" alt="" /><span>为每一方商家立传</span><small>一物 · 一景 · 一方志</small></footer>
     </div>
   </section>
 </template>

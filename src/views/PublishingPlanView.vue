@@ -189,9 +189,9 @@ function nextLabel(plan) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-bg-subtle p-8 font-sans text-brand-primary antialiased [font-family:Inter,-apple-system,BlinkMacSystemFont,'PingFang_SC','Segoe_UI',sans-serif] max-sm:p-4 [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-brand-primary">
+  <div class="publishing-plan-page min-h-full bg-bg-canvas font-sans text-brand-primary antialiased   [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-brand-primary">
     <header class="mb-7 flex flex-wrap items-center justify-between gap-5">
-      <div><h1 class="m-0 text-[26px] font-semibold tracking-tight text-brand-primary max-sm:text-xl">发布计划 <span class="mx-1 font-normal text-brand-muted">/</span> 自动分发引擎</h1><p class="mb-0 mt-3 text-xs leading-6 text-brand-muted">基于本地生活商圈流量波段，自动化执行作品分发任务，支持智能错峰防重</p></div>
+      <div><h1 class="m-0 font-serif text-[26px] font-semibold tracking-normal text-brand-primary max-sm:text-xl">发布计划 <span class="mx-1 font-normal text-brand-muted">/</span> 自动分发引擎</h1><p class="mb-0 mt-3 text-xs leading-6 text-brand-muted">基于本地生活商圈流量波段，自动化执行作品分发任务，支持智能错峰防重</p></div>
       <button :class="primary" @click="openPlan()"><Plus :size="17" />新增发布计划</button>
     </header>
     <div v-if="storageWarning" role="alert" class="mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">{{ storageWarning }}</div>

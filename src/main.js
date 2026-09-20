@@ -18,6 +18,7 @@ import './studio.css'
 import './live-studio.css'
 import './publishing.css'
 import './brand.css'
+import './publishing-workspace.css'
 
 theme.apply()
 

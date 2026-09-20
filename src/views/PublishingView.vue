@@ -42,6 +42,11 @@ import {
 
 const activePlatform = ref("抖音");
 const studioStep = ref(0);
+const mediaPanel = ref('assets');
+const editorPanel = ref('copy');
+const previewLayout = ref('phone');
+const mediaPanels = [{ id: 'assets', label: '作品素材' }, { id: 'music', label: '背景音乐' }, { id: 'features', label: '店铺特征' }];
+const editorPanels = [{ id: 'copy', label: '文案编辑' }, { id: 'accounts', label: '平台账号' }, { id: 'local', label: '门店挂载' }, { id: 'strategy', label: '发布策略' }];
 const copyVersion = ref('烟火日常');
 const copyVariants = ['烟火日常', '匠心手艺', '市井趣味'];
 function selectCopyVersion(version) {
@@ -430,10 +435,11 @@ onBeforeUnmount(() => {
       <div class="pub-header-left">
         <div class="pub-title-block">
           <h1 class="text-xl font-bold tracking-tight">
-            内容刊印 <span class="title-slash">/</span> 把烟火带到更远的地方
+            内容发布
           </h1>
         </div>
       </div>
+      <p class="studio-demo-note">演示工作台 · 发布仅预演，不会向真实平台发送。</p>
     </header>
 
     <div v-if="notice" class="toast" role="status">
@@ -450,11 +456,11 @@ onBeforeUnmount(() => {
     <input ref="imageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden @change="uploadPictures" />
     <input ref="musicInput" type="file" accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/aac,.mp3,.wav,.m4a,.ogg,.aac" hidden @change="uploadMusic" />
     <PublishingAssetPicker ref="assetPicker" :kind="pickerKind" :limit="pickerLimit" :busy="libraryBusy" :error="libraryError" @select="chooseLibrary" />
-    <p class="studio-demo-note">演示工作台 · 文案为本地示例，发布仅预演；不会向真实平台发送。</p>
     <nav class="studio-mobile-steps" aria-label="刊印步骤"><button v-for="(label, index) in ['素材', '文案与挂载', '预览']" :key="label" :aria-current="studioStep === index ? 'step' : undefined" @click="studioStep = index">0{{ index + 1 }} {{ label }}</button></nav>
     <main class="pub-grid">
       <section class="studio-upload-column" tabindex="0" aria-label="素材上传区">
-        <div class="pub-section asset-section" :aria-busy="mediaBusy" @dragover.prevent @drop.prevent="dropMedia">
+        <nav class="pub-column-tabs" aria-label="素材设置"><button v-for="panel in mediaPanels" :key="panel.id" type="button" :aria-pressed="mediaPanel === panel.id" @click="mediaPanel = panel.id">{{ panel.label }}</button></nav>
+        <div v-show="mediaPanel === 'assets'" class="pub-section asset-section" :aria-busy="mediaBusy" @dragover.prevent @drop.prevent="dropMedia">
           <div class="section-heading">
             <div>
               <h2 class="flex items-center gap-2"><Images :size="18" aria-hidden="true" />作品核心素材</h2>
@@ -475,7 +481,6 @@ onBeforeUnmount(() => {
           <div v-if="!hasMedia" class="pub-upload-zone pub-upload-empty">
             <component :is="mediaType === 'video' ? Video : Images" :size="26" /><strong>{{ mediaType === 'video' ? '拖入作品视频' : '拖入作品图片' }}</strong>
             <span>{{ mediaType === 'video' ? 'MP4 / MOV / WebM · 最大 500 MB' : `JPG / PNG / WebP · 单张 20 MB · 最多 ${IMAGE_LIMIT} 张` }}</span>
-            <div class="asset-actions"><button :disabled="mediaBusy" @click="uploadLocal"><Upload :size="14" />本地上传</button><button :disabled="mediaBusy" @click="openLibrary()"><FolderOpen :size="14" />从素材库选择</button></div>
           </div>
           <div v-else-if="mediaType === 'video'" class="pub-video-file">
             <Video :size="24" /><div>
@@ -505,7 +510,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="pub-section pub-music-section">
+        <div v-show="mediaPanel === 'music'" class="pub-section pub-music-section">
           <div class="section-heading"><div><h2 class="flex items-center gap-2"><Music2 :size="18" />背景音乐</h2><p>视频与图文均可配乐</p></div><span class="selection-count">可选</span></div>
           <div class="asset-actions"><button :disabled="mediaBusy" @click="musicInput?.click()"><Upload :size="14" />上传音乐</button><button :disabled="mediaBusy" @click="openLibrary('audio')"><FolderOpen :size="14" />素材库音乐</button></div>
           <p v-if="attachmentsError" class="pub-error" role="alert">{{ attachmentsError }}</p>
@@ -516,10 +521,11 @@ onBeforeUnmount(() => {
           <p class="pub-music-note">使用自有或已获授权的音频。平台曲库与发布混音尚未接入，当前可在此试听效果。</p>
         </div>
 
-        <div class="feature-tags pub-section"><h2>AI 店铺特征</h2><p>识别服务待接入。上传素材后，可先手动标注门店特征。</p><label>特征标签<input class="pub-input" placeholder="例如：街边小馆、炭火、手作" /></label></div>
+        <div v-show="mediaPanel === 'features'" class="feature-tags pub-section"><h2>AI 店铺特征</h2><p>识别服务待接入。上传素材后，可先手动标注门店特征。</p><label>特征标签<input class="pub-input" placeholder="例如：街边小馆、炭火、手作" /></label></div>
       </section>
       <section class="editor-column" tabindex="0" aria-label="文案与本地化挂载">
-        <div class="pub-section platform-section">
+        <nav class="pub-column-tabs" aria-label="发布设置"><button v-for="panel in editorPanels" :key="panel.id" type="button" :aria-pressed="editorPanel === panel.id" @click="editorPanel = panel.id">{{ panel.label }}<small v-if="panel.id === 'accounts'">{{ selectedAccounts.length }}</small></button></nav>
+        <div v-show="editorPanel === 'accounts'" class="pub-section platform-section">
           <div class="section-heading">
             <div>
               <h2 class="flex items-center gap-2">
@@ -584,7 +590,7 @@ onBeforeUnmount(() => {
           <p v-if="!activeAccounts.length" class="pub-music-note">此平台暂无具备发布权限的账号，<RouterLink to="/publishing/platforms">前往关联平台管理绑定或续期</RouterLink>。</p>
         </div>
 
-        <div class="pub-section copy-section">
+        <div v-show="editorPanel === 'copy'" class="pub-section copy-section">
           <div class="section-heading">
             <div>
               <h2 class="flex items-center gap-2">
@@ -617,10 +623,10 @@ onBeforeUnmount(() => {
               <LoaderCircle v-if="aiBusy === '生成正文描述'" class="pub-loading" :size="14" /><WandSparkles v-else :size="14" />{{ aiBusy === '生成正文描述' ? '生成中…' : 'AI 智能生成' }}
             </button>
           </div><textarea id="body" v-model="body" :readonly="aiBusy === '生成正文描述'" class="pub-textarea" rows="4" />
-          <div class="ai-toolbar">
-            <div class="ai-toolbar-head">
+          <details class="ai-toolbar">
+            <summary class="ai-toolbar-head">
               <span><WandSparkles :size="15" /> AI 提效工具</span><small>本地演示 · 未连接 AI 服务</small>
-            </div>
+            </summary>
             <div class="ai-actions" :aria-busy="!!aiBusy">
               <button :disabled="!!aiBusy" @click="runAction('AI 扩写 / 润色')">
                 AI 扩写 / 润色
@@ -635,15 +641,17 @@ onBeforeUnmount(() => {
                 爆款文案去重
               </button>
             </div>
-          </div>
-          <div class="tag-library">
-            <span>快捷标签</span><button v-for="tag in tags" :key="tag" @click="addTag(tag)">
-              {{ tag }} <Plus :size="11" />
-            </button>
-          </div>
+          </details>
+          <details class="pub-tag-details">
+            <summary>快捷标签 <small>{{ tags.length }} 个可用</small></summary><div class="tag-library">
+              <button v-for="tag in tags" :key="tag" @click="addTag(tag)">
+                {{ tag }} <Plus :size="11" />
+              </button>
+            </div>
+          </details>
         </div>
 
-        <div class="pub-section local-section">
+        <div v-show="editorPanel === 'local'" class="pub-section local-section">
           <div class="section-heading">
             <div>
               <h2 class="flex items-center gap-2">
@@ -674,7 +682,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="pub-section strategy-section">
+        <div v-show="editorPanel === 'strategy'" class="pub-section strategy-section">
           <div class="section-heading">
             <div>
               <h2 class="flex items-center gap-2">
@@ -722,8 +730,10 @@ onBeforeUnmount(() => {
               </button><button :class="{ active: previewPlatform === '视频号' }" @click="previewPlatform = '视频号'">视频号</button>
             </div>
           </div>
-          <div v-if="previewPlatform === '小红书'" class="xhs-feed" aria-label="小红书双列封面预览"><article v-for="(picture, index) in (pictures.length ? pictures.slice(0, 4) : cover ? [{ url: cover, name: title }] : [])" :key="picture.url"><img :src="picture.url" :alt="picture.name || title" /><strong>{{ title || '封面标题' }}</strong><small>{{ currentAccount?.name || '门店账号' }} · {{ index + 1 }}</small></article><p v-if="!pictures.length && !cover">上传图片或设置视频封面，即可查看双列信息流效果。</p></div>
+          <div v-if="previewPlatform === '小红书'" class="pub-preview-layout" aria-label="小红书预览方式"><button type="button" :aria-pressed="previewLayout === 'phone'" @click="previewLayout = 'phone'">手机预览</button><button type="button" :aria-pressed="previewLayout === 'feed'" @click="previewLayout = 'feed'">双列信息流</button></div>
+          <div v-if="previewPlatform === '小红书' && previewLayout === 'feed'" class="xhs-feed" aria-label="小红书双列封面预览"><article v-for="(picture, index) in (pictures.length ? pictures.slice(0, 4) : cover ? [{ url: cover, name: title }] : [])" :key="picture.url"><img :src="picture.url" :alt="picture.name || title" /><strong>{{ title || '封面标题' }}</strong><small>{{ currentAccount?.name || '门店账号' }} · {{ index + 1 }}</small></article><p v-if="!pictures.length && !cover">上传图片或设置视频封面，即可查看双列信息流效果。</p></div>
           <PublishingPhone
+            v-show="previewPlatform !== '小红书' || previewLayout === 'phone'"
             ref="phonePreview"
             :video-url="mediaType === 'video' ? videoUrl : ''"
             :pictures="mediaType === 'image' ? pictures : []"

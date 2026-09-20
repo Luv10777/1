@@ -55,7 +55,7 @@ const goGenerate = () => {
 
       <RouterLink to="/image/create/product-set" class="workflow-card workflow-card-cyan">
         <div class="workflow-card-copy"><h3>产品套图</h3><p>基于商品图，批量生成统一风格的电商主图、详情页配图与使用场景图。</p><div class="workflow-tags"><span>主图与细节</span><span>场景氛围</span><span>多尺寸输出</span></div></div>
-        <PhotoStack class="product-stack" :images="['/images/product-set-case-1.png', '/images/product-set-case-2.png', '/images/product-set-case-3.png']" alt="产品套图案例" label="产品套图案例组图" />
+        <PhotoStack class="product-stack" :images="['/images/marketing-poster-case-3.png', '/images/publishing/restaurant.jpg', '/images/marketing-poster-case-2.png']" alt="产品套图视觉参考" label="产品套图视觉参考" />
       </RouterLink>
     </section>
 
