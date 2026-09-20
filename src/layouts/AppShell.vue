@@ -13,7 +13,7 @@ const accountOpen = ref(false)
 const searchOpen = ref(false)
 const search = ref('')
 const pageScroll = ref(null)
-const edgeWorkspace = computed(() => ['image-create-product-set', 'video-workbench', 'assets'].includes(route.name))
+const edgeWorkspace = computed(() => ['image-create-product-set', 'video-workbench', 'assets', 'messages'].includes(route.name))
 const keyboard = (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); searchOpen.value = true }
   if (event.key === 'Escape') { searchOpen.value = false; menuOpen.value = false; accountOpen.value = false }

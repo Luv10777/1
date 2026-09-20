@@ -23,3 +23,4 @@ import './publishing-workspace.css'
 theme.apply()
 
 createApp(App).use(router).mount('#app')
+
