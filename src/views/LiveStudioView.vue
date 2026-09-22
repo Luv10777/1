@@ -1,9 +1,11 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 /* ---------------- 全局阶段：配置 → 开播引导 → 监控台 → 复盘 ---------------- */
 const stage = ref('setup') // setup | live | review
+const route = useRoute()
 const steps = [
   { key: 'voice', index: '01', label: '人设与声音' },
   { key: 'script', index: '02', label: '话术与知识库' },
@@ -199,6 +201,13 @@ const libraryProducts = [
 ]
 const pickedProduct = ref('p1')
 const manualProduct = ref({ name: '', price: '', points: '' })
+onMounted(() => {
+  if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) {
+    productSource.value = 'manual'
+    manualProduct.value.points = route.query.prompt
+    editingConfig.value = true
+  }
+})
 
 const toneGroups = [
   { key: 'opening', label: '开场', options: ['门店实景寒暄', '直接报价', '悬念提问'] },
@@ -730,7 +739,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearInterval(recordTimer); clearT
           <article class="panel ls-chart-card">
             <div class="panel-heading"><div><p class="eyebrow">观看人数</p><h3>{{ viewers }}<small> 人在线</small></h3></div></div>
             <svg class="ls-spark" viewBox="0 0 100 36" preserveAspectRatio="none" role="img" aria-label="观看人数曲线">
-              <polyline :points="trendPath" fill="none" stroke="var(--violet-bright)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+              <polyline :points="trendPath" fill="none" stroke="var(--cinnabar-bright)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
             </svg>
             <p class="ls-chart-foot mono">近 24 分钟趋势</p>
           </article>

@@ -47,8 +47,8 @@ const emit = defineEmits(['confirm', 'cancel'])
 }
 
 .dialog-content {
-  background: rgba(20, 20, 30, 0.95);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(30,22,20, 0.95);
+  border: 1px solid rgba(195,154,143, 0.2);
   border-radius: 12px;
   padding: 24px;
   max-width: 420px;

@@ -1,49 +1,37 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { auth } from '../stores/auth'
+import { selectedStore, stores } from '../stores/merchantContext'
 
-const selectedStore = ref('青岚茶事 · 杭州城西店')
-const route = useRoute()
-const stores = ['青岚茶事 · 杭州城西店', '青岚茶事 · 湖滨店', '山止咖啡 · 黄龙店']
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 12) return '早上好'
-  if (hour < 18) return '下午好'
-  return '晚上好'
-})
-
-const metrics = [
-  { label: '本周内容产出', value: '38', unit: '条', delta: '+18.4%', note: '较上周', tone: 'violet' },
-  { label: '待审核任务', value: '07', unit: '项', delta: '需要关注', note: '预计 2h 内完成', tone: 'amber' },
-  { label: '内容互动率', value: '6.8', unit: '%', delta: '+2.1%', note: '较上周', tone: 'cyan' },
+const month = new Date().getMonth()
+const seasons = [
+ { name: '冬日', idea: '用一份暖心热饮，记录冬日的小店日常' },
+ { name: '春日', idea: '春意正好，适合讲一段时令新品的故事' },
+ { name: '夏日', idea: '暑气渐盛，适合记录清凉饮品与晚间小聚' },
+ { name: '秋日', idea: '秋意渐浓，适合筹备节气滋补特惠' },
 ]
-
-const pulseBars = [28, 44, 38, 62, 54, 78, 64, 72, 48, 84, 68, 92, 74, 88, 80, 96]
+const season = seasons[Math.floor(((month + 1) % 12) / 3)]
+const termPairs = [['小寒','大寒'],['立春','雨水'],['惊蛰','春分'],['清明','谷雨'],['立夏','小满'],['芒种','夏至'],['小暑','大暑'],['立秋','处暑'],['白露','秋分'],['寒露','霜降'],['立冬','小雪'],['大雪','冬至']]
+const nextTerm = termPairs[month][new Date().getDate() < 15 ? 0 : 1]
+const today = new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(new Date())
+const greeting = computed(() => { const hour = new Date().getHours(); return hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好' })
+const metrics = [
+  { label: '全网曝光量', value: '128.6', unit: '万', delta: '+18.4%', note: '较上周', tone: 'accent' },
+  { label: '多平台同步数', value: '42', unit: '条', delta: '+12', note: '本周已刊印', tone: 'blue' },
+  { label: '挂载 POI 到店引导数', value: '2,486', unit: '次', delta: '+26.8%', note: '有效引导', tone: 'green' },
+  { label: '团购转化估算', value: '¥18.4', unit: '万', delta: '+9.2%', note: '本月累计', tone: 'orange' },
+]
+const pulseBars = [32, 48, 41, 68, 57, 73, 62, 86, 69, 92, 78, 96]
 </script>
 
 <template>
-  <div class="dashboard-page">
-    <div class="page-heading dashboard-heading">
-      <div><p class="eyebrow">{{ route?.meta?.eyebrow || 'TODAY / OPERATIONS' }}</p><h1>{{ greeting }}，{{ auth.user?.name || '林知夏' }} <span class="heading-mark">✦</span></h1><p class="page-intro">这里是你的增长脉冲。今天，先从一个小动作开始。</p></div>
-      <div class="heading-controls"><label class="store-select"><span class="eyebrow">当前门店</span><select v-model="selectedStore"><option v-for="store in stores" :key="store">{{ store }}</option></select><span class="select-chevron">⌄</span></label><button class="primary-button compact"><span>＋</span> 新建任务</button></div>
-    </div>
-
-    <section class="pulse-hero panel-dark">
-      <div class="pulse-copy"><div class="pulse-label"><span class="status-pulse" /> 今日增长脉冲 <span class="mono">/ 08.25</span></div><h2>把每一次内容动作，<br /><span>都变成下一次到店理由。</span></h2><p>你的内容系统正在稳定运行。现在有 3 个动作值得优先处理。</p><div class="pulse-actions"><RouterLink to="/tasks" class="text-link">查看任务队列 <span>→</span></RouterLink><RouterLink to="/analytics" class="text-link muted">查看本周分析</RouterLink></div></div>
-      <div class="pulse-chart-wrap"><div class="chart-topline"><span class="mono">CONTENT VELOCITY</span><span class="chart-value">+24.8%</span></div><div class="pulse-chart"><span v-for="(height, index) in pulseBars" :key="index" class="pulse-bar" :style="{ height: `${height}%`, animationDelay: `${index * 35}ms` }" /></div><div class="chart-axis"><span>08.19</span><span>08.21</span><span>08.23</span><span>08.25</span></div></div>
-    </section>
-
-    <section class="metrics-grid">
-      <article v-for="metric in metrics" :key="metric.label" class="metric-card" :class="`metric-${metric.tone}`"><div class="metric-header"><span>{{ metric.label }}</span><span class="metric-glyph">{{ metric.tone === 'violet' ? '↗' : metric.tone === 'amber' ? '!' : '◔' }}</span></div><div class="metric-number">{{ metric.value }}<small>{{ metric.unit }}</small></div><div class="metric-foot"><span class="metric-delta">{{ metric.delta }}</span><span>{{ metric.note }}</span></div></article>
-      <article class="metric-card model-card"><div class="metric-header"><span>模型与连接</span><span class="metric-glyph">✦</span></div><div class="model-status"><span class="status-pulse offline" /><strong>演示模式</strong></div><div class="model-list"><span>核心 API <i class="status-demo">未配置</i></span><span>AI 模型 <i class="status-demo">未配置</i></span><span>对象存储 <i class="status-demo">未配置</i></span></div></article>
-    </section>
-
-    <section class="workspace-grid">
-      <article class="panel task-panel"><div class="panel-heading"><div><p class="eyebrow">NEXT BEST ACTION</p><h3>接下来做什么</h3></div><RouterLink to="/tasks" class="panel-link">全部任务 <span>→</span></RouterLink></div><div class="task-list"><div class="task-row"><div class="task-icon violet">Aa</div><div class="task-copy"><strong>完成 3 条夏日新品文案</strong><span>文案重写 · 品牌「青岚茶事」</span></div><span class="task-time">约 12 min</span><button class="row-arrow" aria-label="打开任务">→</button></div><div class="task-row"><div class="task-icon cyan">▧</div><div class="task-copy"><strong>审核小红书封面组图</strong><span>内容审核 · 4 张待确认</span></div><span class="task-time">约 8 min</span><button class="row-arrow" aria-label="打开任务">→</button></div><div class="task-row"><div class="task-icon amber">◌</div><div class="task-copy"><strong>查看上周门店复盘</strong><span>运营分析 · 周报已生成</span></div><span class="task-time">约 5 min</span><button class="row-arrow" aria-label="打开任务">→</button></div></div></article>
-      <article class="panel activity-panel"><div class="panel-heading"><div><p class="eyebrow">RECENT WORK</p><h3>最近工作</h3></div><RouterLink to="/works" class="panel-link">作品库 <span>→</span></RouterLink></div><div class="activity-list"><div class="activity-row"><div class="activity-thumb thumb-violet">Aa</div><div class="activity-copy"><strong>夏日新品 · 三平台标题</strong><span>文案重写 <i>已完成</i></span></div><span class="activity-date mono">08:42</span></div><div class="activity-row"><div class="activity-thumb thumb-cyan">▧</div><div class="activity-copy"><strong>城西店 · 周末活动封面</strong><span>AI 图片创作 <i>审核中</i></span></div><span class="activity-date mono">昨天</span></div><div class="activity-row"><div class="activity-thumb thumb-amber">◌</div><div class="activity-copy"><strong>上周评论情绪摘要</strong><span>运营分析 <i>已完成</i></span></div><span class="activity-date mono">08.23</span></div></div></article>
-    </section>
-
-    <footer class="dashboard-footer"><span><span class="status-pulse" /> 梧曜星枢系统运行正常</span><span class="mono">LAST SYNC 08:46:12 CST</span></footer>
+  <div class="dashboard-page paper-page">
+    <div class="page-heading dashboard-heading"><div><p class="eyebrow">今日 · {{ today }}</p><h1>{{ greeting }}，{{ auth.user?.name || '林知夏' }}</h1><p class="page-intro">一方水土，一方志。今天也为门店留下几笔真实而有用的记录。</p></div><div class="heading-controls"><label class="store-select"><span class="eyebrow">当前门店</span><select v-model="selectedStore"><option v-for="store in stores" :key="store">{{ store }}</option></select><span class="select-chevron">⌄</span></label><RouterLink to="/creative" class="primary-button compact">＋ 新建内容</RouterLink></div></div>
+    <section class="season-banner paper-banner"><div class="season-mark">{{ season.name }}</div><div><p class="eyebrow accent">{{ nextTerm }}经营灵感 · {{ today }}</p><h2>{{ season.idea }} · 为{{ nextTerm }}做准备</h2><p>把一碗热气、一束花、一段慢下来的时间，写进今天的内容里。</p></div><RouterLink to="/creative" class="secondary-button">查看灵感 →</RouterLink></section>
+    <section class="creation-hero paper-hero"><div class="creation-copy"><p class="eyebrow accent">一方志 · 快速刊印</p><h2>拖入店铺素材，<br /><span>10 分钟生成全网视频。</span></h2><p>AI 识别店铺特征，提炼真实烟火，自动适配抖音、小红书与视频号。</p><RouterLink to="/publishing" class="primary-button">开始一次创作 <span>→</span></RouterLink></div><div class="hero-steps"><div class="hero-step"><span>01</span><b>上传素材</b><small>照片 / 视频 / 菜单</small></div><div class="hero-line" /><div class="hero-step"><span>02</span><b>AI 提炼</b><small>识别门店特征</small></div><div class="hero-line" /><div class="hero-step"><span>03</span><b>一键刊印</b><small>多端同步发布</small></div></div></section>
+    <p class="demo-data-label">经营数据示例 · 尚未接入平台统计，以下数值与清单仅用于展示。</p><section class="metrics-grid paper-metrics"><article v-for="metric in metrics" :key="metric.label" class="metric-card paper-metric" :class="`metric-${metric.tone}`"><div class="metric-header"><span>{{ metric.label }}</span><span class="metric-glyph">↗</span></div><div class="metric-number">{{ metric.value }}<small>{{ metric.unit }}</small></div><div class="metric-foot"><span class="metric-delta">{{ metric.delta }}</span><span>{{ metric.note }}</span></div></article></section>
+    <section class="dashboard-columns"><article class="panel paper-panel action-panel"><div class="panel-heading"><div><p class="eyebrow">接下来做什么</p><h3>今日编撰清单</h3></div><RouterLink to="/tasks" class="panel-link">查看全部 →</RouterLink></div><div class="task-list"><div class="task-row"><div class="task-icon accent">01</div><div class="task-copy"><strong>完成 3 条秋分滋补文案</strong><span>内容创作 · 青岚茶事</span></div><span class="task-time">约 12 分钟</span><RouterLink to="/tasks" class="row-arrow" aria-label="查看任务">→</RouterLink></div><div class="task-row"><div class="task-icon blue">02</div><div class="task-copy"><strong>审核小红书封面组图</strong><span>多端发布 · 4 张待确认</span></div><span class="task-time">约 8 分钟</span><RouterLink to="/tasks" class="row-arrow" aria-label="查看任务">→</RouterLink></div><div class="task-row"><div class="task-icon green">03</div><div class="task-copy"><strong>查看上周到店转化复盘</strong><span>数据分析 · 周报已生成</span></div><span class="task-time">约 5 分钟</span><RouterLink to="/analytics" class="row-arrow" aria-label="查看转化数据">→</RouterLink></div></div></article><article class="panel paper-panel trend-panel"><div class="panel-heading"><div><p class="eyebrow">到店趋势 · 示例</p><h3>烟火被看见，也走进店里</h3></div><span class="trend-total">+24.8%</span></div><div class="trend-chart"><span v-for="(height, index) in pulseBars" :key="index" class="trend-bar" :style="{ height: `${height}%`, animationDelay: `${index * 40}ms` }" /></div><div class="trend-axis"><span>周一</span><span>周四</span><span>周日</span></div></article></section>
+    <footer class="dashboard-footer"><span><span class="status-pulse" /> 方志编撰中 · 演示模式</span><span class="mono">一方志 · 为每一方商家立传</span></footer>
   </div>
 </template>

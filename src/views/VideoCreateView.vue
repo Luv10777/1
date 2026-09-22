@@ -29,10 +29,10 @@ const openTask = (task) => {
 
     <main>
       <section class="video-entry-grid" aria-label="视频创作入口">
-        <RouterLink to="/video/workbench" class="video-entry-card video-entry-card-violet">
+        <RouterLink to="/video/workbench" class="video-entry-card video-entry-card-cinnabar">
           <div class="video-entry-orb" aria-hidden="true" />
           <div class="video-entry-card-top">
-            <div class="video-entry-icon video-entry-icon-violet"><span class="material-symbols-outlined">movie_edit</span></div>
+            <div class="video-entry-icon video-entry-icon-cinnabar"><span class="material-symbols-outlined">movie_edit</span></div>
           </div>
           <div class="video-entry-copy">
             <h2>AI 视频生成</h2>

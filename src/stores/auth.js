@@ -26,7 +26,7 @@ function persistSession(data) {
     id: data.user.userId,
     tenantId: data.user.tenantId,
     phone: data.user.phone,
-    name: data.user.name || `用户${data.user.phone.slice(-4)}`,
+    name: data.user.name || (data.user.phone ? `用户${data.user.phone.slice(-4)}` : '用户'),
     roles: ['user'],
   }
   state.user = user
@@ -61,14 +61,15 @@ export const auth = {
     }
     if (state.cooldown > 0) return
 
-    await authService.sendCode(phone)
+    const result = await authService.sendCode(phone)
 
-    state.cooldown = 60
+    state.cooldown = result.retryAfterSeconds
     clearInterval(timer)
     timer = setInterval(() => {
       state.cooldown -= 1
       if (state.cooldown <= 0) clearInterval(timer)
     }, 1000)
+    return result
   },
 
   async login(phone, code) {
@@ -88,12 +89,22 @@ export const auth = {
     }
   },
 
+  async loginWithPassword(account, password) {
+    state.loading = true
+    try {
+      const data = await authService.loginWithPassword(account, password)
+      return persistSession(data)
+    } finally {
+      state.loading = false
+    }
+  },
+
   /** 刷新页面后校验会话是否还有效，顺便把用户信息对齐服务端。 */
   async restore() {
     if (!state.token?.accessToken) return false
     try {
       const me = await authService.getCurrentUser()
-      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone }
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name }
       writeUser(state.user)
       return true
     } catch {

@@ -1,0 +1,63 @@
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source './views/ServiceRulesWorkbench.tsx';
+
+/* This embedded React page does not load global Tailwind preflight.
+   Normalize only its own elements, below the utility layer. */
+@layer theme {
+  .service-rules-workbench *,
+  .service-rules-workbench *::before,
+  .service-rules-workbench *::after {
+    border: 0 solid #E2EAE7;
+  }
+
+  .service-rules-workbench :is(h1, h2, h3, p) {
+    margin: 0;
+    color: inherit;
+  }
+
+  .service-rules-workbench :is(button, input, textarea, select) {
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+    accent-color: #1C3532;
+  }
+
+  .service-rules-workbench button {
+    appearance: none;
+  }
+}
+
+/* The Vue shell has unlayered element rules. Let this page's Tailwind
+   utilities determine typography, color and accent without changing the shell. */
+.service-rules-workbench :is(button, input, textarea, select) {
+  font: revert-layer;
+  color: revert-layer;
+  accent-color: revert-layer;
+}
+
+.service-rules-workbench :is(h1, h2, h3) {
+  color: revert-layer;
+}
+
+.service-rules-workbench :focus-visible {
+  outline: 2px solid #6F968B;
+  outline-offset: 3px;
+}
+
+.service-rules-workbench :is(input:not([type]), textarea):focus-visible {
+  outline: none;
+}
+
+.service-rules-workbench .rules-field:focus-within {
+  border-color: #8EADA4;
+  box-shadow: 0 0 0 3px rgb(184 211 205 / 20%);
+}
+
+.service-rules-workbench .rules-field-danger:focus-within {
+  border-color: #D69589;
+  box-shadow: 0 0 0 3px rgb(196 61 42 / 7%);
+}

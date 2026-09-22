@@ -2,6 +2,7 @@ package com.wuyao.growth.asset;
 
 import com.wuyao.growth.common.task.Task;
 import com.wuyao.growth.common.task.TaskHandler;
+import com.wuyao.growth.common.storage.ObjectStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ public class AssetProbeHandler implements TaskHandler {
     public static final String TYPE = "ASSET_PROBE";
 
     private final AssetRepository repository;
+    private final ObjectStorage storage;
 
     @Override
     public String type() {
@@ -33,9 +35,10 @@ public class AssetProbeHandler implements TaskHandler {
         Asset asset = repository.findById(assetId)
                 .orElseThrow(() -> new IllegalStateException("素材不存在: " + assetId));
 
-        // TODO 真实实现：从对象存储读文件头，解析图片宽高 / 视频时长，回写字段。
-        log.info("补素材元数据: id={} key={}", asset.getId(), asset.getStorageKey());
+        storage.stat(asset.getStorageKey()).orElseThrow(() -> new IllegalStateException("素材文件不存在"));
+        // 宽高、时长和 SHA-256 尚未解析，不能宣称 probed=true。
+        log.info("素材文件存在，媒体元数据尚未解析: id={}", assetId);
 
-        return Map.of("assetId", assetId, "probed", true);
+        return Map.of("assetId", assetId, "objectVerified", true, "probed", false);
     }
 }

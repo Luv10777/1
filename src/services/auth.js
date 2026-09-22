@@ -17,6 +17,14 @@ export const authService = {
     return post('/api/auth/login', { phone, code })
   },
 
+  loginWithPassword(account, password) {
+    const endpoint = import.meta.env.VITE_PASSWORD_LOGIN_ENDPOINT || '/api/auth/password-login'
+    if (!endpoint.startsWith('/api/')) {
+      throw new Error('密码登录接口配置不正确，请联系管理员。')
+    }
+    return post(endpoint, { account, password })
+  },
+
   refreshToken(refreshToken) {
     return post('/api/auth/refresh', { refreshToken })
   },

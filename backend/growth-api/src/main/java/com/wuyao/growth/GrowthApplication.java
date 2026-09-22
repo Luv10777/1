@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * 梧曜星枢 · 后端主干。
+ * 一方志 · 后端主干。
  *
  * 同一个 jar，两条启动命令：
  *   api    : java -jar growth-api.jar --growth.worker.enabled=false

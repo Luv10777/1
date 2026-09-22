@@ -29,7 +29,7 @@ public class AssetController {
 
     @PostMapping("/{id}/confirm")
     public ApiResponse<AssetDtos.AssetView> confirm(@PathVariable Long id,
-                                                    @RequestBody AssetDtos.ConfirmRequest req,
+                                                    @Valid @RequestBody AssetDtos.ConfirmRequest req,
                                                     @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(assetService.confirmUpload(id, req, me.userId()));
     }

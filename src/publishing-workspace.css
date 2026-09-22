@@ -1,0 +1,134 @@
+/* Keep editing, preview and the final actions within the app viewport. */
+:root .paper-app:has(.publishing-page) .page-scroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 20px 0;
+}
+:root .publishing-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+}
+:root .publishing-page .pub-header { flex: none; align-items: center; gap: 16px; margin: 0 0 12px; }
+:root .publishing-page .pub-header h1 { white-space: nowrap; font: 600 23px/1.4 var(--font-serif); }
+:root .publishing-page .studio-demo-note { margin: 0; font-size: 11px; text-align: right; }
+:root .publishing-page .pub-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, .9fr) minmax(350px, 1.4fr) minmax(260px, 1fr);
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  gap: 14px;
+  align-items: stretch;
+  overflow: hidden;
+}
+:root .publishing-page :is(.studio-upload-column, .editor-column, .preview-column) {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--night-panel);
+}
+:root .publishing-page .pub-column-tabs {
+  display: flex; flex: none; gap: 4px; padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+:root .publishing-page .pub-column-tabs button {
+  display: inline-flex; align-items: center; justify-content: center; flex: 1; gap: 4px;
+  min-width: 0; min-height: 34px; padding: 6px 4px;
+  border: 0; border-radius: 4px; background: transparent; color: var(--ink-muted);
+  font-size: 12px; white-space: nowrap;
+}
+:root .publishing-page .pub-column-tabs button[aria-pressed='true'] { background: var(--night); color: var(--color-accent-text); font-weight: 600; }
+:root .publishing-page .pub-column-tabs small { font: 10px var(--font-mono); }
+:root .publishing-page .pub-section {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 12px; margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+:root .publishing-page .section-heading { margin-bottom: 8px; gap: 8px; }
+:root .publishing-page .section-heading h2 { font-size: 14px; }
+:root .publishing-page .section-heading p { margin-top: 4px; font-size: 11px; line-height: 1.6; }
+:root .publishing-page .asset-section .section-heading { display: block; }
+:root .publishing-page .asset-section .section-heading .asset-actions { margin-top: 12px; }
+:root .publishing-page .pub-upload-empty { min-height: 116px; padding: 16px 12px; gap: 6px; }
+:root .publishing-page .pub-upload-empty > span { font-size: 11px; }
+:root .publishing-page .pub-cover-tools { margin-top: 12px; padding-top: 12px; }
+:root .publishing-page .copy-version-tabs { margin-bottom: 10px; gap: 6px; }
+:root .publishing-page .copy-version-tabs button { padding: 7px 4px; font-size: 11px; }
+:root .publishing-page .pub-field-heading { margin: 10px 0 6px; }
+:root .publishing-page .pub-field-generate { min-height: 28px; padding: 4px 8px; font-size: 11px; }
+:root .publishing-page .pub-input { min-height: 36px; padding: 8px 10px; }
+:root .publishing-page .pub-textarea { field-sizing: fixed; height: 96px; min-height: 96px; max-height: 240px; padding: 10px; font-size: 13px; }
+:root .publishing-page .ai-toolbar { margin-top: 10px; padding: 10px; border-radius: 4px; }
+:root .publishing-page .ai-toolbar-head { margin: 0; cursor: pointer; }
+:root .publishing-page .ai-toolbar-head::after { content: '+'; color: var(--color-accent-text); }
+:root .publishing-page .ai-toolbar[open] .ai-toolbar-head::after { content: '−'; }
+:root .publishing-page .ai-toolbar-head small { font-size: 10px; margin-left: auto; }
+:root .publishing-page .ai-toolbar[open] .ai-actions { margin-top: 10px; }
+:root .publishing-page .tag-library { margin-top: 10px; gap: 6px; font-size: 11px; }
+:root .publishing-page .tag-library button { padding: 4px 6px; }
+:root .publishing-page .pub-tag-details { margin-top: 8px; font-size: 12px; }
+:root .publishing-page .pub-tag-details summary { cursor: pointer; color: var(--ink-muted); }
+:root .publishing-page .pub-tag-details summary small { margin-left: 8px; font-size: 10px; }
+:root .publishing-page .preview-sticky {
+  position: static; display: flex; flex-direction: column; flex: 1; min-height: 0;
+  width: 100%; max-width: none; height: 100%; margin: 0; gap: 0;
+  padding: 12px; border: 0; border-radius: 0; box-shadow: none;
+}
+:root .publishing-page .preview-topline { flex: none; margin: 0 0 8px; }
+:root .publishing-page .preview-switch { min-width: 0; }
+:root .publishing-page .preview-switch button { min-width: 0; padding: 7px 4px; white-space: nowrap; }
+:root .publishing-page .pub-video-stage { flex: 1; min-height: 0; height: auto; max-height: none; max-width: none; margin: 0; }
+:root .publishing-page .pub-phone-fit { position: relative; flex: none; width: var(--phone-width); height: var(--phone-height); }
+:root .publishing-page .pub-video-stage .phone { position: absolute; inset: 0; width: 320px; height: 644px; transform: scale(var(--phone-scale)); transform-origin: top left; }
+:root .publishing-page .preview-sticky > .pub-error { flex: none; margin: 6px 0 0; font-size: 11px; line-height: 1.5; }
+:root .publishing-page .pub-preview-layout { display: flex; justify-content: center; gap: 12px; flex: none; margin-bottom: 8px; }
+:root .publishing-page .pub-preview-layout button { padding: 4px; border: 0; background: transparent; color: var(--ink-muted); font-size: 11px; }
+:root .publishing-page .pub-preview-layout button[aria-pressed='true'] { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 4px; }
+:root .publishing-page .xhs-feed { flex: 1; min-height: 0; overflow-y: auto; align-content: start; width: 100%; margin: 0; }
+:root .publishing-page .studio-bottom-bar {
+  position: relative; flex: none; bottom: auto; width: 100%; margin: 12px 0 0;
+  padding: 12px 0; border: 0; border-top: 1px solid var(--line); border-radius: 0;
+  background: var(--night); box-shadow: none;
+}
+:root .publishing-page .studio-schedule { flex: 1; min-width: 0; margin-right: auto; gap: 8px; }
+:root .publishing-page .studio-schedule input { min-width: 0; max-width: 205px; }
+:root .publishing-page :is(.publish-btn, .draft-btn) { min-height: 38px; padding: 8px 14px; white-space: nowrap; }
+
+@media (max-width: 1200px) {
+  :root .publishing-page .pub-grid { display: block; }
+  :root .publishing-page .studio-mobile-steps { display: flex; position: static; flex: none; margin: 0 0 10px; padding: 0; gap: 8px; }
+  :root .publishing-page .studio-mobile-steps button { min-height: 36px; flex: 1; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); font-size: 12px; }
+  :root .publishing-page .studio-mobile-steps button[aria-current='step'] { color: var(--color-accent-text); border-color: var(--color-accent); }
+  :root .publishing-page[data-studio-step='0'] :is(.editor-column, .preview-column),
+  :root .publishing-page[data-studio-step='1'] :is(.studio-upload-column, .preview-column),
+  :root .publishing-page[data-studio-step='2'] :is(.studio-upload-column, .editor-column) { display: none; }
+  :root .publishing-page .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  :root .paper-app:has(.publishing-page) .page-scroll { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 640px) {
+  :root .paper-app:has(.publishing-page) .page-scroll { padding: 12px 12px calc(64px + env(safe-area-inset-bottom)); }
+  :root .publishing-page .pub-header { align-items: flex-start; gap: 8px; }
+  :root .publishing-page .pub-header h1 { font-size: 20px; }
+  :root .publishing-page .studio-demo-note { max-width: 190px; font-size: 10px; }
+  :root .publishing-page .pub-section { padding: 12px; }
+  :root .publishing-page .pub-column-tabs { gap: 2px; padding: 6px; }
+  :root .publishing-page .pub-column-tabs button { font-size: 11px; }
+  :root .publishing-page .account-grid { grid-template-columns: 1fr; }
+  :root .publishing-page .studio-bottom-bar { flex-wrap: wrap; gap: 8px; margin-top: 8px; padding: 8px 0; }
+  :root .publishing-page .studio-schedule { flex: 1 0 100%; }
+  :root .publishing-page .publish-btn { flex: 1; }
+  :root .publishing-page .ai-toolbar-head small { display: none; }
+}

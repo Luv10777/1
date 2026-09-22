@@ -11,9 +11,9 @@ const _cartItems = computed(() => commerce.cart.items)
 <template>
   <main class="consumer-page">
     <header class="consumer-nav">
-      <a class="consumer-brand" href="/consumer" aria-label="梧曜星枢消费者预览首页">
+      <a class="consumer-brand" href="/consumer" aria-label="一方志消费者预览首页">
         <span class="consumer-brand-mark"><i /><i /><i /></span>
-        <span><strong>梧曜星枢</strong><small>WUYAO NEXUS / PREVIEW</small></span>
+        <span><strong>一方志</strong><small>WUYAO NEXUS / PREVIEW</small></span>
       </a>
       <div class="consumer-nav-actions">
         <span class="preview-pill"><b /> 演示模式 · 未接入支付</span>

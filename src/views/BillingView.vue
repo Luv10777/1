@@ -5,7 +5,7 @@ import { billing } from '../stores/billing.js'
 const formatMoney = (minor) => minor === 0 ? '免费' : `¥${(minor / 100).toLocaleString('zh-CN')}/月`
 const planCards = computed(() => billing.plans.map((plan) => ({ ...plan, current: plan.id === billing.currentPlan.id })))
 const meters = [
-  { code: 'AI_IMAGE', label: '图片生成', unit: '张', color: 'violet' },
+  { code: 'AI_IMAGE', label: '图片生成', unit: '张', color: 'cinnabar' },
   { code: 'AI_VIDEO', label: '视频任务', unit: '条', color: 'cyan' },
   { code: 'STORES', label: '门店数', unit: '家', color: 'amber' },
   { code: 'AUTOMATION', label: '自动化流程', unit: '条', color: 'green' },

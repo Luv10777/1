@@ -1,5 +1,11 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+
+const props = defineProps({
+  initialPrompt: { type: String, default: '' },
+  initialRatio: { type: String, default: '' },
+  initialReference: { type: String, default: '' },
+})
 
 const emit = defineEmits(['generate'])
 const prompt = ref('')
@@ -16,6 +22,12 @@ const ratios = [
 ]
 const selectedStyle = ref(styles[0])
 const selectedRatio = ref(ratios[1].label)
+
+onMounted(() => {
+  if (props.initialPrompt) prompt.value = props.initialPrompt
+  if (ratios.some(item => item.label === props.initialRatio)) selectedRatio.value = props.initialRatio
+  if (props.initialReference) uploadedName.value = props.initialReference
+})
 
 const toggle = (name) => { activePopover.value = activePopover.value === name ? null : name }
 const chooseStyle = (style) => { selectedStyle.value = style; activePopover.value = null }
@@ -44,7 +56,7 @@ const submit = () => emit('generate', { prompt: prompt.value, style: selectedSty
       <div class="prompt-toolbar">
         <div class="prompt-tools">
           <button type="button" class="prompt-pill active" aria-pressed="true" @click="toggle('agent')"><span class="prompt-pill-dot" /> Agent 模式</button>
-          <button type="button" class="prompt-pill" @click="openUpload">＋ 参考海报</button>
+          <button type="button" class="prompt-pill" @click="openUpload">{{ uploadedName ? `参考 · ${uploadedName}` : '＋ 参考海报' }}</button>
           <button type="button" class="prompt-pill" :class="{ active: activePopover === 'style' }" :aria-expanded="activePopover === 'style'" aria-haspopup="dialog" @click="toggle('style')">风格 · {{ selectedStyle }}</button>
           <button type="button" class="prompt-pill" :class="{ active: activePopover === 'ratio' }" :aria-expanded="activePopover === 'ratio'" aria-haspopup="menu" @click="toggle('ratio')">比例 · {{ selectedRatio }}</button>
           <button type="button" class="prompt-pill" @click="prompt = `${prompt}${prompt ? '，' : ''}请优化构图、层次与转化重点`">润色提示词</button>

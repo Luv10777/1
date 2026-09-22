@@ -9,11 +9,11 @@ defineProps({
 })
 
 const statusConfig = {
-  success: { color: 'rgb(34, 197, 94)', label: '成功' },
-  warning: { color: 'rgb(251, 191, 36)', label: '警告' },
-  error: { color: 'rgb(239, 68, 68)', label: '错误' },
-  info: { color: 'rgb(59, 130, 246)', label: '信息' },
-  pending: { color: 'rgb(156, 163, 175)', label: '待处理' }
+  success: { color: 'var(--color-success)', label: '成功' },
+  warning: { color: 'var(--color-warning)', label: '警告' },
+  error: { color: 'var(--color-error)', label: '错误' },
+  info: { color: 'var(--color-info)', label: '信息' },
+  pending: { color: 'var(--color-text-muted)', label: '待处理' }
 }
 </script>
 
@@ -29,10 +29,10 @@ const statusConfig = {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 2px 8px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--badge-color, rgba(255, 255, 255, 0.1));
-  border-radius: 12px;
+  border-radius: 2px;
   font-size: 12px;
   color: var(--badge-color);
   font-weight: 500;
@@ -43,7 +43,7 @@ const statusConfig = {
   height: 6px;
   background: var(--badge-color);
   border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
+
 }
 
 @keyframes pulse {

@@ -52,11 +52,19 @@ public class AssetService {
 
     @Transactional
     public AssetDtos.AssetView confirmUpload(Long assetId, AssetDtos.ConfirmRequest req, Long userId) {
-        Asset asset = repository.findById(assetId)
+        Asset asset = repository.findForUpdate(assetId)
                 .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
+        if ("READY".equals(asset.getStatus())) return AssetDtos.AssetView.of(asset);
+        var stored = storage.stat(asset.getStorageKey())
+                .orElseThrow(() -> BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "文件尚未上传完成"));
+        if (req.sizeBytes() != null && req.sizeBytes() != stored.sizeBytes()) {
+            throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "文件大小与上传声明不一致");
+        }
         asset.setStatus("READY");
-        asset.setSizeBytes(req.sizeBytes());
-        asset.setSha256(req.sha256());
+        asset.setSizeBytes(stored.sizeBytes());
+        asset.setMimeType(stored.contentType());
+        asset.setSha256(null);
+        asset.setUpdatedAt(java.time.Instant.now());
 
         // 交给 worker 去补宽高/时长这类要读文件才知道的元数据
         taskService.submit(AssetProbeHandler.TYPE, "DEFAULT",
@@ -67,6 +75,9 @@ public class AssetService {
 
     @Transactional(readOnly = true)
     public PageResult<AssetDtos.AssetView> list(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "page 必须非负，size 必须在 1 到 100 之间");
+        }
         var result = repository.findAllByOrderByIdDesc(PageRequest.of(page, size));
         return PageResult.of(result, result.getContent().stream().map(AssetDtos.AssetView::of).toList());
     }

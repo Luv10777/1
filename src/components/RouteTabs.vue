@@ -33,7 +33,8 @@ const restoreTabs = () => {
 
   const uniqueTabs = new Map([[FIXED_TAB.name, FIXED_TAB]])
   savedTabs.forEach((tab) => {
-    if (tab.name !== FIXED_TAB.name) uniqueTabs.set(tab.name, { ...tab, closable: true })
+    const title = String(router.resolve(tab.path).meta.title || tab.title)
+    if (tab.name !== FIXED_TAB.name) uniqueTabs.set(tab.name, { ...tab, title, closable: true })
   })
   return [...uniqueTabs.values()].slice(0, MAX_TABS)
 }

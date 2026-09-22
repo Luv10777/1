@@ -33,6 +33,10 @@ public class JwtService {
     public JwtService(@Value("${growth.jwt.secret}") String secret,
                       @Value("${growth.jwt.access-ttl}") Duration accessTtl,
                       @Value("${growth.jwt.refresh-ttl}") Duration refreshTtl) {
+        if (secret == null || secret.isBlank()
+                || secret.equals("dev-only-secret-change-me-0123456789abcdef")) {
+            throw new IllegalStateException("必须配置随机 JWT_SECRET，禁止使用空值或旧默认密钥");
+        }
         byte[] raw = secret.getBytes(StandardCharsets.UTF_8);
         if (raw.length < 32) {
             throw new IllegalStateException("growth.jwt.secret 至少 32 字节，当前 " + raw.length);

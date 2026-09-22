@@ -1,3 +1,4 @@
+import './utils/crypto-polyfill.js'
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
@@ -15,7 +16,11 @@ import './video-workbench.css'
 import './video-analyze.css'
 import './studio.css'
 import './live-studio.css'
+import './publishing.css'
+import './brand.css'
+import './publishing-workspace.css'
 
 theme.apply()
 
 createApp(App).use(router).mount('#app')
+

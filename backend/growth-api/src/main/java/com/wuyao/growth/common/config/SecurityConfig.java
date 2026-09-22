@@ -30,6 +30,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/send-code",
                                 "/api/auth/login",
+                                "/api/auth/password-login",
                                 "/api/auth/refresh",
                                 "/actuator/health").permitAll()
                         .anyRequest().authenticated())
