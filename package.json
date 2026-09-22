@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
+    "framer-motion": "^13.4.0",
     "lucide-react": "^1.47.0",
     "lucide-vue-next": "^1.0.0",
     "qrcode": "^1.5.4",
