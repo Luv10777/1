@@ -24,6 +24,7 @@ import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
 import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
+import ServiceRulesView from './views/ServiceRulesView.vue'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
@@ -64,7 +65,7 @@ const routes = [
   { path: '/analytics/platforms', name: 'analytics-platforms', component: PlaceholderView, meta: { title: '数据接口管理', eyebrow: 'OPERATIONS ANALYTICS', icon: '⌗', description: '管理运营分析的数据接口、指标读取授权与数据同步状态。' } },
   { path: '/acquisition', name: 'acquisition', component: PlaceholderView, meta: { title: '获客中心', eyebrow: 'CUSTOMER ACQUISITION', icon: '◎', description: '集中承接获客渠道、潜在客户和转化动作；具体功能将在业务范围明确后逐步开放。' } },
   { path: '/service/messages', name: 'messages', component: MessagesView, meta: { title: '私信会话', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合各平台私信，集中查看并处理客户会话。' } },
-  { path: '/service/rules', name: 'service-rules', component: PlaceholderView, meta: { title: '客服规则配置', eyebrow: 'CUSTOMER SERVICE', icon: '⌘', description: '配置智能回复范围、审核条件和客服升级规则。' } },
+  { path: '/service/rules', name: 'service-rules', component: ServiceRulesView, meta: { title: '客服规则配置', eyebrow: 'CUSTOMER SERVICE', icon: '⌘', description: '配置智能回复范围、审核条件和客服升级规则。' } },
   { path: '/geo/brand', name: 'geo-brand', component: PlaceholderView, meta: { title: '品牌信息设置', eyebrow: 'GEO GROWTH', icon: '◎', description: '维护用于生成式搜索理解和引用的品牌基础信息。' } },
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', eyebrow: 'GEO GROWTH', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', eyebrow: 'GEO GROWTH', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
