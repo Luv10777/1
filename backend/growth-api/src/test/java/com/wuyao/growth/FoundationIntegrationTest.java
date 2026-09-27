@@ -1,6 +1,8 @@
 package com.wuyao.growth;
 
 import com.wuyao.growth.asset.*;
+import com.wuyao.growth.creative.image.*;
+import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.security.JwtService;
 import com.wuyao.growth.common.storage.MinioObjectStorage;
 import com.wuyao.growth.common.task.*;
@@ -17,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +35,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Connection;
@@ -41,6 +45,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
+import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
@@ -48,7 +53,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"growth.worker.enabled=false", "logging.level.root=WARN",
+@SpringBootTest(properties = {"growth.worker.enabled=false", "spring.data.redis.client-type=jedis", "logging.level.root=WARN",
         "logging.level.com.wuyao.growth=WARN"})
 @AutoConfigureMockMvc
 @Testcontainers
@@ -63,6 +68,12 @@ class FoundationIntegrationTest {
             .withCommand("server /data").withExposedPorts(9000)
             .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000));
 
+    @Container
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine")
+            .withExposedPorts(6379)
+            .waitingFor(Wait.forListeningPort());
+
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -71,6 +82,9 @@ class FoundationIntegrationTest {
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        registry.add("spring.data.redis.password", () -> "");
         registry.add("growth.jwt.secret", () -> "test-only-random-signing-secret-0123456789abcdef");
         registry.add("growth.storage.endpoint", FoundationIntegrationTest::minioEndpoint);
         registry.add("growth.storage.access-key", () -> "testadmin");
@@ -78,11 +92,20 @@ class FoundationIntegrationTest {
         registry.add("growth.storage.bucket", () -> "test-assets");
     }
 
+    @Autowired ImageCreationService imageCreations;
+    @Autowired com.wuyao.growth.common.gateway.ImageModelProperties imageConfig;
+    @Autowired ImagePlanHandler imagePlanHandler;
+    @Autowired ImageRenderHandler imageRenderHandler;
+    @Autowired ImageRenderer imageRenderer;
+    @Autowired com.wuyao.growth.common.storage.ObjectStorage imageStorage;
+    @MockitoBean AiGateway imageGateway;
     @Autowired AuthService auth;
     @MockitoBean SmsSender smsSender;
     @Autowired JwtService jwt;
     @Autowired TaskService tasks;
     @Autowired TaskRepository taskRepository;
+    @Autowired com.wuyao.growth.common.ratelimit.TenantRateLimiter imageRateLimiter;
+    @Autowired StringRedisTemplate redis;
     @Autowired AssetService assets;
     @Autowired AssetRepository assetRepository;
     @Autowired AssetProbeHandler probe;
@@ -99,7 +122,15 @@ class FoundationIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        imageConfig.setPlannerAlias(ModelAlias.TEXT_PLANNER_ADVANCED);
+        imageConfig.setQualities(List.of("480P", "720P", "1080P", "4K"));
+        imageConfig.getRefiner().setEnabled(false);
+        imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.BRIDGE);
+        imageConfig.getGenerator().setModel("");
         owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+        try (var connection = redis.getConnectionFactory().getConnection()) {
+            connection.serverCommands().flushDb();
+        }
         owner.execute("TRUNCATE tasks, assets, refresh_tokens, sms_codes, users, tenants RESTART IDENTITY CASCADE");
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('A') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('B') RETURNING id", Long.class);
@@ -107,6 +138,28 @@ class FoundationIntegrationTest {
         if (!minio.bucketExists(BucketExistsArgs.builder().bucket("test-assets").build())) {
             minio.makeBucket(MakeBucketArgs.builder().bucket("test-assets").build());
         }
+        // Database IDs restart per test, so durable image keys must be isolated too.
+        for (var object : minio.listObjects(ListObjectsArgs.builder().bucket("test-assets").recursive(true).build())) {
+            minio.removeObject(RemoveObjectArgs.builder().bucket("test-assets").object(object.get().objectName()).build());
+        }
+    }
+
+    @Test
+    void newTenantsReceiveDefaultImageQuota() {
+        assertThat(owner.queryForObject("SELECT concurrent_limit FROM tenant_quotas WHERE tenant_id=?",
+                Integer.class, tenantA)).isEqualTo(20);
+    }
+
+    @Test
+    void globalImageConcurrencyLimitIsSharedAcrossTenants() {
+        assertThat(imageRateLimiter.tryAcquireImageGeneration(tenantA, 20, 1)).isTrue();
+        assertThat(imageRateLimiter.tryAcquireImageGeneration(tenantB, 20, 1)).isFalse();
+        assertThat(imageRateLimiter.getGlobalActiveCount()).isEqualTo(1);
+
+        imageRateLimiter.releaseImageGeneration(tenantA);
+        assertThat(imageRateLimiter.tryAcquireImageGeneration(tenantB, 20, 1)).isTrue();
+        imageRateLimiter.releaseImageGeneration(tenantB);
+        assertThat(imageRateLimiter.getGlobalActiveCount()).isZero();
     }
 
     @Test
@@ -376,7 +429,10 @@ class FoundationIntegrationTest {
     @Test
     void confirmationUsesStorageSizeAndDoesNotTrustClientHashes() throws Exception {
         var ticket = ticket();
-        byte[] content = "actual file".getBytes(StandardCharsets.UTF_8);
+        var image = new java.awt.image.BufferedImage(2, 3, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var encoded = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", encoded);
+        byte[] content = encoded.toByteArray();
         minio.putObject(PutObjectArgs.builder().bucket("test-assets").object(ticket.storageKey())
                 .stream(new ByteArrayInputStream(content), content.length, -1).contentType("image/png").build());
         assertThat(code(() -> TenantContext.runAs(tenantA,
@@ -385,12 +441,13 @@ class FoundationIntegrationTest {
                 new AssetDtos.ConfirmRequest((long) content.length, "a".repeat(64)), null));
         assertThat(view.status()).isEqualTo("READY");
         assertThat(view.sizeBytes()).isEqualTo(content.length);
-        assertThat(owner.queryForObject("SELECT sha256 FROM assets WHERE id=?", String.class, ticket.assetId())).isNull();
+        assertThat(owner.queryForObject("SELECT sha256 FROM assets WHERE id=?", String.class, ticket.assetId()))
+                .isEqualTo(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)));
         TenantContext.runAs(tenantA, () -> assets.confirmUpload(ticket.assetId(), new AssetDtos.ConfirmRequest(null, null), null));
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks", Integer.class)).isEqualTo(1);
         Task task = tasks.claim("DEFAULT", 1).getFirst();
         assertThat(TenantContext.runAs(tenantA, () -> probe.handle(task)))
-                .containsEntry("objectVerified", true).containsEntry("probed", false);
+                .containsEntry("objectVerified", true).containsEntry("probed", true);
     }
 
     @Test
@@ -430,8 +487,316 @@ class FoundationIntegrationTest {
         return TenantContext.runAs(tenantA, () -> assets.presignUpload(new AssetDtos.PresignRequest("test", "IMAGE", "image/png"), null));
     }
 
+    private ImageDtos.Create imageRequest(String key, String workflow, int count, List<ImageDtos.Reference> refs) {
+        return new ImageDtos.Create(key, workflow, "夏日新品", refs, "3:4", "480P", count, "朋友圈", "帮我搭配", null);
+    }
+
+    private void enableImageModels() {
+        when(imageGateway.configured(any())).thenReturn(true);
+    }
+
+    private void planImageCount(int count) {
+        planImageCount(count, "", "");
+    }
+
+    private void planImageCount(int count, String headline, String caption) {
+        var specs = java.util.stream.IntStream.range(0, count).mapToObj(n -> Map.of(
+                "role", "场景" + n, "prompt", "夏日自然光，保持商品外观", "headline", headline, "caption", caption)).toList();
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED)))
+                .thenReturn(new ProviderResult(true, "TEST", null,
+                        Map.of("summary", "一组清爽的夏日图片", "visualDirection", "浅绿背景，自然光", "question", "", "items", specs), null, null));
+    }
+
+    private ProviderResult imageResult() {
+        byte[] bytes = imageRenderer.png(new java.awt.image.BufferedImage(480, 640, java.awt.image.BufferedImage.TYPE_INT_RGB));
+        return new ProviderResult(true, "TEST", "remote-job", Map.of("status", "SUCCEEDED",
+                "imageBase64", Base64.getEncoder().encodeToString(bytes), "_model", "fixture-image"), null, null);
+    }
+
+    private Task runImageTask(String queue, TaskHandler handler) {
+        Task task = tasks.claim(queue, 1).getFirst();
+        Map<String, Object> result = TenantContext.runAs(task.getTenantId(), () -> handler.handle(task));
+        assertThat(tasks.succeed(task.getId(), task.getAttempts(), result)).isTrue();
+        return task;
+    }
+
+    @Test
+    void imageModelsMustBeConfiguredAndCreationIsIdempotentUnderConcurrency() throws Exception {
+        var request = imageRequest("image-concurrent", "POSTER", 1, List.of());
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(request, null)))).isEqualTo(4001);
+        enableImageModels();
+        var ids = concurrent(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(request, null).id()));
+        assertThat(ids.getFirst()).isEqualTo(ids.getLast());
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(ids.getFirst()).quality())).isEqualTo("4K");
+        assertThat(owner.queryForObject("select count(*) from image_creations", Integer.class)).isEqualTo(1);
+        assertThat(owner.queryForObject("select count(*) from tasks where type='IMAGE_PLAN'", Integer.class)).isEqualTo(1);
+        var changed = new ImageDtos.Create(request.requestKey(), "POSTER", "另一条需求", List.of(), "3:4", "480P", 1, "朋友圈", "帮我搭配", null);
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(changed, null)))).isEqualTo(1400);
+        assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.get(ids.getFirst())))).isEqualTo(1404);
+        assertThat(TenantContext.runAs(tenantB, () -> imageCreations.history("POSTER", 0, 20).total())).isZero();
+    }
+
+    @Test
+    void imageWorkflowPollsSavesWorksAndEditsTextUsingOriginalImage() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(1);
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
+                .thenReturn(new ProviderResult(true, "TEST", "remote-job", Map.of("status", "RUNNING"), null, null))
+                .thenReturn(imageResult());
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("image-roundtrip", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);
+        runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).status())).isEqualTo("GENERATING");
+        owner.update("update tasks set run_after=now() where type='IMAGE_RENDER'");
+        runImageTask("IMAGE", imageRenderHandler);
+        var done = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()));
+        assertThat(done.status()).isEqualTo("SUCCEEDED");
+        assertThat(owner.queryForObject("select status from image_creations where id=?", String.class, created.id()))
+                .isEqualTo("SUCCEEDED");
+        assertThat(done.items().getFirst().url()).contains("work.png");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.history("POSTER", 0, 20).items().getFirst().previewUrl())).contains("work.png");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20).total())).isEqualTo(1);
+        assertThat(TenantContext.runAs(tenantB, () -> imageCreations.works(0, 20).total())).isZero();
+        var calls = ArgumentCaptor.forClass(ProviderRequest.class);
+        verify(imageGateway, times(3)).invokeReal(calls.capture());
+        assertThat(calls.getAllValues().get(1).idempotencyKey()).isEqualTo(calls.getAllValues().get(2).idempotencyKey());
+        assertThat(calls.getAllValues().get(2).options().get("operation")).isEqualTo("query");
+        clearInvocations(imageGateway);
+        var edit = TenantContext.runAs(tenantA, () -> imageCreations.editText(created.id(), done.items().getFirst().id(),
+                new ImageDtos.TextEdit("text-edit-version", "Summer", "Fresh today"), null));
+        runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(edit.id()).status())).isEqualTo("SUCCEEDED");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).status())).isEqualTo("SUCCEEDED");
+        var editCall = ArgumentCaptor.forClass(ProviderRequest.class);
+        verify(imageGateway).invokeReal(editCall.capture());
+        assertThat(editCall.getValue().prompt()).contains("Headline: Summer", "Caption: Fresh today");
+        var references = (List<?>) editCall.getValue().options().get("references");
+        assertThat(references).hasSize(1);
+        assertThat(((Map<?, ?>) references.getFirst()).get("dataUrl").toString()).startsWith("data:image/png;base64,");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.itemSnapshot(edit.items().getFirst().id()).getSpec().editSourceItemId()))
+                .isEqualTo(done.items().getFirst().id());
+    }
+
+    @Test
+    void imageReferenceOwnershipAndFileReadinessAreEnforced() {
+        enableImageModels();
+        var ticket = TenantContext.runAs(tenantA, () -> assets.presignUpload(new AssetDtos.PresignRequest("商品", "IMAGE", "image/png"), null));
+        var req = imageRequest("reference-ready", "PRODUCT_SET", 3, List.of(new ImageDtos.Reference(ticket.assetId(), "SUBJECT")));
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(req, null)))).isEqualTo(1400);
+        assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.create(req, null)))).isEqualTo(3001);
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("missing-subject", "PRODUCT_SET", 3, List.of()), null)))).isEqualTo(1400);
+    }
+
+    @Test
+    void imageSuiteRetriesOnlyFailedItemAndKeepsSuccessfulWorks() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(3);
+        var ticket = TenantContext.runAs(tenantA, () -> assets.presignUpload(new AssetDtos.PresignRequest("商品", "IMAGE", "image/png"), null));
+        byte[] bytes = imageRenderer.png(new java.awt.image.BufferedImage(480, 640, java.awt.image.BufferedImage.TYPE_INT_RGB));
+        imageStorage.put(ticket.storageKey(), bytes, "image/png");
+        TenantContext.runAs(tenantA, () -> assets.confirmUpload(ticket.assetId(), new AssetDtos.ConfirmRequest((long)bytes.length, null), null));
+        owner.update("delete from tasks where type='ASSET_PROBE'");
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
+                .thenReturn(imageResult()).thenReturn(new ProviderResult(true, "TEST", "failed-job", Map.of("status", "FAILED"), null, null))
+                .thenReturn(imageResult());
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("suite-partial", "PRODUCT_SET", 3,
+                List.of(new ImageDtos.Reference(ticket.assetId(), "SUBJECT"))), null));
+        runImageTask("DEFAULT", imagePlanHandler);
+        for (int n=0; n<3; n++) runImageTask("IMAGE", imageRenderHandler);
+        var partial = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()));
+        assertThat(partial.status()).isEqualTo("PARTIAL");assertThat(partial.completed()).isEqualTo(2);
+        var failed = partial.items().get(1);
+        TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(), failed.id(), failed.taskId(), null));
+        TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(), failed.id(), failed.taskId(), null));
+        assertThat(owner.queryForObject("select count(*) from tasks where type='IMAGE_RENDER' and status='PENDING'", Integer.class)).isEqualTo(1);
+        clearInvocations(imageGateway);
+        runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).completed())).isEqualTo(3);
+        verify(imageGateway, times(1)).invokeReal(any());
+    }
+
+    @Test
+    void posterVariantReplansWithoutChangingTheTextEditFlow() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(1, "夏日新品", "欢迎到店");
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY))).thenReturn(imageResult());
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("regenerate-source", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
+        var original = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()));
+        clearInvocations(imageGateway);
+        var revised = TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "LAYOUT", null));
+        var repeated = TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "LAYOUT", null));
+        assertThat(repeated.id()).isEqualTo(revised.id());
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "SCENE", null)))).isEqualTo(1400);
+        assertThat(revised.status()).isEqualTo("QUEUED");
+        runImageTask("DEFAULT", imagePlanHandler);
+        runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(revised.id()).status())).isEqualTo("SUCCEEDED");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(revised.id()).items().getFirst().headline())).isEqualTo("夏日新品");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(revised.id()).items().getFirst().caption())).isEqualTo("欢迎到店");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).items().getFirst().url())).contains("work.png");
+        var thread = TenantContext.runAs(tenantA, () -> imageCreations.thread(revised.id()));
+        assertThat(thread).extracting(ImageDtos.View::id).containsExactly(created.id(), revised.id());
+        assertThat(thread).allSatisfy(version -> assertThat(version.items().getFirst().url()).contains("work.png"));
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.rename(revised.id(), "  夏日活动海报  "))).isEqualTo("夏日活动海报");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.history("POSTER", 0, 20).items().getFirst().title())).isEqualTo("夏日活动海报");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20).items())).anyMatch(work -> work.creationId().equals(revised.id()) && work.title().equals("夏日活动海报"));
+        assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.thread(revised.id())))).isEqualTo(1404);
+        assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.rename(revised.id(), "越权改名")))).isEqualTo(1404);
+        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
+        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED
+                && r.prompt().contains("\"variation\":\"LAYOUT\"") && r.prompt().contains("\"previousPoster\"")));
+    }
+
+    @Test
+    void repeatedPosterReferenceProvidesHistoryAndWarnsWithoutExtraGeneration() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(1);
+        var ticket = TenantContext.runAs(tenantA, () -> assets.presignUpload(
+                new AssetDtos.PresignRequest("招牌饮品", "IMAGE", "image/png"), null));
+        byte[] reference = imageRenderer.png(new java.awt.image.BufferedImage(480, 640, java.awt.image.BufferedImage.TYPE_INT_RGB));
+        imageStorage.put(ticket.storageKey(), reference, "image/png");
+        TenantContext.runAs(tenantA, () -> assets.confirmUpload(ticket.assetId(),
+                new AssetDtos.ConfirmRequest((long) reference.length, null), null));
+        owner.update("delete from tasks where type='ASSET_PROBE'");
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY))).thenReturn(imageResult());
+        var refs=List.of(new ImageDtos.Reference(ticket.assetId(), "SUBJECT"));
+        var first=TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-first", "POSTER", 1, refs), null));
+        runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(first.id()).items().getFirst().similarityWarning())).isFalse();
+        clearInvocations(imageGateway);
+        var second=TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-second", "POSTER", 1, refs), null));
+        runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
+        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED
+                && r.prompt().contains("recentPostersToAvoid")));
+        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(second.id()).items().getFirst().similarityWarning())).isTrue();
+    }
+
+    @Test
+    void olderPostersWithoutReferenceFingerprintsStillProvideLayoutHistory() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(1);
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY))).thenReturn(imageResult());
+        var first=TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-legacy", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(first.id()).status())).isEqualTo("SUCCEEDED");
+        clearInvocations(imageGateway);
+        TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-next", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);
+        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED
+                && r.prompt().contains("recentPostersToAvoid")));
+        verify(imageGateway, never()).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
+    }
+
+    @Test
+    void imagePlansAreFencedAfterLeaseExpiryAndExhaustionIsVisible() {
+        enableImageModels(); planImageCount(1);
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("plan-fencing", "POSTER", 1, List.of()), null));
+        var task = tasks.claim("DEFAULT", 1).getFirst();
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.beginPlan(created.id(), task))).isTrue();
+        expire(task.getId());
+        TenantContext.runAs(tenantA, () -> {imageCreations.savePlan(created.id(), task,
+                new ImageDtos.Plan("过期结果", "", List.of(new ImageDtos.Spec("主图", "提示", "", ""))));return null;});
+        assertThat(owner.queryForObject("select count(*) from image_items", Integer.class)).isZero();
+        owner.update("update tasks set attempts=max_attempts where id=?", task.getId());
+        tasks.reclaimExpired();
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).status())).isEqualTo("INTERRUPTED");
+    }
+
+    @Test
+    void persistedBackgroundIsRecoveredWithoutResubmittingToProvider() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(1);
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("image-recover", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);
+        var item = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).items().getFirst());
+        imageStorage.put("t"+tenantA+"/generated/"+item.id()+"/0/background.png",
+                imageRenderer.png(new java.awt.image.BufferedImage(480, 640, java.awt.image.BufferedImage.TYPE_INT_RGB)), "image/png");
+        clearInvocations(imageGateway);
+        runImageTask("IMAGE", imageRenderHandler);
+        verify(imageGateway, never()).invokeReal(any());
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).status())).isEqualTo("SUCCEEDED");
+    }
+
     private Task submit(String key) {
         return TenantContext.runAs(tenantA, () -> tasks.submit("TEST", "TEST", Map.of("key", key), key, null));
+    }
+    @Test
+    void refinedPromptIsPersistedAndReusedDuringImagePolling() {
+        imageConfig.setQualities(List.of("480P"));
+        enableImageModels(); planImageCount(1); imageConfig.getRefiner().setEnabled(true);
+        String prompt="Subject: tea; Lighting: studio lighting; Color: warm palette; Composition: asymmetric; Depth: deep focus; Quality: professional photography, sharp focus, 8K; Avoid: blurry, watermark";
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER)))
+                .thenReturn(new ProviderResult(true,"TEST",null,Map.of("prompt",prompt,"_model","gpt-4o"),null,null));
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
+                .thenReturn(new ProviderResult(true,"TEST","refined-job",Map.of("status","RUNNING"),null,null))
+                .thenReturn(imageResult());
+        var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("refined-roundtrip","POSTER",1,List.of()),null));
+        runImageTask("DEFAULT",imagePlanHandler);runImageTask("IMAGE",imageRenderHandler);
+        owner.update("update tasks set run_after=now() where type='IMAGE_RENDER'");
+        runImageTask("IMAGE",imageRenderHandler);
+        var result=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()));
+        assertThat(result.status()).isEqualTo("SUCCEEDED");
+        var item=TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(result.items().getFirst().id()));
+        assertThat(item.getSpec().refinement().status()).isEqualTo("REFINED");
+        assertThat(item.getSpec().refinement().model()).isEqualTo("gpt-4o");
+        verify(imageGateway,times(1)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_REFINER && r.tenantId().equals(tenantA)));
+        var calls=ArgumentCaptor.forClass(ProviderRequest.class);
+        verify(imageGateway,times(4)).invokeReal(calls.capture());
+        var imageCalls=calls.getAllValues().stream().filter(r->r.alias()==ModelAlias.IMAGE_PRIMARY).toList();
+        assertThat(imageCalls).hasSize(2);
+        assertThat(imageCalls.getFirst().prompt()).startsWith(prompt).isEqualTo(imageCalls.getLast().prompt());
+    }
+
+    @Test
+    void synchronousTimeoutIsNotAutomaticallyResubmittedAndExplicitRetryGetsANewGeneration() {
+        imageConfig.setQualities(List.of("480P"));
+        imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.OPENAI);
+        enableImageModels(); planImageCount(1);
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
+                .thenThrow(new IllegalStateException("test transport timeout")).thenReturn(imageResult());
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("sync-timeout", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);
+        clearInvocations(imageGateway);
+        var task=runImageTask("IMAGE", imageRenderHandler);
+        TenantContext.runAs(tenantA, () -> imageRenderHandler.handle(task));
+        var failed=TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).items().getFirst());
+        assertThat(failed.status()).isEqualTo("FAILED");assertThat(failed.error()).contains("中转站记录");
+        verify(imageGateway,times(1)).invokeReal(any());
+        TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(),failed.id(),failed.taskId(),null));
+        runImageTask("IMAGE", imageRenderHandler);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).status())).isEqualTo("SUCCEEDED");
+        verify(imageGateway,times(2)).invokeReal(any());
+    }
+
+    @Test
+    void synchronousIntentSurvivesLeaseReclaimWithoutSendingAgain() {
+        imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.OPENAI);
+        enableImageModels(); planImageCount(1);
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("sync-crash", "POSTER", 1, List.of()), null));
+        runImageTask("DEFAULT", imagePlanHandler);
+        var item=TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).items().getFirst());
+        var task=tasks.claim("IMAGE",1).getFirst();
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.reserveSynchronousSubmission(item.id(),task))).isTrue();
+        expire(task.getId());tasks.reclaimExpired();owner.update("update tasks set run_after=now() where id=?",task.getId());
+        clearInvocations(imageGateway);
+        runImageTask("IMAGE",imageRenderHandler);
+        verify(imageGateway,never()).invokeReal(any());
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).items().getFirst().error())).contains("上次提交状态尚未确认");
+    }
+
+    @Test
+    void gptImage2AutomaticallyChoosesHighestQualityForEachRatio() {
+        enableImageModels();imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.OPENAI);
+        imageConfig.getGenerator().setModel("gpt-image-2");
+        var req=new ImageDtos.Create("too-large-square","POSTER","新品",List.of(),"1:1","4K",1,"朋友圈","自动",null);
+        var square=TenantContext.runAs(tenantA,()->imageCreations.create(req,null));
+        assertThat(square.quality()).isEqualTo("1080P");
+        var wide=new ImageDtos.Create("wide-highest","POSTER","新品",List.of(),"16:9","480P",1,"朋友圈","自动",null);
+        assertThat(TenantContext.runAs(tenantA,()->imageCreations.create(wide,null)).quality()).isEqualTo("4K");
+        assertThat(owner.queryForObject("select count(*) from tasks",Integer.class)).isEqualTo(2);
+        assertThat(imageCreations.capabilities().get("qualityRatios").toString()).contains("4K=[9:16, 16:9]");
     }
 
     private void expire(Long id) {

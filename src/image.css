@@ -23,7 +23,7 @@
 @media(prefers-reduced-motion:reduce){.workflow-tags span{transition:none}.workflow-tags span:hover{transform:none}}
 
 /* 图片工作区互切：与视频工作台共用滑动胶囊和页面转场 */
-.poster-studio-page,.product-set-studio{view-transition-name:image-workspace}
+.poster-workbench,.product-set-studio{view-transition-name:image-workspace}
 .poster-studio-header{position:relative}
 .image-workspace-switch{position:absolute;top:0;right:0;z-index:8;width:248px}
 /* 图片工作区切换栏需要脱离 flex 流，固定在各自页面的右上角。 */

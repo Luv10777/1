@@ -9,8 +9,12 @@ spring:
     username: ${DB_USER:growth_app}
     password: ${DB_PASSWORD:}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: ${DB_POOL_SIZE:50}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT:10000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT:300000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME:1800000}
+      leak-detection-threshold: ${DB_POOL_LEAK_DETECTION:60000}
 
   jpa:
     open-in-view: false
@@ -43,6 +47,55 @@ server:
 
 # ---- 平台自有配置 ----
 growth:
+  image:
+    base-url: ${NEW_API_BASE_URL:}
+    planner-alias: ${IMAGE_PLANNER_ALIAS:TEXT_PLANNER_ADVANCED}
+    tenant-max-concurrent: ${IMAGE_TENANT_MAX_CONCURRENT:20}
+    global-max-concurrent: ${IMAGE_GLOBAL_MAX_CONCURRENT:200}
+    api-rate-limit: ${IMAGE_API_RATE_LIMIT:100}
+    api-timeout: ${IMAGE_API_TIMEOUT:10}
+    upload-max-pixels: ${IMAGE_UPLOAD_MAX_PIXELS:50000000}
+    creation-lock-wait-seconds: ${IMAGE_CREATION_LOCK_WAIT_SECONDS:5}
+    creation-lock-lease-seconds: ${IMAGE_CREATION_LOCK_LEASE_SECONDS:120}
+    planner:
+      url: ${IMAGE_PLANNER_URL:}
+      api-key: ${IMAGE_PLANNER_API_KEY:${NEW_API_API_KEY:}}
+      model: ${IMAGE_PLANNER_MODEL:}
+    advanced-planner:
+      url: ${IMAGE_ADVANCED_PLANNER_URL:${IMAGE_PLANNER_URL:}}
+      api-key: ${IMAGE_ADVANCED_PLANNER_API_KEY:${IMAGE_PLANNER_API_KEY:${NEW_API_API_KEY:}}}
+      model: ${IMAGE_ADVANCED_PLANNER_MODEL:gpt-5.6-luna}
+      temperature: ${IMAGE_ADVANCED_PLANNER_TEMPERATURE:0.7}
+      max-tokens: ${IMAGE_ADVANCED_PLANNER_MAX_TOKENS:2000}
+      timeout-seconds: ${IMAGE_ADVANCED_PLANNER_TIMEOUT_SECONDS:60}
+    refiner:
+      enabled: ${IMAGE_REFINER_ENABLED:true}
+      url: ${IMAGE_REFINER_URL:}
+      api-key: ${IMAGE_REFINER_API_KEY:${NEW_API_API_KEY:}}
+      model: ${IMAGE_REFINER_MODEL:gpt-4o}
+      temperature: ${IMAGE_REFINER_TEMPERATURE:0.5}
+      max-tokens: ${IMAGE_REFINER_MAX_TOKENS:1500}
+      timeout-seconds: ${IMAGE_REFINER_TIMEOUT_SECONDS:30}
+    generator:
+      protocol: ${IMAGE_GENERATOR_PROTOCOL:OPENAI}
+      url: ${IMAGE_GENERATOR_URL:}
+      edits-url: ${IMAGE_GENERATOR_EDITS_URL:}
+      api-key: ${IMAGE_GENERATOR_API_KEY:${NEW_API_API_KEY:}}
+      model: ${IMAGE_GENERATOR_MODEL:}
+      quality: ${IMAGE_GENERATOR_QUALITY:}
+      response-format: ${IMAGE_GENERATOR_RESPONSE_FORMAT:}
+      download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:}
+    qualities: ${IMAGE_SUPPORTED_QUALITIES:480P,720P,1080P,4K}
+    max-output-pixels: ${IMAGE_MAX_OUTPUT_PIXELS:0}
+    timeout-seconds: ${IMAGE_TIMEOUT_SECONDS:120}
+    poll-seconds: ${IMAGE_POLL_SECONDS:5}
+    max-polls: ${IMAGE_MAX_POLLS:360}
+    font: ${IMAGE_FONT:Microsoft YaHei}
+  http:
+    max-total: ${HTTP_MAX_TOTAL:200}
+    max-per-route: ${HTTP_MAX_PER_ROUTE:50}
+    connection-timeout: ${HTTP_CONNECTION_TIMEOUT:15}
+    socket-timeout: ${HTTP_SOCKET_TIMEOUT:120}
   jwt:
     # 至少 32 字节。生产必须用环境变量注入。
     secret: ${JWT_SECRET:}
@@ -61,10 +114,13 @@ growth:
       template-code: ${ALIYUN_SMS_TEMPLATE_CODE:}
   storage:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:${MINIO_ENDPOINT:http://localhost:9000}}
+    region: ${MINIO_REGION:us-east-1}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: ${MINIO_BUCKET:growth-assets}
     presign-ttl: 15m
+    cleanup-interval-ms: ${STORAGE_CLEANUP_INTERVAL_MS:3600000}
   worker:
     # api 进程设 false，worker 进程设 true。同一个 jar，两条启动命令。
     enabled: ${WORKER_ENABLED:false}
@@ -75,9 +131,14 @@ growth:
     heartbeat-interval: 10000
 
 management:
-  endpoints.web.exposure.include: health,info
-  endpoint.health.show-details: never
+  endpoints.web.exposure.include: ${MANAGEMENT_EXPOSURE_INCLUDE:health}
+  endpoint.health.show-details: when_authorized
+  endpoint.health.roles: ACTUATOR
 
 logging:
   level:
-    com.wuyao.growth: DEBUG
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.wuyao.growth: ${LOG_LEVEL:INFO}
+    com.wuyao.growth.creative.image: ${LOG_LEVEL_IMAGE:DEBUG}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_LEVEL_SQL_PARAMS:WARN}

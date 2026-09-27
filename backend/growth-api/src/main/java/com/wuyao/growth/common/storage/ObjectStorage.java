@@ -26,4 +26,9 @@ public interface ObjectStorage {
     }
 
     void delete(String key);
+
+    /** Small image objects only; implementations enforce the byte limit before decoding. */
+    byte[] read(String key, int maxBytes);
+
+    void put(String key, byte[] data, String contentType);
 }

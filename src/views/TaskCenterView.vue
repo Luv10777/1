@@ -1,4 +1,5 @@
 <script setup>
+import ImageCreationRecords from '../components/ImageCreationRecords.vue'
 import { ref, reactive, onMounted } from 'vue'
 import { isDemoMode } from '../utils/config'
 import Loading from '../components/Loading.vue'
@@ -106,104 +107,111 @@ filteredTasks.value = tasks.value
 </script>
 
 <template>
-  <div class="task-center">
-    <header class="page-header">
-      <div class="header-top">
-        <div class="title-group">
-          <span class="eyebrow mono">TASK CENTER</span>
-          <h1>任务中心</h1>
+  <div>
+    <ImageCreationRecords mode="tasks" />
+    <details class="image-other-demo">
+      <summary>其他模块的界面示例（演示数据）</summary>
+
+      <div class="task-center">
+        <header class="page-header">
+          <div class="header-top">
+            <div class="title-group">
+              <span class="eyebrow mono">TASK CENTER</span>
+              <h1>任务中心</h1>
+            </div>
+            <div class="header-actions">
+              <button class="secondary-button" @click="loadTasks">
+                <span>↻</span> 刷新
+              </button>
+            </div>
+          </div>
+          <p class="header-desc">所有AI生成任务的统一管理和监控</p>
+        </header>
+
+        <section class="filter-bar">
+          <div class="filter-group">
+            <label>状态</label>
+            <select v-model="filter.status" class="filter-select">
+              <option value="all">全部状态</option>
+              <option value="PENDING">待处理</option>
+              <option value="PROCESSING">处理中</option>
+              <option value="COMPLETED">已完成</option>
+              <option value="FAILED">失败</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>类型</label>
+            <select v-model="filter.type" class="filter-select">
+              <option value="all">全部类型</option>
+              <option value="TEXT_GENERATION">文本生成</option>
+              <option value="IMAGE_GENERATION">图片生成</option>
+              <option value="VIDEO_GENERATION">视频生成</option>
+              <option value="BATCH_GENERATION">批量生成</option>
+            </select>
+          </div>
+        </section>
+
+        <Loading v-if="loading" text="加载任务列表..." />
+
+        <Empty
+          v-else-if="tasks.length === 0"
+          icon="◌"
+          title="暂无任务"
+          description="还没有创建任何AI生成任务"
+        />
+
+        <div v-else class="task-list">
+          <div v-for="task in tasks" :key="task.id" class="task-card">
+            <div class="task-header">
+              <div class="task-meta">
+                <span class="task-code mono">{{ task.code }}</span>
+                <span class="task-type">{{ typeMap[task.type] }}</span>
+              </div>
+              <StatusBadge :status="getStatusConfig(task.status).color" :text="getStatusConfig(task.status).label" />
+            </div>
+
+            <div class="task-body">
+              <div class="task-info-row">
+                <span class="label">模型</span>
+                <span class="value mono">{{ task.modelAlias }}</span>
+              </div>
+              <div class="task-info-row">
+                <span class="label">预估成本</span>
+                <span class="value">{{ formatCost(task.estimatedCost) }}</span>
+              </div>
+              <div v-if="task.actualCost" class="task-info-row">
+                <span class="label">实际成本</span>
+                <span class="value">{{ formatCost(task.actualCost) }}</span>
+              </div>
+              <div class="task-info-row">
+                <span class="label">创建时间</span>
+                <span class="value">{{ formatDate(task.createdAt) }}</span>
+              </div>
+            </div>
+
+            <div v-if="task.status === 'PROCESSING'" class="task-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: task.progress + '%' }" />
+              </div>
+              <span class="progress-text">{{ task.progress }}%</span>
+            </div>
+
+            <div class="task-actions">
+              <button v-if="task.status === 'COMPLETED'" class="link-button">查看结果</button>
+              <button v-if="task.status === 'FAILED'" class="link-button">重试</button>
+              <button v-if="task.status === 'PENDING' || task.status === 'QUEUED'" class="link-button danger">取消</button>
+            </div>
+          </div>
         </div>
-        <div class="header-actions">
-          <button class="secondary-button" @click="loadTasks">
-            <span>↻</span> 刷新
-          </button>
-        </div>
+
+        <footer class="page-footer">
+          <p class="demo-notice">
+            <span class="status-pulse offline" />
+            演示模式 · 任务处理需要后端服务运行
+          </p>
+        </footer>
       </div>
-      <p class="header-desc">所有AI生成任务的统一管理和监控</p>
-    </header>
-
-    <section class="filter-bar">
-      <div class="filter-group">
-        <label>状态</label>
-        <select v-model="filter.status" class="filter-select">
-          <option value="all">全部状态</option>
-          <option value="PENDING">待处理</option>
-          <option value="PROCESSING">处理中</option>
-          <option value="COMPLETED">已完成</option>
-          <option value="FAILED">失败</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>类型</label>
-        <select v-model="filter.type" class="filter-select">
-          <option value="all">全部类型</option>
-          <option value="TEXT_GENERATION">文本生成</option>
-          <option value="IMAGE_GENERATION">图片生成</option>
-          <option value="VIDEO_GENERATION">视频生成</option>
-          <option value="BATCH_GENERATION">批量生成</option>
-        </select>
-      </div>
-    </section>
-
-    <Loading v-if="loading" text="加载任务列表..." />
-
-    <Empty
-      v-else-if="tasks.length === 0"
-      icon="◌"
-      title="暂无任务"
-      description="还没有创建任何AI生成任务"
-    />
-
-    <div v-else class="task-list">
-      <div v-for="task in tasks" :key="task.id" class="task-card">
-        <div class="task-header">
-          <div class="task-meta">
-            <span class="task-code mono">{{ task.code }}</span>
-            <span class="task-type">{{ typeMap[task.type] }}</span>
-          </div>
-          <StatusBadge :status="getStatusConfig(task.status).color" :text="getStatusConfig(task.status).label" />
-        </div>
-
-        <div class="task-body">
-          <div class="task-info-row">
-            <span class="label">模型</span>
-            <span class="value mono">{{ task.modelAlias }}</span>
-          </div>
-          <div class="task-info-row">
-            <span class="label">预估成本</span>
-            <span class="value">{{ formatCost(task.estimatedCost) }}</span>
-          </div>
-          <div v-if="task.actualCost" class="task-info-row">
-            <span class="label">实际成本</span>
-            <span class="value">{{ formatCost(task.actualCost) }}</span>
-          </div>
-          <div class="task-info-row">
-            <span class="label">创建时间</span>
-            <span class="value">{{ formatDate(task.createdAt) }}</span>
-          </div>
-        </div>
-
-        <div v-if="task.status === 'PROCESSING'" class="task-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: task.progress + '%' }" />
-          </div>
-          <span class="progress-text">{{ task.progress }}%</span>
-        </div>
-
-        <div class="task-actions">
-          <button v-if="task.status === 'COMPLETED'" class="link-button">查看结果</button>
-          <button v-if="task.status === 'FAILED'" class="link-button">重试</button>
-          <button v-if="task.status === 'PENDING' || task.status === 'QUEUED'" class="link-button danger">取消</button>
-        </div>
-      </div>
-    </div>
-
-    <footer class="page-footer">
-      <p class="demo-notice">
-        <span class="status-pulse offline" />
-        演示模式 · 任务处理需要后端服务运行
-      </p>
-    </footer>
+    </details>
   </div>
 </template>
 
@@ -438,4 +446,8 @@ filteredTasks.value = tasks.value
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+</style>
+
+<style scoped>
+.image-other-demo{margin-top:24px}.image-other-demo>summary{cursor:pointer;font-size:12px;color:var(--color-text-muted);padding:14px 0}
 </style>
