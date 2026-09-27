@@ -40,7 +40,12 @@ public enum ErrorCode {
 
     // ---- asset ----
     ASSET_NOT_FOUND(3001),
-    ASSET_UPLOAD_FAILED(3002);
+    ASSET_UPLOAD_FAILED(3002),
+
+    IMAGE_NOT_CONFIGURED(4001),
+    IMAGE_PROVIDER_ERROR(4002),
+    IMAGE_PLAN_INVALID(4003),
+    IMAGE_QUALITY_UNSUPPORTED(4004);
 
     private final int code;
 

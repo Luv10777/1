@@ -1,20 +1,48 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { imageApi, downloadImage } from '../services/imageCreation'
 import { ArrowUpRight, Check, Clock3, Download, Edit3, FileText, Image as ImageIcon, LayoutGrid, List, MapPin, Plus, Search, SlidersHorizontal, Sparkles, Video, X, WandSparkles } from 'lucide-vue-next'
 
 const router = useRouter()
 const mockWorks = [
   { id: 'chronicle-01', title: '城市夜游 · 光影叙事短片', date: '2026-08-30', type: 'video', typeLabel: 'AI 视频', status: 'generating', statusLabel: '方志编撰中', tags: ['城市文旅', '60s 竖屏'], summary: '让城市灯火成为主角，穿行于夜色与人群之间。', tone: 'cinnabar', progress: 68, prompt: '夜幕下的城市文旅宣传片，镜头从街巷灯火缓慢推进，穿过人群与灯火，最后停在江边的城市天际线。电影感，克制高级，竖屏 9:16。', references: ['城市夜景参考.jpg', '品牌色板.png'], model: 'Video 2.1', size: '1080 × 1920 px', duration: '00:12', seed: '842193' },
-  { id: 'chronicle-02', title: '春日限定 · 手冲咖啡主视觉', date: '2026-08-29', type: 'image', typeLabel: 'AI 生图', status: 'completed', statusLabel: '已完成', tags: ['新品上市', '视觉海报'], summary: '以晨雾、陶土与咖啡香气，构成一张有呼吸感的海报。', tone: 'amber', prompt: '春日限定手冲咖啡海报，晨雾感自然光，陶土色桌面，咖啡器具与新鲜烘焙豆，留出右上角标题空间，杂志感静物摄影。', references: ['咖啡杯产品照.jpg', '门店 Logo.svg'], model: 'Image Pro', size: '2048 × 2732 px', duration: '—', seed: '381204' },
   { id: 'chronicle-03', title: '小红书探店笔记 · 叙事版', date: '2026-08-28', type: 'copy', typeLabel: '营销文案', status: 'completed', statusLabel: '已完成', tags: ['小红书', '第一人称'], summary: '把一次普通的探店，写成值得收藏的周末路线。', tone: 'blue' },
   { id: 'chronicle-04', title: '门店经营体检 · 八月诊断报告', date: '2026-08-27', type: 'diagnosis', typeLabel: '探店诊断', status: 'completed', statusLabel: '已完成', tags: ['经营分析', '行动建议'], summary: '从客流、内容与转化三条链路，找到本月最值得投入的动作。', tone: 'green', diagnosis: { score: '78', level: '稳步增长', summary: '门店自然客流保持增长，但内容发布与到店转化之间仍有明显断层。建议优先补齐“周末场景 + 真实顾客反馈”两类内容。', metrics: [{ label: '内容活跃度', value: '86', change: '+12%' }, { label: '到店转化', value: '64', change: '+4%' }, { label: '复购意向', value: '71', change: '+8%' }], actions: ['每周发布 2 条真实探店内容', '将会员权益前置到短视频前三秒', '为高意向顾客配置到店提醒'] } },
-  { id: 'chronicle-05', title: '秋日新品 · 系列封面组图', date: '2026-08-25', type: 'image', typeLabel: 'AI 生图', status: 'completed', statusLabel: '已完成', tags: ['系列物料', '品牌资产'], summary: '同一套光线与构图，保持品牌资产在不同场景中的秩序感。', tone: 'rose' },
   { id: 'chronicle-06', title: '三分钟读懂 · 门店会员权益', date: '2026-08-24', type: 'video', typeLabel: '数字人视频', status: 'generating', statusLabel: '方志编撰中', tags: ['会员运营', '口播动画'], summary: '将复杂的权益说明，转译成清晰、轻量、可分享的内容。', tone: 'cyan', progress: 34, editorPath: '/digital-human/studio', prompt: '请用亲和、可信的店长口吻，介绍门店会员权益，突出首次到店礼、积分兑换和生日礼遇。', references: ['店长形象参考.png', '会员权益卡.png'], model: 'Digital Human Studio', size: '1080 × 1920 px', duration: '00:30', seed: '619204' },
 ]
 const filters = [{ key: 'all', label: '全部作品' }, { key: 'video', label: 'AI 视频' }, { key: 'image', label: 'AI 生图' }, { key: 'copy', label: '营销文案' }, { key: 'diagnosis', label: '探店诊断' }]
 const activeFilter = ref('all'); const searchQuery = ref(''); const layout = ref('grid')
-const filteredWorks = computed(() => { const query = searchQuery.value.trim().toLowerCase(); return mockWorks.filter((work) => (activeFilter.value === 'all' || work.type === activeFilter.value) && (!query || `${work.title} ${work.summary} ${work.tags.join(' ')}`.toLowerCase().includes(query))) })
+const imageWorks = ref([])
+const worksPage = ref(0)
+const worksTotalPages = ref(0)
+const worksLoading = ref(false)
+const worksError = ref('')
+const allWorks = computed(() => [...imageWorks.value, ...mockWorks])
+const filteredWorks = computed(() => { const query = searchQuery.value.trim().toLowerCase(); return allWorks.value.filter((work) => (activeFilter.value === 'all' || work.type === activeFilter.value) && (!query || `${work.title} ${work.summary} ${work.tags.join(' ')}`.toLowerCase().includes(query))) })
+async function loadImageWorks(page = 0) {
+  if (worksLoading.value) return
+  worksLoading.value = true; worksError.value = ''
+  try {
+    const data = await imageApi.works(page)
+    const mapped = data.items.map(row => ({
+      id: `image-${row.id}`, creationId: row.creationId, realImage: true,
+      title: row.title || 'AI 图片作品', date: new Date(row.createdAt).toLocaleDateString('zh-CN'),
+      type: 'image', typeLabel: 'AI 生图', status: 'completed', statusLabel: '已完成',
+      tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '营销海报', row.quality],
+      summary: row.title || 'AI 图片作品', tone: 'amber', url: row.url,
+      workflow: row.workflow, size: `${row.width} × ${row.height} px`, references: [],
+    }))
+    imageWorks.value = page === 0 ? mapped : [...imageWorks.value, ...mapped]
+    worksPage.value = page; worksTotalPages.value = data.totalPages
+  } catch (error) { worksError.value = error.message }
+  finally { worksLoading.value = false }
+}
+async function downloadWork(work) {
+  if (!work.url) return
+  try { await downloadImage(work.url, `一方志作品-${work.creationId}.png`) }
+  catch (error) { worksError.value = error.message }
+}
 const typeIcon = { video: Video, image: ImageIcon, copy: FileText, diagnosis: MapPin }
 const toneClasses = { cinnabar: 'tone-cinnabar', amber: 'tone-amber', blue: 'tone-blue', green: 'tone-green', rose: 'tone-rose', cyan: 'tone-cyan' }
 const reEdit = () => router.push('/creative')
@@ -22,6 +50,10 @@ const selectedWork = ref(null)
 const openDetails = (work) => { selectedWork.value = work }
 const closeDetails = () => { selectedWork.value = null }
 const editWork = async (work) => {
+  if (work.realImage) {
+    closeDetails()
+    return router.push({ path: work.workflow === 'PRODUCT_SET' ? '/image/create/product-set' : '/image/create/poster', query: { creation: work.creationId } })
+  }
   const path = work.editorPath || (work.type === 'digital-human' ? '/digital-human/studio' : work.type === 'video' ? '/video/workbench' : work.type === 'image' ? '/image/create/poster' : work.type === 'diagnosis' ? '/analytics/diagnosis' : '/copy/rewrite')
   const query = { workId: work.id, prompt: work.prompt || work.summary, assets: work.references?.join('|') || '', ratio: work.size?.includes('1920') ? '9:16' : undefined, duration: work.duration?.replace('00:', '') || undefined }
   closeDetails()
@@ -38,39 +70,44 @@ const editWork = async (work) => {
   }
 }
 const handleModalKeydown = (event) => { if (event.key === 'Escape') closeDetails() }
-onMounted(() => window.addEventListener('keydown', handleModalKeydown))
+onMounted(() => { window.addEventListener('keydown', handleModalKeydown); loadImageWorks() })
 onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 </script>
 
 <template>
-  <div class="works-library">
-    <header class="works-header">
-      <div class="works-heading">
-        <div class="works-title-copy"><h1>数字方志库</h1><p class="works-subtitle">每一次生成，都是一颗可追溯、可复用的内容篇章。</p></div>
-        <button class="new-work-button" type="button" @click="reEdit"><Plus :size="16" stroke-width="1.8" /> 新建创作</button>
-      </div>
-      <div class="works-toolbar">
-        <div class="filter-tabs" role="tablist" aria-label="作品类型筛选"><button v-for="filter in filters" :key="filter.key" class="filter-tab" :class="{ active: activeFilter === filter.key }" type="button" role="tab" :aria-selected="activeFilter === filter.key" @click="activeFilter = filter.key">{{ filter.label }}</button></div>
-        <div class="toolbar-actions"><label class="search-field"><Search :size="16" stroke-width="1.8" aria-hidden="true" /><input v-model="searchQuery" type="search" placeholder="搜索作品标题或标签" aria-label="搜索作品" /></label><button class="icon-control" type="button" aria-label="筛选设置"><SlidersHorizontal :size="17" stroke-width="1.8" /></button><div class="layout-switch" role="group" aria-label="切换布局"><button :class="{ active: layout === 'grid' }" type="button" aria-label="网格布局" @click="layout = 'grid'"><LayoutGrid :size="16" /></button><button :class="{ active: layout === 'list' }" type="button" aria-label="列表布局" @click="layout = 'list'"><List :size="17" /></button></div></div>
-      </div>
-    </header>
-    <div class="library-meta"><span>共 {{ filteredWorks.length }} 件作品</span><span class="meta-divider" /><span><span class="live-dot" /> {{ mockWorks.filter(work => work.status === 'generating').length }} 个任务正在生成</span></div>
-    <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
-      <article v-for="(work, index) in filteredWorks" :key="work.id" class="work-card" :class="`card-${work.tone}`" :style="{ '--stagger': `${index * 55}ms` }" tabindex="0" @click="openDetails(work)" @keydown.enter="openDetails(work)">
-        <div class="work-thumb" :class="toneClasses[work.tone]"><div class="thumb-noise" /><div class="thumb-content"><component :is="typeIcon[work.type]" :size="21" stroke-width="1.5" /><span>{{ work.typeLabel }}</span><strong>{{ work.summary }}</strong></div><div v-if="work.type === 'video'" class="thumb-timeline"><span /><span /><span /><span /><span /></div><div v-else-if="work.type === 'image'" class="thumb-shape" /><div v-else class="thumb-lines"><i /><i /><i /></div><div class="thumb-overlay"><button class="download-button" type="button" aria-label="下载作品" @click.stop><Download :size="17" stroke-width="1.8" /></button></div><div class="status-pill" :class="work.status"><span v-if="work.status === 'generating'" class="status-pulse" /><Check v-else :size="12" stroke-width="2.2" /> {{ work.statusLabel }}</div></div>
-        <div class="work-body"><div class="work-title-row"><h2>{{ work.title }}</h2><button class="more-button" type="button" aria-label="查看详情" @click.stop="openDetails(work)"><ArrowUpRight :size="16" stroke-width="1.7" /></button></div><div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ work.date }}</div><div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div><div v-if="work.status === 'generating'" class="generation-progress"><div><span>生成中</span><strong>{{ work.progress }}%</strong></div><div class="progress-track"><span :style="{ width: `${work.progress}%` }" /></div></div></div>
-      </article>
-    </section>
-    <div v-if="!filteredWorks.length" class="empty-state"><Sparkles :size="24" stroke-width="1.5" /><strong>没有找到匹配的作品</strong><span>试试其他关键词，或切换到全部作品。</span></div>
+  <div>
+      <div class="works-library">
+        <header class="works-header">
+          <div class="works-heading">
+            <div class="works-title-copy"><h1>数字方志库</h1><p class="works-subtitle">每一次生成，都是一颗可追溯、可复用的内容篇章。</p></div>
+            <button class="new-work-button" type="button" @click="reEdit"><Plus :size="16" stroke-width="1.8" /> 新建创作</button>
+          </div>
+          <div class="works-toolbar">
+            <div class="filter-tabs" role="tablist" aria-label="作品类型筛选"><button v-for="filter in filters" :key="filter.key" class="filter-tab" :class="{ active: activeFilter === filter.key }" type="button" role="tab" :aria-selected="activeFilter === filter.key" @click="activeFilter = filter.key">{{ filter.label }}</button></div>
+            <div class="toolbar-actions"><label class="search-field"><Search :size="16" stroke-width="1.8" aria-hidden="true" /><input v-model="searchQuery" type="search" placeholder="搜索作品标题或标签" aria-label="搜索作品" /></label><button class="icon-control" type="button" aria-label="筛选设置"><SlidersHorizontal :size="17" stroke-width="1.8" /></button><div class="layout-switch" role="group" aria-label="切换布局"><button :class="{ active: layout === 'grid' }" type="button" aria-label="网格布局" @click="layout = 'grid'"><LayoutGrid :size="16" /></button><button :class="{ active: layout === 'list' }" type="button" aria-label="列表布局" @click="layout = 'list'"><List :size="17" /></button></div></div>
+          </div>
+        </header>
+        <div class="library-meta"><span>共 {{ filteredWorks.length }} 件作品</span><span class="meta-divider" /><span><span class="live-dot" /> {{ mockWorks.filter(work => work.status === 'generating').length }} 个任务正在生成</span></div>
+        <p v-if="worksError" class="works-error" role="alert">{{ worksError }} <button type="button" @click="loadImageWorks(worksPage)">重试</button></p>
+        <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
+          <article v-for="(work, index) in filteredWorks" :key="work.id" class="work-card" :class="`card-${work.tone}`" :style="{ '--stagger': `${index * 55}ms` }" tabindex="0" @click="openDetails(work)" @keydown.enter="openDetails(work)">
+            <div class="work-thumb" :class="toneClasses[work.tone]"><img v-if="work.url" class="work-real-image" :src="work.url" :alt="work.title" loading="lazy" /><template v-else><div class="thumb-noise" /><div class="thumb-content"><component :is="typeIcon[work.type]" :size="21" stroke-width="1.5" /><span>{{ work.typeLabel }}</span><strong>{{ work.summary }}</strong></div><div v-if="work.type === 'video'" class="thumb-timeline"><span /><span /><span /><span /><span /></div><div v-else-if="work.type === 'image'" class="thumb-shape" /><div v-else class="thumb-lines"><i /><i /><i /></div></template><div class="thumb-overlay"><button v-if="work.url" class="download-button" type="button" aria-label="下载作品" @click.stop="downloadWork(work)"><Download :size="17" stroke-width="1.8" /></button></div><div class="status-pill" :class="work.status"><span v-if="work.status === 'generating'" class="status-pulse" /><Check v-else :size="12" stroke-width="2.2" /> {{ work.statusLabel }}</div></div>
+            <div class="work-body"><div class="work-title-row"><h2>{{ work.title }}</h2><button class="more-button" type="button" aria-label="查看详情" @click.stop="openDetails(work)"><ArrowUpRight :size="16" stroke-width="1.7" /></button></div><div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ work.date }}</div><div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div><div v-if="work.status === 'generating'" class="generation-progress"><div><span>生成中</span><strong>{{ work.progress }}%</strong></div><div class="progress-track"><span :style="{ width: `${work.progress}%` }" /></div></div></div>
+          </article>
+        </section>
+        <div v-if="!filteredWorks.length" class="empty-state"><Sparkles :size="24" stroke-width="1.5" /><strong>没有找到匹配的作品</strong><span>试试其他关键词，或切换到全部作品。</span></div>
+        <button v-if="worksPage + 1 < worksTotalPages" class="works-load-more" type="button" :disabled="worksLoading" @click="loadImageWorks(worksPage + 1)">{{ worksLoading ? '正在读取…' : '加载更多图片' }}</button>
 
-    <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
-      <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
-        <header class="detail-header"><div><p class="detail-eyebrow"><WandSparkles :size="14" /> {{ selectedWork.typeLabel }} / HISTORY</p><h2>{{ selectedWork.title }}</h2><p class="detail-date">生成于 {{ selectedWork.date }} · {{ selectedWork.statusLabel }}</p></div><button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button></header>
-        <div v-if="selectedWork.type === 'diagnosis'" class="diagnosis-detail"><div class="diagnosis-score"><span>本次诊断评分</span><strong>{{ selectedWork.diagnosis.score }}</strong><em>{{ selectedWork.diagnosis.level }}</em></div><div class="diagnosis-summary">{{ selectedWork.diagnosis.summary }}</div><div class="diagnosis-metrics"><div v-for="metric in selectedWork.diagnosis.metrics" :key="metric.label"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><em>{{ metric.change }}</em></div></div><div class="detail-block"><h3>建议行动</h3><ul><li v-for="action in selectedWork.diagnosis.actions" :key="action">{{ action }}</li></ul></div></div>
-        <div v-else class="generation-detail"><div class="detail-preview" :class="toneClasses[selectedWork.tone]"><component :is="typeIcon[selectedWork.type]" :size="30" stroke-width="1.4" /><span>{{ selectedWork.typeLabel }}</span><strong>{{ selectedWork.summary }}</strong></div><div class="detail-block"><h3>生成输入</h3><p class="prompt-copy">{{ selectedWork.prompt }}</p></div><div class="detail-block"><h3>参考素材 <small>{{ selectedWork.references.length }} 个文件</small></h3><div class="reference-list"><span v-for="reference in selectedWork.references" :key="reference"><ImageIcon :size="14" /> {{ reference }}</span></div></div><div class="parameter-grid"><div><span>模型</span><strong>{{ selectedWork.model }}</strong></div><div><span>画布尺寸</span><strong>{{ selectedWork.size }}</strong></div><div><span>时长</span><strong>{{ selectedWork.duration }}</strong></div><div><span>随机种子</span><strong>{{ selectedWork.seed }}</strong></div></div></div>
-        <footer class="detail-footer"><span>作品 ID · {{ selectedWork.id }}</span><div><button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button><button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 编辑</button></div></footer>
-      </section>
-    </div>
+        <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
+          <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
+            <header class="detail-header"><div><p class="detail-eyebrow"><WandSparkles :size="14" /> {{ selectedWork.typeLabel }} / HISTORY</p><h2>{{ selectedWork.title }}</h2><p class="detail-date">生成于 {{ selectedWork.date }} · {{ selectedWork.statusLabel }}</p></div><button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button></header>
+            <div v-if="selectedWork.type === 'diagnosis'" class="diagnosis-detail"><div class="diagnosis-score"><span>本次诊断评分</span><strong>{{ selectedWork.diagnosis.score }}</strong><em>{{ selectedWork.diagnosis.level }}</em></div><div class="diagnosis-summary">{{ selectedWork.diagnosis.summary }}</div><div class="diagnosis-metrics"><div v-for="metric in selectedWork.diagnosis.metrics" :key="metric.label"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><em>{{ metric.change }}</em></div></div><div class="detail-block"><h3>建议行动</h3><ul><li v-for="action in selectedWork.diagnosis.actions" :key="action">{{ action }}</li></ul></div></div>
+            <div v-else-if="selectedWork.realImage" class="generation-detail"><img class="detail-real-image" :src="selectedWork.url" :alt="selectedWork.title" /><div class="parameter-grid"><div><span>类型</span><strong>{{ selectedWork.tags[0] }}</strong></div><div><span>画质</span><strong>{{ selectedWork.tags[1] }}</strong></div><div><span>画布尺寸</span><strong>{{ selectedWork.size }}</strong></div></div></div>
+            <div v-else class="generation-detail"><div class="detail-preview" :class="toneClasses[selectedWork.tone]"><component :is="typeIcon[selectedWork.type]" :size="30" stroke-width="1.4" /><span>{{ selectedWork.typeLabel }}</span><strong>{{ selectedWork.summary }}</strong></div><div class="detail-block"><h3>生成输入</h3><p class="prompt-copy">{{ selectedWork.prompt }}</p></div><div class="detail-block"><h3>参考素材 <small>{{ selectedWork.references.length }} 个文件</small></h3><div class="reference-list"><span v-for="reference in selectedWork.references" :key="reference"><ImageIcon :size="14" /> {{ reference }}</span></div></div><div class="parameter-grid"><div><span>模型</span><strong>{{ selectedWork.model }}</strong></div><div><span>画布尺寸</span><strong>{{ selectedWork.size }}</strong></div><div><span>时长</span><strong>{{ selectedWork.duration }}</strong></div><div><span>随机种子</span><strong>{{ selectedWork.seed }}</strong></div></div></div>
+            <footer class="detail-footer"><span>作品 ID · {{ selectedWork.id }}</span><div><button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button><button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 编辑</button></div></footer>
+          </section>
+        </div>
+      </div>
   </div>
 </template>
 
@@ -100,4 +137,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .work-card.card-cinnabar .work-body{background:var(--color-bg-surface)}.work-card.card-amber .work-body{background:var(--color-bg-surface)}.work-card.card-blue .work-body{background:var(--color-bg-surface)}.work-card.card-green .work-body{background:var(--color-bg-surface)}.work-card.card-rose .work-body{background:var(--color-bg-surface)}.work-card.card-cyan .work-body{background:var(--color-bg-surface)}
 .work-card:hover{border-color:var(--color-border-subtle);box-shadow:var(--shadow-paper)}
 .works-library{background:transparent;box-shadow:var(--shadow-paper)}.filter-tab:hover{color:var(--color-text-muted);background:var(--color-bg-subtle)}
+</style>
+
+<style scoped>
+.work-real-image{display:block;width:100%;height:210px;object-fit:contain;background:var(--color-bg-subtle)}
+.detail-real-image{display:block;max-width:100%;max-height:48vh;margin:0 auto;object-fit:contain}
+.works-error{margin:0 0 16px;color:var(--color-accent-text);font-size:12px}
+.works-error button{border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer}
+.works-load-more{display:block;margin:24px auto 0;padding:9px 18px;border:1px solid var(--color-border-subtle);border-radius:6px;background:var(--color-bg-surface);color:var(--color-primary);cursor:pointer}
+.works-load-more:disabled{opacity:.5;cursor:default}
 </style>

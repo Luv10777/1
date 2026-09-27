@@ -36,9 +36,8 @@ public class AssetProbeHandler implements TaskHandler {
                 .orElseThrow(() -> new IllegalStateException("素材不存在: " + assetId));
 
         storage.stat(asset.getStorageKey()).orElseThrow(() -> new IllegalStateException("素材文件不存在"));
-        // 宽高、时长和 SHA-256 尚未解析，不能宣称 probed=true。
-        log.info("素材文件存在，媒体元数据尚未解析: id={}", assetId);
+        log.info("素材对象存在，图片元数据已在确认阶段校验: id={}", assetId);
 
-        return Map.of("assetId", assetId, "objectVerified", true, "probed", false);
+        return Map.of("assetId", assetId, "objectVerified", true, "probed", true);
     }
 }

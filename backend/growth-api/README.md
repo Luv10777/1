@@ -3,6 +3,10 @@
 Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租户隔离、任务调度和对象存储。
 本文更新于 2026-09-14，说明当前接口边界和两人协作方式。
 
+2026-09-22 新增 AI 图片创作模块：营销海报、产品套图、结构化规划、逐张生成任务、
+480P–4K 画质、作品记录与版本修改。New API / OpenAI 协议配置、可选桥接协议与运行边界见
+[图片工作流接入文档](../../docs/image-workflow.md)。真实模型需在服务端单独配置。
+
 ## 安装与启动
 
 需要 Java 21、Maven 3.9 和已启动的 Docker。以下命令在 `backend/growth-api` 目录运行，
@@ -73,6 +77,34 @@ java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --growth.work
 | `growth.worker.heartbeat-interval` | `10000` ms | 独立线程续租间隔 |
 | `growth.worker.poll-interval` | `2000` ms | 一轮执行结束到下一轮的间隔 |
 
+图片创作的资源保护配置：
+
+| 配置 | 默认值 | 含义 |
+|---|---:|---|
+| `IMAGE_TENANT_MAX_CONCURRENT` | `20` | 未单独配置配额时，单个租户允许的图片任务并发数 |
+| `IMAGE_GLOBAL_MAX_CONCURRENT` | `200` | 所有租户共享的图片任务并发上限；计数由 Redis 原子维护 |
+| `IMAGE_API_RATE_LIMIT` | `100` | 所有 Worker 共享的图片模型速率上限（请求/秒，依赖 Redis） |
+| `HTTP_MAX_TOTAL` | `200` | 图片模型 HTTP 客户端连接池总数 |
+| `HTTP_MAX_PER_ROUTE` | `50` | 单个模型地址的最大连接数 |
+
+图片许可的租户计数和全局计数通过 Redis Lua 脚本在一次操作中完成获取与释放，
+Redis 不可用时采用拒绝创建的策略。每个新租户会由数据库触发器自动创建默认
+`tenant_quotas` 记录；管理员可以按租户覆盖并发值，例如：
+
+```sql
+UPDATE tenant_quotas
+SET concurrent_limit = 50
+WHERE tenant_id = 1;
+```
+
+`tenant_quotas` 使用强制 RLS 隔离，应用只应通过租户上下文访问当前租户的记录。
+新租户的 `concurrent_limit` 数据库默认值为 20；该字段有值时优先于
+`IMAGE_TENANT_MAX_CONCURRENT`。修改默认值需要数据库迁移，调整已有租户可用上述 SQL。
+
+生产启动应使用 `--spring.profiles.active=prod`。该 profile 会拒绝本地对象存储、
+开发数据库密码和默认 MinIO 凭证，并默认不公开 Prometheus；监控采集需通过内网或
+受保护的管理入口开启 `MANAGEMENT_EXPOSURE_INCLUDE=health,prometheus`。
+
 租约必须大于两个心跳间隔。调度器为执行、续租、回收分别保留线程容量。
 `FOR UPDATE SKIP LOCKED` 保护领取事务；它不提供外部业务“恰好执行一次”的保证。
 
@@ -121,9 +153,9 @@ V5 只添加账号字段，不包含任何默认账号或密码；实际凭证�
 再调用 `POST /api/assets/{id}/confirm`。确认接口只在对象存在时返回 `READY`。
 
 `sizeBytes` 可省略；提供时必须非负并与对象存储返回的大小一致。
-落库大小取自对象存储。`sha256` 字段仅兼容旧请求，格式校验后也不会作为可信哈希保存。
-服务端尚未计算 SHA-256；宽高和时长解析也未实现。探测任务只验证文件存在，
-结果明确返回 `objectVerified=true, probed=false`。
+落库大小取自对象存储。`sha256` 字段仅兼容旧请求，可信哈希由服务端读取对象后计算并保存。
+图片确认阶段会使用 `ImageIO` 实际解码、校验像素上限并保存宽高；探测任务会再次
+验证对象仍存在，结果返回 `objectVerified=true, probed=true`。视频和音频的时长解析仍待后续媒体元数据模块实现。
 
 素材分页限制 `size` 在 1–100 之间。重复确认已就绪素材返回已有记录，不重复创建任务。
 
@@ -165,7 +197,8 @@ Docker 不可用时测试失败，不会静默跳过。
 
 ## 能力边界与许可
 
-`EchoProviderAdapter` 仍是占位适配器。真实供应商、计费、完整媒体元数据解析，
-以及其他业务模块不属于本次公共基础修复的交付范围。
+`EchoProviderAdapter` 仍用于旧的开发调用。图片工作流明确禁止回退到 Echo；
+通过可配置的 HTTP 适配器接模型，默认支持 OpenAI Images 生图与参考图编辑，尺寸限制见接入文档。
+计费扣款、完整媒体元数据解析与其他业务模块尚未实现。
 
 嘉兴市一方志科技有限公司版权所有。

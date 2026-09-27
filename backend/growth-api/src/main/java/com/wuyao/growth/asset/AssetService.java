@@ -11,7 +11,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +37,20 @@ public class AssetService {
 
     @Value("${growth.storage.presign-ttl:15m}")
     private Duration presignTtl;
+    @Value("${growth.image.upload-max-pixels:50000000}")
+    private long maxImagePixels;
+
+    @Transactional(readOnly = true)
+    public ImageReference imageReference(Long id) {
+        Asset a = repository.findById(id).orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
+        if (!"READY".equals(a.getStatus()) || !"IMAGE".equals(a.getType())
+                || a.getSizeBytes() == null || a.getSizeBytes() > 20 * 1024 * 1024) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "请使用已上传完成且小于 20 MB 的图片");
+        }
+        return new ImageReference(a.getId(), a.getStorageKey(), a.getName());
+    }
+
+    public record ImageReference(Long id, String storageKey, String name) {}
 
     @Transactional
     public AssetDtos.UploadTicket presignUpload(AssetDtos.PresignRequest req, Long userId) {
@@ -54,7 +73,7 @@ public class AssetService {
     public AssetDtos.AssetView confirmUpload(Long assetId, AssetDtos.ConfirmRequest req, Long userId) {
         Asset asset = repository.findForUpdate(assetId)
                 .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
-        if ("READY".equals(asset.getStatus())) return AssetDtos.AssetView.of(asset);
+        if ("READY".equals(asset.getStatus())) return view(asset);
         var stored = storage.stat(asset.getStorageKey())
                 .orElseThrow(() -> BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "文件尚未上传完成"));
         if (req.sizeBytes() != null && req.sizeBytes() != stored.sizeBytes()) {
@@ -62,15 +81,33 @@ public class AssetService {
         }
         asset.setStatus("READY");
         asset.setSizeBytes(stored.sizeBytes());
-        asset.setMimeType(stored.contentType());
-        asset.setSha256(null);
+        if ("IMAGE".equals(asset.getType())) {
+            byte[] bytes = storage.read(asset.getStorageKey(), 20 * 1024 * 1024);
+            BufferedImage image;
+            try {
+                image = ImageIO.read(new ByteArrayInputStream(bytes));
+            } catch (Exception e) {
+                throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片文件无法解析");
+            }
+            if (image == null) throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "只支持有效的 PNG 或 JPEG 图片");
+            long pixels = (long) image.getWidth() * image.getHeight();
+            if (pixels > maxImagePixels) {
+                throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片像素过高，请压缩后重试");
+            }
+            asset.setWidth(image.getWidth());
+            asset.setHeight(image.getHeight());
+            asset.setMimeType(stored.contentType());
+            asset.setSha256(sha256(bytes));
+        } else {
+            asset.setMimeType(stored.contentType());
+        }
         asset.setUpdatedAt(java.time.Instant.now());
 
         // 交给 worker 去补宽高/时长这类要读文件才知道的元数据
         taskService.submit(AssetProbeHandler.TYPE, "DEFAULT",
                 Map.of("assetId", assetId), "asset-probe-" + assetId, userId);
 
-        return AssetDtos.AssetView.of(asset);
+        return view(asset);
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +116,34 @@ public class AssetService {
             throw BizException.of(ErrorCode.BAD_REQUEST, "page 必须非负，size 必须在 1 到 100 之间");
         }
         var result = repository.findAllByOrderByIdDesc(PageRequest.of(page, size));
-        return PageResult.of(result, result.getContent().stream().map(AssetDtos.AssetView::of).toList());
+        return PageResult.of(result, result.getContent().stream().map(this::view).toList());
+    }
+
+    private AssetDtos.AssetView view(Asset asset) {
+        String previewUrl = "READY".equals(asset.getStatus()) && "IMAGE".equals(asset.getType())
+                ? storage.presignGet(asset.getStorageKey(), Duration.ofMinutes(30)) : null;
+        return AssetDtos.AssetView.of(asset, previewUrl);
+    }
+
+    private String sha256(byte[] bytes) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder out = new StringBuilder(64);
+            for (byte value : digest) out.append("%02x".formatted(value & 0xff));
+            return out.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("计算图片校验值失败", e);
+        }
+    }
+
+    /** Remove abandoned direct-upload objects that never reached confirm. */
+    @Scheduled(fixedDelayString = "${growth.storage.cleanup-interval-ms:3600000}")
+    @Transactional
+    public void cleanupAbandonedUploads() {
+        var cutoff = java.time.Instant.now().minus(Duration.ofHours(2));
+        for (Asset asset : repository.findByStatusAndCreatedAtBefore("PENDING", cutoff)) {
+            storage.delete(asset.getStorageKey());
+            repository.delete(asset);
+        }
     }
 }

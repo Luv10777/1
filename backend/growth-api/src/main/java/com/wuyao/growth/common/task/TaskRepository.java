@@ -48,6 +48,13 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             """, nativeQuery = true)
     int renew(@Param("id") Long id, @Param("attempt") int attempt, @Param("leaseMillis") long leaseMillis);
 
+    @Modifying
+    @Query(value = "UPDATE tasks SET status = 'CANCELLED', error_code = 'CANCELLED', "
+            + "error_message = '用户取消任务', lease_expires_at = NULL, finished_at = clock_timestamp(), "
+            + "updated_at = clock_timestamp() WHERE id = :id AND tenant_id = :tenantId "
+            + "AND status IN ('PENDING', 'RUNNING')", nativeQuery = true)
+    int cancelForTenant(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     @Query(value = """
             UPDATE tasks SET
                 status = CASE WHEN attempts >= max_attempts THEN 'FAILED' ELSE 'PENDING' END,
@@ -64,4 +71,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     Optional<Task> findByTenantIdAndIdempotencyKey(Long tenantId, String idempotencyKey);
 
     Page<Task> findByTenantIdOrderByIdDesc(Long tenantId, Pageable pageable);
+
+    /**
+     * 按状态和队列统计任务数量
+     */
+    @Query(value = "SELECT count(*) FROM tasks WHERE status = :status AND queue = :queue", nativeQuery = true)
+    long countByStatusAndQueue(@Param("status") String status, @Param("queue") String queue);
 }

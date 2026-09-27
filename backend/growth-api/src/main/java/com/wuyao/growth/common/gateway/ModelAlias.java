@@ -10,6 +10,8 @@ package com.wuyao.growth.common.gateway;
  */
 public enum ModelAlias {
     TEXT_PLANNER,     // 意图理解、方案规划
+    TEXT_PLANNER_ADVANCED, // 高级商业视觉规划
+    TEXT_REFINER,     // 图像提示词精修
     TEXT_WRITER,      // 文案撰写、仿写、重写
     TEXT_REVIEWER,    // 内容审核、事实核对
     VISION_ANALYZER,  // 视频反推、图片理解

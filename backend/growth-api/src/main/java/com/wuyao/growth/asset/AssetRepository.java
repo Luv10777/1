@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
+import java.time.Instant;
+import java.util.List;
 
 /**
  * 注意这里没有一个方法带 tenantId 参数。
@@ -20,6 +22,8 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
     Page<Asset> findAllByOrderByIdDesc(Pageable pageable);
 
     Optional<Asset> findByStorageKey(String storageKey);
+
+    List<Asset> findByStatusAndCreatedAtBefore(String status, Instant before);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from Asset a where a.id = :id")
