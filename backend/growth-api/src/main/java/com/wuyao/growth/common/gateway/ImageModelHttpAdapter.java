@@ -15,6 +15,7 @@ import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,7 @@ import java.util.*;
 
 /** OpenAI-compatible planner/images; the asynchronous bridge remains opt-in. */
 @Component
+@Slf4j
 public class ImageModelHttpAdapter implements ProviderAdapter {
  private final ImageModelProperties config;
  private final ObjectMapper json;
@@ -61,6 +63,12 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
        body.put("model",endpoint.getModel());body.put("prompt",req.prompt());body.put("idempotencyKey",req.idempotencyKey());
        output=json.readValue(post(config.generatorUrl(),endpoint,req,"application/json",List.of(json.writeValueAsBytes(body))),new TypeReference<>(){});
      } else output=image(req);
+     if(!planner && output.get("imageUrl") instanceof String url && !url.isBlank()
+         && !output.containsKey("imageSourceUrl")) {
+       validateDownloadUrl(url);
+       output.put("imageSourceUrl",url);
+       if(isOnlyRouterFilesContent(URI.create(url))) output.put("imageUrl",resolveFileUrl(url));
+     }
      output.put("_model",endpoint.getModel());
      return new ProviderResult(true,code(),(String)output.get("jobId"),output,null,null);
    } catch(BizException e) {throw e;}
@@ -134,13 +142,18 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    }
    var root=json.readTree(response);var data=root.path("data");
    if(!data.isArray() || data.size()!=1) throw failure("图片服务未返回单张有效图片");
-   String encoded=data.get(0).path("b64_json").asText("");
-   if(encoded.isBlank()) {
-     String url=data.get(0).path("url").asText("");
-     if(url.isBlank()) throw failure("图片服务未返回图片内容");
-     encoded=Base64.getEncoder().encodeToString(download(url));
-   } else if(encoded.length()>44*1024*1024) throw failure("生成图片超过大小限制");
-   var output=new LinkedHashMap<String,Object>();output.put("status","SUCCEEDED");output.put("imageBase64",encoded);
+   String url=data.get(0).path("url").asText("");
+   var output=new LinkedHashMap<String,Object>();output.put("status","SUCCEEDED");
+   if(!url.isBlank()) {
+     validateDownloadUrl(url);
+     output.put("imageUrl",isOnlyRouterFilesContent(URI.create(url))?resolveFileUrl(url):url);
+     output.put("imageSourceUrl",url);
+   } else {
+     String encoded=data.get(0).path("b64_json").asText("");
+     if(encoded.isBlank()) throw failure("图片服务未返回图片内容");
+     if(encoded.length()>44*1024*1024) throw failure("生成图片超过大小限制");
+     output.put("imageBase64",encoded);
+   }
    if(root.path("usage").isObject()) output.put("usage",json.convertValue(root.get("usage"),Map.class));
    return output;
  }
@@ -161,20 +174,42 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    ByteArrayOutputStream body=new ByteArrayOutputStream();
    for(byte[] chunk:chunks) { if(body.size()+chunk.length>128*1024*1024) throw failure("模型请求内容超过大小限制"); body.write(chunk); }
    request.setEntity(new ByteArrayEntity(body.toByteArray(),ContentType.parse(contentType)));
-   return execute(request,endpoint.getModel(),48*1024*1024);
+   if(req.alias()!=ModelAlias.IMAGE_PRIMARY) return execute(request,endpoint.getModel(),48*1024*1024);
+   long started=System.nanoTime();
+   log.info("图片请求开始: model={} host={} requestBytes={}",endpoint.getModel(),uri.getHost(),body.size());
+   try {
+     byte[] response=execute(request,endpoint.getModel(),48*1024*1024);
+     log.info("图片响应收完: model={} host={} responseBytes={} elapsedMs={}",endpoint.getModel(),uri.getHost(),response.length,(System.nanoTime()-started)/1_000_000);
+     return response;
+   } catch (IOException | RuntimeException e) {
+     log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",endpoint.getModel(),uri.getHost(),
+       (System.nanoTime()-started)/1_000_000,e.getClass().getSimpleName());
+     if (e.getClass().getSimpleName().equals("ConnectionClosedException"))
+       throw failure("中转站已返回图片响应，但图片传输中途断开，生成结果状态未确认");
+     throw e;
+   }
  }
- private byte[] download(String url) throws IOException {
-   URI uri=checkedUri(url);
-   boolean allowed=config.getGenerator().getDownloadAllowedOrigins().stream().filter(origin->!origin.isBlank()).anyMatch(origin->sameOrigin(uri,checkedUri(origin)));
+ private void validateDownloadUrl(String url) {
+   URI uri=ImageDownloadOrigins.checkedUri(url);
+   boolean allowed=ImageDownloadOrigins.allows(uri,config.getGenerator().getDownloadAllowedOrigins());
    if(!allowed) throw failure("请配置 IMAGE_DOWNLOAD_ALLOWED_ORIGINS，或让中转站返回 Base64 图片");
-   // Image downloads receive no API token. Redirects are never followed.
-   return execute(new HttpGet(uri),"download",32*1024*1024);
  }
- private boolean sameOrigin(URI a,URI b) {
-   return a.getScheme().equalsIgnoreCase(b.getScheme()) && a.getHost().equalsIgnoreCase(b.getHost()) && port(a)==port(b)
-     && (b.getPath()==null || b.getPath().isEmpty() || b.getPath().equals("/"));
+ private boolean isOnlyRouterFilesContent(URI uri) {
+   return "api.onlyrouter.ai".equalsIgnoreCase(uri.getHost())
+     && uri.getPath()!=null && uri.getPath().matches("/v1/files/[^/]+/content");
  }
- private int port(URI uri) {return uri.getPort()<0?(uri.getScheme().equalsIgnoreCase("https")?443:80):uri.getPort();}
+ private String resolveFileUrl(String url) throws IOException {
+   var request=new HttpGet(URI.create(url));
+   request.setHeader("Authorization","Bearer "+config.getGenerator().getApiKey());
+   return httpClient.execute(request,(HttpClientResponseHandler<String>) response -> {
+     if(response.getCode()!=302 || response.getFirstHeader("Location")==null)
+       throw failure("Files API 未返回临时下载链接");
+     String location=response.getFirstHeader("Location").getValue();
+     URI signed=checkedUri(location);
+     if(!"https".equalsIgnoreCase(signed.getScheme())) throw failure("Files API 下载链接无效");
+     return location;
+   });
+ }
  private URI checkedUri(String value) {
    URI uri=URI.create(value);
    if(uri.getScheme()==null || !Set.of("http","https").contains(uri.getScheme().toLowerCase(Locale.ROOT)) || uri.getHost()==null
@@ -186,6 +221,9 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
  }
  private byte[] responseBytes(ClassicHttpResponse connection,String model,int limit) throws IOException {
    int status=connection.getCode();
+   if(model.equals(config.getGenerator().getModel()))
+     log.info("图片响应头收到: status={} contentLength={}",status,
+       connection.getEntity()==null?0:connection.getEntity().getContentLength());
    if(status<200 || status>=300) {
      String reason=switch(status) {
        case 401 -> "模型服务令牌无效或已过期";

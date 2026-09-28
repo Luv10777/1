@@ -84,7 +84,7 @@ growth:
       model: ${IMAGE_GENERATOR_MODEL:}
       quality: ${IMAGE_GENERATOR_QUALITY:}
       response-format: ${IMAGE_GENERATOR_RESPONSE_FORMAT:}
-      download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:}
+      download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:*.aliyuncs.com}
     qualities: ${IMAGE_SUPPORTED_QUALITIES:480P,720P,1080P,4K}
     max-output-pixels: ${IMAGE_MAX_OUTPUT_PIXELS:0}
     timeout-seconds: ${IMAGE_TIMEOUT_SECONDS:120}

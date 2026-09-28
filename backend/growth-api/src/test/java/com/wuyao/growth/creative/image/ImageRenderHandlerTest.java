@@ -22,6 +22,49 @@ import static org.mockito.Mockito.*;
 
 class ImageRenderHandlerTest {
     @Test
+    void providerUrlCompletesWithoutReadingOrUploadingImage() {
+        var service = mock(ImageCreationService.class);
+        var gateway = mock(AiGateway.class);
+        var storage = mock(ObjectStorage.class);
+        var refiner = mock(ImagePromptRefiner.class);
+        var limiter = mock(ImageApiRateLimiter.class);
+        var metrics = mock(ImageMetrics.class);
+        var config = new ImageModelProperties();
+        config.getGenerator().setModel("image-model");
+        var creation = new ImageCreation();
+        creation.setId(5L);
+        creation.setTenantId(2L);
+        creation.setRequest(new ImageDtos.Create("test-request", "POSTER", "测试海报", List.of(),
+            "3:4", "1080P", 1, "微信群", "自然", null));
+        var item = new ImageItem();
+        item.setId(8L);
+        item.setCreationId(5L);
+        item.setSpec(new ImageDtos.Spec("海报", "原提示", "", "")
+            .withRefinement(new ImageDtos.PromptTrace("生成海报", "SUCCEEDED", "test", "1", Map.of(), 1)));
+        var task = new Task();
+        task.setId(18L);
+        task.setTenantId(2L);
+        task.setPayload(Map.of("itemId", 8L));
+        String url = "https://images.example/result.png?signature=private";
+        var result = new ProviderResult(true, "IMAGE_HTTP", null,
+            Map.of("status", "SUCCEEDED", "imageUrl", url), null, null);
+        when(service.beginItem(8L, task)).thenReturn(true);
+        when(service.itemSnapshot(8L)).thenReturn(item);
+        when(service.snapshot(5L)).thenReturn(creation);
+        when(service.references(5L)).thenReturn(List.of());
+        when(service.reserveProviderSubmission(8L, task)).thenReturn(true);
+        when(gateway.invokeReal(any())).thenReturn(result);
+        when(storage.stat(anyString())).thenReturn(Optional.empty());
+
+        var handler = new ImageRenderHandler(service, gateway, storage, new ImageRenderer(), config,
+            refiner, limiter, metrics);
+        assertThat(handler.handle(task)).containsEntry("status", "SUCCEEDED").containsEntry("imageUrl", url);
+        verify(service).saveProviderUrl(8L, task, result, url, "t2/generated/8/0/background.png");
+        verify(storage, never()).put(anyString(), any(byte[].class), anyString());
+        verify(storage, never()).read(anyString(), anyInt());
+    }
+
+    @Test
     void showsProviderImageWithoutResizingOrRejectingItsAspectRatio() {
         var service = mock(ImageCreationService.class);
         var gateway = mock(AiGateway.class);

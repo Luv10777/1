@@ -31,6 +31,12 @@ public class TaskService {
                 .map(Task::getStatus).orElseThrow();
     }
 
+    @Transactional(readOnly = true)
+    public TaskStatus statusByIdempotencyKey(String key) {
+        return repository.findByTenantIdAndIdempotencyKey(TenantContext.require(), key)
+                .map(Task::getStatus).orElse(null);
+    }
+
     /** Call inside the business commit transaction to fence expired worker executions. */
     @Transactional
     public boolean ownsExecution(Task execution) {

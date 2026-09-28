@@ -108,6 +108,11 @@ function turnPrompt(turn) {
   return turn.brief?.split("\n本次修改：").at(-1) || "继续修改海报";
 }
 watch(() => studio.value.current?.id, () => { editorOptions.value = []; });
+watch(() => studio.value.thread, turns => {
+  if (!preview.value) return;
+  const latest = turns.flatMap(turn => turn.items || []).find(item => item.id === preview.value.id);
+  if (latest) preview.value = latest;
+});
 watch(() => studio.value.thread?.length, async length => {
   if (!length) return;
   await nextTick();
@@ -387,14 +392,14 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   <button
                     v-if="item.url"
                     type="button"
-                    :disabled="studio.busy || !!studio.pending"
+                    :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)"
                     @click="studio.download(item)"
                   >
                     下载图片</button
                   ><button
                     v-if="item.url"
                     type="button"
-                    :disabled="studio.busy || !!studio.pending || item.assetSaved"
+                    :disabled="studio.busy || !!studio.pending || item.assetSaved || !studio.canUseAsset(item)"
                     @click="studio.saveToLibrary(item)"
                   >
                     {{ item.assetSaved ? "已保存到素材库" : "保存到素材库" }}</button
@@ -462,13 +467,14 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           <button
             type="button"
             class="poster-lightbox-download"
+            :disabled="studio.busy || !studio.canUseAsset(preview)"
             @click="studio.download(preview)"
           >
             下载原图 ↓</button
           ><button
             type="button"
             class="poster-lightbox-download"
-            :disabled="studio.busy || preview.assetSaved"
+            :disabled="studio.busy || preview.assetSaved || !studio.canUseAsset(preview)"
             @click="studio.saveToLibrary(preview)"
           >
             {{ preview.assetSaved ? "已保存到素材库" : "保存到素材库" }}</button

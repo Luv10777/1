@@ -21,8 +21,8 @@ export const POSTER_PURPOSE_GROUPS = [
   ] },
 ]
 export const IMAGE_STATUS = {
-  QUEUED: '等待处理', PLANNING: '正在规划文案与画面', GENERATING: '正在优化画面与生成图片',
-  SAVING: '正在保存', SUCCEEDED: '已完成', PARTIAL: '部分完成',
+  QUEUED: '等待处理', PLANNING: '正在规划文案与画面', GENERATING: '正在生成或接收图片',
+  SAVING: '正在保存图片', SUCCEEDED: '已完成', PARTIAL: '部分完成',
   NEEDS_INPUT: '需要补充一句', FAILED: '生成失败', INTERRUPTED: '执行中断', CANCELLED: '已取消',
 }
 export const isImageActive = status => ['QUEUED', 'PLANNING', 'GENERATING', 'SAVING'].includes(status)

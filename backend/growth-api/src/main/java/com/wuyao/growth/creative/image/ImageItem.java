@@ -24,6 +24,8 @@ public class ImageItem {
  @Column(nullable=false) private int pollRound;
  @Column(length=500) private String rawKey;
  @Column(length=500) private String outputKey;
+ @Column(name="provider_image_url", columnDefinition="text") private String providerImageUrl;
+ @Column(name="persisted_at") private Instant persistedAt;
  private Integer actualWidth;
  private Integer actualHeight;
  @Column(length=16) private String imageHash;

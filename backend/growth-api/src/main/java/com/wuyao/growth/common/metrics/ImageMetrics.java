@@ -53,4 +53,10 @@ public class ImageMetrics {
             "outcome", outcome)
             .increment(round);
     }
+
+    public void recordDownload(long durationMs, String outcome) {
+        registry.timer("image.download.duration", "status", outcome)
+            .record(java.time.Duration.ofMillis(durationMs));
+        registry.counter("image.download.total", "status", outcome).increment();
+    }
 }

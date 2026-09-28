@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { IMAGE_STATUS, imageDimensions, isImageActive } from '../domain/imageCreation'
 import { Check, Pencil, X } from 'lucide-vue-next'
@@ -16,6 +16,11 @@ function showPreview(item) {
   preview.value = item
   previewDialog.value.showModal()
 }
+watch(() => studio.value.thread, turns => {
+  if (!preview.value) return
+  const latest = turns.flatMap(turn => turn.items || []).find(item => item.id === preview.value.id)
+  if (latest) preview.value = latest
+})
 function beginTitleEdit(entry) {
   editingTitleId.value = entry.id
   editingTitle.value = entry.title || entry.brief || ''
@@ -77,7 +82,7 @@ async function saveTitle(entry) {
           <p v-if="item.similarityWarning" class="creation-item-error">这张与近期海报较相似。可以换一个版式或场景；再次生成会调用图片服务。</p>
           <p v-if="item.error" class="creation-item-error">{{ item.error }}</p>
           <div class="creation-result-actions">
-            <template v-if="item.url"><button type="button" :disabled="studio.busy || !!studio.pending" @click="studio.download(item)">下载图片</button><button type="button" :disabled="studio.busy || !!studio.pending || item.assetSaved" @click="studio.saveToLibrary(item)">{{ item.assetSaved ? '已保存到素材库' : '保存到素材库' }}</button><button type="button" :disabled="studio.busy || !!studio.pending" @click="studio.editText(item)">修改文字</button><template v-if="studio.current.status === 'SUCCEEDED'"><template v-if="studio.product"><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item)">单独重做</button></template><template v-else><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item, 'LAYOUT')">换版式</button><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item, 'SCENE')">换场景</button><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item, 'MESSAGE')">换传播角度</button></template></template></template>
+            <template v-if="item.url"><button type="button" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)">下载图片</button><button type="button" :disabled="studio.busy || !!studio.pending || item.assetSaved || !studio.canUseAsset(item)" @click="studio.saveToLibrary(item)">{{ item.assetSaved ? '已保存到素材库' : '保存到素材库' }}</button><button type="button" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.editText(item)">修改文字</button><template v-if="studio.current.status === 'SUCCEEDED'"><template v-if="studio.product"><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item)">单独重做</button></template><template v-else><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item, 'LAYOUT')">换版式</button><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item, 'SCENE')">换场景</button><button type="button" :disabled="studio.busy || !!studio.pending || !studio.configured" @click="studio.regenerate(item, 'MESSAGE')">换传播角度</button></template></template></template>
             <button v-if="['FAILED', 'INTERRUPTED'].includes(item.status)" type="button" :disabled="studio.busy || !!studio.pending" @click="studio.retry(item)">{{ item.status === 'FAILED' ? '重新生成这张' : '恢复这张' }}</button>
           </div>
           <small v-if="!studio.product && item.url && studio.current.status === 'SUCCEEDED'" class="creation-variation-note">换版会再次调用图片服务，现有文案保持不变。</small>
@@ -87,7 +92,7 @@ async function saveTitle(entry) {
       <form v-if="!studio.active" class="creation-revision" @submit.prevent="studio.revise"><label for="image-revision">{{ studio.current.status === 'NEEDS_INPUT' ? '补充一句就好' : '哪里想再调整？' }}</label><div><input id="image-revision" v-model="studio.revision" maxlength="1000" :placeholder="studio.current.status === 'NEEDS_INPUT' ? '在这里补充信息' : '例如：背景再清爽一点，商品不要变'" /><button type="submit" class="creation-primary" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">{{ studio.current.status === 'NEEDS_INPUT' ? '继续创作' : '生成新版本' }}</button></div><small>原作品会保留。新版本也会自动保存到作品库。</small></form>
     </div>
     <dialog ref="previewDialog" class="creation-preview" aria-label="图片大图预览" @click.self="previewDialog.close()" @close="preview = null">
-      <template v-if="preview"><header><strong>{{ preview.role }}</strong><button type="button" aria-label="关闭图片预览" autofocus @click="previewDialog.close()">×</button></header><img :src="preview.url" :alt="preview.role" /><footer><button type="button" :disabled="studio.busy" @click="studio.download(preview)">下载原图 ↓</button><button type="button" :disabled="studio.busy || preview.assetSaved" @click="studio.saveToLibrary(preview)">{{ preview.assetSaved ? '已保存到素材库' : '保存到素材库' }}</button></footer></template>
+      <template v-if="preview"><header><strong>{{ preview.role }}</strong><button type="button" aria-label="关闭图片预览" autofocus @click="previewDialog.close()">×</button></header><img :src="preview.url" :alt="preview.role" /><footer><button type="button" :disabled="studio.busy || !studio.canUseAsset(preview)" @click="studio.download(preview)">下载原图 ↓</button><button type="button" :disabled="studio.busy || preview.assetSaved || !studio.canUseAsset(preview)" @click="studio.saveToLibrary(preview)">{{ preview.assetSaved ? '已保存到素材库' : '保存到素材库' }}</button></footer></template>
     </dialog>
   </div>
 </template>

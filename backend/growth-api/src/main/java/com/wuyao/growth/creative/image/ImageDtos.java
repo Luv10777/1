@@ -32,7 +32,8 @@ public final class ImageDtos {
     public record Rename(@NotBlank @Size(max = 100) String title) {}
     public record ItemView(Long id, int ordinal, String role, String headline, String caption,
                            String status, String error, String url, int width, int height, Long taskId,
-                           boolean similarityWarning) {}
+                           boolean similarityWarning, String providerImageUrl, boolean persisted,
+                           boolean downloadFailed) {}
     public record View(Long id, Long parentId, String workflow, String brief, String quality,
                        String ratio, String status, String summary, String question, String error,
                        int completed, int count, List<ItemView> items, Instant createdAt, Long taskId) {}
