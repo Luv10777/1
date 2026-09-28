@@ -164,8 +164,18 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
 }
 ```
 
-同步图片服务可以在提交时直接返回成功结构。
-桥接层如果取得的是临时下载 URL，应先读取图片再返回 Base64。
+同步图片服务可以在提交时直接返回成功结构。上游也可以返回 `imageUrl`，此时
+`IMAGE_RENDER` 保存临时 URL 并投递 `IMAGE_DOWNLOAD` 到 `DEFAULT` 队列，然后立即完成生成任务。
+下载任务最多重试三次，将图片转为 PNG 存入对象存储，并将图片项的 `persisted` 置为 `true`。
+前端先展示临时 URL，持久化完成后通过轮询切换为对象存储预签名 URL。
+
+配置 `IMAGE_DOWNLOAD_ALLOWED_ORIGINS` 为允许的图片 URL 来源。当前允许 HTTPS 下的
+`*.aliyuncs.com` 子域名；自定义 CDN 域名需另行加入其精确来源。OnlyRouter Files API 的
+`/v1/files/{file_id}/content` 需要服务端携带 API Key 请求；它返回 `302` 和临时签名链接，
+不能把该接口地址直接交给浏览器。跳转后的签名地址不携带 API Key，默认 1 小时有效。
+Files API 上传响应只有文件 ID，不含下载 URL；文件默认保留 7 天。
+当前接入的图片生成接口已确认返回 URL；其他兼容接口返回 Base64 时仍走原有路径。
+
 成本字段只记录供应商信息，不执行用户扣款。
 
 必须按原幂等键返回同一个任务或结果，包括“已接单但连接超时”的情况。
@@ -178,14 +188,17 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
 - 带参考图：`POST /v1/images/edits`，发送 multipart，单图字段为 `image`，多图为 `image[]`。
 - 请求包含 `model`、`prompt`、`n=1`、`size=宽x高`；套图按单张任务生成。
 - 参考图按原顺序传递，主体与风格的用途说明写入提示词。
-- 读取 `data[0].b64_json`，转换为内部成功结果后保存到对象存储。
-- 也支持 `data[0].url`；必须在 `IMAGE_DOWNLOAD_ALLOWED_ORIGINS` 列出其完整来源，
-  例如 `https://images.example.com`。下载不携带模型令牌，不跟随跳转，并限制文件大小。
+- `data[0].b64_json` 走同步保存路径；`data[0].url` 立即作为生成结果返回，
+  由 `IMAGE_DOWNLOAD` 后台任务下载和保存。
+- URL 来源必须列入 `IMAGE_DOWNLOAD_ALLOWED_ORIGINS`，支持精确来源或
+  `*.aliyuncs.com` 这样的 HTTPS 子域名规则。
+  普通签名 URL 下载不携带模型令牌且不跟随跳转；OnlyRouter Files API 的
+  `/content` 地址仅跟随一次 `302`，且不会向签名地址转发 API Key。
 
 `IMAGE_GENERATOR_QUALITY` 是模型的 `auto/low/medium/high` 等质量参数，
-与界面中的 480P、720P 等输出分辨率不同。`gpt-image-2` 默认返回 Base64，
-不发送 `response_format`、`input_fidelity` 等它不接受的参数。
-其他兼容模型需要时可配置 `IMAGE_GENERATOR_RESPONSE_FORMAT=b64_json`。
+与界面中的 480P、720P 等输出分辨率不同。默认不发送 `response_format`、
+`input_fidelity` 等可选参数；只有当前图片接口明确要求时才配置
+`IMAGE_GENERATOR_RESPONSE_FORMAT`。返回格式以实际接口响应为准。
 
 OpenAI 同步图片接口没有通用的任务查询地址，也不能因发送 `Idempotency-Key` 就认定
 中转站会去重。系统在调用前持久化提交标记；请求超时或响应解析失败后，不会自动再次付费生图。

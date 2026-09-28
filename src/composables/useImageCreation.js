@@ -36,6 +36,7 @@ export function useImageCreation(workflow) {
   let pollTimer
   let alive = true
   let refreshSequence = 0
+  let pollError = false
   const owner = readUser()
   const pendingKey = 'image-pending:' + (owner?.userId || owner?.id || 'session') + ':' + workflow
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
@@ -50,6 +51,8 @@ export function useImageCreation(workflow) {
     if (supported.length) quality.value = supported.at(-1)
   }
   const active = computed(() => isImageActive(current.value?.status))
+  const latestItem = item => thread.value.flatMap(turn => turn.items || []).find(latest => latest.id === item?.id) || item
+  const canUseAsset = item => !item?.providerImageUrl || !!latestItem(item)?.persisted
   const locked = computed(() => busy.value || !!pending.value)
   const workspaceTab = ref('inspiration')
   function persistPending(value) {
@@ -78,7 +81,9 @@ export function useImageCreation(workflow) {
       if (current.value?.id !== result.id) workspaceTab.value = 'result'
       thread.value = versions
       current.value = result
-      if (isImageActive(result.status)) pollTimer = setTimeout(() => load(id), 3000)
+      if (pollError) { error.value = ''; pollError = false }
+      const waitingForStorage = versions.some(turn => turn.items?.some(item => item.providerImageUrl && !item.persisted && !item.downloadFailed))
+      if (isImageActive(result.status) || waitingForStorage) pollTimer = setTimeout(() => load(id), waitingForStorage ? 5000 : 3000)
       else await refreshHistory()
     } catch (e) {
       if (!alive || sequence !== refreshSequence) return
@@ -93,6 +98,12 @@ export function useImageCreation(workflow) {
         }
       }
       error.value = e.message
+      if ((isImageActive(current.value?.status) || thread.value.some(turn => turn.items?.some(item => item.providerImageUrl && !item.persisted && !item.downloadFailed)))
+          && String(current.value.id) === String(id)
+          && (typeof e.code !== 'number' || e.code >= 5000)) {
+        pollError = true
+        pollTimer = setTimeout(() => load(id), 5000)
+      }
     }
   }
   async function openCreation(id) {
@@ -231,13 +242,14 @@ export function useImageCreation(workflow) {
       data: { requestKey: crypto.randomUUID(), headline: editHeadline.value, caption: editCaption.value } }))
   }
   function download(item) {
-    run(() => downloadImage(item.url, '一方志-' + current.value.id + '-' + (item.ordinal + 1) + '.png'))
+    if (!canUseAsset(item)) return
+    run(() => downloadImage(latestItem(item).url, '一方志-' + current.value.id + '-' + (item.ordinal + 1) + '.png'))
   }
   function saveToLibrary(item) {
-    if (!item?.url || assetSaving.value.has(item.id)) return
+    if (!item?.url || !canUseAsset(item) || assetSaving.value.has(item.id)) return
     assetSaving.value = new Set(assetSaving.value).add(item.id)
     run(async () => {
-      await saveGeneratedImageToLibrary(item.url, '一方志-' + current.value.id + '-' + (item.ordinal + 1))
+      await saveGeneratedImageToLibrary(latestItem(item).url, '一方志-' + current.value.id + '-' + (item.ordinal + 1))
       item.assetSaved = true
     }).finally(() => {
       const next = new Set(assetSaving.value)
@@ -290,6 +302,6 @@ export function useImageCreation(workflow) {
     capabilities, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,
-    retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt,
+    retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
   })
 }

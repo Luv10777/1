@@ -34,6 +34,7 @@ public class ImageRenderHandler implements TaskHandler {
  }
  private Map<String,Object> handleInternal(Task task){
    long id=((Number)task.getPayload().get("itemId")).longValue();
+   long started=System.nanoTime();
    if(!service.beginItem(id,task))return Map.of("reused",true);
    var item=service.itemSnapshot(id);var c=service.snapshot(item.getCreationId());
    String base="t"+c.getTenantId()+"/generated/"+id+"/"+item.getGeneration();
@@ -75,25 +76,37 @@ public class ImageRenderHandler implements TaskHandler {
          trace.version(),trace.usage(),trace.elapsedMillis());
        if(!service.saveRefinement(id,task,trace)) return Map.of("reused",true);
      }
+     log.info("图片前置处理完成: itemId={} elapsedMs={} refinement={}",id,(System.nanoTime()-started)/1_000_000,
+       trace==null?"NONE":trace.status());
      String finalPrompt=trace==null?imagePrompt(c,item.getSpec()):trace.prompt();
       boolean synchronous=config.getGenerator().getProtocol()==ImageModelProperties.Protocol.OPENAI;
       if(item.getProviderJobId()==null && !service.reserveProviderSubmission(id,task)) return Map.of("status","NOT_RESUBMITTED");
      try {
      // 全局 API 限流,防止压垮图片模型服务
      apiRateLimiter.waitForPermission();
-
+     long providerStarted=System.nanoTime();
+     log.info("图片生成阶段开始: itemId={} model={} operation={}",id,config.getGenerator().getModel(),options.get("operation"));
      var response=gateway.invokeReal(new ProviderRequest(ModelAlias.IMAGE_PRIMARY,c.getTenantId(),
        finalPrompt,
        options,"image-item-"+id+"-"+item.getGeneration()));
+     log.info("图片生成阶段完成: itemId={} status={} elapsedMs={}",id,response.output().get("status"),
+       (System.nanoTime()-providerStarted)/1_000_000);
      String status=String.valueOf(response.output().get("status"));
      if(!Set.of("SUCCEEDED","FAILED","RUNNING","QUEUED").contains(status))
        throw new IllegalArgumentException("图片模型返回未知状态");
      if(status.equals("SUCCEEDED")){
+       String imageUrl=response.output().get("imageUrl") instanceof String url?url:"";
+       if(!imageUrl.isBlank()) {
+         service.saveProviderUrl(id,task,response,imageUrl,base+"/background.png");
+         metrics.recordPollRound(item.getPollRound(), "succeeded");
+         return Map.of("status","SUCCEEDED","imageUrl",imageUrl,"itemId",id);
+       }
        String encoded=String.valueOf(response.output().getOrDefault("imageBase64",""));
        if(encoded.length()>44*1024*1024)throw new IllegalArgumentException("生成图片过大");
        byte[] bytes=Base64.getDecoder().decode(encoded);
        var source=renderer.decode(bytes);
        raw=base+"/background.png";storage.put(raw,renderer.png(source),"image/png");
+       log.info("图片原图保存完成: itemId={} elapsedMs={}",id,(System.nanoTime()-providerStarted)/1_000_000);
      } else if(!status.equals("FAILED") && (response.providerJobId()==null||response.providerJobId().isBlank()))
        throw new IllegalArgumentException("异步模型没有返回任务编号");
      service.saveProvider(id,task,response,raw);
@@ -120,6 +133,7 @@ public class ImageRenderHandler implements TaskHandler {
    String imageHash="POSTER".equals(c.getRequest().workflow())
      && (c.getParentId()==null || c.getVariation()!=null)?ImageFingerprint.of(image):null;
    service.complete(id,task,outputKey,imageHash);
+   log.info("图片任务落盘完成: itemId={} totalElapsedMs={}",id,(System.nanoTime()-started)/1_000_000);
    return Map.of("itemId",id);
  }
  static String imagePrompt(ImageCreation creation,ImageDtos.Spec spec) {

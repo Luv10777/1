@@ -175,7 +175,7 @@ public class ImageCreationService {
  @Transactional(readOnly=true)
  public PageResult<ImageDtos.Work> works(int page,int size) {
    checkPage(page,size);
-   var result=items.findByStatusOrderByIdDesc("SUCCEEDED",PageRequest.of(page,size));
+   var result=items.findByStatusAndOutputKeyIsNotNullOrderByIdDesc("SUCCEEDED",PageRequest.of(page,size));
    return PageResult.of(result,result.stream().map(i->{
      var c=find(i.getCreationId());var d=ImageQuality.dimensions(c.getRequest().quality(),c.getRequest().ratio());
      return new ImageDtos.Work(i.getId(),c.getId(),c.getRequest().workflow(),title(root(c)),
@@ -202,6 +202,7 @@ public class ImageCreationService {
      if(!Set.of("FAILED","INTERRUPTED").contains(status)) throw bad("当前图片无需重试");
      if("FAILED".equals(i.getStatus())) {
        i.setGeneration(i.getGeneration()+1);i.setProviderJobId(null);i.setRawKey(null);i.setPollRound(0);
+       i.setProviderImageUrl(null);i.setPersistedAt(null);i.setOutputKey(null);
        i.setProviderCode(null);
      }
      i.setPollRound(0);
@@ -446,6 +447,49 @@ public class ImageCreationService {
    i.setStatus("GENERATING");
    enqueue(i,find(i.getCreationId()),"poll-"+i.getPollRound(),config.getPollSeconds());
  }
+ /** Complete the user-facing generation as soon as the provider returns a URL. */
+ @Transactional
+ public void saveProviderUrl(Long id,Task task,ProviderResult result,String imageUrl,String targetKey) {
+   if(!tasks.ownsExecution(task))return;
+   var i=items.lock(id).orElseThrow();
+   if(!Objects.equals(i.getTaskId(),task.getId()))return;
+   if(imageUrl==null || imageUrl.isBlank()) throw new IllegalArgumentException("上游未返回图片 URL");
+   if(result.providerJobId()!=null)i.setProviderJobId(result.providerJobId());
+   i.setProviderCode(result.providerCode());
+   i.setModel(String.valueOf(result.output().getOrDefault("_model","")));
+   Object usage=result.output().get("usage");
+   if(usage instanceof Map<?,?>) i.setUsage(json.convertValue(usage,new com.fasterxml.jackson.core.type.TypeReference<>(){}));
+   i.setProviderImageUrl(imageUrl);
+   i.setStatus("SUCCEEDED");
+   i.setError(null);
+   var c=find(i.getCreationId());
+   syncCreationStatus(c);
+   releasePermitIfTerminal(c);
+   var download=tasks.submit("IMAGE_DOWNLOAD", "DEFAULT",
+     Map.of("itemId",id,"imageUrl",String.valueOf(result.output().getOrDefault("imageSourceUrl",imageUrl)),"targetKey",targetKey),
+     "image-download-"+id+"-"+i.getGeneration(), c.getCreatedBy());
+   download.setPriority(-5);
+ }
+ @Transactional
+ public void markImagePersisted(Long itemId,String storageKey,int width,int height,String imageHash) {
+   var item=items.lock(itemId).orElseThrow(()->new IllegalStateException("图片项不存在"));
+   var creation=find(item.getCreationId());
+   String expected="t"+creation.getTenantId()+"/generated/"+itemId+"/"+item.getGeneration()+"/background.png";
+   if(!expected.equals(storageKey) || !"SUCCEEDED".equals(item.getStatus()))
+     throw new IllegalStateException("图片下载结果已过期");
+   item.setRawKey(storageKey);
+   item.setOutputKey(storageKey);
+   item.setActualWidth(width);
+   item.setActualHeight(height);
+   item.setPersistedAt(Instant.now());
+   if(imageHash!=null && "POSTER".equals(creation.getRequest().workflow()) && creation.getReferenceHash()!=null
+       && (creation.getParentId()==null || creation.getVariation()!=null)) {
+     item.setSimilarityWarning(items.recentPosterFingerprints(creation.getTenantId(),itemId,creation.getRequest().ratio()).stream()
+       .anyMatch(previous->ImageFingerprint.distance(creation.getReferenceHash(),(String)previous[0])<=6
+         && ImageFingerprint.distance(imageHash,(String)previous[1])<=6));
+   }
+   item.setImageHash(imageHash);
+ }
  @Transactional
  public void complete(Long id,Task task,String outputKey,String imageHash) {
    if(!tasks.ownsExecution(task))return;
@@ -460,7 +504,7 @@ public class ImageCreationService {
      i.setSimilarityWarning(similar);
    }
    i.setImageHash(imageHash);
-   i.setOutputKey(outputKey);i.setStatus("SUCCEEDED");i.setError(null);
+   i.setOutputKey(outputKey);i.setPersistedAt(Instant.now());i.setStatus("SUCCEEDED");i.setError(null);
    syncCreationStatus(c);
    releasePermitIfTerminal(c);
  }
@@ -492,11 +536,15 @@ public class ImageCreationService {
    var list=items.findByCreationIdOrderByOrdinal(c.getId());
    var views=list.stream().map(i->{
      String status=effective(i.getStatus(),i.getTaskId());
+     String durableUrl=i.getOutputKey()==null?null:storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30));
+     String url=durableUrl!=null?durableUrl:i.getProviderImageUrl();
+     boolean downloadFailed=i.getProviderImageUrl()!=null && i.getPersistedAt()==null
+       && tasks.statusByIdempotencyKey("image-download-"+i.getId()+"-"+i.getGeneration())==TaskStatus.FAILED;
      return new ImageDtos.ItemView(i.getId(),i.getOrdinal(),i.getSpec().role(),i.getSpec().headline(),i.getSpec().caption(),
-       status,status.equals("INTERRUPTED")?"执行中断，可恢复原任务":i.getError(),
-       i.getOutputKey()==null?null:storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30)),
+       status,status.equals("INTERRUPTED")?"执行中断，可恢复原任务":downloadFailed?"图片保存失败，临时预览链接可能过期":i.getError(),url,
        i.getActualWidth()==null?d.width():i.getActualWidth(),
-       i.getActualHeight()==null?d.height():i.getActualHeight(),i.getTaskId(),i.isSimilarityWarning());
+       i.getActualHeight()==null?d.height():i.getActualHeight(),i.getTaskId(),i.isSimilarityWarning(),
+       i.getProviderImageUrl(),i.getPersistedAt()!=null,downloadFailed);
    }).toList();
    int done=(int)views.stream().filter(i->i.status().equals("SUCCEEDED")).count();
    String state=effective(c.getStatus(),c.getTaskId());

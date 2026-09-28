@@ -2,12 +2,21 @@ package com.wuyao.growth.common.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.BizException;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.HttpClientResponseHandler;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.junit.jupiter.api.Test;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class ImageModelHttpAdapterTest {
  @Test void claudeRefinerCanReturnJsonInsideOneMarkdownFence() throws Exception {
@@ -104,18 +113,49 @@ class ImageModelHttpAdapterTest {
      assertThat(request).contains("name=\"quality\"","\r\nhigh\r\n").doesNotContain("data:image","response_format");
    }
  }
- @Test void imageUrlDownloadsRequireExactOriginAndNeverReceiveCredentials() throws Exception {
-   try(var server=new ServerSocket(0,2,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+ @Test void imageUrlIsReturnedWithoutDownloading() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
      String origin="http://127.0.0.1:"+server.getLocalPort();
-     var captured=pool.submit(()->{
-       respond(server,200,"{\"data\":[{\"url\":\""+origin+"/image.png?signature=private\"}]}");
-       return respond(server,200,"image-bytes");
-     });
+     var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"url\":\""+origin+"/image.png?signature=private\"}]}"));
      var p=openAiConfig(server);p.getGenerator().setDownloadAllowedOrigins(List.of(origin));
      var result=new ImageModelHttpAdapter(p,new ObjectMapper()).invoke(imageRequest(List.of()));
-     assertThat(result.output().get("imageBase64")).isEqualTo(Base64.getEncoder().encodeToString("image-bytes".getBytes(StandardCharsets.UTF_8)));
-     assertThat(captured.get(5,TimeUnit.SECONDS)).startsWith("GET /image.png?signature=private ").doesNotContain("Authorization","test-key","Idempotency-Key");
+     assertThat(result.output()).containsEntry("imageUrl",origin+"/image.png?signature=private")
+       .doesNotContainKey("imageBase64");
+     assertThat(captured.get(5,TimeUnit.SECONDS)).startsWith("POST /v1/images/generations ");
    }
+ }
+ @Test void onlyRouterFilesContentResolvesSignedUrlWithoutDownloadingImage() throws Exception {
+   var client=mock(HttpClient.class);
+   String source="https://api.onlyrouter.ai/v1/files/file-123/content";
+   String signed="https://storage.example.com/result.png?signature=private";
+   var requests=new ArrayList<org.apache.hc.core5.http.ClassicHttpRequest>();
+   when(client.execute(any(org.apache.hc.core5.http.ClassicHttpRequest.class),any(HttpClientResponseHandler.class)))
+     .thenAnswer(invocation->{
+       var request=(org.apache.hc.core5.http.ClassicHttpRequest)invocation.getArgument(0);
+       requests.add(request);
+       var response=mock(ClassicHttpResponse.class);
+       if(request instanceof HttpGet) {
+         when(response.getCode()).thenReturn(302);
+         when(response.getFirstHeader("Location")).thenReturn(new BasicHeader("Location",signed));
+       } else {
+         byte[] body=("{\"data\":[{\"url\":\""+source+"\"}]}").getBytes(StandardCharsets.UTF_8);
+         when(response.getCode()).thenReturn(200);
+         when(response.getEntity()).thenReturn(new ByteArrayEntity(body,ContentType.APPLICATION_JSON));
+       }
+       return ((HttpClientResponseHandler<?>)invocation.getArgument(1)).handleResponse(response);
+     });
+   var props=new ImageModelProperties();
+   props.getGenerator().setProtocol(ImageModelProperties.Protocol.OPENAI);
+   props.getGenerator().setUrl("https://api.onlyrouter.ai/v1/images/generations");
+   props.getGenerator().setApiKey("test-key");
+   props.getGenerator().setModel("image-model");
+   props.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai"));
+
+   var result=new ImageModelHttpAdapter(props,new ObjectMapper(),client).invoke(imageRequest(List.of()));
+   assertThat(result.output()).containsEntry("imageUrl",signed).containsEntry("imageSourceUrl",source);
+   assertThat(requests).hasSize(2);
+   assertThat(requests.get(1).getUri().toString()).isEqualTo(source);
+   assertThat(requests.get(1).getFirstHeader("Authorization").getValue()).isEqualTo("Bearer test-key");
  }
  @Test void unapprovedImageUrlsAreRejectedBeforeDownload() throws Exception {
    try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {

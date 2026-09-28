@@ -6,7 +6,7 @@ import java.util.*;
 
 public interface ImageItemRepository extends JpaRepository<ImageItem,Long> {
  List<ImageItem> findByCreationIdOrderByOrdinal(Long id);
- Page<ImageItem> findByStatusOrderByIdDesc(String status, Pageable page);
+ Page<ImageItem> findByStatusAndOutputKeyIsNotNullOrderByIdDesc(String status, Pageable page);
  @Query(value="select c.reference_hash, i.image_hash from image_items i "
    +"join image_creations c on c.id=i.creation_id where i.tenant_id=:tenantId "
    +"and i.id<>:itemId and i.status='SUCCEEDED' and i.image_hash is not null "
