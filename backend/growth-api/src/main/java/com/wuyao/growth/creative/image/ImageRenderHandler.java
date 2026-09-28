@@ -7,7 +7,6 @@ import com.wuyao.growth.common.task.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import java.awt.image.BufferedImage;
 import java.util.*;
 
 @Slf4j
@@ -37,7 +36,6 @@ public class ImageRenderHandler implements TaskHandler {
    long id=((Number)task.getPayload().get("itemId")).longValue();
    if(!service.beginItem(id,task))return Map.of("reused",true);
    var item=service.itemSnapshot(id);var c=service.snapshot(item.getCreationId());
-   var d=ImageQuality.dimensions(c.getRequest().quality(),c.getRequest().ratio());
    String base="t"+c.getTenantId()+"/generated/"+id+"/"+item.getGeneration();
    String raw=item.getRawKey();
    if(raw==null && storage.exists(base+"/background.png")) raw=base+"/background.png";
@@ -95,18 +93,7 @@ public class ImageRenderHandler implements TaskHandler {
        if(encoded.length()>44*1024*1024)throw new IllegalArgumentException("生成图片过大");
        byte[] bytes=Base64.getDecoder().decode(encoded);
        var source=renderer.decode(bytes);
-       BufferedImage decoded;
-       try {
-         decoded=renderer.normalize(source,nativeSize,d);
-       } catch (IllegalArgumentException e) {
-         // Some OpenAI-compatible relays ignore 4K dimensions but return a
-         // correctly proportioned native image. Keep that image at its real
-         // size instead of upscaling it or failing the whole creation.
-         if (!e.getMessage().contains("低于所选输出") || !renderer.matchesAspect(source,nativeSize)) throw e;
-         decoded=source;
-       }
-       service.saveActualDimensions(id,task,decoded.getWidth(),decoded.getHeight());
-       raw=base+"/background.png";storage.put(raw,renderer.png(decoded),"image/png");
+       raw=base+"/background.png";storage.put(raw,renderer.png(source),"image/png");
      } else if(!status.equals("FAILED") && (response.providerJobId()==null||response.providerJobId().isBlank()))
        throw new IllegalArgumentException("异步模型没有返回任务编号");
      service.saveProvider(id,task,response,raw);
@@ -125,13 +112,13 @@ public class ImageRenderHandler implements TaskHandler {
        Map.of("status","SUCCEEDED"),null,null),raw);
    }
    item=service.itemSnapshot(id);
-   var outputSize=item.getActualWidth()!=null && item.getActualHeight()!=null
-     ? new ImageDtos.Dimensions(item.getActualWidth(),item.getActualHeight()) : d;
-   byte[] output=renderer.render(storage.read(raw,64*1024*1024),outputSize,item.getSpec());
+   byte[] output=storage.read(raw,64*1024*1024);
+   var image=renderer.decode(output);
+   service.saveActualDimensions(id,task,image.getWidth(),image.getHeight());
    String outputKey=base+"/work.png";
    storage.put(outputKey,output,"image/png");
    String imageHash="POSTER".equals(c.getRequest().workflow())
-     && (c.getParentId()==null || c.getVariation()!=null)?ImageFingerprint.of(renderer.decode(output)):null;
+     && (c.getParentId()==null || c.getVariation()!=null)?ImageFingerprint.of(image):null;
    service.complete(id,task,outputKey,imageHash);
    return Map.of("itemId",id);
  }
