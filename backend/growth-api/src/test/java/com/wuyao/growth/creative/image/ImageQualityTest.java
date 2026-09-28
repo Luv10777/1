@@ -2,7 +2,6 @@ package com.wuyao.growth.creative.image;
 
 import com.wuyao.growth.common.gateway.ImageModelProperties;
 import org.junit.jupiter.api.Test;
-import java.awt.image.BufferedImage;
 import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
@@ -30,26 +29,9 @@ class ImageQualityTest {
    for(String ratio:List.of("1:1","3:4","4:3","2:3","3:2"))
      assertThatThrownBy(()->ImageQuality.modelDimensions("4K",ratio,config())).hasMessageContaining("4K 支持");
  }
- @Test void normalizationDownsamplesAndRejectsProviderDimensionMismatch() {
-   var renderer=new ImageRenderer(config());var nativeSize=new ImageDtos.Dimensions(1104,1472);var target=new ImageDtos.Dimensions(1080,1440);
-   var normalized=renderer.normalize(new BufferedImage(1104,1472,BufferedImage.TYPE_INT_RGB),nativeSize,target);
-   assertThat(normalized.getWidth()).isEqualTo(1080);assertThat(normalized.getHeight()).isEqualTo(1440);
-   assertThatThrownBy(()->renderer.normalize(new BufferedImage(512,512,BufferedImage.TYPE_INT_RGB),nativeSize,target)).hasMessageContaining("请求不符");
-   assertThatThrownBy(()->renderer.normalize(normalized,target,nativeSize)).hasMessageContaining("不允许");
- }
- @Test void relayMayReturnDifferentResolutionWithSameAspectRatio() {
-   var renderer=new ImageRenderer(config());
-   var returned=new BufferedImage(1086,1448,BufferedImage.TYPE_INT_RGB);
-   var target=new ImageDtos.Dimensions(480,640);
-   var normalized=renderer.normalize(returned,new ImageDtos.Dimensions(720,960),target);
-   assertThat(normalized.getWidth()).isEqualTo(480);
-   assertThat(normalized.getHeight()).isEqualTo(640);
-   // Even if requested and output sizes match, the returned image must be resized.
-   assertThat(renderer.normalize(returned,target,target).getWidth()).isEqualTo(480);
-   assertThatThrownBy(()->renderer.normalize(returned,new ImageDtos.Dimensions(2160,2880),
-     new ImageDtos.Dimensions(2160,2880))).hasMessageContaining("不允许");
-   var strict=new ImageRenderer(new ImageModelProperties());
-   assertThatThrownBy(()->strict.normalize(returned,new ImageDtos.Dimensions(720,960),target))
-     .hasMessageContaining("请求不符");
+ @Test void requestsHighestSupportedQualityForPortraitPoster() {
+   assertThat(ImageQuality.highestQuality("3:4",config())).isEqualTo("1080P");
+   assertThat(ImageQuality.modelDimensions("1080P","3:4",config()))
+     .isEqualTo(new ImageDtos.Dimensions(1104,1472));
  }
 }

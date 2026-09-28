@@ -67,7 +67,7 @@ growth:
       model: ${IMAGE_ADVANCED_PLANNER_MODEL:gpt-5.6-luna}
       temperature: ${IMAGE_ADVANCED_PLANNER_TEMPERATURE:0.7}
       max-tokens: ${IMAGE_ADVANCED_PLANNER_MAX_TOKENS:2000}
-      timeout-seconds: ${IMAGE_ADVANCED_PLANNER_TIMEOUT_SECONDS:60}
+      timeout-seconds: ${IMAGE_ADVANCED_PLANNER_TIMEOUT_SECONDS:300}
     refiner:
       enabled: ${IMAGE_REFINER_ENABLED:true}
       url: ${IMAGE_REFINER_URL:}
@@ -95,7 +95,8 @@ growth:
     max-total: ${HTTP_MAX_TOTAL:200}
     max-per-route: ${HTTP_MAX_PER_ROUTE:50}
     connection-timeout: ${HTTP_CONNECTION_TIMEOUT:15}
-    socket-timeout: ${HTTP_SOCKET_TIMEOUT:120}
+    # Multimodal planning requests may take longer than a normal API call.
+    socket-timeout: ${HTTP_SOCKET_TIMEOUT:300}
   jwt:
     # 至少 32 字节。生产必须用环境变量注入。
     secret: ${JWT_SECRET:}
@@ -127,6 +128,7 @@ growth:
     queues: DEFAULT,IMAGE,VIDEO
     poll-interval: 2000
     batch-size: 5
+    parallelism: ${WORKER_PARALLELISM:1}
     lease: 30m
     heartbeat-interval: 10000
 

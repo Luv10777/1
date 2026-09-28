@@ -73,6 +73,7 @@ java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --growth.work
 |---|---|---|
 | `growth.worker.enabled` | `false` | API 默认不执行后台任务 |
 | `growth.worker.batch-size` | `5` | 每轮每队列最多处理数量；每次只领取一条 |
+| `growth.worker.parallelism` | `1` | 单个 Worker 进程同时执行的任务数；每个执行槽独立续租 |
 | `growth.worker.lease` | `30m` | 执行租约时长 |
 | `growth.worker.heartbeat-interval` | `10000` ms | 独立线程续租间隔 |
 | `growth.worker.poll-interval` | `2000` ms | 一轮执行结束到下一轮的间隔 |

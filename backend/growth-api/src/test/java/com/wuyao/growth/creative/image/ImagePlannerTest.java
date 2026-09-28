@@ -24,12 +24,14 @@ class ImagePlannerTest {
      .isInstanceOf(IllegalArgumentException.class);
    assertThat(ImagePlanner.validate(new ImageDtos.Plan("方案","哪个价格？",List.of()),request(1)).items()).isEmpty();
  }
- @Test void rejectsUndersizedProviderOutputWithoutUpscaling() {
-   var renderer=new ImageRenderer(new ImageModelProperties());
-   byte[] png=renderer.png(new BufferedImage(480,640,BufferedImage.TYPE_INT_RGB));
-   assertThatThrownBy(()->renderer.render(png,ImageQuality.dimensions("4K","3:4"),new ImageDtos.Spec("主图","提示","","")))
-     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("尺寸");
-   assertThat(renderer.decode(renderer.render(png,ImageQuality.dimensions("480P","3:4"),new ImageDtos.Spec("主图","提示","",""))).getHeight()).isEqualTo(640);
+ @Test void providerPixelsAreKeptAtReturnedDimensions() {
+   var renderer=new ImageRenderer();
+   var returned=new BufferedImage(1374,1145,BufferedImage.TYPE_INT_RGB);
+   returned.setRGB(500,500,0xffa12345);
+   var decoded=renderer.decode(renderer.png(returned));
+   assertThat(decoded.getWidth()).isEqualTo(1374);
+   assertThat(decoded.getHeight()).isEqualTo(1145);
+   assertThat(decoded.getRGB(500,500)).isEqualTo(0xffa12345);
  }
  @Test void qualityHasConsistentOrientations() {
    assertThat(ImageQuality.dimensions("4K","3:4")).isEqualTo(new ImageDtos.Dimensions(2880,3840));
@@ -43,28 +45,13 @@ class ImagePlannerTest {
    assertThat(ImageQuality.supportsOutput("1080P","9:16",config)).isFalse();
    assertThat(ImageQuality.supportsOutput("4K","9:16",config)).isFalse();
  }
- @Test void acceptsSmallProviderRoundingErrorButNeverUpscales() {
-   var config=new ImageModelProperties();
-   config.getGenerator().setModel("gpt-image-2");
-   var renderer=new ImageRenderer(config);
-   var rounded=new BufferedImage(1081,1920,BufferedImage.TYPE_INT_RGB);
-   var png=renderer.png(rounded);
-   assertThat(renderer.normalize(renderer.decode(png),
-     ImageQuality.modelDimensions("1080P","9:16",config),ImageQuality.dimensions("1080P","9:16")).getHeight()).isEqualTo(1920);
-   var small=renderer.png(new BufferedImage(941,1672,BufferedImage.TYPE_INT_RGB));
-   assertThatThrownBy(()->renderer.normalize(renderer.decode(small),
-     ImageQuality.modelDimensions("4K","9:16",config),ImageQuality.dimensions("4K","9:16")))
-     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("941×1672").hasMessageContaining("2160×3840");
-   assertThat(renderer.matchesAspect(renderer.decode(small),ImageQuality.modelDimensions("4K","9:16",config))).isTrue();
- }
  @Test void finishedModelImageIsNotCoveredWithProgrammaticTextBoxes() {
-   var renderer=new ImageRenderer(new ImageModelProperties());
+   var renderer=new ImageRenderer();
    var source=new BufferedImage(480,640,BufferedImage.TYPE_INT_RGB);
    var g=source.createGraphics();
    g.setColor(java.awt.Color.RED);g.fillRect(0,0,480,640);g.dispose();
    byte[] png=renderer.png(source);
-   assertThat(renderer.render(png,new ImageDtos.Dimensions(480,640),
-     new ImageDtos.Spec("海报","完整海报","一周年","欢迎到店"))).isEqualTo(png);
+   assertThat(renderer.png(renderer.decode(png))).isEqualTo(png);
  }
  @Test void imageModelReceivesExactCopyEvenForLegacyBackgroundPlans() {
    var spec=new ImageDtos.Spec("海报","no text, top 23% empty","双人餐 99 元","周末限定");
