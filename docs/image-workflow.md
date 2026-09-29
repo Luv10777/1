@@ -27,12 +27,14 @@ IMAGE_REFINER_ENABLED=true
 IMAGE_REFINER_MODEL=claude-sonnet-4-6-ab
 IMAGE_REFINER_MAX_TOKENS=3000
 IMAGE_REFINER_TIMEOUT_SECONDS=300
-IMAGE_GENERATOR_MODEL=gpt-image-2
+IMAGE_GENERATOR_MODEL=gpt-image-2.5-ultra-fast
 IMAGE_GENERATOR_PROTOCOL=OPENAI
-IMAGE_GENERATOR_QUALITY=auto
+IMAGE_GENERATOR_URL=https://new.fluapi.com/v1/images/generations
+IMAGE_GENERATOR_QUALITY=standard
+IMAGE_GENERATOR_RESPONSE_FORMAT=url
 IMAGE_GENERATOR_TIMEOUT_SECONDS=900
 IMAGE_TIMEOUT_SECONDS=300
-IMAGE_SUPPORTED_QUALITIES=480P,720P,1080P,4K
+IMAGE_SUPPORTED_QUALITIES=1K,2K,4K
 IMAGE_MAX_OUTPUT_PIXELS=0
 IMAGE_FONT=Microsoft YaHei
 ```
@@ -43,7 +45,10 @@ IMAGE_FONT=Microsoft YaHei
 `IMAGE_GENERATOR_API_KEY`，它们优先于共享令牌，不要把独立令牌显式设为空。
 
 `IMAGE_SUPPORTED_QUALITIES` 只填写实际支持的档位。`IMAGE_MAX_OUTPUT_PIXELS` 可按中转站实测能力限制可选输出尺寸；0 表示不额外限制。带参考图时，规划模型必须支持图像输入。
-模型 ID 保持用户指定的名称，中转站的实际映射仍需带令牌联调。前端没有供应商密钥。
+当前生产图片模型为 `gpt-image-2.5-ultra-fast`，使用 Flu 的 OpenAI 兼容
+`/v1/images/generations` 接口，并请求 `response_format=url`。中转站返回的临时图片 URL
+仍由服务端下载、转 PNG 并保存到对象存储；前端不接触供应商令牌。参考图编辑能力需以
+中转站对 `/v1/images/edits` 的实际支持为准。
 
 ```powershell
 cd backend/growth-api
@@ -137,7 +142,7 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
   "prompt": "整组统一设计……本张画面……",
   "width": 1080,
   "height": 1440,
-  "quality": "1080P",
+  "quality": "2K",
   "references": [
     { "role": "SUBJECT", "dataUrl": "data:image/png;base64,..." }
   ]
@@ -196,7 +201,7 @@ Files API 上传响应只有文件 ID，不含下载 URL；文件默认保留 7 
   `/content` 地址仅跟随一次 `302`，且不会向签名地址转发 API Key。
 
 `IMAGE_GENERATOR_QUALITY` 是模型的 `auto/low/medium/high` 等质量参数，
-与界面中的 480P、720P 等输出分辨率不同。默认不发送 `response_format`、
+与界面中的 1K、2K、4K 输出分辨率不同。默认不发送 `response_format`、
 `input_fidelity` 等可选参数；只有当前图片接口明确要求时才配置
 `IMAGE_GENERATOR_RESPONSE_FORMAT`。返回格式以实际接口响应为准。
 
@@ -209,15 +214,14 @@ worker 崩溃后若底图已经保存，则从底图恢复；只有提交标记�
 
 ## 画质与排版
 
-480P、720P、1080P 以短边定义；4K 以长边 3840 像素定义。
-按比例四舍五入得到目标像素值，提交前页面显示实际尺寸。
+1K、2K 按短边定义；4K 使用模型支持的 16:9 或 9:16 原生尺寸。
+提交前页面显示当前比例下的实际像素尺寸。
 
 | 画质 | 1:1 | 3:4 | 16:9 |
 |---|---|---|---|
-| 480P | 480 × 480 | 480 × 640 | 853 × 480 |
-| 720P | 720 × 720 | 720 × 960 | 1280 × 720 |
-| 1080P | 1080 × 1080 | 1080 × 1440 | 1920 × 1080 |
-| 4K | 3840 × 3840 | 2880 × 3840 | 3840 × 2160 |
+| 1K | 1024 × 1024 | 768 × 1024（3:4） | 1536 × 1024（3:2） |
+| 2K | 2048 × 2048 | 1536 × 2048（3:4） | 2048 × 1152（16:9） |
+| 4K | 不支持 | 不支持 | 3840 × 2160（16:9） |
 
 表格是平台输出尺寸约定，具体模型可能只支持其中部分组合。
 对于 `gpt-image-2`，请求宽高必须是 16 的倍数，总像素在 655,360–8,294,400 之间，
@@ -226,10 +230,8 @@ worker 崩溃后若底图已经保存，则从底图恢复；只有提交标记�
 实测中转站可能把 720×960 请求返回为 1086×1448。gpt-image-2 允许返回其他同一比例、
 且宽高均不小于目标输出的分辨率，再缩小至用户选择的尺寸；比例不符或清晰度不足仍报错。
 
-例如 1080P 的 3:4 海报按 1104×1472 生成，再输出 1080×1440；
-480P 的 3:4 海报按 720×960 生成，再输出 480×640。
-因此低输出分辨率不代表模型只按该分辨率计费。
-4K 仅开放 3840×2160 和 2160×3840；正方形、3:4 等比例的 4K 超过模型总像素限制。
+1K/2K 的 3:4、4:3、2:3、3:2 等比例按短边等比计算；4K 仅开放 3840×2160 和
+2160×3840，正方形、3:4 等比例的 4K 在页面和服务端都会被禁用。
 能力接口的 `qualityRatios` 同时约束前端选择和服务端提交，非法组合在调用模型前拒绝。
 
 上述约束来源于 [OpenAI 图片生成指南][image-guide]、[生图接口][image-generate]

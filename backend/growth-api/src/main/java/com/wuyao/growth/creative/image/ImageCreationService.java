@@ -45,14 +45,13 @@ public class ImageCreationService {
    }).toList());
    return Map.of("configured",planner&&generator,"plannerConfigured",planner,"generatorConfigured",generator,
        "qualities",config.getQualities(),"qualityRatios",ratios,
-       "sizeHint",ImageQuality.usesGptImage2(config)?"4K 支持 16:9 横屏或 9:16 竖屏；其他比例自动使用当前支持的最高画质。":"",
+       "sizeHint",ImageQuality.usesGptImage2(config)?"1K/2K 支持方图、横图和竖图；4K 仅支持 16:9 横屏或 9:16 竖屏。":"",
        "message",planner&&generator?"":"图片创作服务尚未配置，请联系管理员");
  }
  @Transactional
  public ImageDtos.View create(ImageDtos.Create request,Long userId) {return createVersion(request,userId,null,null);}
  private ImageDtos.View createVersion(ImageDtos.Create req,Long userId,Long parent,String variation) {
    Long tenantId = TenantContext.require();
-   req = withAutomaticQuality(req);
    creations.lockRequest(tenantId + ":" + req.requestKey());
        String hash=variation==null?hash(req,parent):hash(List.of(req,variation),parent);
        var old=creations.findByRequestKey(req.requestKey());
@@ -91,12 +90,6 @@ public class ImageCreationService {
      throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,"当前图片模型尚不支持该画质");
    if(!ImageQuality.supportsOutput(req.quality(),req.ratio(),config))
      throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,"当前中转站不支持该比例的图片输出，请调整比例");
- }
- private ImageDtos.Create withAutomaticQuality(ImageDtos.Create req) {
-   String quality = ImageQuality.highestQuality(req.ratio(), config);
-   if (quality.equals(req.quality())) return req;
-   return new ImageDtos.Create(req.requestKey(), req.workflow(), req.brief(), req.references(), req.ratio(),
-       quality, req.count(), req.purpose(), req.style(), req.templateId());
  }
  @Transactional
  public ImageDtos.View revise(Long id,ImageDtos.Revision revision,Long userId) {

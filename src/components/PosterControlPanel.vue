@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { IMAGE_RATIOS, POSTER_PURPOSE_GROUPS } from '../domain/imageCreation'
+import { IMAGE_QUALITIES, IMAGE_RATIOS, POSTER_PURPOSE_GROUPS, imageDimensions } from '../domain/imageCreation'
 import { POSTER_SCENARIOS } from '../domain/posterScenarios'
 import { assetSource } from '../stores/assetLibrary'
 import PosterReferenceLibrary from './PosterReferenceLibrary.vue'
@@ -13,6 +13,10 @@ const dragging = ref(false)
 const libraryOpen = ref(false)
 const purposeGroup = ref(POSTER_PURPOSE_GROUPS.findIndex(group => group.options.some(option => option.label === studio.value.purpose)))
 const currentPurposes = computed(() => POSTER_PURPOSE_GROUPS[Math.max(0, purposeGroup.value)].options)
+const qualityDimensions = quality => {
+  try { return imageDimensions(quality, studio.value.ratio) }
+  catch { return { width: 0, height: 0 } }
+}
 defineExpose({ focus: () => promptInput.value?.focus() })
 watch(() => studio.value.optimistic, value => { if (value) libraryOpen.value = false })
 
@@ -73,6 +77,8 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="poster-control-section"><div class="poster-section-heading"><strong>海报比例</strong></div><div class="poster-ratio-grid" role="group" aria-label="海报比例"><button v-for="ratio in IMAGE_RATIOS" :key="ratio" type="button" :disabled="studio.locked || !studio.supportsRatio(ratio)" :aria-pressed="studio.ratio === ratio" :class="{ active: studio.ratio === ratio }" @click="studio.ratio = ratio"><span class="poster-ratio-icon" :style="{ aspectRatio: ratio.replace(':', ' / ') }" />{{ ratio }}</button></div></section>
+
+      <section class="poster-control-section"><div class="poster-section-heading"><strong>输出画质</strong><small>按当前比例生成原生尺寸</small></div><div class="poster-quality-grid" role="group" aria-label="输出画质"><button v-for="quality in IMAGE_QUALITIES" :key="quality" type="button" :disabled="studio.locked || !studio.supportsQuality(quality)" :aria-pressed="studio.quality === quality" :class="{ active: studio.quality === quality }" @click="studio.quality = quality"><strong>{{ quality }}</strong><small>{{ qualityDimensions(quality).width ? `${qualityDimensions(quality).width} × ${qualityDimensions(quality).height}` : '当前比例不可用' }}</small></button></div></section>
 
       <section class="poster-control-section"><div class="poster-section-heading"><strong>发布用途</strong><small>决定画面信息层级</small></div><div class="poster-purpose-groups" role="tablist" aria-label="发布用途分类"><button v-for="(group, index) in POSTER_PURPOSE_GROUPS" :key="group.label" type="button" role="tab" :aria-selected="purposeGroup === index" :class="{ active: purposeGroup === index }" @click="purposeGroup = index">{{ group.label }}</button></div><div class="poster-purpose-options" role="group" aria-label="发布用途"><button v-for="option in currentPurposes" :key="option.label" type="button" :disabled="studio.locked" :aria-pressed="studio.purpose === option.label" :class="{ active: studio.purpose === option.label }" @click="studio.purpose = option.label">{{ option.label }}</button></div></section>
     </div>

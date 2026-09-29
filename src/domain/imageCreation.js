@@ -1,4 +1,4 @@
-export const IMAGE_QUALITIES = ['480P', '720P', '1080P', '4K']
+export const IMAGE_QUALITIES = ['1K', '2K', '4K']
 export const IMAGE_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2']
 export const POSTER_PURPOSE_GROUPS = [
   { label: '线上分享', options: [
@@ -33,10 +33,20 @@ export function supportsImageSize(capabilities, quality, ratio) {
 }
 export function imageDimensions(quality, ratio) {
   if (!IMAGE_QUALITIES.includes(quality) || !IMAGE_RATIOS.includes(ratio)) throw new Error('不支持的画质或比例')
-  const [x, y] = ratio.split(':').map(Number)
-  const base = { '480P': 480, '720P': 720, '1080P': 1080, '4K': 3840 }[quality]
-  const scale = base / (quality === '4K' ? Math.max(x, y) : Math.min(x, y))
-  return { width: Math.round(x * scale), height: Math.round(y * scale) }
+  const sizes = {
+    '1K': { '1:1': [1024, 1024], '3:2': [1536, 1024], '2:3': [1024, 1536] },
+    '2K': { '1:1': [2048, 2048], '16:9': [2048, 1152], '9:16': [1152, 2048] },
+    '4K': { '16:9': [3840, 2160], '9:16': [2160, 3840] },
+  }
+  let size = sizes[quality]?.[ratio]
+  if (!size && quality !== '4K') {
+    const [x, y] = ratio.split(':').map(Number)
+    const base = quality === '1K' ? 1024 : 2048
+    const scale = base / (['3:4', '4:3'].includes(ratio) ? Math.max(x, y) : Math.min(x, y))
+    size = [Math.round(x * scale), Math.round(y * scale)]
+  }
+  if (!size) throw new Error('该画质不支持此比例')
+  return { width: size[0], height: size[1] }
 }
 export function validateImageFile(file) {
   if (!['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片')
