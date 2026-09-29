@@ -72,7 +72,7 @@ growth:
       enabled: ${IMAGE_REFINER_ENABLED:true}
       url: ${IMAGE_REFINER_URL:}
       api-key: ${IMAGE_REFINER_API_KEY:${NEW_API_API_KEY:}}
-      model: ${IMAGE_REFINER_MODEL:deepseek-v4-pro}
+      model: ${IMAGE_REFINER_MODEL:gpt-6-luna}
       temperature: ${IMAGE_REFINER_TEMPERATURE:0.5}
       max-tokens: ${IMAGE_REFINER_MAX_TOKENS:3000}
       timeout-seconds: ${IMAGE_REFINER_TIMEOUT_SECONDS:300}
