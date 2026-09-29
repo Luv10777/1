@@ -24,7 +24,7 @@ NEW_API_BASE_URL=https://myrouter.online/v1
 NEW_API_API_KEY=replace-on-server
 IMAGE_PLANNER_ALIAS=TEXT_REFINER
 IMAGE_REFINER_ENABLED=true
-IMAGE_REFINER_MODEL=claude-sonnet-4-6-ab
+IMAGE_REFINER_MODEL=deepseek-v4-pro
 IMAGE_REFINER_MAX_TOKENS=3000
 IMAGE_REFINER_TIMEOUT_SECONDS=300
 IMAGE_GENERATOR_MODEL=gpt-image-2.5-ultra-fast
@@ -304,7 +304,7 @@ retry 使用当前查询结果中的 `{taskId}`，重复点击不会重复排队
 
 ## Claude 单层文本模型配置
 
-规划和精修统一使用 `TEXT_REFINER` 别名，当前对应 Claude Sonnet，配置项为 `IMAGE_REFINER_MODEL`、
+规划和精修统一使用 `TEXT_REFINER` 别名，当前对应 DeepSeek V4 Pro，配置项为 `IMAGE_REFINER_MODEL`、
 `IMAGE_REFINER_URL`、`IMAGE_REFINER_API_KEY`。旧的 `IMAGE_PLANNER_ALIAS`、
 `IMAGE_ADVANCED_PLANNER_*` 配置仅为兼容旧环境保留，不再路由到 GPT-6 Luna；无论旧值是什么，图片规划都会固定走 Claude。
 省略地址时从 `NEW_API_BASE_URL` 推导，省略密钥时使用 `NEW_API_API_KEY`。
