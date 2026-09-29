@@ -1,12 +1,12 @@
 # AI 图片创作工作流
 
-版本：1.3 · 更新：2026-09-24
+版本：1.4 · 更新：2026-09-29
 
-营销海报与产品套图共用“规划 → 提示词精修 → 图片生成”的技术流程，但不共用创作指令。
-营销海报使用 `poster-director-v9` / `poster-refiner-v4`：聚焦本地商家的传播主题、图文层级、投放场景和历次版式差异；
-产品套图使用 `product-set-director-v2` / `product-set-refiner-v2`：聚焦商品身份保真、镜头分工、材质表现、使用场景和整组一致性，默认不叠加海报标题或促销装饰。
+营销海报与产品套图共用“Claude 需求理解与提示词精修 → 图片生成”的技术流程，但不共用创作指令。
+营销海报使用 `poster-claude-director-v1`：聚焦本地商家的传播主题、图文层级、投放场景和历次版式差异；
+产品套图使用 `product-set-claude-director-v1`：聚焦商品身份保真、镜头分工、材质表现、使用场景和整组一致性，默认不叠加海报标题或促销装饰。
 两者只共享图片身份保真、尺寸校验、参考图角色和安全限制等基础规则。
-规划模型输出结构化方案，精修模型整理对应工作流的视觉指令并保留中文事实，
+Claude 一次调用同时输出结构化方案和每张图的最终视觉指令并保留中文事实，
 图片模型按工作流的成片要求生成，服务端校验尺寸并保存作品，不再叠加固定文字框。
 未配置规划或图片模型时拒绝提交；精修失败时使用原始方案，不回退到 Echo。
 
@@ -22,15 +22,15 @@
 ```properties
 NEW_API_BASE_URL=https://myrouter.online/v1
 NEW_API_API_KEY=replace-on-server
-IMAGE_PLANNER_MODEL=deepseek-v4-flash
-IMAGE_PLANNER_ALIAS=TEXT_PLANNER_ADVANCED
-IMAGE_ADVANCED_PLANNER_MODEL=gpt-5.6-luna
-IMAGE_ADVANCED_PLANNER_TIMEOUT_SECONDS=120
+IMAGE_PLANNER_ALIAS=TEXT_REFINER
 IMAGE_REFINER_ENABLED=true
-IMAGE_REFINER_MODEL=gpt-4o
+IMAGE_REFINER_MODEL=claude-sonnet-4-6-ab
+IMAGE_REFINER_MAX_TOKENS=3000
+IMAGE_REFINER_TIMEOUT_SECONDS=300
 IMAGE_GENERATOR_MODEL=gpt-image-2
 IMAGE_GENERATOR_PROTOCOL=OPENAI
 IMAGE_GENERATOR_QUALITY=auto
+IMAGE_GENERATOR_TIMEOUT_SECONDS=900
 IMAGE_TIMEOUT_SECONDS=300
 IMAGE_SUPPORTED_QUALITIES=480P,720P,1080P,4K
 IMAGE_MAX_OUTPUT_PIXELS=0
@@ -203,6 +203,8 @@ Files API 上传响应只有文件 ID，不含下载 URL；文件默认保留 7 
 OpenAI 同步图片接口没有通用的任务查询地址，也不能因发送 `Idempotency-Key` 就认定
 中转站会去重。系统在调用前持久化提交标记；请求超时或响应解析失败后，不会自动再次付费生图。
 worker 崩溃后若底图已经保存，则从底图恢复；只有提交标记而没有底图时，显示结果待确认。
+这种情况使用 `UPSTREAM_UNKNOWN` 状态，前端不会把它显示为确定失败，worker 也不会自动再次提交。
+用户核对中转站记录后，显式重试才会创建新的生成轮次。
 核对中转站记录后可主动重试，新重试使用新的生成轮次。保存失败仍可恢复已保存的模型图像。
 
 ## 画质与排版
@@ -297,19 +299,14 @@ retry 使用当前查询结果中的 `{taskId}`，重复点击不会重复排队
 
 测试中的模型响应是受控测试数据；测试通过不代表真实供应商已配置或模型效果已验收。
 
-## 两级文本模型配置与回滚
+## Claude 单层文本模型配置
 
-`growth.image.planner-alias` 默认为 `TEXT_PLANNER_ADVANCED`，映射到
-`IMAGE_ADVANCED_PLANNER_MODEL=gpt-5.6-luna`。原来的 `IMAGE_PLANNER_MODEL`
-只在显式选择 `IMAGE_PLANNER_ALIAS=TEXT_PLANNER` 时使用，不会静默替代目标模型。
-高级规划的独立配置为 `IMAGE_ADVANCED_PLANNER_URL` 和 `IMAGE_ADVANCED_PLANNER_API_KEY`；
-缺省时复用原规划地址与密钥。须确认密钥确实拥有目标模型权限。
-
-精修使用 `IMAGE_REFINER_MODEL`、`IMAGE_REFINER_URL`、`IMAGE_REFINER_API_KEY`。
+规划和精修统一使用 `TEXT_REFINER` 别名，对应 `IMAGE_REFINER_MODEL`、
+`IMAGE_REFINER_URL`、`IMAGE_REFINER_API_KEY`。旧的 `IMAGE_PLANNER_ALIAS`、
+`IMAGE_ADVANCED_PLANNER_*` 配置仅为兼容旧环境保留，不再路由到 GPT-6 Luna；无论旧值是什么，图片规划都会固定走 Claude。
 省略地址时从 `NEW_API_BASE_URL` 推导，省略密钥时使用 `NEW_API_API_KEY`。
-GPT-4o 或 Claude 必须由中转站提供兼容 `/chat/completions` 的协议；未实现 Anthropic 原生协议。
-两个文本端点可独立设置 `TEMPERATURE`、`MAX_TOKENS`、`TIMEOUT_SECONDS`，
-分别默认 0.7/2000/60 秒和 0.5/1500/30 秒；令牌上限以 `max_completion_tokens` 发送。
+Claude Sonnet 必须由中转站提供兼容 `/chat/completions` 的协议；未实现 Anthropic 原生协议。
+文本端点默认使用 0.5 温度、3000 最大令牌和 300 秒超时；令牌上限以 `max_completion_tokens` 发送。
 
 精修输出 JSON `{"prompt":"Identity: ... Composition: ... Lighting: ... Camera: ... Restrictions: ..."}`，
 须包含 Depth、Quality 和 Avoid。中文标题、说明和引号内中文名称必须保留。
@@ -319,7 +316,7 @@ GPT-4o 或 Claude 必须由中转站提供兼容 `/chat/completions` 的协议�
 
 无需新增数据库列：规划模型、版本与用量保存在 `image_creations.plan.planning`；
 最终提示词、精修模型、耗时、用量和状态保存在 `image_items.spec.refinement`。
-状态包括 `REFINED`、`DISABLED`、`NOT_CONFIGURED`、`FAILED`、`INVALID_OUTPUT`。
+规划阶段生成的精修状态为 `DIRECTOR_REFINED`；旧数据回退精修仍可能出现 `REFINED`、`DISABLED`、`NOT_CONFIGURED`、`FAILED`、`INVALID_OUTPUT`。
 持久化受现有 RLS、任务租约与执行轮次保护；已有 JSON 数据缺失这些字段时仍可读取。
 
 DEBUG 日志包含 Original visualDirection、Raw prompt、Refined prompt。
@@ -328,9 +325,8 @@ DEBUG 日志包含 Original visualDirection、Raw prompt、Refined prompt。
 不把未提供费用视为免费，不按预期百分比或固定人民币金额伪造实测结果。
 这些指标不带租户标签，详细单图追踪仍受租户隔离约束；指标为进程级，重启会重置。
 
-回滚无需改代码：设置 `IMAGE_PLANNER_ALIAS=TEXT_PLANNER`，
-并设置 `IMAGE_REFINER_ENABLED=false`，重启 API 和 worker。
-已持久化的图片提示词继续复用；需要重新规划的任务应创建新版本。
+升级后无需双模型迁移；重启 API 和 worker 后，新任务固定由 Claude 完成需求理解与精修。
+已持久化的图片提示词继续复用；旧任务缺少精修结果时会按兼容路径补做一次 Claude 精修。
 
 [image-guide]: https://developers.openai.com/api/docs/guides/image-generation
 [image-generate]: https://developers.openai.com/api/reference/resources/images/methods/generate

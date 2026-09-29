@@ -404,12 +404,12 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   >
                     {{ item.assetSaved ? "已保存到素材库" : "保存到素材库" }}</button
                   ><button
-                    v-if="['FAILED', 'INTERRUPTED'].includes(item.status)"
+                    v-if="['FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN'].includes(item.status)"
                     type="button"
                     :disabled="studio.busy || !!studio.pending"
                     @click="studio.retry(item)"
                   >
-                    {{ item.status === "FAILED" ? "重新生成这张" : "恢复这张" }}
+                    {{ item.status === "FAILED" ? "重新生成这张" : item.status === "UPSTREAM_UNKNOWN" ? "核对后重新生成" : "恢复这张" }}
                   </button>
                 </div>
                 <form v-if="item.url && turn.id === studio.current?.id && turn.status === 'SUCCEEDED'" class="poster-conversation-editor" @submit.prevent="submitEditor(item)">

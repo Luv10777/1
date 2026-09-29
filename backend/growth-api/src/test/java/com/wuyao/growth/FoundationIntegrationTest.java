@@ -122,7 +122,7 @@ class FoundationIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        imageConfig.setPlannerAlias(ModelAlias.TEXT_PLANNER_ADVANCED);
+        imageConfig.setPlannerAlias(ModelAlias.TEXT_REFINER);
         imageConfig.setQualities(List.of("480P", "720P", "1080P", "4K"));
         imageConfig.getRefiner().setEnabled(false);
         imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.BRIDGE);
@@ -502,7 +502,7 @@ class FoundationIntegrationTest {
     private void planImageCount(int count, String headline, String caption) {
         var specs = java.util.stream.IntStream.range(0, count).mapToObj(n -> Map.of(
                 "role", "场景" + n, "prompt", "夏日自然光，保持商品外观", "headline", headline, "caption", caption)).toList();
-        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED)))
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER)))
                 .thenReturn(new ProviderResult(true, "TEST", null,
                         Map.of("summary", "一组清爽的夏日图片", "visualDirection", "浅绿背景，自然光", "question", "", "items", specs), null, null));
     }
@@ -644,7 +644,7 @@ class FoundationIntegrationTest {
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.thread(revised.id())))).isEqualTo(1404);
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.rename(revised.id(), "越权改名")))).isEqualTo(1404);
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
-        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED
+        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER
                 && r.prompt().contains("\"variation\":\"LAYOUT\"") && r.prompt().contains("\"previousPoster\"")));
     }
 
@@ -667,7 +667,7 @@ class FoundationIntegrationTest {
         clearInvocations(imageGateway);
         var second=TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-second", "POSTER", 1, refs), null));
         runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
-        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED
+        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER
                 && r.prompt().contains("recentPostersToAvoid")));
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(second.id()).items().getFirst().similarityWarning())).isTrue();
@@ -684,7 +684,7 @@ class FoundationIntegrationTest {
         clearInvocations(imageGateway);
         TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-next", "POSTER", 1, List.of()), null));
         runImageTask("DEFAULT", imagePlanHandler);
-        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_PLANNER_ADVANCED
+        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER
                 && r.prompt().contains("recentPostersToAvoid")));
         verify(imageGateway, never()).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
     }
@@ -723,12 +723,15 @@ class FoundationIntegrationTest {
         return TenantContext.runAs(tenantA, () -> tasks.submit("TEST", "TEST", Map.of("key", key), key, null));
     }
     @Test
-    void refinedPromptIsPersistedAndReusedDuringImagePolling() {
+    void claudeDirectorPromptIsPersistedAndReusedDuringImagePolling() {
         imageConfig.setQualities(List.of("480P"));
-        enableImageModels(); planImageCount(1); imageConfig.getRefiner().setEnabled(true);
+        enableImageModels(); imageConfig.getRefiner().setEnabled(true);
         String prompt="Subject: tea; Lighting: studio lighting; Color: warm palette; Composition: asymmetric; Depth: deep focus; Quality: professional photography, sharp focus, 8K; Avoid: blurry, watermark";
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER)))
-                .thenReturn(new ProviderResult(true,"TEST",null,Map.of("prompt",prompt,"_model","gpt-4o"),null,null));
+                .thenReturn(new ProviderResult(true,"TEST",null,Map.of(
+                        "summary", "茶饮摄影方案", "visualDirection", "studio lighting", "question", "",
+                        "items", List.of(Map.of("role", "主图", "prompt", prompt, "headline", "", "caption", "")),
+                        "_model", "claude-sonnet-4-6-ab"),null,null));
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
                 .thenReturn(new ProviderResult(true,"TEST","refined-job",Map.of("status","RUNNING"),null,null))
                 .thenReturn(imageResult());
@@ -739,11 +742,11 @@ class FoundationIntegrationTest {
         var result=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()));
         assertThat(result.status()).isEqualTo("SUCCEEDED");
         var item=TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(result.items().getFirst().id()));
-        assertThat(item.getSpec().refinement().status()).isEqualTo("REFINED");
-        assertThat(item.getSpec().refinement().model()).isEqualTo("gpt-4o");
+        assertThat(item.getSpec().refinement().status()).isEqualTo("DIRECTOR_REFINED");
+        assertThat(item.getSpec().refinement().model()).isEqualTo("claude-sonnet-4-6-ab");
         verify(imageGateway,times(1)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_REFINER && r.tenantId().equals(tenantA)));
         var calls=ArgumentCaptor.forClass(ProviderRequest.class);
-        verify(imageGateway,times(4)).invokeReal(calls.capture());
+        verify(imageGateway,times(3)).invokeReal(calls.capture());
         var imageCalls=calls.getAllValues().stream().filter(r->r.alias()==ModelAlias.IMAGE_PRIMARY).toList();
         assertThat(imageCalls).hasSize(2);
         assertThat(imageCalls.getFirst().prompt()).startsWith(prompt).isEqualTo(imageCalls.getLast().prompt());

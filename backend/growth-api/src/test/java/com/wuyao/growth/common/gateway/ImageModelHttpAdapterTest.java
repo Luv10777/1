@@ -26,11 +26,11 @@ class ImageModelHttpAdapterTest {
      String response=mapper.writeValueAsString(Map.of("choices",List.of(Map.of("message",Map.of("content",content))),"usage",Map.of("total_tokens",50)));
      var captured=pool.submit(()->respond(server,200,response));
      var props=config(server);props.setBaseUrl("http://127.0.0.1:"+server.getLocalPort());
-     props.getRefiner().setModel("claude-sonnet-4-6");props.getRefiner().setApiKey("test-key");
+     props.getRefiner().setModel("claude-sonnet-4-6-ab");props.getRefiner().setApiKey("test-key");
      var result=new ImageModelHttpAdapter(props,mapper).invoke(new ProviderRequest(ModelAlias.TEXT_REFINER,1L,"brief",Map.of("system","rules"),"refine-key"));
      assertThat(result.output()).containsEntry("prompt","Subject: 周末奶茶半价; Lighting: studio lighting");
-     assertThat(result.output()).containsEntry("_model","claude-sonnet-4-6").containsEntry("_usage",Map.of("total_tokens",50));
-     assertThat(captured.get(5,TimeUnit.SECONDS)).contains("claude-sonnet-4-6");
+     assertThat(result.output()).containsEntry("_model","claude-sonnet-4-6-ab").containsEntry("_usage",Map.of("total_tokens",50));
+     assertThat(captured.get(5,TimeUnit.SECONDS)).contains("claude-sonnet-4-6-ab");
    }
  }
  @Test void advancedAndRefinerUseSeparateCredentialsModelsAndSamplingOptions() throws Exception {
@@ -39,7 +39,7 @@ class ImageModelHttpAdapterTest {
        var captured=pool.submit(()->respond(server,200,"{\"choices\":[{\"message\":{\"content\":\"{\\\"prompt\\\":\\\"refined\\\"}\"}}],\"usage\":{\"total_tokens\":10}}"));
        var props=config(server);props.setBaseUrl("http://127.0.0.1:"+server.getLocalPort());
        var endpoint=alias==ModelAlias.TEXT_REFINER?props.getRefiner():props.getAdvancedPlanner();
-       endpoint.setModel(alias==ModelAlias.TEXT_REFINER?"gpt-4o":"gpt-5.6-luna");
+       endpoint.setModel("claude-sonnet-4-6-ab");
        endpoint.setApiKey("separate-key");endpoint.setTemperature(0.5);endpoint.setMaxTokens(1500);
        var adapter=new ImageModelHttpAdapter(props,new ObjectMapper());
        assertThat(adapter.supports()).contains(alias);

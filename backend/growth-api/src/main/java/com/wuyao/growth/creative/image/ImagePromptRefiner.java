@@ -16,6 +16,17 @@ public class ImagePromptRefiner {
  public static final String PRODUCT_SET_VERSION="product-set-refiner-v2";
  static String version(String workflow) {return "POSTER".equals(workflow)?POSTER_VERSION:PRODUCT_SET_VERSION;}
  static String system(String workflow) {return "POSTER".equals(workflow)?POSTER_SYSTEM:PRODUCT_SET_SYSTEM;}
+ static String directorRules(String workflow) {
+   var lines=system(workflow).strip().split("\\R",3);
+   if(lines.length<3) throw new IllegalStateException("精修系统提示词格式无效");
+   String outputStyle="POSTER".equals(workflow)
+     ? "清晰英文标签和具体视觉描述；商品名、品牌名、Headline、Caption 中的中文原样保留。"
+     : "清晰英文标签和具体摄影描述；商品与品牌名称保留原文。";
+   return """
+     你同时承担最终提示词精修编导职责。对每个 item.prompt 应用以下完整精修规则；输出仍遵循外层方案 JSON，"prompt" 字段承载精修文本，不要返回独立的 {"prompt":"..."} 对象。每条 prompt 使用 %s
+     %s
+     """.formatted(outputStyle,lines[2]);
+ }
  static final String POSTER_SYSTEM="""
   你是本地商家营销海报的提示词编导。把已经完成的海报视觉规划精修为一条可直接交给图像模型的完整图文设计指令。
   输出 JSON {"prompt":"..."}，prompt 使用清晰的英文标签和具体视觉描述，商品名、品牌名、Headline、Caption 的中文原样保留。不输出 Markdown 或解释。
@@ -94,6 +105,9 @@ public class ImagePromptRefiner {
    if("POSTER".equals(workflow))
      return "Avoid: illegible typography, misspelled Chinese text, broken characters, text behind objects, text in blur, excessive decoration, weak hierarchy, crowded composition, generic template layout, random slogans, random price or date, watermark.";
    return "Avoid: blurry, distorted, deformed subject, cluttered composition, generic stock-photo look, random text, random logo, watermark, inconsistent lighting, unnatural shadows.";
+ }
+ static String appendSafety(String prompt,String workflow) {
+   return appendOnce(prompt,avoidFor(workflow));
  }
  private static String appendOnce(String prompt,String line) {
    if(prompt==null || prompt.isBlank()) return line;

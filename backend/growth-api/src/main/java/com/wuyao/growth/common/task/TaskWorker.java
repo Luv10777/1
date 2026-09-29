@@ -107,7 +107,11 @@ public class TaskWorker {
             }
             Map<String, Object> result = TenantContext.runAs(task.getTenantId(), () -> handler.handle(task));
             if (taskService.succeed(task.getId(), task.getAttempts(), result)) {
-                log.info("任务完成: id={} type={}", task.getId(), task.getType());
+                if ("UPSTREAM_UNKNOWN".equals(result == null ? null : result.get("status"))) {
+                    log.warn("任务完成但上游结果待核对: id={} type={}", task.getId(), task.getType());
+                } else {
+                    log.info("任务完成: id={} type={}", task.getId(), task.getType());
+                }
             }
         } catch (Exception e) {
             log.warn("任务执行异常: id={} type={}", task.getId(), task.getType(), e);

@@ -199,14 +199,15 @@ public class ImageCreationService {
      if(!i.getCreationId().equals(id)) throw bad("图片不属于这次创作");
      if(!Objects.equals(i.getTaskId(),expectedTaskId)) return view(c);
      String status=effective(i.getStatus(),i.getTaskId());
-     if(!Set.of("FAILED","INTERRUPTED").contains(status)) throw bad("当前图片无需重试");
-     if("FAILED".equals(i.getStatus())) {
+      if(!Set.of("FAILED","INTERRUPTED","UPSTREAM_UNKNOWN").contains(status)) throw bad("当前图片无需重试");
+      if(Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus())) {
        i.setGeneration(i.getGeneration()+1);i.setProviderJobId(null);i.setRawKey(null);i.setPollRound(0);
        i.setProviderImageUrl(null);i.setPersistedAt(null);i.setOutputKey(null);
        i.setProviderCode(null);
      }
      i.setPollRound(0);
      i.setStatus("QUEUED");i.setError(null);
+      c.setStatus("GENERATING");c.setError(null);
      enqueue(i,c,"retry-"+expectedTaskId,0);
    }
    return view(c);
@@ -291,8 +292,8 @@ public class ImageCreationService {
  private void releasePermitIfTerminal(ImageCreation creation) {
    if (!creation.isConcurrencyPermitHeld()) return;
    var children=items.findByCreationIdOrderByOrdinal(creation.getId());
-   boolean terminal = Set.of("FAILED","NEEDS_INPUT","CANCELLED").contains(creation.getStatus())
-       || (!children.isEmpty() && children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED").contains(effective(i.getStatus(),i.getTaskId()))));
+    boolean terminal = Set.of("FAILED","NEEDS_INPUT","CANCELLED","UPSTREAM_UNKNOWN").contains(creation.getStatus())
+        || (!children.isEmpty() && children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN").contains(effective(i.getStatus(),i.getTaskId()))));
    if (terminal) cleanupFailedObjects(children);
    if (terminal && creations.clearConcurrencyPermit(creation.getId()) == 1)
      rateLimiter.releaseImageGeneration(creation.getTenantId());
@@ -421,6 +422,22 @@ public class ImageCreationService {
    syncCreationStatus(c);
    releasePermitIfTerminal(c);
  }
+  /**
+   * A synchronous provider can finish a paid operation after the response
+   * connection is lost. Do not turn that ambiguous outcome into FAILED or
+   * submit the same request automatically.
+   */
+  @Transactional
+  public void markUpstreamUnknown(Long id,Task task,String message) {
+    if(!tasks.ownsExecution(task))return;
+    var i=items.lock(id).orElseThrow();
+    if(!Objects.equals(i.getTaskId(),task.getId()))return;
+    i.setStatus("UPSTREAM_UNKNOWN");
+    i.setError(message+"。请先核对中转站记录，确认未生成后再重新生成。");
+    var c=find(i.getCreationId());
+    syncCreationStatus(c);
+    releasePermitIfTerminal(c);
+  }
  @Transactional
  public void saveProvider(Long id,Task task,ProviderResult result,String rawKey) {
    if(!tasks.ownsExecution(task))return;
@@ -513,11 +530,13 @@ public class ImageCreationService {
    if(children.isEmpty()) return;
    boolean allSucceeded=children.stream().allMatch(i -> "SUCCEEDED".equals(i.getStatus()));
    boolean allCancelled=children.stream().allMatch(i -> "CANCELLED".equals(i.getStatus()));
-   boolean allTerminal=children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED").contains(i.getStatus()));
-   if(allSucceeded) creation.setStatus("SUCCEEDED");
-   else if(allCancelled) creation.setStatus("CANCELLED");
-   else if(allTerminal && children.stream().anyMatch(i -> "SUCCEEDED".equals(i.getStatus()))) creation.setStatus("PARTIAL");
-   else if(allTerminal) creation.setStatus("FAILED");
+    boolean allTerminal=children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN").contains(i.getStatus()));
+    boolean anyUnknown=children.stream().anyMatch(i -> "UPSTREAM_UNKNOWN".equals(i.getStatus()));
+    if(allSucceeded) creation.setStatus("SUCCEEDED");
+    else if(allCancelled) creation.setStatus("CANCELLED");
+    else if(anyUnknown && allTerminal) creation.setStatus("UPSTREAM_UNKNOWN");
+    else if(allTerminal && children.stream().anyMatch(i -> "SUCCEEDED".equals(i.getStatus()))) creation.setStatus("PARTIAL");
+    else if(allTerminal) creation.setStatus("FAILED");
  }
  @Transactional
  public void saveActualDimensions(Long id,Task task,int width,int height) {
@@ -527,7 +546,7 @@ public class ImageCreationService {
    i.setActualWidth(width);i.setActualHeight(height);
  }
  private String effective(String state,Long taskId) {
-   if(Set.of("SUCCEEDED","FAILED","NEEDS_INPUT").contains(state))return state;
+    if(Set.of("SUCCEEDED","FAILED","NEEDS_INPUT","UPSTREAM_UNKNOWN").contains(state))return state;
    if(taskId!=null && tasks.statusForTenant(taskId)==TaskStatus.FAILED)return "INTERRUPTED";
    return state;
  }
@@ -550,8 +569,9 @@ public class ImageCreationService {
    String state=effective(c.getStatus(),c.getTaskId());
    if(!views.isEmpty()) {
      boolean active=views.stream().anyMatch(i->Set.of("QUEUED","GENERATING","SAVING").contains(i.status()));
-     boolean cancelled=views.stream().allMatch(i->"CANCELLED".equals(i.status()));
-     state=cancelled?"CANCELLED":done==views.size()?"SUCCEEDED":active?"GENERATING":done>0?"PARTIAL":"FAILED";
+      boolean cancelled=views.stream().allMatch(i->"CANCELLED".equals(i.status()));
+      boolean unknown=views.stream().anyMatch(i->"UPSTREAM_UNKNOWN".equals(i.status()));
+      state=cancelled?"CANCELLED":done==views.size()?"SUCCEEDED":active?"GENERATING":unknown?"UPSTREAM_UNKNOWN":done>0?"PARTIAL":"FAILED";
    }
    return new ImageDtos.View(c.getId(),c.getParentId(),c.getRequest().workflow(),c.getRequest().brief(),
      c.getRequest().quality(),c.getRequest().ratio(),state,c.getPlan()==null?"":c.getPlan().summary(),

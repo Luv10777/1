@@ -12,10 +12,19 @@ public class ImagePlanner {
  private final AiGateway gateway;
  private final ObjectMapper json;
  private final ImageModelProperties config;
- public static final String POSTER_VERSION="poster-director-v9";
- public static final String PRODUCT_SET_VERSION="product-set-director-v2";
+ public static final String POSTER_VERSION="poster-claude-director-v1";
+ public static final String PRODUCT_SET_VERSION="product-set-claude-director-v1";
  static String version(String workflow) {return "POSTER".equals(workflow)?POSTER_VERSION:PRODUCT_SET_VERSION;}
- static String system(String workflow) {return "POSTER".equals(workflow)?POSTER_SYSTEM:PRODUCT_SET_SYSTEM;}
+ static String system(String workflow) {
+   return ("POSTER".equals(workflow)?POSTER_SYSTEM:PRODUCT_SET_SYSTEM)+CLAUDE_DIRECTOR_CONTRACT
+     +ImagePromptRefiner.directorRules(workflow);
+ }
+ private static final String CLAUDE_DIRECTOR_CONTRACT="""
+  你同时负责需求理解、视觉方案规划和最终提示词精修。不要把规划交给另一个模型，也不要输出第二套候选方案。
+  先从用户 brief、purpose、style 和参考图中分离可验证事实与创作决定，再输出一份可直接执行的结构化方案。每个 item 的 prompt 就是最终交给图像模型的完整提示词，必须已经完成精修，不要只写提纲或让下游模型补全。
+  prompt 必须包含主体身份、该图唯一任务、构图、文字层级（如有）、镜头、光线、材质、色彩、景深和限制，并与 headline、caption 逐字一致。禁止在 prompt 中加入用户没有提供的价格、日期、功效、容量、认证、品牌或场所事实。
+  输出必须是严格 JSON，不要 Markdown 代码围栏、解释或额外字段。字段结构必须符合示例；question 非空时 items 必须为空。专业术语用英文，品牌、商品和准确中文文案原样保留。
+  """;
  static final String POSTER_SYSTEM="""
   你是本地商家的营销海报视觉总监。只规划一张可直接发布的完整图文海报，而不是商品摄影套图。
   从 brief、purpose、style 和参考图提炼一个明确的顾客行动理由。第一眼读到主题，第二眼认出真实商品或服务，第三眼知道与到店、购买或活动的关系。
@@ -47,13 +56,14 @@ public class ImagePlanner {
   输出 JSON: {"summary":"...","question":"","visualDirection":"Product identity: ...; Series concept: ...; Shot progression: ...; Palette: ...; Lighting: ...; Material language: ...; Camera language: ...; Composition language: ...; Platform fit: ...; Brand guardrails: ...","items":[{"role":"...","shotType":"hero","focalPoint":"...","materialLanguage":"...","cameraLanguage":"...","mustPreserve":["..."],"mustAvoid":["..."],"prompt":"...","headline":"","caption":""}]}。
   """;
  public ImageDtos.Plan plan(ImageCreation creation,List<Map<String,Object>> refs,Map<String,Object> posterContext) {
+   long started=System.nanoTime();
    try {
      var req=creation.getRequest();
      var options=Map.<String,Object>of("system",system(req.workflow()),"references",refs);
      var input=new LinkedHashMap<String,Object>();input.put("request",req);
      if(!posterContext.isEmpty()) input.put("posterContext",posterContext);
      String plannerInput=posterContext.isEmpty()?json.writeValueAsString(req):json.writeValueAsString(input);
-     var result=gateway.invokeReal(new ProviderRequest(config.selectedPlannerAlias(),creation.getTenantId(),
+     var result=gateway.invokeReal(new ProviderRequest(ModelAlias.TEXT_REFINER,creation.getTenantId(),
        plannerInput,options,"image-plan-"+creation.getId()));
      var body=new LinkedHashMap<>(result.output());body.remove("_model");
      body.remove("_usage");
@@ -66,9 +76,18 @@ public class ImagePlanner {
          throw new IllegalArgumentException("换版方案未保留原文案");
      }
      log.debug("Original visualDirection: {}",plan.visualDirection());
-     return new ImageDtos.Plan(plan.summary(),plan.question(),plan.visualDirection(),plan.items(),
-       new ImageDtos.PlanningTrace(config.selectedPlannerAlias().name(),String.valueOf(result.output().getOrDefault("_model","")),
-         version(req.workflow()),ImagePromptRefiner.usage(result.output().get("_usage"))));
+     var model=String.valueOf(result.output().getOrDefault("_model",""));
+     var usage=ImagePromptRefiner.usage(result.output().get("_usage"));
+     var items=plan.items().stream().map(item -> {
+       if(item==null || item.prompt()==null || item.prompt().isBlank()) return item;
+       var prompt=ImagePromptRefiner.appendSafety(
+         ImageRenderHandler.withTextRequirements(item.prompt(),req.workflow(),item),req.workflow());
+       var trace=new ImageDtos.PromptTrace(prompt,"DIRECTOR_REFINED",model,version(req.workflow()),usage,
+         (System.nanoTime()-started)/1_000_000);
+       return item.withRefinement(trace);
+     }).toList();
+     return new ImageDtos.Plan(plan.summary(),plan.question(),plan.visualDirection(),items,
+       new ImageDtos.PlanningTrace(ModelAlias.TEXT_REFINER.name(),model,version(req.workflow()),usage));
    } catch(IllegalArgumentException e) {throw new IllegalArgumentException("规划模型未返回有效创作方案");}
    catch(com.fasterxml.jackson.core.JsonProcessingException e) {throw new IllegalStateException(e);}
  }

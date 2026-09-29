@@ -19,7 +19,7 @@ test('upload rejects unrenderable or oversized reference files', () => {
   assert.doesNotThrow(() => validateImageFile({ type: 'image/jpeg', size: 500 }))
 })
 test('partial failures and clarification do not trigger endless frontend polling', () => {
-  for (const state of ['PARTIAL', 'FAILED', 'INTERRUPTED', 'NEEDS_INPUT', 'SUCCEEDED']) assert.equal(isImageActive(state), false)
+  for (const state of ['PARTIAL', 'FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN', 'NEEDS_INPUT', 'SUCCEEDED']) assert.equal(isImageActive(state), false)
   for (const state of ['QUEUED', 'PLANNING', 'GENERATING', 'SAVING']) assert.equal(isImageActive(state), true)
 })
 test('model capabilities restrict quality and ratio combinations while older APIs remain compatible', () => {
