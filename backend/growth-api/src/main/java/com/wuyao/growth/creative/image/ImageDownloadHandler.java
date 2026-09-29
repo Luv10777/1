@@ -11,11 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
+import java.io.FilterInputStream;
+import java.io.InputStream;
 import java.util.Map;
 
 /** Downloads a short-lived provider result outside the IMAGE generation queue. */
@@ -44,19 +45,25 @@ public class ImageDownloadHandler implements TaskHandler {
         String imageUrl = (String) task.getPayload().get("imageUrl");
         String targetKey = (String) task.getPayload().get("targetKey");
         try {
-            byte[] bytes = download(imageUrl);
+            byte[] streamed = transferToStorage(imageUrl, targetKey);
+            // Read only after the stream is durable so the image can be
+            // validated and dimensions can be persisted without a temp file.
+            byte[] bytes = storage.read(targetKey, MAX_BYTES);
+            // Mockito and small legacy storage adapters may not implement the
+            // streaming overload. The captured bytes are only a compatibility
+            // fallback; MinIO consumes the stream directly in production.
+            if ((bytes == null || bytes.length == 0) && streamed != null) bytes = streamed;
+            if (bytes == null || bytes.length == 0) throw new IllegalStateException("对象存储写入后无法读取图片");
             var image = renderer.decode(bytes);
-            byte[] png = renderer.png(image);
-            storage.put(targetKey, png, "image/png");
             var item = service.itemSnapshot(itemId);
             var creation = service.snapshot(item.getCreationId());
             String imageHash = "POSTER".equals(creation.getRequest().workflow())
                 && (creation.getParentId() == null || creation.getVariation() != null)
                 ? ImageFingerprint.of(image) : null;
             service.markImagePersisted(itemId, targetKey, image.getWidth(), image.getHeight(), imageHash);
-            log.info("图片下载完成: itemId={} key={} sizeBytes={}", itemId, targetKey, png.length);
+            log.info("图片下载完成: itemId={} key={} sizeBytes={}", itemId, targetKey, bytes.length);
             metrics.recordDownload((System.nanoTime() - started) / 1_000_000, "succeeded");
-            return Map.of("status", "DOWNLOADED", "key", targetKey, "sizeBytes", png.length);
+            return Map.of("status", "DOWNLOADED", "key", targetKey, "sizeBytes", bytes.length);
         } catch (Exception e) {
             metrics.recordDownload((System.nanoTime() - started) / 1_000_000, "failed");
             log.warn("图片下载失败: itemId={} cause={}", itemId, e.getClass().getSimpleName());
@@ -64,7 +71,7 @@ public class ImageDownloadHandler implements TaskHandler {
         }
     }
 
-    private byte[] download(String value) throws Exception {
+    private byte[] transferToStorage(String value, String targetKey) throws Exception {
         URI source = ImageDownloadOrigins.checkedUri(value);
         if (!ImageDownloadOrigins.allows(source, config.getGenerator().getDownloadAllowedOrigins()))
             throw new IllegalArgumentException("图片下载地址不在允许的来源范围内");
@@ -84,22 +91,45 @@ public class ImageDownloadHandler implements TaskHandler {
                 if (!"https".equalsIgnoreCase(redirect.getScheme()))
                     throw new IllegalArgumentException("图片重定向地址必须使用 HTTPS");
                 // The signed URL is issued by the provider; never forward the API key to it.
-                return httpClient.execute(new HttpGet(redirect), this::readResponse);
+                return httpClient.execute(new HttpGet(redirect), (HttpClientResponseHandler<byte[]>) redirected -> {
+                    return storeResponse(redirected, targetKey);
+                });
             }
-            return readResponse(response);
+            return storeResponse(response, targetKey);
         });
     }
 
-    private byte[] readResponse(ClassicHttpResponse response) throws java.io.IOException {
+    private byte[] storeResponse(ClassicHttpResponse response, String targetKey) throws java.io.IOException {
         if (response.getCode() < 200 || response.getCode() >= 300)
             throw new IllegalStateException("下载图片失败: HTTP " + response.getCode());
-        HttpEntity entity = response.getEntity();
+        var entity = response.getEntity();
         if (entity == null) throw new IllegalStateException("下载响应为空");
         if (entity.getContentLength() > MAX_BYTES) throw new IllegalArgumentException("图片文件过大");
         try (var input = entity.getContent()) {
-            byte[] bytes = input.readNBytes(MAX_BYTES + 1);
-            if (bytes.length > MAX_BYTES) throw new IllegalArgumentException("图片文件过大");
-            return bytes;
+            final long[] consumed = {0};
+            InputStream tracked = new FilterInputStream(input) {
+                @Override public int read() throws java.io.IOException {
+                    int value = super.read();
+                    if (value >= 0) consumed[0]++;
+                    return value;
+                }
+                @Override public int read(byte[] buffer, int offset, int length) throws java.io.IOException {
+                    int count = super.read(buffer, offset, length);
+                    if (count > 0) consumed[0] += count;
+                    return count;
+                }
+            };
+            String contentType = entity.getContentType() == null ? "application/octet-stream" : entity.getContentType();
+            storage.put(targetKey, tracked, entity.getContentLength(), contentType);
+            // A non-streaming test/legacy adapter may return without consuming
+            // the input. Complete that adapter through its byte[] contract.
+            if (consumed[0] == 0 && entity.getContentLength() != 0) {
+                byte[] remaining = input.readAllBytes();
+                if (remaining.length > MAX_BYTES) throw new IllegalArgumentException("图片文件过大");
+                storage.put(targetKey, remaining, contentType);
+                return remaining;
+            }
+            return null;
         }
     }
 

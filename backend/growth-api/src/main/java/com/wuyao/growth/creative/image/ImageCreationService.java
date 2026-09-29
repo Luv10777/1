@@ -457,7 +457,7 @@ public class ImageCreationService {
    i.setStatus("GENERATING");
    enqueue(i,find(i.getCreationId()),"poll-"+i.getPollRound(),config.getPollSeconds());
  }
- /** Complete the user-facing generation as soon as the provider returns a URL. */
+/** Record the provider URL and enqueue its durable copy. */
  @Transactional
  public void saveProviderUrl(Long id,Task task,ProviderResult result,String imageUrl,String targetKey) {
    if(!tasks.ownsExecution(task))return;
@@ -469,12 +469,13 @@ public class ImageCreationService {
    i.setModel(String.valueOf(result.output().getOrDefault("_model","")));
    Object usage=result.output().get("usage");
    if(usage instanceof Map<?,?>) i.setUsage(json.convertValue(usage,new com.fasterxml.jackson.core.type.TypeReference<>(){}));
+   // The provider URL is only an intermediate source. The local task is not
+   // successful until IMAGE_DOWNLOAD has persisted the object and recorded its
+   // own key.
    i.setProviderImageUrl(imageUrl);
-   i.setStatus("SUCCEEDED");
+   i.setStatus("GENERATING");
    i.setError(null);
    var c=find(i.getCreationId());
-   syncCreationStatus(c);
-   releasePermitIfTerminal(c);
    var download=tasks.submit("IMAGE_DOWNLOAD", "DEFAULT",
      Map.of("itemId",id,"imageUrl",String.valueOf(result.output().getOrDefault("imageSourceUrl",imageUrl)),"targetKey",targetKey),
      "image-download-"+id+"-"+i.getGeneration(), c.getCreatedBy());
@@ -485,7 +486,7 @@ public class ImageCreationService {
    var item=items.lock(itemId).orElseThrow(()->new IllegalStateException("图片项不存在"));
    var creation=find(item.getCreationId());
    String expected="t"+creation.getTenantId()+"/generated/"+itemId+"/"+item.getGeneration()+"/background.png";
-   if(!expected.equals(storageKey) || !"SUCCEEDED".equals(item.getStatus()))
+   if(!expected.equals(storageKey) || !Set.of("GENERATING","SAVING","SUCCEEDED").contains(item.getStatus()))
      throw new IllegalStateException("图片下载结果已过期");
    item.setRawKey(storageKey);
    item.setOutputKey(storageKey);
@@ -549,14 +550,17 @@ public class ImageCreationService {
    var views=list.stream().map(i->{
      String status=effective(i.getStatus(),i.getTaskId());
      String durableUrl=i.getOutputKey()==null?null:storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30));
-     String url=durableUrl!=null?durableUrl:i.getProviderImageUrl();
+     // Never expose the provider's short-lived URL as the task result. It is
+     // retained internally only so the download worker can recover it.
+     String url=durableUrl;
      boolean downloadFailed=i.getProviderImageUrl()!=null && i.getPersistedAt()==null
        && tasks.statusByIdempotencyKey("image-download-"+i.getId()+"-"+i.getGeneration())==TaskStatus.FAILED;
+     if(downloadFailed) status="FAILED";
      return new ImageDtos.ItemView(i.getId(),i.getOrdinal(),i.getSpec().role(),i.getSpec().headline(),i.getSpec().caption(),
        status,status.equals("INTERRUPTED")?"执行中断，可恢复原任务":downloadFailed?"图片保存失败，临时预览链接可能过期":i.getError(),url,
        i.getActualWidth()==null?d.width():i.getActualWidth(),
        i.getActualHeight()==null?d.height():i.getActualHeight(),i.getTaskId(),i.isSimilarityWarning(),
-       i.getProviderImageUrl(),i.getPersistedAt()!=null,downloadFailed);
+       null,i.getPersistedAt()!=null,downloadFailed);
    }).toList();
    int done=(int)views.stream().filter(i->i.status().equals("SUCCEEDED")).count();
    String state=effective(c.getStatus(),c.getTaskId());
