@@ -38,6 +38,13 @@
 .product-form-section textarea::placeholder { color: var(--ink-muted); }
 .product-counter { margin-top: 6px; color: var(--ink-muted); text-align: right; font: 10px var(--font-mono); }
 .product-options { display: grid; gap: 16px; }
+.product-quality-option { display: grid; gap: 8px; font-size: 12px; }
+.product-quality-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.product-quality-grid button { display: grid; gap: 3px; min-height: 50px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); text-align: left; }
+.product-quality-grid button.active { border-color: var(--color-accent); color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 5%, var(--night-panel)); }
+.product-quality-grid button:disabled { cursor: not-allowed; opacity: .4; }
+.product-quality-grid strong { font-size: 12px; }
+.product-quality-grid small { color: inherit; font: 10px var(--font-mono); }
 .product-option-row, .product-fixed-count, .product-detail-count { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
 .product-ratio-select select { width: 130px; padding: 8px 10px; }
 .product-fixed-count strong { font-weight: 500; }

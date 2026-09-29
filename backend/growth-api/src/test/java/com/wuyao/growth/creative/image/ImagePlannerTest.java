@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class ImagePlannerTest {
  private ImageDtos.Create request(int count) {
-   return new ImageDtos.Create("test-request","POSTER","周末双人餐 99 元",List.of(),"3:4","480P",count,"朋友圈","帮我搭配",null);
+   return new ImageDtos.Create("test-request","POSTER","周末双人餐 99 元",List.of(),"3:4","2K",count,"朋友圈","帮我搭配",null);
  }
  @Test void refusesInventedPricesAndWrongCounts() {
    var invented=new ImageDtos.Spec("海报","自然光","双人餐只要 69 元","");
@@ -34,15 +34,15 @@ class ImagePlannerTest {
    assertThat(decoded.getRGB(500,500)).isEqualTo(0xffa12345);
  }
  @Test void qualityHasConsistentOrientations() {
-   assertThat(ImageQuality.dimensions("4K","3:4")).isEqualTo(new ImageDtos.Dimensions(2880,3840));
+   assertThat(ImageQuality.dimensions("2K","3:4")).isEqualTo(new ImageDtos.Dimensions(1536,2048));
    assertThat(ImageQuality.dimensions("4K","16:9")).isEqualTo(new ImageDtos.Dimensions(3840,2160));
-   assertThat(ImageQuality.dimensions("1080P","9:16")).isEqualTo(new ImageDtos.Dimensions(1080,1920));
+   assertThat(ImageQuality.dimensions("2K","9:16")).isEqualTo(new ImageDtos.Dimensions(1152,2048));
  }
  @Test void outputCapHidesProxyUnsupportedPortraitSizes() {
    var config=new ImageModelProperties();
    config.setMaxOutputPixels(1_600_000);
-   assertThat(ImageQuality.supportsOutput("1080P","3:4",config)).isTrue();
-   assertThat(ImageQuality.supportsOutput("1080P","9:16",config)).isFalse();
+   assertThat(ImageQuality.supportsOutput("1K","3:4",config)).isTrue();
+   assertThat(ImageQuality.supportsOutput("2K","9:16",config)).isFalse();
    assertThat(ImageQuality.supportsOutput("4K","9:16",config)).isFalse();
  }
  @Test void finishedModelImageIsNotCoveredWithProgrammaticTextBoxes() {

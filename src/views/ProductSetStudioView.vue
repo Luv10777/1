@@ -5,7 +5,7 @@ import ImageCreationWorkspace from '../components/ImageCreationWorkspace.vue'
 import ImageReferenceList from '../components/ImageReferenceList.vue'
 import PosterReferenceLibrary from '../components/PosterReferenceLibrary.vue'
 import { useImageCreation } from '../composables/useImageCreation'
-import { IMAGE_RATIOS } from '../domain/imageCreation'
+import { IMAGE_QUALITIES, IMAGE_RATIOS, imageDimensions } from '../domain/imageCreation'
 import { assetApi } from '../services/imageCreation'
 import { assets, assetSource } from '../stores/assetLibrary'
 import '../image-workflow.css'
@@ -15,6 +15,10 @@ const fileInput = ref(null)
 const workspace = ref(null)
 const libraryOpen = ref(false)
 const libraryAssets = ref([])
+const qualityDimensions = quality => {
+  try { return imageDimensions(quality, studio.ratio) }
+  catch { return { width: 0, height: 0 } }
+}
 watch(() => studio.current?.id, async id => {
   if (!id || !window.matchMedia('(max-width: 760px)').matches) return
   await nextTick()
@@ -122,6 +126,7 @@ onMounted(async () => {
         </section>
         <section class="product-form-section product-options">
           <label class="product-option-row product-ratio-select"><span>图片比例</span><select v-model="studio.ratio" aria-label="选择图片比例"><option v-for="ratio in IMAGE_RATIOS" :key="ratio" :disabled="!studio.supportsRatio(ratio)">{{ ratio }}</option></select></label>
+          <div class="product-quality-option"><span>输出画质</span><div class="product-quality-grid" role="group" aria-label="输出画质"><button v-for="quality in IMAGE_QUALITIES" :key="quality" type="button" :disabled="!studio.supportsQuality(quality)" :aria-pressed="studio.quality === quality" :class="{ active: studio.quality === quality }" @click="studio.quality = quality"><strong>{{ quality }}</strong><small>{{ qualityDimensions(quality).width ? `${qualityDimensions(quality).width} × ${qualityDimensions(quality).height}` : '当前比例不可用' }}</small></button></div></div>
           <label class="product-option-row product-ratio-select"><span>生成数量</span><select v-model.number="studio.count" aria-label="生成数量"><option v-for="n in 6" :key="n" :value="n">{{ n }} 张</option></select></label>
           <label class="product-option-row product-ratio-select"><span>画面风格</span><select v-model="studio.style" aria-label="产品图风格"><option>帮我搭配</option><option>真实自然</option><option>简约高级</option><option>东方雅致</option><option>清爽明亮</option></select></label>
         </section>

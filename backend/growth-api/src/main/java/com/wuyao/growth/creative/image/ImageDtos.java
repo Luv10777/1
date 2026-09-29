@@ -16,7 +16,7 @@ public final class ImageDtos {
         @NotNull @Size(max = 2000) String brief,
         @NotNull @Size(max = 6) List<@Valid Reference> references,
         @NotNull @Pattern(regexp = "1:1|3:4|4:3|9:16|16:9|2:3|3:2") String ratio,
-        @Pattern(regexp = "480P|720P|1080P|4K") String quality,
+        @Pattern(regexp = "1K|2K|4K") String quality,
         @Min(1) @Max(6) int count,
         @NotNull @Size(max = 80) String purpose,
         @NotNull @Size(max = 80) String style,

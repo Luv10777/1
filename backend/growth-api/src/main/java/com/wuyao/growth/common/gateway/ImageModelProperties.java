@@ -14,7 +14,7 @@ public class ImageModelProperties {
  private ModelAlias plannerAlias=ModelAlias.TEXT_REFINER;
  private Generator generator=new Generator();
  private String baseUrl="";
- private List<String> qualities=List.of("480P","720P","1080P","4K");
+ private List<String> qualities=List.of("1K","2K","4K");
  private long maxOutputPixels;
  private int timeoutSeconds=300;
  private int pollSeconds=5;

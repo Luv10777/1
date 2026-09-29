@@ -10,7 +10,7 @@ export function useImageCreation(workflow) {
   const product = computed(() => workflow === 'PRODUCT_SET')
   const brief = ref(typeof route.query.prompt === 'string' ? route.query.prompt : '')
   const ratio = ref(product.value ? '1:1' : '3:4')
-  const quality = ref('1080P')
+  const quality = ref('2K')
   const count = ref(product.value ? 3 : 1)
   const purpose = ref(product.value ? '美团 / 大众点评商品展示' : '朋友圈活动宣传')
   const style = ref('帮我搭配')
@@ -46,8 +46,10 @@ export function useImageCreation(workflow) {
     if (!ratios) return true
     return Object.values(ratios).some(values => values?.includes(value))
   }
+  const supportsQuality = value => supportsImageSize(capabilities.value, value, ratio.value)
   function syncHighestQuality() {
-    const supported = IMAGE_QUALITIES.filter(tier => supportsImageSize(capabilities.value, tier, ratio.value))
+    if (supportsQuality(quality.value)) return
+    const supported = IMAGE_QUALITIES.filter(tier => supportsQuality(tier))
     if (supported.length) quality.value = supported.at(-1)
   }
   const active = computed(() => isImageActive(current.value?.status))
@@ -303,5 +305,6 @@ export function useImageCreation(workflow) {
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
+    supportsQuality,
   })
 }
