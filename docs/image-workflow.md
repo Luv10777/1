@@ -24,7 +24,8 @@ NEW_API_BASE_URL=https://myrouter.online/v1
 NEW_API_API_KEY=replace-on-server
 IMAGE_PLANNER_ALIAS=TEXT_REFINER
 IMAGE_REFINER_ENABLED=true
-IMAGE_REFINER_MODEL=claude-sonnet-4-6-ab
+IMAGE_REFINER_URL=https://www.fluapi.com/v1/chat/completions
+IMAGE_REFINER_MODEL=claude-opus-5
 IMAGE_REFINER_MAX_TOKENS=3000
 IMAGE_REFINER_TIMEOUT_SECONDS=300
 IMAGE_GENERATOR_MODEL=gpt-image-2.5-ultra-fast
@@ -32,7 +33,7 @@ IMAGE_GENERATOR_PROTOCOL=OPENAI
 IMAGE_GENERATOR_URL=https://new.fluapi.com/v1/images/generations
 IMAGE_GENERATOR_QUALITY=standard
 IMAGE_GENERATOR_RESPONSE_FORMAT=url
-IMAGE_GENERATOR_TIMEOUT_SECONDS=900
+IMAGE_GENERATOR_TIMEOUT_SECONDS=600
 IMAGE_TIMEOUT_SECONDS=300
 IMAGE_SUPPORTED_QUALITIES=1K,2K,4K
 IMAGE_MAX_OUTPUT_PIXELS=0
@@ -46,8 +47,9 @@ IMAGE_FONT=Microsoft YaHei
 
 `IMAGE_SUPPORTED_QUALITIES` 只填写实际支持的档位。`IMAGE_MAX_OUTPUT_PIXELS` 可按中转站实测能力限制可选输出尺寸；0 表示不额外限制。带参考图时，规划模型必须支持图像输入。
 当前生产图片模型为 `gpt-image-2.5-ultra-fast`，使用 Flu 的 OpenAI 兼容
-`/v1/images/generations` 接口，并请求 `response_format=url`。中转站返回的临时图片 URL
-仍由服务端下载、转 PNG 并保存到对象存储；前端不接触供应商令牌。参考图编辑能力需以
+`/v1/images/generations` 接口，并请求 `response_format=url`。Flu 单次请求等待生图完成，
+不返回 `task_id`，也没有查询接口；服务端使用 600 秒 Worker 超时接收最终图片 URL，
+再将 URL 流式转存到自己的对象存储，前端不接触供应商令牌。参考图编辑能力需以
 中转站对 `/v1/images/edits` 的实际支持为准。
 
 ```powershell
@@ -170,9 +172,9 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
 ```
 
 同步图片服务可以在提交时直接返回成功结构。上游也可以返回 `imageUrl`，此时
-`IMAGE_RENDER` 保存临时 URL 并投递 `IMAGE_DOWNLOAD` 到 `DEFAULT` 队列，然后立即完成生成任务。
-下载任务最多重试三次，将图片转为 PNG 存入对象存储，并将图片项的 `persisted` 置为 `true`。
-前端先展示临时 URL，持久化完成后通过轮询切换为对象存储预签名 URL。
+`IMAGE_RENDER` 只保存内部的临时 URL，并投递 `IMAGE_DOWNLOAD` 到 `DEFAULT` 队列；
+只有下载任务将图片流写入对象存储并完成校验后，图片项和创作任务才进入 `SUCCEEDED`。
+查询接口在此之前不返回供应商 URL，成功后只返回对象存储预签名 URL。
 
 配置 `IMAGE_DOWNLOAD_ALLOWED_ORIGINS` 为允许的图片 URL 来源。当前允许 HTTPS 下的
 `*.aliyuncs.com` 子域名；自定义 CDN 域名需另行加入其精确来源。OnlyRouter Files API 的
@@ -303,7 +305,7 @@ retry 使用当前查询结果中的 `{taskId}`，重复点击不会重复排队
 
 ## Claude 单层文本模型配置
 
-规划和精修统一使用 `TEXT_REFINER` 别名，对应 `IMAGE_REFINER_MODEL`、
+规划和精修统一使用 `TEXT_REFINER` 别名，当前对应 Claude Opus 5，配置项为 `IMAGE_REFINER_MODEL`、
 `IMAGE_REFINER_URL`、`IMAGE_REFINER_API_KEY`。旧的 `IMAGE_PLANNER_ALIAS`、
 `IMAGE_ADVANCED_PLANNER_*` 配置仅为兼容旧环境保留，不再路由到 GPT-6 Luna；无论旧值是什么，图片规划都会固定走 Claude。
 省略地址时从 `NEW_API_BASE_URL` 推导，省略密钥时使用 `NEW_API_API_KEY`。
@@ -333,3 +335,14 @@ DEBUG 日志包含 Original visualDirection、Raw prompt、Refined prompt。
 [image-guide]: https://developers.openai.com/api/docs/guides/image-generation
 [image-generate]: https://developers.openai.com/api/reference/resources/images/methods/generate
 [image-edit]: https://developers.openai.com/api/reference/resources/images/methods/edit
+
+## 本地任务接口
+
+客户端也可以使用轻量任务 facade：
+
+- `POST /api/generate`：提交现有 `ImageDtos.Create` 参数，返回本地创作 ID 作为
+  `localTaskId`，初始状态为 `PROCESSING`。
+- `GET /api/tasks/{localTaskId}`：返回 `PROCESSING`、`SUCCESS` 或 `FAILED`；只有
+  `SUCCESS` 时 `imageUrl` 才是对象存储预签名 URL。接口不会返回 Flu 的临时 URL。
+
+创作规划、生成和转存仍由数据库任务队列及 Worker 执行，API 请求不等待 Flu 的 600 秒调用。

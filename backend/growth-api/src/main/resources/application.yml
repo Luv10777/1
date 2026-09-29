@@ -72,7 +72,7 @@ growth:
       enabled: ${IMAGE_REFINER_ENABLED:true}
       url: ${IMAGE_REFINER_URL:}
       api-key: ${IMAGE_REFINER_API_KEY:${NEW_API_API_KEY:}}
-      model: ${IMAGE_REFINER_MODEL:claude-sonnet-4-6-ab}
+      model: ${IMAGE_REFINER_MODEL:claude-opus-5}
       temperature: ${IMAGE_REFINER_TEMPERATURE:0.5}
       max-tokens: ${IMAGE_REFINER_MAX_TOKENS:3000}
       timeout-seconds: ${IMAGE_REFINER_TIMEOUT_SECONDS:300}
@@ -82,9 +82,9 @@ growth:
       edits-url: ${IMAGE_GENERATOR_EDITS_URL:}
       api-key: ${IMAGE_GENERATOR_API_KEY:${NEW_API_API_KEY:}}
       model: ${IMAGE_GENERATOR_MODEL:}
-      # The relay is synchronous. Keep this timeout longer than the normal
-      # generation window; the request runs in the image worker, never in API.
-      timeout-seconds: ${IMAGE_GENERATOR_TIMEOUT_SECONDS:900}
+      # Flu waits for generation and returns the final provider URL in the
+      # same response. This long timeout applies only in the image worker.
+      timeout-seconds: ${IMAGE_GENERATOR_TIMEOUT_SECONDS:600}
       quality: ${IMAGE_GENERATOR_QUALITY:}
       response-format: ${IMAGE_GENERATOR_RESPONSE_FORMAT:}
       download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:*.aliyuncs.com}

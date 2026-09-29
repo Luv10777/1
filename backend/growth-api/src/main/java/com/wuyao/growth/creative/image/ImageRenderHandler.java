@@ -43,10 +43,11 @@ public class ImageRenderHandler implements TaskHandler {
    if(raw==null){
      var nativeSize=ImageQuality.modelDimensions(c.getRequest().quality(),c.getRequest().ratio(),config);
      Map<String,Object> options=new LinkedHashMap<>();
-     options.put("operation",item.getProviderJobId()==null?"submit":"query");
+     boolean directUrl=config.getGenerator().getProtocol()==ImageModelProperties.Protocol.OPENAI;
+     options.put("operation",directUrl?"submit":item.getProviderJobId()==null?"submit":"query");
      options.put("width",nativeSize.width());options.put("height",nativeSize.height());options.put("quality",c.getRequest().quality());
      options.put("seriesKey","creation-"+c.getId());
-     if(item.getProviderJobId()!=null) options.put("jobId",item.getProviderJobId());
+     if(!directUrl && item.getProviderJobId()!=null) options.put("jobId",item.getProviderJobId());
      else {
        var refs=new ArrayList<Map<String,Object>>();
        var source=item.getSpec().editSourceItemId()==null?service.references(c.getId()):List.<com.wuyao.growth.asset.AssetService.ImageReference>of();
@@ -68,7 +69,7 @@ public class ImageRenderHandler implements TaskHandler {
        options.put("references",refs);
      }
      var trace=item.getSpec().refinement();
-     if(trace==null && item.getProviderJobId()==null) {
+     if(trace==null && (directUrl || item.getProviderJobId()==null)) {
        trace=refiner.refineWithTrace(imagePrompt(c,item.getSpec()),
          c.getRequest().workflow(),c.getRequest().purpose(),c.getTenantId());
        // Keep immutable copy requirements after creative refinement as well.
@@ -79,13 +80,13 @@ public class ImageRenderHandler implements TaskHandler {
      log.info("图片前置处理完成: itemId={} elapsedMs={} refinement={}",id,(System.nanoTime()-started)/1_000_000,
        trace==null?"NONE":trace.status());
      String finalPrompt=trace==null?imagePrompt(c,item.getSpec()):trace.prompt();
-      boolean synchronous=config.getGenerator().getProtocol()==ImageModelProperties.Protocol.OPENAI;
+      boolean synchronous=directUrl;
       if(item.getProviderJobId()==null && !service.reserveProviderSubmission(id,task)) return Map.of("status","NOT_RESUBMITTED");
      try {
      // 全局 API 限流,防止压垮图片模型服务
      apiRateLimiter.waitForPermission();
      long providerStarted=System.nanoTime();
-     log.info("图片生成阶段开始: itemId={} model={} operation={}",id,config.getGenerator().getModel(),options.get("operation"));
+     log.info("图片生成阶段开始: itemId={} model={} singleRequest=true",id,config.getGenerator().getModel());
      var response=gateway.invokeReal(new ProviderRequest(ModelAlias.IMAGE_PRIMARY,c.getTenantId(),
        finalPrompt,
        options,"image-item-"+id+"-"+item.getGeneration()));
@@ -107,8 +108,8 @@ public class ImageRenderHandler implements TaskHandler {
        var source=renderer.decode(bytes);
        raw=base+"/background.png";storage.put(raw,renderer.png(source),"image/png");
        log.info("图片原图保存完成: itemId={} elapsedMs={}",id,(System.nanoTime()-providerStarted)/1_000_000);
-     } else if(!status.equals("FAILED") && (response.providerJobId()==null||response.providerJobId().isBlank()))
-       throw new IllegalArgumentException("异步模型没有返回任务编号");
+     } else if(!status.equals("FAILED") && !directUrl && (response.providerJobId()==null||response.providerJobId().isBlank()))
+       throw new IllegalArgumentException("图片服务未在单次响应中返回最终图片 URL 或内容");
      service.saveProvider(id,task,response,raw);
      metrics.recordPollRound(item.getPollRound(), status.toLowerCase(Locale.ROOT));
      if(raw==null)return Map.of("status",status);

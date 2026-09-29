@@ -1,6 +1,7 @@
 package com.wuyao.growth.common.storage;
 
 import java.time.Duration;
+import java.io.InputStream;
 import java.util.Optional;
 
 /**
@@ -31,4 +32,13 @@ public interface ObjectStorage {
     byte[] read(String key, int maxBytes);
 
     void put(String key, byte[] data, String contentType);
+
+    /** Stream a provider response directly into object storage. */
+    default void put(String key, InputStream data, long size, String contentType) {
+        try {
+            put(key, data.readAllBytes(), contentType);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("读取对象流失败", e);
+        }
+    }
 }

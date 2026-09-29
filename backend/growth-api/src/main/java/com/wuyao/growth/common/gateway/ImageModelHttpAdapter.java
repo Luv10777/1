@@ -64,6 +64,9 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
        var body=new LinkedHashMap<String,Object>(req.options());
        body.put("model",endpoint.getModel());body.put("prompt",req.prompt());body.put("idempotencyKey",req.idempotencyKey());
        output=json.readValue(post(config.generatorUrl(),endpoint,req,"application/json",List.of(json.writeValueAsBytes(body))),new TypeReference<>(){});
+       // Some relays return the completed URL under the conventional `url`
+       // field instead of the adapter's normalized `imageUrl` field.
+       if(!output.containsKey("imageUrl") && output.get("url") instanceof String url) output.put("imageUrl",url);
      } else output=image(req);
      if(!planner && output.get("imageUrl") instanceof String url && !url.isBlank()
          && !output.containsKey("imageSourceUrl")) {

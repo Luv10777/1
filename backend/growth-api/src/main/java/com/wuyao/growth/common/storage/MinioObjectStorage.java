@@ -116,4 +116,16 @@ public class MinioObjectStorage implements ObjectStorage {
             throw unavailable(key, e);
         }
     }
+
+    @Override
+    public void put(String key, java.io.InputStream data, long size, String contentType) {
+        try {
+            client.putObject(PutObjectArgs.builder().bucket(bucket).object(key)
+                    .stream(data, size, -1)
+                    .contentType(contentType == null || contentType.isBlank() ? "application/octet-stream" : contentType)
+                    .build());
+        } catch (Exception e) {
+            throw unavailable(key, e);
+        }
+    }
 }
