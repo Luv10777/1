@@ -17,14 +17,14 @@ class ImagePromptRefinerTest {
  @Test void refinesWithTenantAndStableIdentityAndRecordsUsage() {
    when(gateway.configured(ModelAlias.TEXT_REFINER)).thenReturn(true);
    when(gateway.invokeReal(any())).thenReturn(new ProviderResult(true,"IMAGE_HTTP",null,
-     Map.of("prompt",refined,"_model","gpt-4o","_usage",Map.of("total_tokens",123)),null,null));
+     Map.of("prompt",refined,"_model","claude-sonnet-4-6-ab","_usage",Map.of("total_tokens",123)),null,null));
    var first=refiner.refineWithTrace(raw,"POSTER","朋友圈",7L);
    refiner.refine(raw,"POSTER","朋友圈",7L);
    var calls=ArgumentCaptor.forClass(ProviderRequest.class);verify(gateway,times(2)).invokeReal(calls.capture());
    assertThat(calls.getValue().alias()).isEqualTo(ModelAlias.TEXT_REFINER);
    assertThat(calls.getValue().tenantId()).isEqualTo(7L);
    assertThat(calls.getAllValues().getFirst().idempotencyKey()).isEqualTo(calls.getValue().idempotencyKey());
-   assertThat(first.status()).isEqualTo("REFINED");assertThat(first.model()).isEqualTo("gpt-4o");
+   assertThat(first.status()).isEqualTo("REFINED");assertThat(first.model()).isEqualTo("claude-sonnet-4-6-ab");
    assertThat(first.usage()).containsEntry("total_tokens",123);
    assertThat(first.prompt()).contains("一方茶5周年","欢迎到店","Avoid:");
  }

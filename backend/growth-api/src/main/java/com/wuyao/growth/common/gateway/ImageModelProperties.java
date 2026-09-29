@@ -10,7 +10,8 @@ public class ImageModelProperties {
  private Endpoint planner=new Endpoint();
  private Endpoint advancedPlanner=new Endpoint();
  private Refiner refiner=new Refiner();
- private ModelAlias plannerAlias=ModelAlias.TEXT_PLANNER_ADVANCED;
+ /** Deprecated compatibility property. Image planning is now always handled by Claude via TEXT_REFINER. */
+ private ModelAlias plannerAlias=ModelAlias.TEXT_REFINER;
  private Generator generator=new Generator();
  private String baseUrl="";
  private List<String> qualities=List.of("480P","720P","1080P","4K");
@@ -23,9 +24,9 @@ public class ImageModelProperties {
  public String advancedPlannerUrl() {return endpoint(advancedPlanner.getUrl(),"/chat/completions");}
  public String refinerUrl() {return endpoint(refiner.getUrl(),"/chat/completions");}
  public ModelAlias selectedPlannerAlias() {
-   if(plannerAlias!=ModelAlias.TEXT_PLANNER && plannerAlias!=ModelAlias.TEXT_PLANNER_ADVANCED)
-     throw new IllegalArgumentException("规划别名必须为 TEXT_PLANNER 或 TEXT_PLANNER_ADVANCED");
-   return plannerAlias;
+   // Keep the old property bindable during rollout, but never route image planning
+   // back to the removed GPT planner layer.
+   return ModelAlias.TEXT_REFINER;
  }
  public String generatorUrl() {return endpoint(generator.getUrl(),"/images/generations");}
  public String editsUrl() {

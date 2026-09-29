@@ -6,6 +6,7 @@ import com.wuyao.growth.common.web.*;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpEntity;
@@ -13,6 +14,7 @@ import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.util.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +74,11 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      output.put("_model",endpoint.getModel());
      return new ProviderResult(true,code(),(String)output.get("jobId"),output,null,null);
    } catch(BizException e) {throw e;}
+   catch(ProviderOutcomeUnknownException e) {throw e;}
+   catch(IOException e) {
+     if(!planner) throw new ProviderOutcomeUnknownException("中转站图片响应无法完整解析，生成结果状态未确认", e);
+     throw failure("规划模型响应异常或超时，请稍后重试");
+   }
    catch(Exception e) {
      // Never expose provider bodies, signed URLs or credentials through exceptions.
      throw failure(planner?"规划模型响应异常或超时，请稍后重试":"图片服务响应异常或超时，请先核对中转站记录再重试");
@@ -100,8 +107,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    String result=choice.path("message").path("content").asText();
    // Some compatible Claude endpoints wrap JSON despite response_format=json_object.
    // Only remove a single enclosing fence; malformed JSON still fails validation.
-   if(req.alias()==ModelAlias.TEXT_REFINER)
-     result=result.strip().replaceFirst("(?is)^```(?:json)?\\s*(.*?)\\s*```$","$1");
+   result=result.strip().replaceFirst("(?is)^```(?:json)?\\s*(.*?)\\s*```$","$1");
    Map<String,Object> output=json.readValue(result,new TypeReference<>(){});
    if(root.path("usage").isObject()) output.put("_usage",json.convertValue(root.get("usage"),Map.class));
    return output;
@@ -174,6 +180,11 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    ByteArrayOutputStream body=new ByteArrayOutputStream();
    for(byte[] chunk:chunks) { if(body.size()+chunk.length>128*1024*1024) throw failure("模型请求内容超过大小限制"); body.write(chunk); }
    request.setEntity(new ByteArrayEntity(body.toByteArray(),ContentType.parse(contentType)));
+   request.setConfig(RequestConfig.custom()
+     .setConnectionRequestTimeout(Timeout.ofSeconds(10))
+     .setConnectTimeout(Timeout.ofSeconds(Math.max(1, Math.min(endpoint.getTimeoutSeconds(), 60))))
+     .setResponseTimeout(Timeout.ofSeconds(Math.max(1, endpoint.getTimeoutSeconds())))
+     .build());
    if(req.alias()!=ModelAlias.IMAGE_PRIMARY) return execute(request,endpoint.getModel(),48*1024*1024);
    long started=System.nanoTime();
    log.info("图片请求开始: model={} host={} requestBytes={}",endpoint.getModel(),uri.getHost(),body.size());
@@ -181,11 +192,15 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      byte[] response=execute(request,endpoint.getModel(),48*1024*1024);
      log.info("图片响应收完: model={} host={} responseBytes={} elapsedMs={}",endpoint.getModel(),uri.getHost(),response.length,(System.nanoTime()-started)/1_000_000);
      return response;
-   } catch (IOException | RuntimeException e) {
+   } catch (IOException e) {
      log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",endpoint.getModel(),uri.getHost(),
        (System.nanoTime()-started)/1_000_000,e.getClass().getSimpleName());
-     if (e.getClass().getSimpleName().equals("ConnectionClosedException"))
-       throw failure("中转站已返回图片响应，但图片传输中途断开，生成结果状态未确认");
+     if(req.alias()==ModelAlias.IMAGE_PRIMARY)
+       throw new ProviderOutcomeUnknownException("中转站响应未完整返回，生成结果状态未确认", e);
+     throw e;
+   } catch (RuntimeException e) {
+     log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",endpoint.getModel(),uri.getHost(),
+       (System.nanoTime()-started)/1_000_000,e.getClass().getSimpleName());
      throw e;
    }
  }

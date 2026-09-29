@@ -112,7 +112,11 @@ public class ImageRenderHandler implements TaskHandler {
      service.saveProvider(id,task,response,raw);
      metrics.recordPollRound(item.getPollRound(), status.toLowerCase(Locale.ROOT));
      if(raw==null)return Map.of("status",status);
-     } catch(RuntimeException e) {
+      } catch(ProviderOutcomeUnknownException e) {
+        service.markUpstreamUnknown(id,task,e.getMessage());
+        log.warn("图片上游结果未知，不自动重试: itemId={} message={}",id,e.getMessage());
+        return Map.of("status","UPSTREAM_UNKNOWN","itemId",id);
+      } catch(RuntimeException e) {
        if(!synchronous || raw!=null) throw e;
        String message=e instanceof com.wuyao.growth.common.web.BizException || e instanceof IllegalArgumentException?
          e.getMessage():"图片生成或保存未完成";
