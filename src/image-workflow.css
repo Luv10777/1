@@ -149,3 +149,4 @@
   .creation-progress { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .creation-pulse { animation: none; } }
+.creation-service-retry{border:0;padding:0 0 0 8px;background:none;color:inherit;text-decoration:underline;cursor:pointer}

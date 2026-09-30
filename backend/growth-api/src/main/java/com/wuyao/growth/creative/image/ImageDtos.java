@@ -1,5 +1,6 @@
 package com.wuyao.growth.creative.image;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.Instant;
@@ -53,6 +54,7 @@ public final class ImageDtos {
         }
     }
     public record PlanningTrace(String alias, String model, String version, Map<String,Object> usage) {}
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record Spec(String role, String prompt, String headline, String caption, Long editSourceItemId,
                        String shotType, String focalPoint, String materialLanguage,
                        String cameraLanguage, List<String> mustPreserve, List<String> mustAvoid) {

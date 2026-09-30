@@ -20,6 +20,8 @@ export function useImageCreation(workflow) {
   const busy = ref(false)
   const error = ref('')
   const capabilities = ref(null)
+  const capabilityState = ref('checking')
+  const capabilityError = ref('')
   const current = ref(null)
   const thread = ref([])
   const history = ref([])
@@ -42,7 +44,7 @@ export function useImageCreation(workflow) {
   const owner = readUser()
   const pendingKey = 'image-pending:' + (owner?.userId || owner?.id || 'session') + ':' + workflow
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
-  const configured = computed(() => capabilities.value?.configured === true)
+  const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
   const supportsRatio = value => {
     const ratios = capabilities.value?.qualityRatios
     if (!ratios) return true
@@ -275,17 +277,28 @@ export function useImageCreation(workflow) {
     run(() => deliver({ kind: 'regenerate', id: current.value.id, itemId: item.id,
       data: { requestKey: crypto.randomUUID(), variation } }))
   }
+  async function loadCapabilities() {
+    capabilityState.value = 'checking'
+    capabilityError.value = ''
+    try {
+      capabilities.value = await imageApi.capabilities()
+      capabilityState.value = 'ready'
+      syncHighestQuality()
+    } catch (e) {
+      capabilityState.value = 'error'
+      capabilityError.value = e.message || '无法连接图片创作服务'
+    }
+  }
   onMounted(async () => {
     try {
       const saved = sessionStorage.getItem(pendingKey)
       if (saved) pending.value = JSON.parse(saved)
-      capabilities.value = await imageApi.capabilities()
-      syncHighestQuality()
-    } catch (e) { error.value = e.message }
+    } catch { /* A malformed pending draft should not block service checks. */ }
+    await loadCapabilities()
     if (!alive) return
     await refreshHistory()
     if (route.query.creation) await load(route.query.creation)
-  }, { immediate: true })
+  })
   watch(() => route.query.creation, id => { if (id && String(current.value?.id) !== String(id)) load(id) })
   watch(purpose, value => {
     if (!product.value) {
@@ -317,10 +330,10 @@ export function useImageCreation(workflow) {
   }
   return reactive({
     product, brief, ratio, quality, count, platform, imageType, purpose, style, files, busy, error,
-    capabilities, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
+    capabilities, capabilityState, capabilityError, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
-    supportsQuality,
+    supportsQuality, loadCapabilities,
   })
 }

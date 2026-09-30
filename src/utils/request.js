@@ -70,6 +70,9 @@ export async function request(endpoint, options = {}, allowRetry = true) {
       },
     })
   } catch (error) {
+    if (error.name === 'TimeoutError') {
+      throw new ApiError('连接创作服务超时，请检查后端服务后重试', 'NETWORK_ERROR', 0)
+    }
     throw new ApiError(error.message || '网络请求失败，请检查后端是否已启动', 'NETWORK_ERROR', 0)
   }
 

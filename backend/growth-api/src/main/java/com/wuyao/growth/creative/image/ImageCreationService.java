@@ -492,6 +492,10 @@ public class ImageCreationService {
          && ImageFingerprint.distance(imageHash,(String)previous[1])<=6));
    }
    item.setImageHash(imageHash);
+   item.setStatus("SUCCEEDED");
+   item.setError(null);
+   syncCreationStatus(creation);
+   releasePermitIfTerminal(creation);
  }
  @Transactional
  public void complete(Long id,Task task,String outputKey,String imageHash) {

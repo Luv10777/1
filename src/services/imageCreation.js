@@ -1,8 +1,8 @@
-import { get, post, put } from '../utils/request'
+import { get, post, put, request } from '../utils/request'
 import { validateImageFile } from '../domain/imageCreation'
 const root = '/api/image-creations'
 export const imageApi = {
-  capabilities: () => get(root + '/capabilities'),
+  capabilities: () => request(root + '/capabilities', { method: 'GET', signal: AbortSignal.timeout(10000) }),
   create: data => post(root, data),
   get: id => get(root + '/' + id),
   cancel: id => post(root + '/' + id + '/cancel', {}),

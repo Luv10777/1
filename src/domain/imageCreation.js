@@ -27,8 +27,9 @@ export const IMAGE_STATUS = {
 }
 export const isImageActive = status => ['QUEUED', 'PLANNING', 'GENERATING', 'SAVING'].includes(status)
 export function supportsImageSize(capabilities, quality, ratio) {
+  try { imageDimensions(quality, ratio) } catch { return false }
   if (!capabilities) return true
-  return capabilities.qualities.includes(quality)
+  return capabilities.qualities?.includes(quality) === true
     && (!capabilities.qualityRatios || !!capabilities.qualityRatios[quality]?.includes(ratio))
 }
 export function imageDimensions(quality, ratio) {
