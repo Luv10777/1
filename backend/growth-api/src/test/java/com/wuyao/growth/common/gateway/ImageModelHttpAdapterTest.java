@@ -26,19 +26,19 @@ class ImageModelHttpAdapterTest {
      String response=mapper.writeValueAsString(Map.of("choices",List.of(Map.of("message",Map.of("content",content))),"usage",Map.of("total_tokens",50)));
      var captured=pool.submit(()->respond(server,200,response));
      var props=config(server);props.setBaseUrl("http://127.0.0.1:"+server.getLocalPort());
-     props.getRefiner().setModel("claude-sonnet-4-6-ab");props.getRefiner().setApiKey("test-key");
-     var result=new ImageModelHttpAdapter(props,mapper).invoke(new ProviderRequest(ModelAlias.TEXT_REFINER,1L,"brief",Map.of("system","rules"),"refine-key"));
+     props.getText().setModel("claude-sonnet-4-6-ab");props.getText().setApiKey("test-key");
+     var result=new ImageModelHttpAdapter(props,mapper).invoke(new ProviderRequest(ModelAlias.TEXT_CREATIVE,1L,"brief",Map.of("system","rules"),"refine-key"));
      assertThat(result.output()).containsEntry("prompt","Subject: 周末奶茶半价; Lighting: studio lighting");
      assertThat(result.output()).containsEntry("_model","claude-sonnet-4-6-ab").containsEntry("_usage",Map.of("total_tokens",50));
      assertThat(captured.get(5,TimeUnit.SECONDS)).contains("claude-sonnet-4-6-ab");
    }
  }
  @Test void advancedAndRefinerUseSeparateCredentialsModelsAndSamplingOptions() throws Exception {
-   for(var alias:List.of(ModelAlias.TEXT_PLANNER_ADVANCED,ModelAlias.TEXT_REFINER)) {
+   for(var alias:List.of(ModelAlias.TEXT_CREATIVE,ModelAlias.TEXT_CREATIVE)) {
      try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
        var captured=pool.submit(()->respond(server,200,"{\"choices\":[{\"message\":{\"content\":\"{\\\"prompt\\\":\\\"refined\\\"}\"}}],\"usage\":{\"total_tokens\":10}}"));
        var props=config(server);props.setBaseUrl("http://127.0.0.1:"+server.getLocalPort());
-       var endpoint=alias==ModelAlias.TEXT_REFINER?props.getRefiner():props.getAdvancedPlanner();
+       var endpoint=alias==ModelAlias.TEXT_CREATIVE?props.getText():props.getText();
        endpoint.setModel("claude-sonnet-4-6-ab");
        endpoint.setApiKey("separate-key");endpoint.setTemperature(0.5);endpoint.setMaxTokens(1500);
        var adapter=new ImageModelHttpAdapter(props,new ObjectMapper());
@@ -54,12 +54,12 @@ class ImageModelHttpAdapterTest {
      var captured=pool.submit(()->respond(server,200,"{\"choices\":[{\"message\":{\"content\":\"{\\\"summary\\\":\\\"test\\\",\\\"question\\\":\\\"\\\",\\\"items\\\":[]}\"}}]}"));
      var props=config(server);
      var adapter=new ImageModelHttpAdapter(props,new ObjectMapper());
-     var result=adapter.invoke(new ProviderRequest(ModelAlias.TEXT_PLANNER,1L,"brief",
+     var result=adapter.invoke(new ProviderRequest(ModelAlias.TEXT_CREATIVE,1L,"brief",
        Map.of("system","rules","references",List.of(Map.of("role","SUBJECT","dataUrl","data:image/png;base64,AA=="))),"stable-key"));
      assertThat(result.output().get("summary")).isEqualTo("test");
      String request=captured.get(5,TimeUnit.SECONDS);
      assertThat(request).contains("stable-key","SUBJECT","image_url","json_object");
-     assertThat(adapter.supports()).containsExactly(ModelAlias.TEXT_PLANNER,ModelAlias.IMAGE_PRIMARY);
+     assertThat(adapter.supports()).containsExactly(ModelAlias.TEXT_CREATIVE,ModelAlias.IMAGE_PRIMARY);
    }
  }
  @Test void imageQueryRetainsIdempotencyAndNeverLeaksErrorBody() throws Exception {
@@ -82,7 +82,7 @@ class ImageModelHttpAdapterTest {
  private ImageModelProperties config(ServerSocket server) {
    var p=new ImageModelProperties();
    p.getGenerator().setProtocol(ImageModelProperties.Protocol.BRIDGE);
-   for(var endpoint:List.of(p.getPlanner(),p.getGenerator())) {
+   for(var endpoint:List.of(p.getText(),p.getGenerator())) {
      endpoint.setUrl("http://127.0.0.1:"+server.getLocalPort()+"/model");
      endpoint.setApiKey("test-key");endpoint.setModel("test-model");
    }
@@ -173,7 +173,7 @@ class ImageModelHttpAdapterTest {
  }
  @Test void baseUrlsAndExplicitOverridesAreResolvedWithoutDuplicatingV1() {
    var p=new ImageModelProperties();p.setBaseUrl("https://relay.example/prefix/v1/");
-   assertThat(p.plannerUrl()).isEqualTo("https://relay.example/prefix/v1/chat/completions");
+   assertThat(p.textUrl()).isEqualTo("https://relay.example/prefix/v1/chat/completions");
    assertThat(p.editsUrl()).isEqualTo("https://relay.example/prefix/v1/images/edits");
    p.setBaseUrl("https://relay.example");assertThat(p.generatorUrl()).isEqualTo("https://relay.example/v1/images/generations");
    p.getGenerator().setEditsUrl("https://other.example/edit");assertThat(p.editsUrl()).isEqualTo("https://other.example/edit");

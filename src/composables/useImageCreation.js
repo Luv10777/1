@@ -12,6 +12,8 @@ export function useImageCreation(workflow) {
   const ratio = ref(product.value ? '1:1' : '3:4')
   const quality = ref('2K')
   const count = ref(product.value ? 3 : 1)
+  const platform = ref(product.value ? 'LOCAL' : 'LOCAL')
+  const imageType = ref(product.value ? 'PRODUCT_MAIN' : 'POSTER')
   const purpose = ref(product.value ? '美团 / 大众点评商品展示' : '朋友圈活动宣传')
   const style = ref('帮我搭配')
   const files = ref([])
@@ -57,6 +59,15 @@ export function useImageCreation(workflow) {
   const canUseAsset = item => !item?.providerImageUrl || !!latestItem(item)?.persisted
   const locked = computed(() => busy.value || !!pending.value)
   const workspaceTab = ref('inspiration')
+  const posterPlatform = purposeValue => {
+    if (purposeValue.includes('小红书')) return 'XIAOHONGSHU'
+    if (purposeValue.includes('抖音')) return purposeValue.includes('团购') ? 'DOUYIN_GROUP' : 'DOUYIN'
+    if (purposeValue.includes('视频号') || purposeValue.includes('朋友圈') || purposeValue.includes('微信群')) return 'WECHAT'
+    if (purposeValue.includes('美团') || purposeValue.includes('点评')) return 'MEITUAN'
+    if (purposeValue.includes('外卖')) return 'ELEME'
+    if (purposeValue.includes('门店')) return 'OFFLINE'
+    return 'LOCAL'
+  }
   function persistPending(value) {
     pending.value = value
     if (value) sessionStorage.setItem(pendingKey, JSON.stringify(value))
@@ -188,6 +199,7 @@ export function useImageCreation(workflow) {
           requestKey: crypto.randomUUID(), workflow: workflow, brief: submittedBrief,
           references: submittedFiles.map(f => ({ assetId: f.assetId, role: f.role })),
           ratio: ratio.value, quality: quality.value, count: product.value ? Number(count.value) : 1,
+          platform: platform.value, imageType: imageType.value,
           purpose: purpose.value, style: style.value,
         } })
         if (!product.value) submittedFiles.forEach(file => { if (file.file) URL.revokeObjectURL(file.preview) })
@@ -273,9 +285,13 @@ export function useImageCreation(workflow) {
     if (!alive) return
     await refreshHistory()
     if (route.query.creation) await load(route.query.creation)
-  })
+  }, { immediate: true })
   watch(() => route.query.creation, id => { if (id && String(current.value?.id) !== String(id)) load(id) })
   watch(purpose, value => {
+    if (!product.value) {
+      platform.value = posterPlatform(value)
+      imageType.value = 'POSTER'
+    }
     if (!product.value) {
       const option = POSTER_PURPOSE_GROUPS.flatMap(group => group.options).find(option => option.label === value)
       if (option && supportsRatio(option.ratio)) ratio.value = option.ratio
@@ -300,7 +316,7 @@ export function useImageCreation(workflow) {
     if (!locked.value && lastPrompt.value) brief.value = lastPrompt.value
   }
   return reactive({
-    product, brief, ratio, quality, count, purpose, style, files, busy, error,
+    product, brief, ratio, quality, count, platform, imageType, purpose, style, files, busy, error,
     capabilities, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,

@@ -43,18 +43,14 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
  public String code() {return "IMAGE_HTTP";}
  public Set<ModelAlias> supports() {
    var aliases=EnumSet.noneOf(ModelAlias.class);
-   if(config.plannerConfigured()) aliases.add(ModelAlias.TEXT_PLANNER);
-   if(config.advancedPlannerConfigured()) aliases.add(ModelAlias.TEXT_PLANNER_ADVANCED);
-   if(config.refinerConfigured()) aliases.add(ModelAlias.TEXT_REFINER);
+   if(config.textConfigured()) aliases.add(ModelAlias.TEXT_CREATIVE);
    if(config.generatorConfigured()) aliases.add(ModelAlias.IMAGE_PRIMARY);
    return aliases;
  }
  public ProviderResult invoke(ProviderRequest req) {
-   boolean planner=Set.of(ModelAlias.TEXT_PLANNER,ModelAlias.TEXT_PLANNER_ADVANCED,ModelAlias.TEXT_REFINER).contains(req.alias());
+   boolean planner=req.alias()==ModelAlias.TEXT_CREATIVE;
    var endpoint=switch(req.alias()) {
-     case TEXT_PLANNER -> config.getPlanner();
-     case TEXT_PLANNER_ADVANCED -> config.getAdvancedPlanner();
-     case TEXT_REFINER -> config.getRefiner();
+     case TEXT_CREATIVE -> config.getText();
      default -> config.getGenerator();
    };
    try {
@@ -99,16 +95,12 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      "response_format",Map.of("type","json_object")));
    if(endpoint.getTemperature()!=null) body.put("temperature",endpoint.getTemperature());
    if(endpoint.getMaxTokens()!=null) body.put("max_completion_tokens",endpoint.getMaxTokens());
-   String url=switch(req.alias()) {
-     case TEXT_PLANNER_ADVANCED -> config.advancedPlannerUrl();
-     case TEXT_REFINER -> config.refinerUrl();
-     default -> config.plannerUrl();
-   };
+   String url=config.textUrl();
    byte[] bytes=post(url,endpoint,req,"application/json",List.of(json.writeValueAsBytes(body)));
    var root=json.readTree(bytes);var choice=root.path("choices").path(0);
    if("length".equals(choice.path("finish_reason").asText())) throw failure("文本模型输出超出长度限制");
    String result=choice.path("message").path("content").asText();
-   // Some compatible Claude endpoints wrap JSON despite response_format=json_object.
+   // Some compatible endpoints wrap JSON despite response_format=json_object.
    // Only remove a single enclosing fence; malformed JSON still fails validation.
    result=result.strip().replaceFirst("(?is)^```(?:json)?\\s*(.*?)\\s*```$","$1");
    Map<String,Object> output=json.readValue(result,new TypeReference<>(){});

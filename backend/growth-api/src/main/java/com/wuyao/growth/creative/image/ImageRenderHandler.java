@@ -17,7 +17,6 @@ public class ImageRenderHandler implements TaskHandler {
  private final ObjectStorage storage;
  private final ImageRenderer renderer;
  private final ImageModelProperties config;
- private final ImagePromptRefiner refiner;
  private final ImageApiRateLimiter apiRateLimiter;
  private final ImageMetrics metrics;
  public String type(){return "IMAGE_RENDER";}
@@ -68,18 +67,12 @@ public class ImageRenderHandler implements TaskHandler {
        }
        options.put("references",refs);
      }
-     var trace=item.getSpec().refinement();
-     if(trace==null && (directUrl || item.getProviderJobId()==null)) {
-       trace=refiner.refineWithTrace(imagePrompt(c,item.getSpec()),
-         c.getRequest().workflow(),c.getRequest().purpose(),c.getTenantId());
-       // Keep immutable copy requirements after creative refinement as well.
-       trace=new ImageDtos.PromptTrace(withTextRequirements(trace.prompt(),c.getRequest().workflow(),item.getSpec()),trace.status(),trace.model(),
-         trace.version(),trace.usage(),trace.elapsedMillis());
-       if(!service.saveRefinement(id,task,trace)) return Map.of("reused",true);
-     }
-     log.info("图片前置处理完成: itemId={} elapsedMs={} refinement={}",id,(System.nanoTime()-started)/1_000_000,
-       trace==null?"NONE":trace.status());
-     String finalPrompt=trace==null?imagePrompt(c,item.getSpec()):trace.prompt();
+     if(item.getSpec()==null || item.getSpec().prompt()==null || item.getSpec().prompt().isBlank())
+       throw new IllegalStateException("图片缺少文本方案，请重新规划后再生成");
+     log.info("图片前置处理完成: itemId={} elapsedMs={} textLayer=single",id,(System.nanoTime()-started)/1_000_000);
+     // IMAGE_PLAN is the only text-model stage. Rendering only reads its
+     // persisted prompt; it never performs a per-image text fallback call.
+     String finalPrompt=withTextRequirements(item.getSpec().prompt(),c.getRequest().workflow(),item.getSpec());
       boolean synchronous=directUrl;
       if(item.getProviderJobId()==null && !service.reserveProviderSubmission(id,task)) return Map.of("status","NOT_RESUBMITTED");
      try {
@@ -154,6 +147,8 @@ public class ImageRenderHandler implements TaskHandler {
      Focal point: %s
      Material language: %s
      Camera language: %s
+     Target platform: %s
+     Image type: %s
      This image requirements: %s
      Purpose: %s
      Must preserve: %s
@@ -178,7 +173,7 @@ public class ImageRenderHandler implements TaskHandler {
      distorted typography, garbled text, duplicate objects, warped proportions, watermark, logo invention.
      %s
      """.formatted(creation.getPlan().visualDirection(),value(spec.shotType()),value(spec.focalPoint()),
-       value(spec.materialLanguage()),value(spec.cameraLanguage()),spec.prompt(),creation.getRequest().purpose(),preserve,avoid,textRequirements("POSTER",spec));
+       value(spec.materialLanguage()),value(spec.cameraLanguage()),creation.getRequest().platform(),creation.getRequest().imageType(),spec.prompt(),creation.getRequest().purpose(),preserve,avoid,textRequirements("POSTER",spec));
  }
  static String productSetPrompt(ImageCreation creation,ImageDtos.Spec spec) {
    return """
@@ -189,6 +184,8 @@ public class ImageRenderHandler implements TaskHandler {
      Material language: %s
      Camera language: %s
      Frame-specific photography brief: %s
+     Platform: %s
+     Image type: %s
      Platform and image use: %s
      Must preserve: %s
      Must avoid: %s
@@ -200,7 +197,7 @@ public class ImageRenderHandler implements TaskHandler {
      Negative prompt: distorted packaging, incorrect logo, duplicate product, extra ingredients, fake claims, floating objects, harsh reflections, inconsistent shadows, plastic texture, compression artifacts, random text, watermark.
      %s
      """.formatted(creation.getPlan().visualDirection(),spec.role(),value(spec.shotType()),value(spec.focalPoint()),
-       value(spec.materialLanguage()),value(spec.cameraLanguage()),spec.prompt(),creation.getRequest().purpose(),
+       value(spec.materialLanguage()),value(spec.cameraLanguage()),spec.prompt(),creation.getRequest().platform(),creation.getRequest().imageType(),creation.getRequest().purpose(),
        join(spec.mustPreserve()),join(spec.mustAvoid()),textRequirements("PRODUCT_SET",spec));
  }
  static String textRequirements(String workflow,ImageDtos.Spec spec) {

@@ -59,7 +59,7 @@ class ImageDownloadHandlerTest {
         item.setCreationId(5L);
         var creation = new ImageCreation();
         creation.setRequest(new ImageDtos.Create("test-request", "PRODUCT_SET", "product", List.of(),
-            "1:1", "1080P", 1, "test", "test", null));
+            "1:1", "1080P", 1, "LOCAL", "PRODUCT_MAIN", "test", "test", null));
         when(service.itemSnapshot(8L)).thenReturn(item);
         when(service.snapshot(5L)).thenReturn(creation);
         var task = new Task();
@@ -106,7 +106,7 @@ class ImageDownloadHandlerTest {
             item.setCreationId(5L);
             var creation = new ImageCreation();
             creation.setRequest(new ImageDtos.Create("test-request", "PRODUCT_SET", "product", List.of(),
-                "1:1", "1080P", 1, "test", "test", null));
+                "1:1", "1080P", 1, "LOCAL", "PRODUCT_MAIN", "test", "test", null));
             when(service.itemSnapshot(8L)).thenReturn(item);
             when(service.snapshot(5L)).thenReturn(creation);
             var task = new Task();

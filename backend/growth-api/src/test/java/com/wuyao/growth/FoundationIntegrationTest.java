@@ -122,9 +122,7 @@ class FoundationIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        imageConfig.setPlannerAlias(ModelAlias.TEXT_REFINER);
         imageConfig.setQualities(List.of("480P", "720P", "1080P", "4K"));
-        imageConfig.getRefiner().setEnabled(false);
         imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.BRIDGE);
         imageConfig.getGenerator().setModel("");
         owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
@@ -488,7 +486,7 @@ class FoundationIntegrationTest {
     }
 
     private ImageDtos.Create imageRequest(String key, String workflow, int count, List<ImageDtos.Reference> refs) {
-        return new ImageDtos.Create(key, workflow, "夏日新品", refs, "3:4", "480P", count, "朋友圈", "帮我搭配", null);
+        return new ImageDtos.Create(key, workflow, "夏日新品", refs, "3:4", "480P", count, "LOCAL", "POSTER", "朋友圈", "帮我搭配", null);
     }
 
     private void enableImageModels() {
@@ -502,7 +500,7 @@ class FoundationIntegrationTest {
     private void planImageCount(int count, String headline, String caption) {
         var specs = java.util.stream.IntStream.range(0, count).mapToObj(n -> Map.of(
                 "role", "场景" + n, "prompt", "夏日自然光，保持商品外观", "headline", headline, "caption", caption)).toList();
-        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER)))
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE)))
                 .thenReturn(new ProviderResult(true, "TEST", null,
                         Map.of("summary", "一组清爽的夏日图片", "visualDirection", "浅绿背景，自然光", "question", "", "items", specs), null, null));
     }
@@ -530,7 +528,7 @@ class FoundationIntegrationTest {
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(ids.getFirst()).quality())).isEqualTo("4K");
         assertThat(owner.queryForObject("select count(*) from image_creations", Integer.class)).isEqualTo(1);
         assertThat(owner.queryForObject("select count(*) from tasks where type='IMAGE_PLAN'", Integer.class)).isEqualTo(1);
-        var changed = new ImageDtos.Create(request.requestKey(), "POSTER", "另一条需求", List.of(), "3:4", "480P", 1, "朋友圈", "帮我搭配", null);
+        var changed = new ImageDtos.Create(request.requestKey(), "POSTER", "另一条需求", List.of(), "3:4", "480P", 1, "LOCAL", "POSTER", "朋友圈", "帮我搭配", null);
         assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(changed, null)))).isEqualTo(1400);
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.get(ids.getFirst())))).isEqualTo(1404);
         assertThat(TenantContext.runAs(tenantB, () -> imageCreations.history("POSTER", 0, 20).total())).isZero();
@@ -644,7 +642,7 @@ class FoundationIntegrationTest {
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.thread(revised.id())))).isEqualTo(1404);
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.rename(revised.id(), "越权改名")))).isEqualTo(1404);
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
-        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER
+        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
                 && r.prompt().contains("\"variation\":\"LAYOUT\"") && r.prompt().contains("\"previousPoster\"")));
     }
 
@@ -667,7 +665,7 @@ class FoundationIntegrationTest {
         clearInvocations(imageGateway);
         var second=TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-second", "POSTER", 1, refs), null));
         runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
-        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER
+        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
                 && r.prompt().contains("recentPostersToAvoid")));
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(second.id()).items().getFirst().similarityWarning())).isTrue();
@@ -684,7 +682,7 @@ class FoundationIntegrationTest {
         clearInvocations(imageGateway);
         TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-next", "POSTER", 1, List.of()), null));
         runImageTask("DEFAULT", imagePlanHandler);
-        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER
+        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
                 && r.prompt().contains("recentPostersToAvoid")));
         verify(imageGateway, never()).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
     }
@@ -725,9 +723,9 @@ class FoundationIntegrationTest {
     @Test
     void claudeDirectorPromptIsPersistedAndReusedDuringImagePolling() {
         imageConfig.setQualities(List.of("480P"));
-        enableImageModels(); imageConfig.getRefiner().setEnabled(true);
+        enableImageModels();
         String prompt="Subject: tea; Lighting: studio lighting; Color: warm palette; Composition: asymmetric; Depth: deep focus; Quality: professional photography, sharp focus, 8K; Avoid: blurry, watermark";
-        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_REFINER)))
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE)))
                 .thenReturn(new ProviderResult(true,"TEST",null,Map.of(
                         "summary", "茶饮摄影方案", "visualDirection", "studio lighting", "question", "",
                         "items", List.of(Map.of("role", "主图", "prompt", prompt, "headline", "", "caption", "")),
@@ -742,9 +740,8 @@ class FoundationIntegrationTest {
         var result=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()));
         assertThat(result.status()).isEqualTo("SUCCEEDED");
         var item=TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(result.items().getFirst().id()));
-        assertThat(item.getSpec().refinement().status()).isEqualTo("DIRECTOR_REFINED");
-        assertThat(item.getSpec().refinement().model()).isEqualTo("claude-sonnet-4-6-ab");
-        verify(imageGateway,times(1)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_REFINER && r.tenantId().equals(tenantA)));
+        assertThat(item.getSpec().prompt()).contains("夏日自然光");
+        verify(imageGateway,times(1)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_CREATIVE && r.tenantId().equals(tenantA)));
         var calls=ArgumentCaptor.forClass(ProviderRequest.class);
         verify(imageGateway,times(3)).invokeReal(calls.capture());
         var imageCalls=calls.getAllValues().stream().filter(r->r.alias()==ModelAlias.IMAGE_PRIMARY).toList();
@@ -793,10 +790,10 @@ class FoundationIntegrationTest {
     void gptImage2AutomaticallyChoosesHighestQualityForEachRatio() {
         enableImageModels();imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.OPENAI);
         imageConfig.getGenerator().setModel("gpt-image-2");
-        var req=new ImageDtos.Create("too-large-square","POSTER","新品",List.of(),"1:1","4K",1,"朋友圈","自动",null);
+        var req=new ImageDtos.Create("too-large-square","POSTER","新品",List.of(),"1:1","4K",1,"LOCAL","POSTER","朋友圈","自动",null);
         var square=TenantContext.runAs(tenantA,()->imageCreations.create(req,null));
         assertThat(square.quality()).isEqualTo("1080P");
-        var wide=new ImageDtos.Create("wide-highest","POSTER","新品",List.of(),"16:9","480P",1,"朋友圈","自动",null);
+        var wide=new ImageDtos.Create("wide-highest","POSTER","新品",List.of(),"16:9","480P",1,"LOCAL","POSTER","朋友圈","自动",null);
         assertThat(TenantContext.runAs(tenantA,()->imageCreations.create(wide,null)).quality()).isEqualTo("4K");
         assertThat(owner.queryForObject("select count(*) from tasks",Integer.class)).isEqualTo(2);
         assertThat(imageCreations.capabilities().get("qualityRatios").toString()).contains("4K=[9:16, 16:9]");

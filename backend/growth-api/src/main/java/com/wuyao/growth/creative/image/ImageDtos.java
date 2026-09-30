@@ -18,6 +18,8 @@ public final class ImageDtos {
         @NotNull @Pattern(regexp = "1:1|3:4|4:3|9:16|16:9|2:3|3:2") String ratio,
         @Pattern(regexp = "1K|2K|4K") String quality,
         @Min(1) @Max(6) int count,
+        @NotNull @Pattern(regexp = "TAOBAO|JD|PDD|XIAOHONGSHU|MEITUAN|TAOBAO_FLASH|DOUYIN_GROUP|DIANPING|WECHAT|DOUYIN|ELEME|OFFLINE|LOCAL") String platform,
+        @NotNull @Pattern(regexp = "PRODUCT_MAIN|WHITE_BG|DETAIL|SCENE_SET|DISH|STORE|POSTER") String imageType,
         @NotNull @Size(max = 80) String purpose,
         @NotNull @Size(max = 80) String style,
         @Size(max = 40) String templateId) {}
@@ -51,25 +53,19 @@ public final class ImageDtos {
         }
     }
     public record PlanningTrace(String alias, String model, String version, Map<String,Object> usage) {}
-    public record PromptTrace(String prompt, String status, String model, String version, Map<String,Object> usage, long elapsedMillis) {}
     public record Spec(String role, String prompt, String headline, String caption, Long editSourceItemId,
-                       PromptTrace refinement, String shotType, String focalPoint, String materialLanguage,
+                       String shotType, String focalPoint, String materialLanguage,
                        String cameraLanguage, List<String> mustPreserve, List<String> mustAvoid) {
         public Spec(String role, String prompt, String headline, String caption) {
-            this(role, prompt, headline, caption, null, null, null, null, null, null, List.of(), List.of());
+            this(role, prompt, headline, caption, null, null, null, null, null, List.of(), List.of());
         }
         public Spec(String role, String prompt, String headline, String caption, Long editSourceItemId) {
-            this(role, prompt, headline, caption, editSourceItemId, null, null, null, null, null, List.of(), List.of());
+            this(role, prompt, headline, caption, editSourceItemId, null, null, null, null, List.of(), List.of());
         }
         public Spec(String role, String prompt, String headline, String caption, String shotType, String focalPoint,
                     String materialLanguage, String cameraLanguage, List<String> mustPreserve, List<String> mustAvoid) {
-            this(role, prompt, headline, caption, null, null, shotType, focalPoint, materialLanguage,
+            this(role, prompt, headline, caption, null, shotType, focalPoint, materialLanguage,
                 cameraLanguage, mustPreserve == null ? List.of() : mustPreserve,
-                mustAvoid == null ? List.of() : mustAvoid);
-        }
-        public Spec withRefinement(PromptTrace trace) {
-            return new Spec(role, prompt, headline, caption, editSourceItemId, trace, shotType, focalPoint,
-                materialLanguage, cameraLanguage, mustPreserve == null ? List.of() : mustPreserve,
                 mustAvoid == null ? List.of() : mustAvoid);
         }
     }

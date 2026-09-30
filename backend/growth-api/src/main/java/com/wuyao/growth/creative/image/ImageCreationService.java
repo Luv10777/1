@@ -37,7 +37,7 @@ public class ImageCreationService {
  private int globalMaxConcurrent;
 
  public Map<String,Object> capabilities() {
-   boolean planner=gateway.configured(config.selectedPlannerAlias());
+   boolean planner=gateway.configured(config.selectedTextAlias());
    boolean generator=gateway.configured(ModelAlias.IMAGE_PRIMARY);
    var ratios=new LinkedHashMap<String,List<String>>();
    for(String quality:config.getQualities()) ratios.put(quality,List.of("1:1","3:4","4:3","9:16","16:9","2:3","3:2").stream().filter(r->{
@@ -84,7 +84,7 @@ public class ImageCreationService {
    }
  }
  private void requireConfigured(ImageDtos.Create req) {
-   if(!gateway.configured(config.selectedPlannerAlias())||!gateway.configured(ModelAlias.IMAGE_PRIMARY))
+   if(!gateway.configured(config.selectedTextAlias())||!gateway.configured(ModelAlias.IMAGE_PRIMARY))
      throw BizException.of(ErrorCode.IMAGE_NOT_CONFIGURED,"图片创作模型尚未配置，请联系管理员");
    if(!config.getQualities().contains(req.quality()))
      throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,"当前图片模型尚不支持该画质");
@@ -97,7 +97,7 @@ public class ImageCreationService {
    String brief=r.brief()+"\n本次修改："+revision.instruction();
    if(brief.length()>2000) throw bad("修改历史过长，请新建创作");
    return createVersion(new ImageDtos.Create(revision.requestKey(),r.workflow(),brief,r.references(),r.ratio(),
-     r.quality(),r.count(),r.purpose(),r.style(),r.templateId()),userId,id,revision.variation());
+     r.quality(),r.count(),r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId()),userId,id,revision.variation());
  }
  @Transactional(readOnly=true)
  public ImageDtos.View get(Long id) {return view(find(id));}
@@ -212,7 +212,7 @@ public class ImageCreationService {
    if(!source.getCreationId().equals(id)||!"SUCCEEDED".equals(source.getStatus())) throw bad("请先完成这张图片");
    var r=original.getRequest();
    String brief="修改文字："+edit.headline()+"\n"+edit.caption();
-   var req=new ImageDtos.Create(edit.requestKey(),r.workflow(),brief,r.references(),r.ratio(),r.quality(),1,r.purpose(),r.style(),r.templateId());
+   var req=new ImageDtos.Create(edit.requestKey(),r.workflow(),brief,r.references(),r.ratio(),r.quality(),1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
    creations.lockRequest(TenantContext.require()+":"+edit.requestKey());
    String hash=hash(req,itemId);
    var previous=creations.findByRequestKey(edit.requestKey());
@@ -242,7 +242,7 @@ public class ImageCreationService {
      if(!Set.of("LAYOUT","SCENE","MESSAGE").contains(direction)) throw bad("不支持的海报换版方向");
      var r=original.getRequest();
      var req=new ImageDtos.Create(requestKey,r.workflow(),r.brief(),r.references(),r.ratio(),r.quality(),
-       1,r.purpose(),r.style(),r.templateId());
+       1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
      return createVersion(req,userId,id,direction);
    }
    if(variation!=null) throw bad("产品套图不支持海报换版方向");
@@ -378,14 +378,6 @@ public class ImageCreationService {
    var i=items.lock(id).orElseThrow();
    if(!Objects.equals(i.getTaskId(),task.getId())||Set.of("SUCCEEDED","FAILED","CANCELLED").contains(i.getStatus()))return false;
    i.setStatus(i.getRawKey()==null?"GENERATING":"SAVING");return true;
- }
- @Transactional
- public boolean saveRefinement(Long id,Task task,ImageDtos.PromptTrace trace) {
-   if(!tasks.ownsExecution(task)) return false;
-   var item=items.lock(id).orElseThrow();
-   if(!Objects.equals(item.getTaskId(),task.getId())) return false;
-   if(item.getSpec().refinement()==null) item.setSpec(item.getSpec().withRefinement(trace));
-   return true;
  }
  /** Persist intent before a synchronous call: OpenAI compatibility does not guarantee idempotency. */
  @Transactional
