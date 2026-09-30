@@ -7,11 +7,7 @@ import java.util.List;
 
 @Component @ConfigurationProperties(prefix="growth.image") @Getter @Setter
 public class ImageModelProperties {
- private Endpoint planner=new Endpoint();
- private Endpoint advancedPlanner=new Endpoint();
- private Refiner refiner=new Refiner();
- /** Deprecated compatibility property. Image planning is now always handled by Claude via TEXT_REFINER. */
- private ModelAlias plannerAlias=ModelAlias.TEXT_REFINER;
+ private Endpoint text=new Endpoint();
  private Generator generator=new Generator();
  private String baseUrl="";
  private List<String> qualities=List.of("1K","2K","4K");
@@ -20,14 +16,8 @@ public class ImageModelProperties {
  private int pollSeconds=5;
  private int maxPolls=360;
  private String font="Microsoft YaHei";
- public String plannerUrl() {return endpoint(planner.getUrl(),"/chat/completions");}
- public String advancedPlannerUrl() {return endpoint(advancedPlanner.getUrl(),"/chat/completions");}
- public String refinerUrl() {return endpoint(refiner.getUrl(),"/chat/completions");}
- public ModelAlias selectedPlannerAlias() {
-   // Keep the old property bindable during rollout, but never route image planning
-   // back to the removed GPT planner layer.
-   return ModelAlias.TEXT_REFINER;
- }
+ public String textUrl() {return endpoint(text.getUrl(),"/chat/completions");}
+ public ModelAlias selectedTextAlias() {return ModelAlias.TEXT_CREATIVE;}
  public String generatorUrl() {return endpoint(generator.getUrl(),"/images/generations");}
  public String editsUrl() {
    if(!generator.getEditsUrl().isBlank()) return generator.getEditsUrl();
@@ -41,15 +31,9 @@ public class ImageModelProperties {
    String root=baseUrl.replaceAll("/+$", "");
    return root+(root.endsWith("/v1")?"":"/v1")+path;
  }
- public boolean plannerConfigured() {return !plannerUrl().isBlank() && planner.credentialsConfigured();}
- public boolean advancedPlannerConfigured() {return !advancedPlannerUrl().isBlank() && advancedPlanner.credentialsConfigured();}
- public boolean refinerConfigured() {return refiner.isEnabled() && !refinerUrl().isBlank() && refiner.credentialsConfigured();}
+ public boolean textConfigured() {return !textUrl().isBlank() && text.credentialsConfigured();}
  public boolean generatorConfigured() {return !generatorUrl().isBlank() && generator.credentialsConfigured();}
  public enum Protocol {OPENAI, BRIDGE}
- @Getter @Setter public static class Refiner extends Endpoint {
-   private boolean enabled=true;
-   public Refiner() {setTimeoutSeconds(30);setMaxTokens(1500);setTemperature(0.5);}
- }
  @Getter @Setter public static class Generator extends Endpoint {
    private Protocol protocol=Protocol.OPENAI;
    private String editsUrl="";

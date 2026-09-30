@@ -24,9 +24,9 @@ watch(() => studio.current?.id, async id => {
   await nextTick()
   workspace.value?.$el.scrollIntoView({ block: 'start' })
 })
-const platformGroup = ref('local')
-const selectedPlatform = ref('美团')
-const imageType = ref('dish')
+const platformGroup = ref('commerce')
+const selectedPlatform = ref('淘宝')
+const imageType = ref('PRODUCT_MAIN')
 const productImages = [
   '/images/product-set-case-1.png',
   '/images/product-set-case-2.png',
@@ -43,17 +43,16 @@ const productImages = [
 
 const platforms = {
   commerce: [
-    { name: '淘宝', mark: '淘', tone: 'orange', logo: '/images/platform-logos/taobao.png' },
-    { name: '京东', mark: '京', tone: 'red', logo: '/images/platform-logos/jd.png' },
-    { name: '拼多多', mark: '拼', tone: 'crimson', logo: '/images/platform-logos/pinduoduo.png' },
-    { name: '小红书', mark: '红', tone: 'pink', logo: '/images/platform-logos/xiaohongshu.png' },
-    { name: '抖音商城', mark: '抖', tone: 'dark', logo: '/images/platform-logos/douyin.png' },
+    { name: '淘宝', value: 'TAOBAO', mark: '淘', tone: 'orange', logo: '/images/platform-logos/taobao.png' },
+    { name: '京东', value: 'JD', mark: '京', tone: 'red', logo: '/images/platform-logos/jd.png' },
+    { name: '拼多多', value: 'PDD', mark: '拼', tone: 'crimson', logo: '/images/platform-logos/pinduoduo.png' },
+    { name: '小红书', value: 'XIAOHONGSHU', mark: '红', tone: 'pink', logo: '/images/platform-logos/xiaohongshu.png' },
   ],
   local: [
-    { name: '美团', mark: '美', tone: 'yellow', logo: '/images/platform-logos/meituan.png' },
-    { name: '淘宝闪购', mark: '闪', tone: 'orange', logo: '/images/platform-logos/taobao-flash.png' },
-    { name: '抖音团购', mark: '团', tone: 'dark', logo: '/images/platform-logos/douyin.png' },
-    { name: '大众点评', mark: '点', tone: 'red', logo: '/images/platform-logos/dianping.png' },
+    { name: '美团', value: 'MEITUAN', mark: '美', tone: 'yellow', logo: '/images/platform-logos/meituan.png' },
+    { name: '淘宝闪购', value: 'TAOBAO_FLASH', mark: '闪', tone: 'orange', logo: '/images/platform-logos/taobao-flash.png' },
+    { name: '抖音团购', value: 'DOUYIN_GROUP', mark: '团', tone: 'dark', logo: '/images/platform-logos/douyin.png' },
+    { name: '大众点评', value: 'DIANPING', mark: '点', tone: 'red', logo: '/images/platform-logos/dianping.png' },
   ],
 }
 
@@ -65,22 +64,29 @@ const buildWallColumn = offset => {
 const wallColumns = [buildWallColumn(0), buildWallColumn(3), buildWallColumn(6)]
 const visiblePlatforms = computed(() => platforms[platformGroup.value])
 const imageTypes = computed(() => platformGroup.value === 'local'
-  ? [{ value: 'dish', label: '菜品图' }, { value: 'store', label: '门店美化图' }]
-  : [{ value: 'single', label: '商品主图' }, { value: 'white-background', label: '白底图' }, { value: 'detail', label: '详情图' }, { value: 'set', label: '场景套图' }])
+  ? [{ value: 'DISH', label: '菜品图', count: 3 }, { value: 'STORE', label: '门店美化图', count: 3 }]
+  : [{ value: 'PRODUCT_MAIN', label: '商品主图', count: 1 }, { value: 'WHITE_BG', label: '白底图', count: 1 }, { value: 'DETAIL', label: '详情图', count: 3 }, { value: 'SCENE_SET', label: '场景套图', count: 3 }])
 function selectPlatformGroup(group) {
   platformGroup.value = group
   selectedPlatform.value = platforms[group][0].name
-  imageType.value = group === 'local' ? 'dish' : 'single'
+  imageType.value = group === 'local' ? 'DISH' : 'PRODUCT_MAIN'
+  studio.platform = platforms[group][0].value
+  studio.imageType = imageType.value
 }
 function selectImageType(type) {
   imageType.value = type
+  studio.imageType = type
+  studio.count = imageTypes.value.find(item => item.value === type)?.count || 1
 }
 function reset() {
   studio.resetDraft()
-  studio.count = 3
-  selectPlatformGroup('local')
+  studio.count = 1
+  selectPlatformGroup('commerce')
 }
 watch([selectedPlatform, imageType], () => {
+  const platform = visiblePlatforms.value.find(item => item.name === selectedPlatform.value)
+  studio.platform = platform?.value || 'LOCAL'
+  studio.imageType = imageType.value
   studio.purpose = selectedPlatform.value + ' / ' + imageTypes.value.find(type => type.value === imageType.value)?.label
 }, { immediate: true })
 onMounted(async () => {
@@ -112,7 +118,7 @@ onMounted(async () => {
         </section>
         <section class="product-form-section product-type-section">
           <div class="product-section-label"><strong>图片类型</strong><small>选择生成用途</small></div>
-          <div class="product-type-tabs" :class="{ local: platformGroup === 'local' }" role="group" aria-label="图片类型"><button v-for="type in imageTypes" :key="type.value" type="button" :aria-pressed="imageType === type.value" :class="{ active: imageType === type.value }" @click="selectImageType(type.value)">{{ type.label }}</button></div>
+          <div class="product-type-tabs" role="group" aria-label="图片类型"><button v-for="type in imageTypes" :key="type.value" type="button" :aria-pressed="imageType === type.value" :class="{ active: imageType === type.value }" @click="selectImageType(type.value)">{{ type.label }}</button></div>
         </section>
         <section class="product-form-section platform-section">
           <div class="product-section-label"><strong>选择平台</strong><small>{{ selectedPlatform }}</small></div>

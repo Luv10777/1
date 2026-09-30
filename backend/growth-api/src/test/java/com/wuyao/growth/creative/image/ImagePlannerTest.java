@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class ImagePlannerTest {
  private ImageDtos.Create request(int count) {
-   return new ImageDtos.Create("test-request","POSTER","周末双人餐 99 元",List.of(),"3:4","2K",count,"朋友圈","帮我搭配",null);
+   return new ImageDtos.Create("test-request","POSTER","周末双人餐 99 元",List.of(),"3:4","2K",count,"LOCAL","POSTER","朋友圈","帮我搭配",null);
  }
  @Test void refusesInventedPricesAndWrongCounts() {
    var invented=new ImageDtos.Spec("海报","自然光","双人餐只要 69 元","");
@@ -79,7 +79,7 @@ class ImagePlannerTest {
        "Headline、Caption 中的中文原样保留", "外层方案 JSON");
    assertThat(ImagePlanner.system("PRODUCT_SET"))
      .contains("不靠更换背景颜色制造假差异", "默认不添加画面外叠加标题", "只允许优化该张的拍摄职责");
-   var productRequest=new ImageDtos.Create("product-request","PRODUCT_SET","真实商品",List.of(),"1:1","1080P",3,"美团 / 菜品图","真实自然",null);
+   var productRequest=new ImageDtos.Create("product-request","PRODUCT_SET","真实商品",List.of(),"1:1","1080P",3,"LOCAL","PRODUCT_MAIN","美团 / 菜品图","真实自然",null);
    var product=new ImageCreation();product.setRequest(productRequest);
    var spec=new ImageDtos.Spec("主图","真实商品近景","","");
    product.setPlan(new ImageDtos.Plan("方案","","Product identity: real item",List.of(spec)));
@@ -87,9 +87,8 @@ class ImagePlannerTest {
      .doesNotContain("complete ready-to-publish poster","Generate a complete ready-to-publish design with integrated text");
    assertThat(ImagePlanner.version("POSTER")).isNotEqualTo(ImagePlanner.version("PRODUCT_SET"));
  }
- @Test void legacyPlannerConfigurationCannotRouteImagePlanningBackToRemovedLayer() {
+ @Test void legacyPlannerConfigurationKeepsTheUnifiedTextLayer() {
    var config=new ImageModelProperties();
-   config.setPlannerAlias(com.wuyao.growth.common.gateway.ModelAlias.TEXT_PLANNER_ADVANCED);
-   assertThat(config.selectedPlannerAlias()).isEqualTo(com.wuyao.growth.common.gateway.ModelAlias.TEXT_REFINER);
+   assertThat(config.selectedTextAlias()).isEqualTo(com.wuyao.growth.common.gateway.ModelAlias.TEXT_CREATIVE);
  }
 }

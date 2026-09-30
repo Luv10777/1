@@ -49,7 +49,6 @@ server:
 growth:
   image:
     base-url: ${NEW_API_BASE_URL:}
-    planner-alias: ${IMAGE_PLANNER_ALIAS:TEXT_REFINER}
     tenant-max-concurrent: ${IMAGE_TENANT_MAX_CONCURRENT:20}
     global-max-concurrent: ${IMAGE_GLOBAL_MAX_CONCURRENT:200}
     api-rate-limit: ${IMAGE_API_RATE_LIMIT:100}
@@ -57,25 +56,13 @@ growth:
     upload-max-pixels: ${IMAGE_UPLOAD_MAX_PIXELS:50000000}
     creation-lock-wait-seconds: ${IMAGE_CREATION_LOCK_WAIT_SECONDS:5}
     creation-lock-lease-seconds: ${IMAGE_CREATION_LOCK_LEASE_SECONDS:120}
-    planner:
-      url: ${IMAGE_PLANNER_URL:}
-      api-key: ${IMAGE_PLANNER_API_KEY:${NEW_API_API_KEY:}}
-      model: ${IMAGE_PLANNER_MODEL:}
-    advanced-planner:
-      url: ${IMAGE_ADVANCED_PLANNER_URL:${IMAGE_PLANNER_URL:}}
-      api-key: ${IMAGE_ADVANCED_PLANNER_API_KEY:${IMAGE_PLANNER_API_KEY:${NEW_API_API_KEY:}}}
-      model: ${IMAGE_ADVANCED_PLANNER_MODEL:}
-      temperature: ${IMAGE_ADVANCED_PLANNER_TEMPERATURE:0.7}
-      max-tokens: ${IMAGE_ADVANCED_PLANNER_MAX_TOKENS:2000}
-      timeout-seconds: ${IMAGE_ADVANCED_PLANNER_TIMEOUT_SECONDS:300}
-    refiner:
-      enabled: ${IMAGE_REFINER_ENABLED:true}
-      url: ${IMAGE_REFINER_URL:}
-      api-key: ${IMAGE_REFINER_API_KEY:${NEW_API_API_KEY:}}
-      model: ${IMAGE_REFINER_MODEL:gpt-6-luna}
-      temperature: ${IMAGE_REFINER_TEMPERATURE:0.5}
-      max-tokens: ${IMAGE_REFINER_MAX_TOKENS:3000}
-      timeout-seconds: ${IMAGE_REFINER_TIMEOUT_SECONDS:300}
+    text:
+      url: ${IMAGE_TEXT_URL:}
+      api-key: ${IMAGE_TEXT_API_KEY:${NEW_API_API_KEY:}}
+      model: ${IMAGE_TEXT_MODEL:deepseek-flash}
+      temperature: ${IMAGE_TEXT_TEMPERATURE:0.5}
+      max-tokens: ${IMAGE_TEXT_MAX_TOKENS:6000}
+      timeout-seconds: ${IMAGE_TEXT_TIMEOUT_SECONDS:300}
     generator:
       protocol: ${IMAGE_GENERATOR_PROTOCOL:OPENAI}
       url: ${IMAGE_GENERATOR_URL:}

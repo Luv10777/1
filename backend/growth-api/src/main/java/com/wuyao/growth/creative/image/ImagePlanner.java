@@ -11,19 +11,18 @@ import java.util.regex.Pattern;
 public class ImagePlanner {
  private final AiGateway gateway;
  private final ObjectMapper json;
- private final ImageModelProperties config;
- public static final String POSTER_VERSION="poster-claude-director-v1";
- public static final String PRODUCT_SET_VERSION="product-set-claude-director-v1";
+ public static final String POSTER_VERSION="poster-single-text-v2";
+ public static final String PRODUCT_SET_VERSION="product-set-single-text-v2";
  static String version(String workflow) {return "POSTER".equals(workflow)?POSTER_VERSION:PRODUCT_SET_VERSION;}
  static String system(String workflow) {
-   return ("POSTER".equals(workflow)?POSTER_SYSTEM:PRODUCT_SET_SYSTEM)+CLAUDE_DIRECTOR_CONTRACT
-     +ImagePromptRefiner.directorRules(workflow);
+   return ("POSTER".equals(workflow)?POSTER_SYSTEM:PRODUCT_SET_SYSTEM)+SINGLE_TEXT_CONTRACT;
  }
- private static final String CLAUDE_DIRECTOR_CONTRACT="""
+ private static final String SINGLE_TEXT_CONTRACT="""
   你同时负责需求理解、视觉方案规划和最终提示词精修。不要把规划交给另一个模型，也不要输出第二套候选方案。
   先从用户 brief、purpose、style 和参考图中分离可验证事实与创作决定，再输出一份可直接执行的结构化方案。每个 item 的 prompt 就是最终交给图像模型的完整提示词，必须已经完成精修，不要只写提纲或让下游模型补全。
   prompt 必须包含主体身份、该图唯一任务、构图、文字层级（如有）、镜头、光线、材质、色彩、景深和限制，并与 headline、caption 逐字一致。禁止在 prompt 中加入用户没有提供的价格、日期、功效、容量、认证、品牌或场所事实。
-  输出必须是严格 JSON，不要 Markdown 代码围栏、解释或额外字段。字段结构必须符合示例；question 非空时 items 必须为空。专业术语用英文，品牌、商品和准确中文文案原样保留。
+  不得写成无字底图或要求后期加字；Headline 和 Caption 非空时必须逐字出现在 prompt 中；Headline、Caption 中的中文原样保留。产品套图不靠更换背景颜色制造假差异，默认不添加画面外叠加标题，只允许优化该张的拍摄职责。
+  输出必须是严格 JSON，不要 Markdown 代码围栏、解释或额外字段。字段结构必须符合示例；question 非空时 items 必须为空。外层方案 JSON 只允许一套最终结果。专业术语用英文，品牌、商品和准确中文文案原样保留。
   """;
  static final String POSTER_SYSTEM="""
   你是本地商家的营销海报视觉总监。只规划一张可直接发布的完整图文海报，而不是商品摄影套图。
@@ -45,6 +44,7 @@ public class ImagePlanner {
   你是本地商家的商品摄影总监与电商视觉编导。规划一组可直接使用的产品图片，不套用营销海报的文字层级、促销版式或装饰元素。
   先识别参考商品的包装、Logo、形状、颜色、比例、材质、配料可见部分与真实卖点；这些是全套图片一致的身份锚点。SUBJECT 保持商品真实身份；STYLE 仅影响视觉气质；LAYOUT 仅影响构图；BACKGROUND 仅影响场景。绝不能把参考商品替换成类似商品。
   按 purpose 指定的平台与图片类型安排图片：主图让商品一眼可辨，细节图呈现可验证的材质或工艺，使用图展示合理的消费方式，场景图建立可信的本地生活语境。门店美化图只依据已有门店参考，不虚构店面结构或人物。
+  platform 使用 TAOBAO、JD、PDD、XIAOHONGSHU、MEITUAN、TAOBAO_FLASH、DOUYIN_GROUP、DIANPING、WECHAT、DOUYIN、ELEME、OFFLINE 或 LOCAL；imageType 使用 PRODUCT_MAIN、WHITE_BG、DETAIL、SCENE_SET、DISH、STORE 或 POSTER。PRODUCT_MAIN 主体完整且缩略图可读；WHITE_BG 使用近纯白背景、少道具、边缘清晰且无促销文字；DETAIL 在多张图中分配材质、结构、工艺和功能细节；SCENE_SET 在多张图中分配不同消费场景、距离和道具关系；DISH 突出菜品真实色泽、份量和食用场景；STORE 只依据参考图美化门店，不虚构空间。淘宝强调商品识别与商业构图，京东强调干净可信，拼多多强调直观高对比与缩略图识别，小红书强调生活方式编辑感；美团、点评和团购平台强调清晰、可信、到店转化。
   count 张图片共享品牌色彩、商品身份、光线逻辑和后期质感，但每张承担不同视觉任务。明确 shotType（hero/detail/usage/material/context/editorial）、视角、焦段、机位、拍摄距离、裁切、景深、道具与背景；不能只换颜色或背景复制同一张图。
   style 是摄影气质约束而非海报模板。“帮我搭配”时根据商品与平台选择；真实自然、简约高级、东方雅致、清爽明亮都要落到光线、材质和构图，不用空泛形容词。
   产品图默认不加入后期标题、贴纸、价格牌、促销文案或水印；headline/caption 留空。只有用户明确提供并要求图片中呈现的文字才写入对应字段，且不得改写。商品包装上原有的真实文字和 Logo 应保持。
@@ -63,7 +63,7 @@ public class ImagePlanner {
      var input=new LinkedHashMap<String,Object>();input.put("request",req);
      if(!posterContext.isEmpty()) input.put("posterContext",posterContext);
      String plannerInput=posterContext.isEmpty()?json.writeValueAsString(req):json.writeValueAsString(input);
-     var result=gateway.invokeReal(new ProviderRequest(ModelAlias.TEXT_REFINER,creation.getTenantId(),
+     var result=gateway.invokeReal(new ProviderRequest(ModelAlias.TEXT_CREATIVE,creation.getTenantId(),
        plannerInput,options,"image-plan-"+creation.getId()));
      var body=new LinkedHashMap<>(result.output());body.remove("_model");
      body.remove("_usage");
@@ -77,17 +77,13 @@ public class ImagePlanner {
      }
      log.debug("Original visualDirection: {}",plan.visualDirection());
      var model=String.valueOf(result.output().getOrDefault("_model",""));
-     var usage=ImagePromptRefiner.usage(result.output().get("_usage"));
-     var items=plan.items().stream().map(item -> {
-       if(item==null || item.prompt()==null || item.prompt().isBlank()) return item;
-       var prompt=ImagePromptRefiner.appendSafety(
-         ImageRenderHandler.withTextRequirements(item.prompt(),req.workflow(),item),req.workflow());
-       var trace=new ImageDtos.PromptTrace(prompt,"DIRECTOR_REFINED",model,version(req.workflow()),usage,
-         (System.nanoTime()-started)/1_000_000);
-       return item.withRefinement(trace);
-     }).toList();
+     var usage=result.output().get("_usage") instanceof Map<?,?> value ? json.convertValue(value,Map.class) : Map.<String,Object>of();
+     var items=plan.items().stream().map(item -> item == null ? null : new ImageDtos.Spec(item.role(),
+       ImageRenderHandler.withTextRequirements(item.prompt(),req.workflow(),item),item.headline(),item.caption(),
+       item.editSourceItemId(),item.shotType(),item.focalPoint(),item.materialLanguage(),item.cameraLanguage(),
+       item.mustPreserve(),item.mustAvoid())).toList();
      return new ImageDtos.Plan(plan.summary(),plan.question(),plan.visualDirection(),items,
-       new ImageDtos.PlanningTrace(ModelAlias.TEXT_REFINER.name(),model,version(req.workflow()),usage));
+       new ImageDtos.PlanningTrace(ModelAlias.TEXT_CREATIVE.name(),model,version(req.workflow()),usage));
    } catch(IllegalArgumentException e) {throw new IllegalArgumentException("规划模型未返回有效创作方案");}
    catch(com.fasterxml.jackson.core.JsonProcessingException e) {throw new IllegalStateException(e);}
  }
@@ -101,7 +97,7 @@ public class ImagePlanner {
    }
    if(plan.items().size()!=req.count()) throw new IllegalArgumentException("套图数量不匹配");
    for(var item:plan.items()) {
-     if(item==null || item.editSourceItemId()!=null || item.refinement()!=null || item.role()==null || item.role().isBlank() || item.role().length()>60
+     if(item==null || item.editSourceItemId()!=null || item.role()==null || item.role().isBlank() || item.role().length()>60
          || item.prompt()==null || item.prompt().isBlank() || item.prompt().length()>6000
          || item.headline()==null || item.headline().length()>40
          || item.caption()==null || item.caption().length()>100

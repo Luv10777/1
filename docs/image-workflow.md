@@ -2,13 +2,13 @@
 
 版本：1.4 · 更新：2026-09-29
 
-营销海报与产品套图共用“Claude 需求理解与提示词精修 → 图片生成”的技术流程，但不共用创作指令。
-营销海报使用 `poster-claude-director-v1`：聚焦本地商家的传播主题、图文层级、投放场景和历次版式差异；
-产品套图使用 `product-set-claude-director-v1`：聚焦商品身份保真、镜头分工、材质表现、使用场景和整组一致性，默认不叠加海报标题或促销装饰。
+营销海报与产品套图共用“DeepSeek Flash 需求理解、方案规划与最终提示词 → 图片生成”的技术流程，但不共用创作指令。
+营销海报使用 `poster-single-text-v2`：聚焦本地商家的传播主题、图文层级、投放场景和历次版式差异；
+产品套图使用 `product-set-single-text-v2`：聚焦商品身份保真、镜头分工、材质表现、使用场景和整组一致性，默认不叠加海报标题或促销装饰。
 两者只共享图片身份保真、尺寸校验、参考图角色和安全限制等基础规则。
-Claude 一次调用同时输出结构化方案和每张图的最终视觉指令并保留中文事实，
+DeepSeek Flash 一次调用同时输出结构化方案和每张图的最终视觉指令并保留中文事实，
 图片模型按工作流的成片要求生成，服务端校验尺寸并保存作品，不再叠加固定文字框。
-未配置规划或图片模型时拒绝提交；精修失败时使用原始方案，不回退到 Echo。
+未配置文本或图片模型时拒绝提交；图片渲染阶段不再追加文本模型调用。
 
 ## 本地启动
 
@@ -22,11 +22,9 @@ Claude 一次调用同时输出结构化方案和每张图的最终视觉指令�
 ```properties
 NEW_API_BASE_URL=https://myrouter.online/v1
 NEW_API_API_KEY=replace-on-server
-IMAGE_PLANNER_ALIAS=TEXT_REFINER
-IMAGE_REFINER_ENABLED=true
-IMAGE_REFINER_MODEL=gpt-6-luna
-IMAGE_REFINER_MAX_TOKENS=3000
-IMAGE_REFINER_TIMEOUT_SECONDS=300
+IMAGE_TEXT_MODEL=deepseek-flash
+IMAGE_TEXT_MAX_TOKENS=6000
+IMAGE_TEXT_TIMEOUT_SECONDS=300
 IMAGE_GENERATOR_MODEL=gpt-image-2.5-ultra-fast
 IMAGE_GENERATOR_PROTOCOL=OPENAI
 IMAGE_GENERATOR_URL=https://new.fluapi.com/v1/images/generations
@@ -40,8 +38,8 @@ IMAGE_FONT=Microsoft YaHei
 ```
 
 `NEW_API_BASE_URL` 可填写域名根地址或以 `/v1` 结尾的地址，不会重复拼接 `/v1`。
-`IMAGE_PLANNER_URL`、`IMAGE_GENERATOR_URL`、`IMAGE_GENERATOR_EDITS_URL` 可覆盖完整接口地址。
-共享令牌通过 `NEW_API_API_KEY` 配置；若设置独立的 `IMAGE_PLANNER_API_KEY` 或
+`IMAGE_TEXT_URL`、`IMAGE_GENERATOR_URL`、`IMAGE_GENERATOR_EDITS_URL` 可覆盖完整接口地址。
+共享令牌通过 `NEW_API_API_KEY` 配置；若设置独立的 `IMAGE_TEXT_API_KEY` 或
 `IMAGE_GENERATOR_API_KEY`，它们优先于共享令牌，不要把独立令牌显式设为空。
 
 `IMAGE_SUPPORTED_QUALITIES` 只填写实际支持的档位。`IMAGE_MAX_OUTPUT_PIXELS` 可按中转站实测能力限制可选输出尺寸；0 表示不额外限制。带参考图时，规划模型必须支持图像输入。
@@ -77,8 +75,7 @@ npm run dev
 
 - `common/gateway/ImageModelProperties.java`：服务端配置。
 - `common/gateway/ImageModelHttpAdapter.java`：目前的 HTTP 传输与协议适配。
-- `creative/image/ImagePlanner.java`：结构化提示词、版本与方案校验。
-- `creative/image/ImagePromptRefiner.java`：按 POSTER / PRODUCT_SET 分流英文提示词精修、负面提示与失败降级。
+- `creative/image/ImagePlanner.java`：唯一文本层，完成需求理解、整组规划和每张图的最终 prompt；图片渲染阶段不再发起文本模型调用。
 - `creative/image/ImageRenderHandler.java`：按工作流分流最终生图指令，提交、查单、保存与渲染。
 - 新供应商可以替换 HTTP 适配器，保持能力别名与业务服务不变。
   当前每种能力只应启用一个真实适配器，未实现动态供应商选型。
@@ -302,34 +299,27 @@ retry 使用当前查询结果中的 `{taskId}`，重复点击不会重复排队
 
 测试中的模型响应是受控测试数据；测试通过不代表真实供应商已配置或模型效果已验收。
 
-## Claude 单层文本模型配置
+## 单层文本模型配置
 
-规划和精修统一使用 `TEXT_REFINER` 别名，当前对应 GPT-6 Luna，配置项为 `IMAGE_REFINER_MODEL`、
-`IMAGE_REFINER_URL`、`IMAGE_REFINER_API_KEY`。旧的 `IMAGE_PLANNER_ALIAS`、
-`IMAGE_ADVANCED_PLANNER_*` 配置仅为兼容旧环境保留，不再路由到 GPT-6 Luna；无论旧值是什么，图片规划都会固定走 Claude。
+规划与最终提示词合并为一层 `TEXT_CREATIVE` 文本调用，当前模型配置为 `deepseek-flash`；
+图片渲染只读取该阶段保存的最终 prompt，不再逐张调用文本模型。整组图片只调用一次 `deepseek-flash` 文本模型。
 省略地址时从 `NEW_API_BASE_URL` 推导，省略密钥时使用 `NEW_API_API_KEY`。
-Claude Sonnet 必须由中转站提供兼容 `/chat/completions` 的协议；未实现 Anthropic 原生协议。
-文本端点默认使用 0.5 温度、3000 最大令牌和 300 秒超时；令牌上限以 `max_completion_tokens` 发送。
-
-精修输出 JSON `{"prompt":"Identity: ... Composition: ... Lighting: ... Camera: ... Restrictions: ..."}`，
-须包含 Depth、Quality 和 Avoid。中文标题、说明和引号内中文名称必须保留。
-请求异常、超时、空结果或校验不通过均退回原提示词，并补充 Avoid 排除项。
-精修只允许优化镜头、构图、信息层级、光线、材质和色彩；事实字段视为不可变约束。服务端只追加一次工作流专属 Avoid，避免同一段负面约束在规划、精修和渲染阶段重复堆叠。
+文本端点默认使用 0.5 温度、6000 最大令牌和 300 秒超时；令牌上限以 `max_completion_tokens` 发送。
+模型一次返回整组结构化方案，`items[].prompt` 已是交给图片模型的最终 prompt；服务端只补充必要的文字约束，不会再调用第二个文本模型。
 `8K` 是提示词质感引导，实际图片分辨率仍按所选档位校验。
 
 无需新增数据库列：规划模型、版本与用量保存在 `image_creations.plan.planning`；
-最终提示词、精修模型、耗时、用量和状态保存在 `image_items.spec.refinement`。
-规划阶段生成的精修状态为 `DIRECTOR_REFINED`；旧数据回退精修仍可能出现 `REFINED`、`DISABLED`、`NOT_CONFIGURED`、`FAILED`、`INVALID_OUTPUT`。
+最终提示词和拍摄职责直接保存在 `image_items.spec.prompt` 及其结构化字段中。
 持久化受现有 RLS、任务租约与执行轮次保护；已有 JSON 数据缺失这些字段时仍可读取。
 
-DEBUG 日志包含 Original visualDirection、Raw prompt、Refined prompt。
+DEBUG 日志包含 Original visualDirection 与最终图片 prompt。
 网关通过 Micrometer 记录 `ai.calls`、`ai.failures`、`ai.tokens`、`ai.duration`；
 供应商明确提供费用时才记录 `ai.reported.cost` 和样本数，费用币种沿用供应商口径，
 不把未提供费用视为免费，不按预期百分比或固定人民币金额伪造实测结果。
 这些指标不带租户标签，详细单图追踪仍受租户隔离约束；指标为进程级，重启会重置。
 
-升级后无需双模型迁移；重启 API 和 worker 后，新任务固定由 Claude 完成需求理解与精修。
-已持久化的图片提示词继续复用；旧任务缺少精修结果时会按兼容路径补做一次 Claude 精修。
+升级后重启 API 和 worker，新任务固定由唯一的 `deepseek-flash` 文本层完成需求理解、整组规划和最终 prompt。
+已持久化的图片提示词继续复用；缺少文本方案的旧任务需要重新规划。
 
 [image-guide]: https://developers.openai.com/api/docs/guides/image-generation
 [image-generate]: https://developers.openai.com/api/reference/resources/images/methods/generate
