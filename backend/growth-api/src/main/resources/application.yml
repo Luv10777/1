@@ -83,6 +83,22 @@ growth:
     poll-seconds: ${IMAGE_POLL_SECONDS:5}
     max-polls: ${IMAGE_MAX_POLLS:360}
     font: ${IMAGE_FONT:Microsoft YaHei}
+  video:
+    provider:
+      name: ${VIDEO_PROVIDER_NAME:onlyrouter}
+      protocol: ${VIDEO_PROVIDER_PROTOCOL:CHAT_COMPLETIONS}
+      base-url: ${VIDEO_PROVIDER_BASE_URL:https://api.onlyrouter.ai}
+      api-key: ${VIDEO_PROVIDER_API_KEY:}
+      submit-path: ${VIDEO_PROVIDER_SUBMIT_PATH:/v1/videos}
+      poll-path: ${VIDEO_PROVIDER_POLL_PATH:/v1/videos/{jobId}}
+      content-path: ${VIDEO_PROVIDER_CONTENT_PATH:/v1/videos/{jobId}/content}
+      timeout-seconds: ${VIDEO_PROVIDER_TIMEOUT_SECONDS:60}
+    model:
+      seedance-2-5: ${VIDEO_MODEL_SEEDANCE_2_5:doubao-seedance-2-5-260628}
+      seedance-2-0: ${VIDEO_MODEL_SEEDANCE_2_0:doubao-seedance-2-0-260128}
+      seedance-2-0-mini: ${VIDEO_MODEL_SEEDANCE_2_0_MINI:doubao-seedance-2-0-mini-260615}
+      seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:doubao-seedance-2-0-fast-260128}
+    poll-seconds: ${VIDEO_POLL_SECONDS:15}
   http:
     max-total: ${HTTP_MAX_TOTAL:200}
     max-per-route: ${HTTP_MAX_PER_ROUTE:50}
@@ -123,7 +139,7 @@ growth:
   worker:
     # api 进程设 false，worker 进程设 true。同一个 jar，两条启动命令。
     enabled: ${WORKER_ENABLED:false}
-    queues: DEFAULT,IMAGE,VIDEO
+    queues: DEFAULT,IMAGE,VIDEO_PROVIDER,MEDIA_CPU
     poll-interval: 2000
     batch-size: 5
     parallelism: ${WORKER_PARALLELISM:1}

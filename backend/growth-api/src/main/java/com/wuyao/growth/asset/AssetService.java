@@ -56,6 +56,24 @@ public class AssetService {
         return new ImageReference(a.getId(), a.getStorageKey(), a.getName());
     }
 
+    /** Reference validation for video workflows; metadata probing happens asynchronously. */
+    @Transactional(readOnly = true)
+    public MediaReference mediaReference(Long id, String expectedType) {
+        Asset asset = repository.findById(id)
+                .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
+        if (!"READY".equals(asset.getStatus()) || !expectedType.equals(asset.getType())) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "请使用已上传完成的" + expectedType + "素材");
+        }
+        return new MediaReference(asset.getId(), asset.getStorageKey(), asset.getMimeType(), asset.getDurationMs());
+    }
+
+    public String presignedReference(Long id, String expectedType) {
+        MediaReference reference = mediaReference(id, expectedType);
+        return storage.presignGet(reference.storageKey(), Duration.ofHours(1));
+    }
+
+    public record MediaReference(Long id, String storageKey, String mimeType, Integer durationMs) {}
+
     public record ImageReference(Long id, String storageKey, String name) {}
 
     @Transactional
