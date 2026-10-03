@@ -90,6 +90,8 @@ public class ImageDownloadHandler implements TaskHandler {
                 URI redirect = ImageDownloadOrigins.checkedUri(location);
                 if (!"https".equalsIgnoreCase(redirect.getScheme()))
                     throw new IllegalArgumentException("图片重定向地址必须使用 HTTPS");
+                if (!ImageDownloadOrigins.allows(redirect, config.getGenerator().getDownloadAllowedOrigins()))
+                    throw new IllegalArgumentException("图片重定向地址不在允许的来源范围内");
                 // The signed URL is issued by the provider; never forward the API key to it.
                 return httpClient.execute(new HttpGet(redirect), (HttpClientResponseHandler<byte[]>) redirected -> {
                     return storeResponse(redirected, targetKey);
@@ -111,11 +113,13 @@ public class ImageDownloadHandler implements TaskHandler {
                 @Override public int read() throws java.io.IOException {
                     int value = super.read();
                     if (value >= 0) consumed[0]++;
+                    if (consumed[0] > MAX_BYTES) throw new java.io.IOException("图片文件过大");
                     return value;
                 }
                 @Override public int read(byte[] buffer, int offset, int length) throws java.io.IOException {
-                    int count = super.read(buffer, offset, length);
+                    int count = super.read(buffer, offset, (int) Math.min(length, MAX_BYTES - consumed[0] + 1));
                     if (count > 0) consumed[0] += count;
+                    if (consumed[0] > MAX_BYTES) throw new java.io.IOException("图片文件过大");
                     return count;
                 }
             };
@@ -124,7 +128,7 @@ public class ImageDownloadHandler implements TaskHandler {
             // A non-streaming test/legacy adapter may return without consuming
             // the input. Complete that adapter through its byte[] contract.
             if (consumed[0] == 0 && entity.getContentLength() != 0) {
-                byte[] remaining = input.readAllBytes();
+                byte[] remaining = input.readNBytes(MAX_BYTES + 1);
                 if (remaining.length > MAX_BYTES) throw new IllegalArgumentException("图片文件过大");
                 storage.put(targetKey, remaining, contentType);
                 return remaining;

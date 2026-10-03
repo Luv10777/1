@@ -55,14 +55,22 @@ public class JwtService {
     }
 
     public String issueAccessToken(Long userId, Long tenantId, String phone) {
-        return build(userId, tenantId, phone, "access", accessTtl);
+        return issueAccessToken(userId, tenantId, phone, 0);
+    }
+
+    public String issueAccessToken(Long userId, Long tenantId, String phone, long version) {
+        return build(userId, tenantId, phone, version, "access", accessTtl);
     }
 
     public String issueRefreshToken(Long userId, Long tenantId, String phone) {
-        return build(userId, tenantId, phone, "refresh", refreshTtl);
+        return issueRefreshToken(userId, tenantId, phone, 0);
     }
 
-    private String build(Long userId, Long tenantId, String phone, String type, Duration ttl) {
+    public String issueRefreshToken(Long userId, Long tenantId, String phone, long version) {
+        return build(userId, tenantId, phone, version, "refresh", refreshTtl);
+    }
+
+    private String build(Long userId, Long tenantId, String phone, long version, String type, Duration ttl) {
         Instant now = Instant.now();
         return Jwts.builder()
                 // jti 必须有：iat/exp 只精确到秒，同一秒内签两次会得到完全相同的 token，
@@ -72,6 +80,7 @@ public class JwtService {
                 .claim("tid", tenantId)
                 .claim("phone", phone)
                 .claim("typ", type)
+                .claim("ver", version)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ttl)))
                 .signWith(key)
@@ -86,7 +95,9 @@ public class JwtService {
                 return null;
             }
             Number tid = c.get("tid", Number.class);
-            return new AuthPrincipal(Long.valueOf(c.getSubject()), tid.longValue(), c.get("phone", String.class));
+            Number version = c.get("ver", Number.class);
+            return new AuthPrincipal(Long.valueOf(c.getSubject()), tid.longValue(), c.get("phone", String.class),
+                    version == null ? 0 : version.longValue());
         } catch (Exception e) {
             log.debug("JWT 校验失败: {}", e.getMessage());
             return null;

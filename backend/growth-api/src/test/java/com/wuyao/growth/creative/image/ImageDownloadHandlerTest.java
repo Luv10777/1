@@ -13,6 +13,8 @@ import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.awt.image.BufferedImage;
 import java.net.InetAddress;
@@ -25,12 +27,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class ImageDownloadHandlerTest {
-    @Test
-    void filesApiRedirectDoesNotForwardApiKeyToSignedUrl() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void filesApiRedirectRequiresAllowedTargetAndNeverForwardsApiKey(boolean allowTarget) throws Exception {
         var renderer = new ImageRenderer();
         byte[] source = renderer.png(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB));
         var client = mock(HttpClient.class);
@@ -53,7 +57,8 @@ class ImageDownloadHandlerTest {
             });
         var config = new ImageModelProperties();
         config.getGenerator().setApiKey("test-key");
-        config.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai"));
+        config.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai", "https://storage.example.com"));
+        if (!allowTarget) config.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai"));
         var service = mock(ImageCreationService.class);
         var item = new ImageItem();
         item.setCreationId(5L);
@@ -68,11 +73,52 @@ class ImageDownloadHandlerTest {
 
         var handler = new ImageDownloadHandler(mock(ObjectStorage.class), service, renderer, client,
             config, mock(ImageMetrics.class));
+        if (!allowTarget) {
+            assertThatThrownBy(() -> handler.handle(task)).isInstanceOf(RuntimeException.class);
+            assertThat(requests).hasSize(1);
+            verifyNoInteractions(service);
+            return;
+        }
         assertThat(handler.handle(task)).containsEntry("status", "DOWNLOADED");
         assertThat(requests).hasSize(2);
         assertThat(requests.get(0).getFirstHeader("Authorization").getValue()).isEqualTo("Bearer test-key");
         assertThat(requests.get(1).getUri().toString()).isEqualTo(signedUrl);
         assertThat(requests.get(1).getFirstHeader("Authorization")).isNull();
+    }
+
+    @Test
+    void limitsChunkedResponseWhileStreamingToStorage() throws Exception {
+        var client = mock(HttpClient.class);
+        var entity = mock(org.apache.hc.core5.http.HttpEntity.class);
+        when(entity.getContentLength()).thenReturn(-1L);
+        var produced = new java.util.concurrent.atomic.AtomicLong();
+        when(entity.getContent()).thenReturn(new java.io.InputStream() {
+            public int read() { produced.incrementAndGet(); return 0; }
+            public int read(byte[] buffer, int offset, int length) {
+                java.util.Arrays.fill(buffer, offset, offset + length, (byte) 0);
+                produced.addAndGet(length);
+                return length;
+            }
+        });
+        var response = mock(ClassicHttpResponse.class);
+        when(response.getCode()).thenReturn(200);
+        when(response.getEntity()).thenReturn(entity);
+        when(client.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
+            .thenAnswer(invocation -> ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response));
+        var storage = mock(ObjectStorage.class);
+        doAnswer(invocation -> {
+            ((java.io.InputStream) invocation.getArgument(1)).transferTo(java.io.OutputStream.nullOutputStream());
+            return null;
+        }).when(storage).put(anyString(), any(java.io.InputStream.class), anyLong(), anyString());
+        var config = new ImageModelProperties();
+        config.getGenerator().setDownloadAllowedOrigins(List.of("https://storage.example.com"));
+        var service = mock(ImageCreationService.class);
+        var handler = new ImageDownloadHandler(storage, service, new ImageRenderer(), client, config, mock(ImageMetrics.class));
+        var task = new Task();
+        task.setPayload(Map.of("itemId", 8L, "imageUrl", "https://storage.example.com/image.png", "targetKey", "target"));
+        assertThatThrownBy(() -> handler.handle(task)).isInstanceOf(RuntimeException.class);
+        assertThat(produced.get()).isBetween(64 * 1024 * 1024L + 1, 64 * 1024 * 1024L + 8192);
+        verifyNoInteractions(service);
     }
 
     @Test

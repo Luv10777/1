@@ -54,7 +54,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = {"growth.worker.enabled=false", "spring.data.redis.client-type=jedis", "logging.level.root=WARN",
-        "logging.level.com.wuyao.growth=WARN"})
+        "logging.level.com.wuyao.growth=WARN", "spring.config.import=", "growth.image.max-output-pixels=0"})
 @AutoConfigureMockMvc
 @Testcontainers
 class FoundationIntegrationTest {
@@ -111,6 +111,7 @@ class FoundationIntegrationTest {
     @Autowired AssetProbeHandler probe;
     @Autowired TransactionTemplate transactions;
     @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate appJdbc;
     JdbcTemplate owner;
     MinioClient minio;
     Long tenantA;
@@ -319,11 +320,11 @@ class FoundationIntegrationTest {
         var pair = login("13800000001", "123456");
         try (Connection lock = ownerConnection(); var pool = Executors.newFixedThreadPool(2)) {
             lock.setAutoCommit(false);
-            lock.createStatement().execute("SELECT id FROM refresh_tokens FOR UPDATE");
+            lock.createStatement().execute("SELECT id FROM users FOR UPDATE");
             var first = pool.submit(() -> code(() -> auth.refresh(pair.refreshToken(), null, null, null)));
             var second = pool.submit(() -> code(() -> auth.refresh(pair.refreshToken(), null, null, null)));
             try {
-                awaitDatabaseWaiters("refresh_tokens", 2);
+                awaitDatabaseWaiters("users", 2);
             } finally {
                 lock.commit();
             }
@@ -451,12 +452,13 @@ class FoundationIntegrationTest {
     @Test
     void tenantIsolationProtectsBothReadsAndWrites() throws Exception {
         var ticket = ticket();
-        String otherToken = jwt.issueAccessToken(123L, tenantB, "13800000002");
+        Long userId = owner.queryForObject("INSERT INTO users(tenant_id,phone) VALUES (?,?) RETURNING id", Long.class, tenantB, "13800000002");
+        String otherToken = jwt.issueAccessToken(userId, tenantB, "13800000002");
         mvc.perform(get("/api/assets").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(0));
         mvc.perform(post("/api/assets/" + ticket.assetId() + "/confirm")
                         .header("Authorization", "Bearer " + otherToken).contentType("application/json").content("{}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(3001));
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value(3001));
         assertThat(owner.queryForObject("SELECT status FROM assets WHERE id=?", String.class, ticket.assetId())).isEqualTo("PENDING");
         assertThat(TenantContext.get()).isNull();
         assertThat(TenantContext.runAs(tenantA, () -> assets.list(0, 20)).total()).isEqualTo(1);
@@ -464,7 +466,8 @@ class FoundationIntegrationTest {
 
     @Test
     void invalidUploadRequestsReturnBusinessValidationErrors() throws Exception {
-        String token = jwt.issueAccessToken(123L, tenantA, "13800000001");
+        Long userId = owner.queryForObject("INSERT INTO users(tenant_id,phone) VALUES (?,?) RETURNING id", Long.class, tenantA, "13800000001");
+        String token = jwt.issueAccessToken(userId, tenantA, "13800000001");
         mvc.perform(post("/api/assets/upload-url").header("Authorization", "Bearer " + token)
                         .contentType("application/json").content("{\"name\":\"missing type\"}"))
                 .andExpect(jsonPath("$.code").value(1400));
@@ -479,6 +482,133 @@ class FoundationIntegrationTest {
     void storageConfigurationFailureIsNotReportedAsAMissingObject() {
         var wrongBucket = new MinioObjectStorage(minioEndpoint(), "testadmin", "testadmin123", "does-not-exist");
         assertThat(code(() -> wrongBucket.stat("missing"))).isEqualTo(1503);
+        assertThat(code(() -> { wrongBucket.delete("missing"); return null; })).isEqualTo(1503);
+    }
+
+    @Test
+    void logoutInvalidatesAllAccessAndRefreshTokensAndNewLoginStillWorks() throws Exception {
+        seedPasswordAccount();
+        var first = passwordLogin("integration-password");
+        var second = passwordLogin("integration-password");
+        mvc.perform(post("/api/auth/logout").header("Authorization", "Bearer " + first.accessToken()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200));
+        for (var pair : List.of(first, second)) {
+            mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + pair.accessToken()))
+                    .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value(1401));
+            assertThat(code(() -> auth.refresh(pair.refreshToken(), null, null, null))).isEqualTo(2005);
+        }
+        var newLogin = passwordLogin("integration-password");
+        assertThat(jwt.parse(newLogin.accessToken(), "access").tokenVersion()).isEqualTo(1);
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + newLogin.accessToken()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    void concurrentLogoutCannotBeUndoneByRefresh() throws Exception {
+        seedPasswordAccount();
+        var pair = passwordLogin("integration-password");
+        try (Connection lock = ownerConnection(); var pool = Executors.newFixedThreadPool(2)) {
+            lock.setAutoCommit(false);
+            lock.createStatement().execute("SELECT id FROM users FOR UPDATE");
+            var logout = pool.submit(() -> { auth.logout(pair.user().userId()); return true; });
+            awaitDatabaseWaiters("users", 1);
+            var refresh = pool.submit(() -> code(() -> auth.refresh(pair.refreshToken(), null, null, null)));
+            try { awaitDatabaseWaiters("users", 2); }
+            finally { lock.commit(); }
+            assertThat(logout.get(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(refresh.get(10, TimeUnit.SECONDS)).isEqualTo(2005);
+        }
+        assertThat(owner.queryForObject("SELECT count(*) FROM refresh_tokens WHERE status='ACTIVE'", Integer.class)).isZero();
+    }
+
+    @Test
+    void disabledUsersCannotUseAccessRefreshOrSmsLogin() throws Exception {
+        seedCode("13800000001", "123456");
+        var pair = login("13800000001", "123456");
+        owner.update("UPDATE users SET status='DISABLED' WHERE id=?", pair.user().userId());
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + pair.accessToken()))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value(1401));
+        assertThat(code(() -> auth.refresh(pair.refreshToken(), null, null, null))).isEqualTo(2005);
+        seedCode("13800000001", "654321");
+        assertThat(code(() -> login("13800000001", "654321"))).isEqualTo(1401);
+        assertThat(owner.queryForObject("SELECT count(*) FROM refresh_tokens", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void spoofingForwardedHeaderCannotBypassIpSmsLimit() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(post("/api/auth/send-code").header("X-Forwarded-For", "203.0.113." + i)
+                    .contentType("application/json").content("{\"phone\":\"1380000000" + i + "\"}"))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(post("/api/auth/send-code").header("X-Forwarded-For", "203.0.113.99")
+                .contentType("application/json").content("{\"phone\":\"13800000009\"}"))
+                .andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value(2001));
+        assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isEqualTo(5);
+        assertThat(redis.getExpire("auth:sms:{send}:global:minute")).isBetween(1L, 60L);
+    }
+
+    @Test
+    void globalSmsBudgetStopsRequestsAcrossDifferentIps() {
+        org.springframework.test.util.ReflectionTestUtils.setField(auth, "globalDay", 2);
+        try {
+            auth.sendCode("13800000001", "203.0.113.1");
+            auth.sendCode("13800000002", "203.0.113.2");
+            assertThat(code(() -> auth.sendCode("13800000003", "203.0.113.3"))).isEqualTo(2002);
+            assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isEqualTo(2);
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(auth, "globalDay", 10000);
+        }
+    }
+
+    @Test
+    void concurrentDifferentPhonesStillShareTheSameIpLimit() throws Exception {
+        org.springframework.test.util.ReflectionTestUtils.setField(auth, "perIpMinute", 1);
+        try {
+            var sequence = new java.util.concurrent.atomic.AtomicInteger();
+            var outcomes = concurrent(() -> code(() -> auth.sendCode("1380000000" + sequence.getAndIncrement(), "203.0.113.1")));
+            assertThat(outcomes).containsExactlyInAnyOrder(200, 2001);
+            assertThat(owner.queryForObject("SELECT count(*) FROM sms_codes", Integer.class)).isEqualTo(1);
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(auth, "perIpMinute", 5);
+        }
+    }
+
+    @Test
+    void productionValidatorChecksActualDatabaseRolePrivileges() {
+        var safe = productionValidator(appJdbc);
+        assertThatCode(() -> org.springframework.test.util.ReflectionTestUtils.invokeMethod(safe, "validate")).doesNotThrowAnyException();
+        var unsafe = productionValidator(owner);
+        assertThatThrownBy(() -> org.springframework.test.util.ReflectionTestUtils.invokeMethod(unsafe, "validate"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("BYPASSRLS");
+    }
+
+    private com.wuyao.growth.common.config.ProductionConfigurationValidator productionValidator(JdbcTemplate jdbc) {
+        return new com.wuyao.growth.common.config.ProductionConfigurationValidator("https://storage.example.com",
+                "random-storage-key", "random-storage-secret", "random-db-secret", "redis.example.com",
+                "https://assets.example.com", "random-redis-secret", "aliyun", "growth_app", "growth_owner", jdbc);
+    }
+
+    @Test
+    void cleanupProcessesAllTenantsUnderRlsAndKeepsReadyAndRecentUploads() throws Exception {
+        var a = ticket();
+        var b = TenantContext.runAs(tenantB, () -> assets.presignUpload(new AssetDtos.PresignRequest("test", "IMAGE", "image/png"), null));
+        var ready = ticket();
+        var recent = ticket();
+        owner.update("UPDATE assets SET created_at=now()-interval '3 hours' WHERE id IN (?,?,?)", a.assetId(), b.assetId(), ready.assetId());
+        owner.update("UPDATE assets SET status='READY' WHERE id=?", ready.assetId());
+        for (var item : List.of(a, b, ready, recent)) {
+            byte[] content = {1, 2, 3};
+            minio.putObject(PutObjectArgs.builder().bucket("test-assets").object(item.storageKey())
+                    .stream(new ByteArrayInputStream(content), content.length, -1).build());
+        }
+        assets.cleanupAbandonedUploads();
+        assertThat(owner.queryForList("SELECT id FROM assets ORDER BY id", Long.class)).containsExactly(ready.assetId(), recent.assetId());
+        assertThat(imageStorage.exists(a.storageKey())).isFalse();
+        assertThat(imageStorage.exists(b.storageKey())).isFalse();
+        assertThat(imageStorage.exists(ready.storageKey())).isTrue();
+        assertThat(imageStorage.exists(recent.storageKey())).isTrue();
+        assertThat(TenantContext.get()).isNull();
     }
 
     private AssetDtos.UploadTicket ticket() {
@@ -525,7 +655,7 @@ class FoundationIntegrationTest {
         enableImageModels();
         var ids = concurrent(() -> TenantContext.runAs(tenantA, () -> imageCreations.create(request, null).id()));
         assertThat(ids.getFirst()).isEqualTo(ids.getLast());
-        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(ids.getFirst()).quality())).isEqualTo("4K");
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(ids.getFirst()).quality())).isEqualTo(request.quality());
         assertThat(owner.queryForObject("select count(*) from image_creations", Integer.class)).isEqualTo(1);
         assertThat(owner.queryForObject("select count(*) from tasks where type='IMAGE_PLAN'", Integer.class)).isEqualTo(1);
         var changed = new ImageDtos.Create(request.requestKey(), "POSTER", "另一条需求", List.of(), "3:4", "480P", 1, "LOCAL", "POSTER", "朋友圈", "帮我搭配", null);
@@ -740,7 +870,7 @@ class FoundationIntegrationTest {
         var result=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()));
         assertThat(result.status()).isEqualTo("SUCCEEDED");
         var item=TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(result.items().getFirst().id()));
-        assertThat(item.getSpec().prompt()).contains("夏日自然光");
+        assertThat(item.getSpec().prompt()).startsWith(prompt);
         verify(imageGateway,times(1)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_CREATIVE && r.tenantId().equals(tenantA)));
         var calls=ArgumentCaptor.forClass(ProviderRequest.class);
         verify(imageGateway,times(3)).invokeReal(calls.capture());
@@ -787,15 +917,20 @@ class FoundationIntegrationTest {
     }
 
     @Test
-    void gptImage2AutomaticallyChoosesHighestQualityForEachRatio() {
+    void gptImage2HonorsSelectedQualityAndRejectsUnsupportedRatios() {
         enableImageModels();imageConfig.getGenerator().setProtocol(com.wuyao.growth.common.gateway.ImageModelProperties.Protocol.OPENAI);
         imageConfig.getGenerator().setModel("gpt-image-2");
+        imageConfig.setQualities(List.of("1K", "2K", "4K"));
         var req=new ImageDtos.Create("too-large-square","POSTER","新品",List.of(),"1:1","4K",1,"LOCAL","POSTER","朋友圈","自动",null);
-        var square=TenantContext.runAs(tenantA,()->imageCreations.create(req,null));
-        assertThat(square.quality()).isEqualTo("1080P");
-        var wide=new ImageDtos.Create("wide-highest","POSTER","新品",List.of(),"16:9","480P",1,"LOCAL","POSTER","朋友圈","自动",null);
-        assertThat(TenantContext.runAs(tenantA,()->imageCreations.create(wide,null)).quality()).isEqualTo("4K");
-        assertThat(owner.queryForObject("select count(*) from tasks",Integer.class)).isEqualTo(2);
+        assertThat(code(() -> TenantContext.runAs(tenantA,()->imageCreations.create(req,null)))).isEqualTo(4004);
+        assertThat(owner.queryForObject("select count(*) from tasks",Integer.class)).isZero();
+        var square=new ImageDtos.Create("square-2k","POSTER","新品",List.of(),"1:1","2K",1,"LOCAL","POSTER","朋友圈","自动",null);
+        assertThat(TenantContext.runAs(tenantA,()->imageCreations.create(square,null)).quality()).isEqualTo("2K");
+        var wide=new ImageDtos.Create("wide-1k","POSTER","新品",List.of(),"16:9","1K",1,"LOCAL","POSTER","朋友圈","自动",null);
+        assertThat(TenantContext.runAs(tenantA,()->imageCreations.create(wide,null)).quality()).isEqualTo("1K");
+        var wide4k=new ImageDtos.Create("wide-4k","POSTER","新品",List.of(),"16:9","4K",1,"LOCAL","POSTER","朋友圈","自动",null);
+        assertThat(TenantContext.runAs(tenantA,()->imageCreations.create(wide4k,null)).quality()).isEqualTo("4K");
+        assertThat(owner.queryForObject("select count(*) from tasks",Integer.class)).isEqualTo(3);
         assertThat(imageCreations.capabilities().get("qualityRatios").toString()).contains("4K=[9:16, 16:9]");
     }
 

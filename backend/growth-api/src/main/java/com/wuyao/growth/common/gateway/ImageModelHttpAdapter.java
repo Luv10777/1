@@ -209,6 +209,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      && uri.getPath()!=null && uri.getPath().matches("/v1/files/[^/]+/content");
  }
  private String resolveFileUrl(String url) throws IOException {
+   if(!"https".equalsIgnoreCase(URI.create(url).getScheme())) throw failure("Files API 地址必须使用 HTTPS");
    var request=new HttpGet(URI.create(url));
    request.setHeader("Authorization","Bearer "+config.getGenerator().getApiKey());
    return httpClient.execute(request,(HttpClientResponseHandler<String>) response -> {
@@ -217,6 +218,8 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      String location=response.getFirstHeader("Location").getValue();
      URI signed=checkedUri(location);
      if(!"https".equalsIgnoreCase(signed.getScheme())) throw failure("Files API 下载链接无效");
+     if(!ImageDownloadOrigins.allows(signed,config.getGenerator().getDownloadAllowedOrigins()))
+       throw failure("Files API 下载链接来源未获允许");
      return location;
    });
  }

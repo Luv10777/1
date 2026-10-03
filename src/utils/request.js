@@ -2,7 +2,7 @@
  * 统一请求封装
  *
  * 后端契约（见 backend/growth-api/README.md）：
- *   所有接口 HTTP 200，业务结果在 body 里：{ code, message, data }
+ *   HTTP 状态表示请求结果，响应体保留 { code, message, data }。
  *   code 200 成功；其余为业务错误码，1401 表示未登录 / access token 过期。
  *
  * 这里做三件事：
@@ -76,16 +76,15 @@ export async function request(endpoint, options = {}, allowRetry = true) {
     throw new ApiError(error.message || '网络请求失败，请检查后端是否已启动', 'NETWORK_ERROR', 0)
   }
 
-  if (!response.ok) {
-    throw new ApiError(`请求失败: ${response.status} ${response.statusText}`, 'HTTP_ERROR', response.status)
-  }
-
   const body = await response.json().catch(() => null)
   if (!body || typeof body.code !== 'number') {
+    if (!response.ok) {
+      throw new ApiError(`请求失败: ${response.status} ${response.statusText}`, 'HTTP_ERROR', response.status)
+    }
     throw new ApiError('响应格式不符合约定', 'BAD_ENVELOPE', response.status)
   }
 
-  if (body.code === 200) {
+  if (body.code === 200 && response.ok) {
     return body.data
   }
 

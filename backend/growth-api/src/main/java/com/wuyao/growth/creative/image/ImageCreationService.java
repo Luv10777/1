@@ -294,8 +294,10 @@ public class ImageCreationService {
  private void cleanupFailedObjects(List<ImageItem> children) {
    for (var item : children) {
      if (Set.of("FAILED", "CANCELLED").contains(item.getStatus())) {
-       if (item.getRawKey() != null) storage.delete(item.getRawKey());
-       if (item.getOutputKey() != null) storage.delete(item.getOutputKey());
+       for (String key : java.util.stream.Stream.of(item.getRawKey(), item.getOutputKey()).filter(java.util.Objects::nonNull).toList()) {
+         try { storage.delete(key); }
+         catch (RuntimeException e) { log.warn("清理失败图片对象失败，保留对象键: itemId={}", item.getId(), e); }
+       }
      }
    }
  }

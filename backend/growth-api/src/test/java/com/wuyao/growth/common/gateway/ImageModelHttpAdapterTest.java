@@ -10,6 +10,8 @@ import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -124,7 +126,8 @@ class ImageModelHttpAdapterTest {
      assertThat(captured.get(5,TimeUnit.SECONDS)).startsWith("POST /v1/images/generations ");
    }
  }
- @Test void onlyRouterFilesContentResolvesSignedUrlWithoutDownloadingImage() throws Exception {
+ @ParameterizedTest @ValueSource(booleans={true,false})
+ void onlyRouterFilesContentRequiresAllowedSignedOrigin(boolean allowTarget) throws Exception {
    var client=mock(HttpClient.class);
    String source="https://api.onlyrouter.ai/v1/files/file-123/content";
    String signed="https://storage.example.com/result.png?signature=private";
@@ -149,7 +152,15 @@ class ImageModelHttpAdapterTest {
    props.getGenerator().setUrl("https://api.onlyrouter.ai/v1/images/generations");
    props.getGenerator().setApiKey("test-key");
    props.getGenerator().setModel("image-model");
-   props.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai"));
+   props.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai", "https://storage.example.com"));
+
+   if(!allowTarget) {
+     props.getGenerator().setDownloadAllowedOrigins(List.of("https://api.onlyrouter.ai"));
+     assertThatThrownBy(()->new ImageModelHttpAdapter(props,new ObjectMapper(),client).invoke(imageRequest(List.of())))
+       .isInstanceOf(BizException.class).hasMessageContaining("来源");
+     assertThat(requests).hasSize(2);
+     return;
+   }
 
    var result=new ImageModelHttpAdapter(props,new ObjectMapper(),client).invoke(imageRequest(List.of()));
    assertThat(result.output()).containsEntry("imageUrl",signed).containsEntry("imageSourceUrl",source);

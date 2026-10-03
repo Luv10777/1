@@ -17,7 +17,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BizException.class)
     public ResponseEntity<ApiResponse<Void>> handleBiz(BizException e) {
         log.warn("业务异常: code={} msg={}", e.getErrorCode(), e.getMessage());
-        return ResponseEntity.ok(ApiResponse.fail(e.getErrorCode(), e.getMessage()));
+        return ResponseEntity.status(e.getErrorCode().httpStatus()).body(ApiResponse.fail(e.getErrorCode(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -25,11 +25,22 @@ public class GlobalExceptionHandler {
         String msg = e.getBindingResult().getFieldErrors().stream()
                 .map(f -> f.getField() + " " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
-        return ResponseEntity.ok(ApiResponse.fail(ErrorCode.BAD_REQUEST, msg));
+        return ResponseEntity.badRequest().body(ApiResponse.fail(ErrorCode.BAD_REQUEST, msg));
+    }
+
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            jakarta.validation.ConstraintViolationException.class})
+    public ResponseEntity<ApiResponse<Void>> handleMalformedRequest(Exception e) {
+        return ResponseEntity.badRequest().body(ApiResponse.fail(ErrorCode.BAD_REQUEST, "请求参数格式无效"));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleOther(Exception e) {
+        if (e instanceof org.springframework.web.ErrorResponse error) {
+            var code = error.getStatusCode().value() == 404 ? ErrorCode.NOT_FOUND : ErrorCode.BAD_REQUEST;
+            return ResponseEntity.status(error.getStatusCode()).body(ApiResponse.fail(code, "请求参数或路径无效"));
+        }
         log.error("未捕获异常", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.fail(ErrorCode.INTERNAL_ERROR, "服务器内部错误"));

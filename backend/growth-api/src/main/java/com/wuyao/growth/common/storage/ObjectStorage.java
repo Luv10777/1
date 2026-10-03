@@ -26,6 +26,7 @@ public interface ObjectStorage {
     record StoredObject(long sizeBytes, String contentType) {
     }
 
+    /** Storage failures must propagate so callers retain records for retry. */
     void delete(String key);
 
     /** Small image objects only; implementations enforce the byte limit before decoding. */
