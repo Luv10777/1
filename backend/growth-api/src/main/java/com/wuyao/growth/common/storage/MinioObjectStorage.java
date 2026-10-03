@@ -91,7 +91,8 @@ public class MinioObjectStorage implements ObjectStorage {
         try {
             client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(key).build());
         } catch (Exception e) {
-            log.warn("删除对象失败: {}", key, e);
+            log.error("删除对象失败，保留数据库记录以便重试: {}", key, e);
+            throw unavailable(key, e);
         }
     }
 

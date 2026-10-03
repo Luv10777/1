@@ -43,6 +43,8 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Only ClientIpResolver applies the explicit trusted-proxy boundary.
+  forward-headers-strategy: none
   shutdown: graceful
 
 # ---- 平台自有配置 ----
@@ -98,11 +100,17 @@ growth:
     code-ttl: 5m
     per-phone-per-minute: 1
     per-phone-per-day: 10
+    per-ip-per-minute: ${SMS_PER_IP_PER_MINUTE:5}
+    per-ip-per-day: ${SMS_PER_IP_PER_DAY:100}
+    global-per-minute: ${SMS_GLOBAL_PER_MINUTE:100}
+    global-per-day: ${SMS_GLOBAL_PER_DAY:10000}
     aliyun:
       access-key-id: ${ALIYUN_SMS_ACCESS_KEY_ID:}
       access-key-secret: ${ALIYUN_SMS_ACCESS_KEY_SECRET:}
       sign-name: ${ALIYUN_SMS_SIGN_NAME:}
       template-code: ${ALIYUN_SMS_TEMPLATE_CODE:}
+  security:
+    trusted-proxies: ${TRUSTED_PROXY_CIDRS:}
   storage:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     public-endpoint: ${MINIO_PUBLIC_ENDPOINT:${MINIO_ENDPOINT:http://localhost:9000}}

@@ -39,6 +39,9 @@ public class User {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    @Column(name = "token_version", nullable = false)
+    private long tokenVersion = 0;
+
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 

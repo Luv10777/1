@@ -35,7 +35,7 @@ public class SecurityConfig {
                                 "/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
-                    res.setStatus(200);
+                    res.setStatus(401);
                     res.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     res.setCharacterEncoding("UTF-8");
                     res.getWriter().write("{\"code\":1401,\"message\":\"未登录或登录已过期\"}");

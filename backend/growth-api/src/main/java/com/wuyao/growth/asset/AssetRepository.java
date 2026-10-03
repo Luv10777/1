@@ -23,7 +23,8 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
 
     Optional<Asset> findByStorageKey(String storageKey);
 
-    List<Asset> findByStatusAndCreatedAtBefore(String status, Instant before);
+    @Query("select a.id from Asset a where a.status = 'PENDING' and a.createdAt < :before order by a.id")
+    List<Long> abandonedUploadIds(@Param("before") Instant before, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from Asset a where a.id = :id")

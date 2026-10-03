@@ -6,11 +6,13 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.common.web.PageResult;
+import com.wuyao.growth.iam.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import javax.imageio.ImageIO;
@@ -20,6 +22,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 示例模块。上传的完整链路长这样，其他模块照抄：
@@ -29,11 +32,14 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AssetService {
 
     private final AssetRepository repository;
     private final ObjectStorage storage;
     private final TaskService taskService;
+    private final TenantRepository tenantRepository;
+    private final TransactionTemplate transactions;
 
     @Value("${growth.storage.presign-ttl:15m}")
     private Duration presignTtl;
@@ -138,12 +144,35 @@ public class AssetService {
 
     /** Remove abandoned direct-upload objects that never reached confirm. */
     @Scheduled(fixedDelayString = "${growth.storage.cleanup-interval-ms:3600000}")
-    @Transactional
     public void cleanupAbandonedUploads() {
         var cutoff = java.time.Instant.now().minus(Duration.ofHours(2));
-        for (Asset asset : repository.findByStatusAndCreatedAtBefore("PENDING", cutoff)) {
-            storage.delete(asset.getStorageKey());
-            repository.delete(asset);
+        Long after = 0L;
+        while (true) {
+            var tenantIds = tenantRepository.idsAfter(after, PageRequest.of(0, 100));
+            if (tenantIds.isEmpty()) return;
+            for (Long tenantId : tenantIds) {
+                // Set the context BEFORE opening Hibernate's transaction/session.
+                TenantContext.runAs(tenantId, () -> {
+                    var ids = transactions.execute(status ->
+                            repository.abandonedUploadIds(cutoff, PageRequest.of(0, 100)));
+                    for (Long id : ids) {
+                        try {
+                            transactions.executeWithoutResult(status -> {
+                                // Serialize with confirmUpload and recheck status under the lock.
+                                var asset = repository.findForUpdate(id).orElse(null);
+                                if (asset == null || !"PENDING".equals(asset.getStatus())
+                                        || !asset.getCreatedAt().isBefore(cutoff)) return;
+                                storage.delete(asset.getStorageKey());
+                                repository.delete(asset);
+                            });
+                        } catch (RuntimeException e) {
+                            log.warn("清理未确认上传失败，保留记录等待重试: assetId={}", id, e);
+                        }
+                    }
+                    return null;
+                });
+            }
+            after = tenantIds.getLast();
         }
     }
 }

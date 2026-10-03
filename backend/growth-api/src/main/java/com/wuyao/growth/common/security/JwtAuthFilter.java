@@ -1,6 +1,7 @@
 package com.wuyao.growth.common.security;
 
 import com.wuyao.growth.common.tenant.TenantContext;
+import com.wuyao.growth.iam.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,9 +24,11 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -34,7 +38,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String header = request.getHeader("Authorization");
             if (header != null && header.startsWith("Bearer ")) {
                 AuthPrincipal principal = jwtService.parse(header.substring(7), "access");
-                if (principal != null) {
+                if (principal != null && isUsable(principal)) {
                     var auth = new UsernamePasswordAuthenticationToken(
                             principal, null, List.of());
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -46,6 +50,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         } finally {
             TenantContext.clear();
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    private boolean isUsable(AuthPrincipal principal) {
+        try {
+            return userRepository.findById(principal.userId())
+                    .filter(user -> "ACTIVE".equals(user.getStatus()))
+                    .filter(user -> principal.tenantId().equals(user.getTenantId()))
+                    .filter(user -> principal.tokenVersion() == user.getTokenVersion())
+                    .isPresent();
+        } catch (RuntimeException e) {
+            // Fail closed if account state cannot be checked.
+            log.error("认证状态检查失败，拒绝当前请求", e);
+            return false;
         }
     }
 }

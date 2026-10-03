@@ -1,5 +1,7 @@
 package com.wuyao.growth.common.web;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * 契约 3：错误码号段。
  *
@@ -55,5 +57,19 @@ public enum ErrorCode {
 
     public int getCode() {
         return code;
+    }
+
+    public HttpStatus httpStatus() {
+        return switch (this) {
+            case UNAUTHORIZED, REFRESH_TOKEN_INVALID, PASSWORD_INVALID, CODE_INVALID, CODE_EXPIRED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case NOT_FOUND, ASSET_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case RATE_LIMITED, SMS_TOO_FREQUENT, SMS_DAILY_LIMIT -> HttpStatus.TOO_MANY_REQUESTS;
+            case STORAGE_UNAVAILABLE, SMS_NOT_CONFIGURED, IMAGE_NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case SMS_SEND_FAILED, IMAGE_PROVIDER_ERROR -> HttpStatus.BAD_GATEWAY;
+            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+            default -> HttpStatus.BAD_REQUEST;
+        };
     }
 }

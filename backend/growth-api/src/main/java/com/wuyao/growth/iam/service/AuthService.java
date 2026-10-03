@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,6 +27,8 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 /**
  * 手机验证码登录（登录即注册）。
@@ -38,6 +41,21 @@ import java.util.HexFormat;
 public class AuthService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final DefaultRedisScript<Long> IP_LIMIT_SCRIPT = new DefaultRedisScript<>("""
+            local minute = redis.call('INCR', KEYS[1])
+            if minute == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
+            if minute > tonumber(ARGV[1]) then return 0 end
+            local day = redis.call('INCR', KEYS[2])
+            if day == 1 then redis.call('PEXPIRE', KEYS[2], ARGV[4]) end
+            if day > tonumber(ARGV[2]) then return 1 end
+            local globalMinute = redis.call('INCR', KEYS[3])
+            if globalMinute == 1 then redis.call('PEXPIRE', KEYS[3], ARGV[3]) end
+            if globalMinute > tonumber(ARGV[5]) then return 0 end
+            local globalDay = redis.call('INCR', KEYS[4])
+            if globalDay == 1 then redis.call('PEXPIRE', KEYS[4], ARGV[4]) end
+            if globalDay > tonumber(ARGV[6]) then return 1 end
+            return 2
+            """, Long.class);
 
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
@@ -48,6 +66,7 @@ public class AuthService {
     private final LoginCodeVerifier codeVerifier;
     private final PasswordLoginVerifier passwordVerifier;
     private final TransactionTemplate transactions;
+    private final StringRedisTemplate redis;
 
     @Value("${growth.sms.code-length:6}")
     private int codeLength;
@@ -61,8 +80,21 @@ public class AuthService {
     @Value("${growth.sms.per-phone-per-day:10}")
     private int perDay;
 
+    @Value("${growth.sms.per-ip-per-minute:5}")
+    private int perIpMinute;
+
+    @Value("${growth.sms.per-ip-per-day:100}")
+    private int perIpDay;
+
+    @Value("${growth.sms.global-per-minute:100}")
+    private int globalMinute;
+
+    @Value("${growth.sms.global-per-day:10000}")
+    private int globalDay;
+
     @Transactional
     public AuthDtos.SendCodeResult sendCode(String phone, String ip) {
+        enforceIpLimit(ip);
         // 同一手机号的限流检查和写入必须串行，防止并发请求同时通过计数检查。
         smsCodeRepository.lockPhone(phone);
         Instant now = Instant.now();
@@ -85,11 +117,40 @@ public class AuthService {
         return new AuthDtos.SendCodeResult(smsSender.developmentMode(), 60, codeTtl.toSeconds());
     }
 
+    private void enforceIpLimit(String ip) {
+        String identity = (ip == null || ip.isBlank()) ? "unknown" : ip.trim();
+        try {
+            Long result = redis.execute(IP_LIMIT_SCRIPT,
+                    List.of("auth:sms:{send}:ip:" + identity + ":minute",
+                            "auth:sms:{send}:ip:" + identity + ":day",
+                            "auth:sms:{send}:global:minute", "auth:sms:{send}:global:day"),
+                    Integer.toString(Math.max(1, perIpMinute)), Integer.toString(Math.max(1, perIpDay)),
+                    "60000", "86400000", Integer.toString(Math.max(1, globalMinute)),
+                    Integer.toString(Math.max(1, globalDay)));
+            if (Long.valueOf(0L).equals(result)) {
+                throw BizException.of(ErrorCode.SMS_TOO_FREQUENT, "发送过于频繁，请稍后再试");
+            }
+            if (Long.valueOf(1L).equals(result)) {
+                throw BizException.of(ErrorCode.SMS_DAILY_LIMIT, "今日发送次数已达上限");
+            }
+            if (!Long.valueOf(2L).equals(result)) throw new IllegalStateException("短信限流未返回有效结果");
+        } catch (BizException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // Do not allow an infrastructure failure to disable the anti-abuse control.
+            log.error("短信 IP 限流不可用，拒绝发送", e);
+            throw BizException.of(ErrorCode.SMS_TOO_FREQUENT, "短信服务暂时不可用，请稍后再试");
+        }
+    }
+
     public AuthDtos.TokenPair login(String phone, String code, String ip, String userAgent, String deviceId) {
         codeVerifier.verifyAndConsume(phone, code);
         // 校验结束后才开启账户事务，避免每个并发登录占用两条数据库连接。
         return transactions.execute(status -> {
             User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
+            if (!"ACTIVE".equals(user.getStatus())) {
+                throw BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用");
+            }
             user.setLastLoginAt(Instant.now());
             return issueTokens(user, ip, userAgent, deviceId);
         });
@@ -99,7 +160,7 @@ public class AuthService {
                                                 String userAgent, String deviceId) {
         Long userId = passwordVerifier.verify(account, password);
         return transactions.execute(status -> {
-            User user = userRepository.findById(userId)
+            User user = userRepository.findForUpdate(userId)
                     .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                     .orElseThrow(() -> BizException.of(ErrorCode.PASSWORD_INVALID, "账号不可用"));
             user.setLastLoginAt(Instant.now());
@@ -110,6 +171,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public AuthDtos.UserInfo currentUser(Long userId) {
         User user = userRepository.findById(userId)
+                .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                 .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "用户不存在"));
         return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName());
     }
@@ -121,6 +183,12 @@ public class AuthService {
         if (principal == null) {
             throw BizException.of(ErrorCode.REFRESH_TOKEN_INVALID, "登录已失效，请重新登录");
         }
+        // Lock the user before the refresh row: logout uses the same lock order.
+        User user = userRepository.findForUpdate(principal.userId())
+                .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                .filter(candidate -> principal.tenantId().equals(candidate.getTenantId()))
+                .filter(candidate -> principal.tokenVersion() == candidate.getTokenVersion())
+                .orElseThrow(() -> BizException.of(ErrorCode.REFRESH_TOKEN_INVALID, "账号不可用或登录已失效"));
         RefreshToken stored = refreshTokenRepository
                 .findByTokenHashAndStatus(sha256(refreshToken), "ACTIVE")
                 .orElseThrow(() -> BizException.of(ErrorCode.REFRESH_TOKEN_INVALID, "登录已失效，请重新登录"));
@@ -130,13 +198,14 @@ public class AuthService {
         }
         stored.setStatus("ROTATED");
 
-        User user = userRepository.findById(principal.userId())
-                .orElseThrow(() -> BizException.of(ErrorCode.REFRESH_TOKEN_INVALID, "用户不存在"));
         return issueTokens(user, ip, userAgent, deviceId);
     }
 
     @Transactional
     public void logout(Long userId) {
+        User user = userRepository.findForUpdate(userId)
+                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+        user.setTokenVersion(user.getTokenVersion() + 1);
         int revoked = refreshTokenRepository.revokeAllForUser(userId);
         log.info("用户登出: userId={} 作废 {} 个 refresh token", userId, revoked);
     }
@@ -157,8 +226,9 @@ public class AuthService {
     }
 
     private AuthDtos.TokenPair issueTokens(User user, String ip, String userAgent, String deviceId) {
-        String access = jwtService.issueAccessToken(user.getId(), user.getTenantId(), user.getPhone());
-        String refresh = jwtService.issueRefreshToken(user.getId(), user.getTenantId(), user.getPhone());
+        // Callers hold the user row lock, serializing issuance with logout.
+        String access = jwtService.issueAccessToken(user.getId(), user.getTenantId(), user.getPhone(), user.getTokenVersion());
+        String refresh = jwtService.issueRefreshToken(user.getId(), user.getTenantId(), user.getPhone(), user.getTokenVersion());
 
         RefreshToken row = new RefreshToken();
         row.setUserId(user.getId());
