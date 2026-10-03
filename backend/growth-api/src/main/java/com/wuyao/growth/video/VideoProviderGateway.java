@@ -52,7 +52,8 @@ public class VideoProviderGateway {
         body.put("model", providerModel(request.model()));
         body.put("seconds", request.durationSeconds());
         body.put("resolution", request.resolution());
-        String prompt = request.prompt().isBlank() ? "" : request.prompt() + "\n画幅：" + request.ratio();
+        String prompt = request.prompt();
+        if (!prompt.isBlank() && !"auto".equals(request.ratio())) prompt += "\n画幅：" + request.ratio();
         body.put("mode", request.referenceVideoAssetId() != null ? "video-to-video"
                 : request.referenceImageAssetIds().isEmpty() ? "text-to-video" : "image-to-video");
         if (!request.referenceImageAssetIds().isEmpty()) {

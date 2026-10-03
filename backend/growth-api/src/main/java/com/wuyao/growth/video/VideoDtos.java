@@ -20,7 +20,7 @@ public final class VideoDtos {
             @NotNull @Size(max = 6) List<@Positive Long> referenceImageAssetIds,
             @Positive Long referenceVideoAssetId,
             @NotBlank @Pattern(regexp = "SEEDANCE_2_5|SEEDANCE_2_0|SEEDANCE_2_0_MINI|SEEDANCE_2_0_FAST") String model,
-            @NotBlank @Pattern(regexp = "9:16|16:9|1:1") String ratio,
+            @NotBlank @Pattern(regexp = "auto|16:9|4:3|1:1|3:4|9:16|21:9") String ratio,
             @Min(5) @Max(30) int durationSeconds,
             @NotBlank @Pattern(regexp = "480p|720p|1080p|4K") String resolution) {}
 

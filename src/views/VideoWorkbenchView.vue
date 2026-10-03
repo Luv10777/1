@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { get, post } from '../utils/request'
 
 const prompt = ref('')
-const format = ref('9:16')
+const format = ref('auto')
 const duration = ref(10)
 const resolution = ref('720p')
 const selectedModel = ref('SEEDANCE_2_5')
@@ -28,6 +28,15 @@ const fallbackCapabilities = [
   { id: 'SEEDANCE_2_0_MINI', label: 'Seedance 2.0 Mini', maxDurationSeconds: 15, resolutions: ['480p', '720p'] },
   { id: 'SEEDANCE_2_0_FAST', label: 'Seedance 2.0 Fast', maxDurationSeconds: 15, resolutions: ['480p', '720p'] },
 ]
+const ratioOptions = [
+  { value: 'auto', label: '自适应' },
+  { value: '16:9', label: '16:9' },
+  { value: '4:3', label: '4:3' },
+  { value: '1:1', label: '1:1' },
+  { value: '3:4', label: '3:4' },
+  { value: '9:16', label: '9:16' },
+  { value: '21:9', label: '21:9' },
+]
 
 const currentCapability = computed(() => (capabilities.value.length ? capabilities.value : fallbackCapabilities).find(item => item.id === selectedModel.value) || fallbackCapabilities[0])
 const durationMax = computed(() => currentCapability.value.maxDurationSeconds)
@@ -35,7 +44,7 @@ const availableResolutions = computed(() => currentCapability.value.resolutions)
 const outputUrl = computed(() => workflow.value?.outputUrl || '')
 
 if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) prompt.value = route.query.prompt
-if (typeof route.query.ratio === 'string' && ['9:16', '16:9'].includes(route.query.ratio)) format.value = route.query.ratio
+if (typeof route.query.ratio === 'string' && ratioOptions.some(option => option.value === route.query.ratio)) format.value = route.query.ratio
 if (typeof route.query.duration === 'string' && Number(route.query.duration)) duration.value = Math.min(30, Math.max(5, Number(route.query.duration)))
 
 get('/api/video/capabilities').then(data => { if (Array.isArray(data) && data.length) capabilities.value = data }).catch(() => {})
@@ -192,14 +201,15 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
           </div>
           <div class="video-model-grid">
             <button v-for="model in (capabilities.length ? capabilities : fallbackCapabilities)" :key="model.id" type="button" :class="{ selected: selectedModel === model.id }" @click="selectModel(model.id)">
-              <strong>{{ model.label }}</strong><small>最长 {{ model.maxDurationSeconds }} 秒</small>
+              <strong>{{ model.label }}</strong>
             </button>
           </div>
-          <div class="video-segmented bg-gray-100 p-1 rounded-xl flex gap-1 mb-6">
-            <button type="button" :class="{ selected: format === '9:16' }" @click="format = '9:16'">9:16 (竖屏)</button>
-            <button type="button" :class="{ selected: format === '16:9' }" @click="format = '16:9'">16:9 (横屏)</button>
-            <button type="button" :class="{ selected: format === '1:1' }" @click="format = '1:1'">1:1 (方形)</button>
-          </div>
+          <label class="video-ratio-select">
+            <span class="video-setting-label">画面比例</span>
+            <select v-model="format" aria-label="选择画面比例">
+              <option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
+          </label>
           <div class="video-setting-block">
             <div class="video-duration-label flex items-center justify-between">
               <span class="video-setting-label">视频时长</span>
@@ -236,11 +246,11 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       </div>
 
       <div class="video-device-stage">
-        <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[format === '9:16' ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">
-          <div class="device-static-border" :class="format === '9:16' ? 'is-phone-border' : 'is-browser-border'" aria-hidden="true" />
+        <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[['3:4', '9:16'].includes(format) ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">
+          <div class="device-static-border" :class="['3:4', '9:16'].includes(format) ? 'is-phone-border' : 'is-browser-border'" aria-hidden="true" />
 
-          <div class="device-screen relative z-10 w-full h-full bg-[#0A0A0B] flex flex-col justify-center items-center overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="format === '9:16' ? 'rounded-[calc(2.5rem-2px)]' : 'rounded-[calc(0.75rem-2px)]'">
-            <div class="device-phone-ui absolute inset-0 pointer-events-none transition-opacity duration-500" :class="format === '9:16' ? 'is-visible' : 'is-hidden'">
+          <div class="device-screen relative z-10 w-full h-full bg-[#0A0A0B] flex flex-col justify-center items-center overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="['3:4', '9:16'].includes(format) ? 'rounded-[calc(2.5rem-2px)]' : 'rounded-[calc(0.75rem-2px)]'">
+            <div class="device-phone-ui absolute inset-0 pointer-events-none transition-opacity duration-500" :class="['3:4', '9:16'].includes(format) ? 'is-visible' : 'is-hidden'">
               <div class="device-island absolute top-3 left-1/2 -translate-x-1/2 w-24 h-7 bg-black rounded-full shadow-[inset_0_-1px_2px_rgba(255,255,255,0.1)] z-30" />
               <div class="device-home absolute bottom-3 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-white/20 rounded-full z-30" />
             </div>
