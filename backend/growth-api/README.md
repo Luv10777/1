@@ -7,6 +7,17 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 480P–4K 画质、作品记录与版本修改。New API / OpenAI 协议配置、可选桥接协议与运行边界见
 [图片工作流接入文档](../../docs/image-workflow.md)。真实模型需在服务端单独配置。
 
+视频工作流使用 OnlyRouter 的 Chat Completions 协议配置和 OpenAI 兼容视频接口，任务链为
+`VIDEO_SUBMIT → VIDEO_POLL → VIDEO_IMPORT → VIDEO_QA`。供应商查询接口在 `completed`
+后通过 `/v1/videos/{id}/content` 返回 302，worker 取得临时结果地址，下载到对象存储后
+再向前端签发内部预览地址。
+视频模型能力和参数约束由后端 `/api/video/capabilities` 提供；Seedance 供应商通过
+`VIDEO_PROVIDER_BASE_URL`、`VIDEO_PROVIDER_API_KEY`、`VIDEO_PROVIDER_SUBMIT_PATH` 和
+`VIDEO_PROVIDER_POLL_PATH` 和 `VIDEO_PROVIDER_CONTENT_PATH` 配置，两个路径中都使用
+`{jobId}` 占位符。前端使用稳定模型别名，网关将其映射为供应商模型 ID；默认 ID 可通过
+`VIDEO_MODEL_SEEDANCE_2_5`、`VIDEO_MODEL_SEEDANCE_2_0`、`VIDEO_MODEL_SEEDANCE_2_0_MINI`
+和 `VIDEO_MODEL_SEEDANCE_2_0_FAST` 覆盖。
+
 ## 安装与启动
 
 需要 Java 21、Maven 3.9 和已启动的 Docker。以下命令在 `backend/growth-api` 目录运行，
@@ -64,7 +75,7 @@ java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --server.port
 不同队列可使用不同 worker 进程：
 
 ```bash
-java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --growth.worker.queues=VIDEO --server.port=8091
+java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --growth.worker.queues=VIDEO_PROVIDER --server.port=8091
 ```
 
 ## 配置与任务语义

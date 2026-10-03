@@ -16,6 +16,10 @@ public enum ModelAlias {
     IMAGE_PRIMARY,    // 海报、产品套图
     VIDEO_DRAFT,      // 低成本预览视频
     VIDEO_PRIMARY,    // 成片视频
+    VIDEO_SEEDANCE_2_5,
+    VIDEO_SEEDANCE_2_0,
+    VIDEO_SEEDANCE_2_0_MINI,
+    VIDEO_SEEDANCE_2_0_FAST,
     TTS_PRIMARY,      // 文本转语音
     VOICE_CLONE,      // 声音克隆
     AVATAR_PRIMARY    // 数字人形象
