@@ -2,6 +2,7 @@ package com.wuyao.growth.video;
 
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
+import com.wuyao.growth.common.web.PageResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,4 +27,10 @@ public class VideoController {
 
     @GetMapping("/workflows/{id}")
     public ApiResponse<VideoDtos.View> get(@PathVariable Long id) { return ApiResponse.ok(service.get(id)); }
+
+    @GetMapping("/workflows")
+    public ApiResponse<PageResult<VideoDtos.History>> history(@RequestParam(defaultValue = "0") int page,
+                                                            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(service.history(page, size));
+    }
 }
