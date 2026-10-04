@@ -23,7 +23,7 @@ public class VideoSubmitHandler implements TaskHandler {
         if (!service.beginSubmit(workflowId, task)) return Map.of("status", "STALE");
         try {
             VideoWorkflow workflow = workflows.findById(workflowId).orElseThrow();
-            VideoProviderGateway.SubmitResult result = provider.submit(workflow.getRequest(), "video:" + workflowId + ":submit");
+            VideoProviderGateway.SubmitResult result = provider.submit(workflow.getRequest(), "video-" + workflowId + "-submit");
             service.saveSubmission(workflowId, task, result);
             return Map.of("status", "SUBMITTED", "providerJobId", result.providerJobId());
         } catch (RuntimeException e) {
