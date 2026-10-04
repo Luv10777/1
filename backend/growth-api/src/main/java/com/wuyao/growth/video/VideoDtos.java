@@ -16,7 +16,7 @@ public final class VideoDtos {
 
     public record Create(
             @NotBlank @Pattern(regexp = "[a-zA-Z0-9-]{8,80}") String requestKey,
-            @NotBlank @Size(max = 2000) String prompt,
+            @NotBlank String prompt,
             @NotNull @Size(max = 6) List<@Positive Long> referenceImageAssetIds,
             @Positive Long referenceVideoAssetId,
             @NotBlank @Pattern(regexp = "SEEDANCE_2_5|SEEDANCE_2_0|SEEDANCE_2_0_MINI|SEEDANCE_2_0_FAST") String model,
