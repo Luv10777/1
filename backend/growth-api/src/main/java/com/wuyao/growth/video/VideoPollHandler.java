@@ -23,7 +23,7 @@ public class VideoPollHandler implements TaskHandler {
         if (!service.beginPoll(workflowId, task)) return Map.of("status", "STALE");
         try {
             VideoWorkflow workflow = workflows.findById(workflowId).orElseThrow();
-            var result = provider.poll(workflow.getProviderJobId(), "video:" + workflowId + ":poll:" + workflow.getPollRound());
+            var result = provider.poll(workflow.getProviderJobId(), "video-" + workflowId + "-poll-" + workflow.getPollRound());
             service.savePoll(workflowId, task, result);
             return Map.of("status", result.status(), "hasUrl", result.resultUrl() != null);
         } catch (RuntimeException e) {

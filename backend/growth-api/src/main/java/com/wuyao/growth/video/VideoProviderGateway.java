@@ -6,6 +6,7 @@ import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class VideoProviderGateway {
     private final ObjectMapper json;
     private final AssetService assets;
@@ -108,7 +110,12 @@ public class VideoProviderGateway {
             }
             HttpResponse<String> result = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NEVER).build()
                     .send(builder.build(), HttpResponse.BodyHandlers.ofString());
-            if (result.statusCode() / 100 != 2) throw providerError("供应商响应 HTTP " + result.statusCode());
+            if (result.statusCode() / 100 != 2) {
+                String detail = providerErrorDetail(result.body());
+                log.warn("视频供应商请求失败: method={} path={} status={} detail={}", method, path, result.statusCode(), detail);
+                throw providerError("供应商响应 HTTP " + result.statusCode()
+                        + (detail == null ? "" : ": " + detail));
+            }
             return json.readTree(result.body());
         } catch (BizException e) {
             throw e;
@@ -119,16 +126,27 @@ public class VideoProviderGateway {
 
     private String resolveContentUrl(String jobId) {
         try {
-            String url = baseUrl.replaceAll("/$", "") + "/" + contentPath.replace("{jobId}", jobId).replaceFirst("^/", "");
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(timeoutSeconds))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey).GET().build();
-            HttpResponse<Void> response = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build()
-                    .send(request, HttpResponse.BodyHandlers.discarding());
-            if (response.statusCode() >= 300 && response.statusCode() < 400 && response.headers().firstValue("location").isPresent()) {
-                return response.headers().firstValue("location").orElseThrow();
+            URI current = URI.create(baseUrl.replaceAll("/$", "") + "/"
+                    + contentPath.replace("{jobId}", jobId).replaceFirst("^/", ""));
+            String providerHost = current.getHost();
+            HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+            for (int redirects = 0; redirects < 5; redirects++) {
+                HttpRequest request = HttpRequest.newBuilder(current).timeout(Duration.ofSeconds(timeoutSeconds))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey).GET().build();
+                HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+                if (response.statusCode() / 100 == 2) return current.toString();
+                if (response.statusCode() < 300 || response.statusCode() >= 400
+                        || response.headers().firstValue("location").isEmpty()) {
+                    throw providerError("获取视频内容地址失败，HTTP " + response.statusCode());
+                }
+                URI next = current.resolve(response.headers().firstValue("location").orElseThrow());
+                if (!"https".equalsIgnoreCase(next.getScheme())) {
+                    throw providerError("获取视频内容地址失败，返回地址不是 HTTPS");
+                }
+                if (providerHost == null || !providerHost.equalsIgnoreCase(next.getHost())) return next.toString();
+                current = next;
             }
-            if (response.statusCode() / 100 == 2) return response.headers().firstValue("location").orElse(null);
-            throw providerError("获取视频内容地址失败，HTTP " + response.statusCode());
+            throw providerError("获取视频内容地址失败，重定向次数过多");
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
@@ -141,6 +159,16 @@ public class VideoProviderGateway {
     }
 
     private BizException providerError(String message) { return BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, message); }
+
+    private String providerErrorDetail(String body) {
+        if (body == null || body.isBlank()) return null;
+        try {
+            String detail = errorMessage(json.readTree(body));
+            return detail == null || detail.isBlank() ? null : detail.substring(0, Math.min(detail.length(), 300));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
 
     private String normalizeStatus(String status) {
         if (status == null) return "RUNNING";
