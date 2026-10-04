@@ -126,16 +126,27 @@ public class VideoProviderGateway {
 
     private String resolveContentUrl(String jobId) {
         try {
-            String url = baseUrl.replaceAll("/$", "") + "/" + contentPath.replace("{jobId}", jobId).replaceFirst("^/", "");
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(timeoutSeconds))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey).GET().build();
-            HttpResponse<Void> response = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build()
-                    .send(request, HttpResponse.BodyHandlers.discarding());
-            if (response.statusCode() >= 300 && response.statusCode() < 400 && response.headers().firstValue("location").isPresent()) {
-                return response.headers().firstValue("location").orElseThrow();
+            URI current = URI.create(baseUrl.replaceAll("/$", "") + "/"
+                    + contentPath.replace("{jobId}", jobId).replaceFirst("^/", ""));
+            String providerHost = current.getHost();
+            HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+            for (int redirects = 0; redirects < 5; redirects++) {
+                HttpRequest request = HttpRequest.newBuilder(current).timeout(Duration.ofSeconds(timeoutSeconds))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey).GET().build();
+                HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+                if (response.statusCode() / 100 == 2) return current.toString();
+                if (response.statusCode() < 300 || response.statusCode() >= 400
+                        || response.headers().firstValue("location").isEmpty()) {
+                    throw providerError("获取视频内容地址失败，HTTP " + response.statusCode());
+                }
+                URI next = current.resolve(response.headers().firstValue("location").orElseThrow());
+                if (!"https".equalsIgnoreCase(next.getScheme())) {
+                    throw providerError("获取视频内容地址失败，返回地址不是 HTTPS");
+                }
+                if (providerHost == null || !providerHost.equalsIgnoreCase(next.getHost())) return next.toString();
+                current = next;
             }
-            if (response.statusCode() / 100 == 2) return response.headers().firstValue("location").orElse(null);
-            throw providerError("获取视频内容地址失败，HTTP " + response.statusCode());
+            throw providerError("获取视频内容地址失败，重定向次数过多");
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
