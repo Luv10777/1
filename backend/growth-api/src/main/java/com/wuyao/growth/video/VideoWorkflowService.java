@@ -10,6 +10,8 @@ import com.wuyao.growth.common.task.TaskService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.common.web.PageResult;
+import org.springframework.data.domain.PageRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -86,6 +88,14 @@ public class VideoWorkflowService {
 
     @Transactional(readOnly = true)
     public VideoDtos.View get(Long id) { return view(find(id)); }
+
+    @Transactional(readOnly = true)
+    public PageResult<VideoDtos.History> history(int page, int size) {
+        var result = workflows.findAllByOrderByIdDesc(PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size))));
+        return PageResult.of(result, result.getContent().stream().map(w -> new VideoDtos.History(
+                w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(), w.getDurationSeconds(),
+                w.getResolution(), w.getStatus(), w.getCreatedAt())).toList());
+    }
 
     @Transactional(readOnly = true)
     public List<VideoDtos.Capability> capabilities() { return VideoCapabilities.all(); }
@@ -253,7 +263,15 @@ public class VideoWorkflowService {
         return new VideoDtos.View(workflow.getId(), workflow.getRequestKey(), request.prompt(), request.referenceImageAssetIds(),
                 request.referenceVideoAssetId(), workflow.getModel(), workflow.getRatio(), workflow.getDurationSeconds(),
                 workflow.getResolution(), workflow.getStatus(), workflow.getStage(), workflow.getProgress(),
-                workflow.getProviderStatus(), workflow.getErrorMessage(), url, workflow.getOutputAssetId(), workflow.getTaskId(), workflow.getCreatedAt());
+                workflow.getProviderStatus(), workflow.getErrorMessage(), url, workflow.getOutputAssetId(), workflow.getTaskId(), workflow.getCreatedAt(),
+                request.referenceImageAssetIds().stream().map(this::referenceView).toList(),
+                request.referenceVideoAssetId() == null ? null : referenceView(request.referenceVideoAssetId()));
+    }
+
+    private VideoDtos.Reference referenceView(Long id) {
+        return assets.findById(id).map(asset -> new VideoDtos.Reference(asset.getId(), asset.getName(),
+                "READY".equals(asset.getStatus()) ? storage.presignGet(asset.getStorageKey(), Duration.ofHours(1)) : null))
+                .orElse(new VideoDtos.Reference(id, "参考素材已不可用", null));
     }
 
     private String hash(VideoDtos.Create request) {

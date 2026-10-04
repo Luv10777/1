@@ -1,7 +1,8 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { get, post } from '../utils/request'
+import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 
 const prompt = ref('')
 const format = ref('auto')
@@ -13,21 +14,22 @@ const referenceVideo = ref(null)
 const imageInput = ref(null)
 const videoInput = ref(null)
 const capabilities = ref([])
-const isGenerating = ref(false)
-const notice = ref('')
-const workflow = ref(null)
+const conversations = ref([])
+const activeConversationId = ref('')
+const historyOpen = ref(false)
+const historyLoading = ref(false)
+const historyError = ref('')
+const historyPage = ref(0)
+const historyHasMore = ref(false)
 const router = useRouter()
 const route = useRoute()
 const isMorphing = ref(false)
 let morphTimer
-let pollTimer
+const pollTimers = new Map()
+const objectUrls = new Set()
+let disposed = false
 
-const fallbackCapabilities = [
-  { id: 'SEEDANCE_2_5', label: 'Seedance 2.5', maxDurationSeconds: 30, resolutions: ['480p', '720p', '1080p'] },
-  { id: 'SEEDANCE_2_0', label: 'Seedance 2.0', maxDurationSeconds: 15, resolutions: ['480p', '720p', '1080p', '4K'] },
-  { id: 'SEEDANCE_2_0_MINI', label: 'Seedance 2.0 Mini', maxDurationSeconds: 15, resolutions: ['480p', '720p'] },
-  { id: 'SEEDANCE_2_0_FAST', label: 'Seedance 2.0 Fast', maxDurationSeconds: 15, resolutions: ['480p', '720p'] },
-]
+const fallbackCapabilities = videoModels
 const ratioOptions = [
   { value: 'auto', label: '自适应' },
   { value: '16:9', label: '16:9' },
@@ -41,11 +43,119 @@ const ratioOptions = [
 const currentCapability = computed(() => (capabilities.value.length ? capabilities.value : fallbackCapabilities).find(item => item.id === selectedModel.value) || fallbackCapabilities[0])
 const durationMax = computed(() => currentCapability.value.maxDurationSeconds)
 const availableResolutions = computed(() => currentCapability.value.resolutions)
+const activeConversation = computed(() => conversations.value.find(item => item.id === activeConversationId.value))
+const workflow = computed(() => activeConversation.value?.workflow)
+const isGenerating = computed(() => Boolean(activeConversation.value?.submitting) || isVideoInProgress(workflow.value))
+const notice = computed(() => activeConversation.value?.notice || '')
 const outputUrl = computed(() => workflow.value?.outputUrl || '')
+const stageLabel = computed(() => activeConversation.value?.submitting ? '正在提交创作' : ({ SUBMIT: '正在提交创作', POLL: '画面渲染中', IMPORT: '正在保存成片', QA: '正在检查成片' }[workflow.value?.stage] || '画面渲染中'))
+const readForm = () => snapshotVideoForm({ prompt: prompt.value, format: format.value, duration: duration.value, resolution: resolution.value, selectedModel: selectedModel.value, referenceImages: referenceImages.value, referenceVideo: referenceVideo.value })
+const applyForm = form => {
+  prompt.value = form.prompt
+  format.value = form.format
+  duration.value = form.duration
+  resolution.value = form.resolution
+  selectedModel.value = form.selectedModel
+  referenceImages.value = form.referenceImages.map(entry => ({ ...entry }))
+  referenceVideo.value = form.referenceVideo ? { ...form.referenceVideo } : null
+}
 
+const newConversationId = () => `video-conversation-${crypto.randomUUID()}`
+const conversationStatus = (item) => {
+  if (item.submitting) return '提交中'
+  if (item.workflow?.status === 'SUCCEEDED') return '已完成'
+  if (item.workflow && !['FAILED', 'CANCELED'].includes(item.workflow.status)) return '生成中'
+  if (item.workflow?.status === 'FAILED') return '生成失败'
+  if (item.workflow?.status === 'CANCELED') return '已取消'
+  if (item.error) return '提交失败'
+  return '草稿'
+}
+const createConversation = (form = null) => {
+  const item = {
+    id: newConversationId(),
+    title: '新的视频创作',
+    prompt: '',
+    format: 'auto',
+    duration: 10,
+    resolution: '720p',
+    selectedModel: 'SEEDANCE_2_5',
+    referenceImages: [],
+    referenceVideo: null,
+    workflow: null,
+    submitting: false,
+    notice: '',
+    error: false,
+    updatedAt: Date.now(),
+  }
+  if (form) Object.assign(item, snapshotVideoForm(form), { title: videoConversationTitle(form.prompt) })
+  conversations.value.unshift(item)
+  activeConversationId.value = item.id
+  applyForm(item)
+  return activeConversation.value
+}
+const saveActiveConversation = () => {
+  const item = activeConversation.value
+  if (!item || item.workflow || item.submitting) return
+  Object.assign(item, readForm(), { title: videoConversationTitle(prompt.value) })
+}
+const updateWorkflow = (item, result) => {
+  item.workflow = result
+  item.error = ['FAILED', 'CANCELED'].includes(result.status)
+  item.notice = result.status === 'SUCCEEDED' ? '视频已完成并保存到作品库。' : item.error ? (result.error || '视频生成失败，请稍后重试。') : ''
+}
+const selectConversation = async (item) => {
+  saveActiveConversation()
+  activeConversationId.value = item.id
+  historyOpen.value = false
+  applyForm(item)
+  if (!item.workflow?.id) return
+  item.loading = true
+  try {
+    const result = await get(`/api/video/workflows/${item.workflow.id}`)
+    if (disposed) return
+    Object.assign(item, videoFormFromWorkflow(result))
+    updateWorkflow(item, result)
+    if (activeConversationId.value === item.id) applyForm(item)
+    if (isVideoInProgress(result)) schedulePoll(item)
+  } catch (error) {
+    item.notice = error.message || '读取创作记录失败，请重新选择重试。'
+  } finally {
+    item.loading = false
+  }
+}
+const startNewConversation = () => {
+  saveActiveConversation()
+  createConversation()
+  historyOpen.value = false
+}
+
+createConversation()
 if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) prompt.value = route.query.prompt
 if (typeof route.query.ratio === 'string' && ratioOptions.some(option => option.value === route.query.ratio)) format.value = route.query.ratio
 if (typeof route.query.duration === 'string' && Number(route.query.duration)) duration.value = Math.min(30, Math.max(5, Number(route.query.duration)))
+saveActiveConversation()
+
+const loadHistory = async (nextPage = 0) => {
+  if (historyLoading.value) return
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const page = await get('/api/video/workflows', { page: nextPage, size: 20 })
+    if (disposed) return
+    for (const result of page.items || []) {
+      if (conversations.value.some(item => item.workflow?.id === result.id)) continue
+      conversations.value.push({ id: `workflow-${result.id}`, title: videoConversationTitle(result.prompt),
+        ...videoFormFromWorkflow(result), workflow: result, updatedAt: Date.parse(result.createdAt), notice: '', loading: false })
+    }
+    historyPage.value = nextPage
+    historyHasMore.value = nextPage + 1 < page.totalPages
+  } catch (error) {
+    historyError.value = error.message || '创作记录暂时无法加载'
+  } finally {
+    historyLoading.value = false
+  }
+}
+onMounted(() => loadHistory())
 
 get('/api/video/capabilities').then(data => { if (Array.isArray(data) && data.length) capabilities.value = data }).catch(() => {})
 
@@ -57,22 +167,25 @@ const selectModel = (model) => { selectedModel.value = model; clampSettings() }
 
 const addImageFiles = (fileList) => {
   const images = Array.from(fileList || []).filter(file => file.type.startsWith('image/'))
-  referenceImages.value = [...referenceImages.value, ...images.map(file => ({ id: `${file.name}-${file.lastModified}-${Math.random()}`, file, name: file.name, url: URL.createObjectURL(file), assetId: null }))]
+  const remaining = Math.max(0, 6 - referenceImages.value.length)
+  if (images.length > remaining) activeConversation.value.notice = '最多添加 6 张参考图。'
+  referenceImages.value = [...referenceImages.value, ...images.slice(0, remaining).map(file => ({ id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }))]
 }
+const previewUrl = file => { const url = URL.createObjectURL(file); objectUrls.add(url); return url }
 const addVideoFile = (fileList) => {
   const file = Array.from(fileList || []).find(item => item.type.startsWith('video/'))
   if (!file) return
-  if (referenceVideo.value?.url) URL.revokeObjectURL(referenceVideo.value.url)
-  referenceVideo.value = { id: `${file.name}-${file.lastModified}`, file, name: file.name, url: URL.createObjectURL(file), assetId: null }
+  referenceVideo.value = { id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }
 }
 const handleImageChange = (event) => { addImageFiles(event.target.files); event.target.value = '' }
 const handleVideoChange = (event) => { addVideoFile(event.target.files); event.target.value = '' }
 const handleImageDrop = (event) => { event.preventDefault(); addImageFiles(event.dataTransfer.files) }
-const removeImage = (asset) => { URL.revokeObjectURL(asset.url); referenceImages.value = referenceImages.value.filter(item => item.id !== asset.id) }
-const removeVideo = () => { if (referenceVideo.value?.url) URL.revokeObjectURL(referenceVideo.value.url); referenceVideo.value = null }
+const removeImage = (asset) => { referenceImages.value = referenceImages.value.filter(item => item.id !== asset.id) }
+const removeVideo = () => { referenceVideo.value = null }
 
 const uploadAsset = async (entry, type) => {
   if (entry.assetId) return entry.assetId
+  if (!entry.file) throw new Error('参考素材已不可用，请移除后重新上传。')
   const ticket = await post('/api/assets/upload-url', { name: entry.file.name, type, mimeType: entry.file.type })
   const response = await fetch(ticket.uploadUrl, { method: 'PUT', headers: { 'Content-Type': entry.file.type }, body: entry.file })
   if (!response.ok) throw new Error('参考素材上传失败')
@@ -81,45 +194,56 @@ const uploadAsset = async (entry, type) => {
   return entry.assetId
 }
 
-const stopPolling = () => { window.clearTimeout(pollTimer); pollTimer = undefined }
-const pollWorkflow = async (id) => {
+const schedulePoll = item => {
+  window.clearTimeout(pollTimers.get(item.id))
+  if (!disposed) pollTimers.set(item.id, window.setTimeout(() => pollWorkflow(item), 2500))
+}
+const pollWorkflow = async item => {
+  if (disposed) return
   try {
-    workflow.value = await get(`/api/video/workflows/${id}`)
-    if (['SUCCEEDED', 'FAILED', 'CANCELED'].includes(workflow.value.status)) {
-      isGenerating.value = false
-      notice.value = workflow.value.status === 'SUCCEEDED' ? '视频已完成并保存到作品库。' : (workflow.value.error || '视频生成失败，请稍后重试。')
-      stopPolling()
-      return
-    }
-    pollTimer = window.setTimeout(() => pollWorkflow(id), 2000)
+    const result = await get(`/api/video/workflows/${item.workflow.id}`)
+    if (disposed) return
+    updateWorkflow(item, result)
+    if (isVideoInProgress(result)) schedulePoll(item)
   } catch (error) {
-    isGenerating.value = false
-    notice.value = error.message || '读取视频任务状态失败'
+    item.notice = error.message || '状态更新暂时中断，正在重试…'
+    if (isVideoInProgress(item.workflow)) schedulePoll(item)
   }
 }
 
 const generate = async () => {
-  if (isGenerating.value) return
-  isGenerating.value = true
-  notice.value = '正在上传参考素材并提交视频任务…'
+  if (isGenerating.value || activeConversation.value?.loading) return
+  if (!prompt.value.trim()) { activeConversation.value.notice = '请先描述你的成片需求。'; return }
+  const form = readForm()
+  if (activeConversation.value?.workflow) createConversation(form)
+  saveActiveConversation()
+  const item = activeConversation.value
+  item.submitting = true
+  item.error = false
+  item.notice = '正在上传参考素材并提交视频任务…'
   try {
-    const imageAssetIds = await Promise.all(referenceImages.value.map(entry => uploadAsset(entry, 'IMAGE')))
-    const videoAssetId = referenceVideo.value ? await uploadAsset(referenceVideo.value, 'VIDEO') : null
-    workflow.value = await post('/api/video/workflows', {
-      requestKey: `video-${crypto.randomUUID()}`,
-      prompt: prompt.value.trim(),
+    const imageAssetIds = await Promise.all(item.referenceImages.map(entry => uploadAsset(entry, 'IMAGE')))
+    const videoAssetId = item.referenceVideo ? await uploadAsset(item.referenceVideo, 'VIDEO') : null
+    const payload = {
+      prompt: item.prompt.trim(),
       referenceImageAssetIds: imageAssetIds,
       referenceVideoAssetId: videoAssetId,
-      model: selectedModel.value,
-      ratio: format.value,
-      durationSeconds: duration.value,
-      resolution: resolution.value,
-    })
-    notice.value = '方志编撰中，请稍候。'
-    pollWorkflow(workflow.value.id)
+      model: item.selectedModel,
+      ratio: item.format,
+      durationSeconds: item.duration,
+      resolution: item.resolution,
+    }
+    const signature = JSON.stringify(payload)
+    if (item.payloadSignature !== signature) { item.requestKey = `video-${crypto.randomUUID()}`; item.payloadSignature = signature }
+    const result = await post('/api/video/workflows', { requestKey: item.requestKey, ...payload })
+    updateWorkflow(item, result)
+    if (activeConversationId.value === item.id) applyForm(item)
+    if (isVideoInProgress(result)) schedulePoll(item)
   } catch (error) {
-    isGenerating.value = false
-    notice.value = error.message || '视频任务提交失败，请稍后重试。'
+    item.error = true
+    item.notice = error.message || '视频任务提交失败，请稍后重试。'
+  } finally {
+    item.submitting = false
   }
 }
 const switchWorkspace = (path) => {
@@ -131,9 +255,9 @@ const switchWorkspace = (path) => {
   router.push(path)
 }
 onBeforeUnmount(() => {
-  referenceImages.value.forEach(asset => URL.revokeObjectURL(asset.url))
-  if (referenceVideo.value?.url) URL.revokeObjectURL(referenceVideo.value.url)
-  stopPolling()
+  disposed = true
+  objectUrls.forEach(url => URL.revokeObjectURL(url))
+  pollTimers.forEach(timer => window.clearTimeout(timer))
 })
 watch(selectedModel, clampSettings)
 watch(format, () => {
@@ -146,8 +270,45 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
 <template>
   <div class="video-workbench-page flex h-[calc(100vh-64px)] w-full overflow-hidden border-t border-gray-200 bg-white">
+    <button v-if="historyOpen" class="video-history-backdrop" aria-label="关闭创作记录" type="button" @click="historyOpen = false" />
+    <aside class="video-conversation-sidebar" :class="{ 'is-open': historyOpen }" aria-label="视频创作记录">
+      <div class="video-conversation-head">
+        <div class="video-conversation-kicker"><span class="video-seal-glyph">志</span><span>视频工作台</span></div>
+        <button class="video-new-conversation" type="button" aria-label="新建对话" @click="startNewConversation"><span>＋</span> 新对话</button>
+      </div>
+      <div class="video-conversation-title-row">
+        <span>创作记录</span><small>{{ conversations.length }} 条</small>
+        <button class="video-history-close" type="button" aria-label="关闭创作记录" @click="historyOpen = false">×</button>
+      </div>
+      <div class="video-conversation-list">
+        <button
+          v-for="item in conversations"
+          :key="item.id"
+          class="video-conversation-item"
+          :class="{ active: item.id === activeConversationId }"
+          :aria-current="item.id === activeConversationId ? 'true' : undefined"
+          :title="videoModelLabel(item.selectedModel)"
+          type="button"
+          @click="selectConversation(item)"
+        >
+          <span class="video-conversation-item-mark" :class="`is-${conversationStatus(item) === '已完成' ? 'done' : conversationStatus(item) === '生成中' ? 'working' : 'draft'}`" aria-hidden="true" />
+          <span class="video-conversation-item-copy">
+            <strong>{{ item.title }}</strong>
+            <small>{{ conversationStatus(item) }} · {{ videoModelLabel(item.selectedModel) }} · {{ item.duration }} 秒 · {{ item.resolution }}</small>
+          </span>
+          <span class="video-conversation-item-arrow" aria-hidden="true">›</span>
+        </button>
+        <div v-if="!conversations.length" class="video-conversation-empty">从一段新的商家故事开始。</div>
+        <p v-if="historyLoading" class="video-history-message" role="status">正在读取创作记录…</p>
+        <div v-else-if="historyError" class="video-history-message" role="status"><span>{{ historyError }}</span><button type="button" @click="loadHistory(historyPage)">重新加载</button></div>
+        <button v-else-if="historyHasMore" class="video-history-more" type="button" @click="loadHistory(historyPage + 1)">加载更早的创作</button>
+      </div>
+      <p class="video-conversation-footnote">每次生成，记录一段故事。<br>已提交的创作会自动保留。</p>
+    </aside>
     <div class="video-workbench-sidebar w-[420px] h-full flex flex-col bg-white border-r border-gray-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
-      <div class="video-workbench-scroll flex-1 overflow-y-auto p-8 space-y-8">
+      <div class="video-editor-heading"><div><span>为每一方商家立传</span><h1>视频创作</h1></div><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
+      <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
+      <fieldset class="video-workbench-scroll flex-1 overflow-y-auto p-8 space-y-8" :disabled="isGenerating || activeConversation?.loading">
         <div class="video-form-section">
           <div class="video-form-heading flex justify-between items-center mb-3">
             <h2 class="text-sm font-semibold text-gray-800">添加参考图 <em>可选</em></h2>
@@ -161,7 +322,8 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
           <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleImageChange">
           <div v-if="referenceImages.length" class="video-asset-strip flex overflow-x-auto gap-2 mt-3">
             <div v-for="asset in referenceImages" :key="asset.id" class="video-asset-thumb relative">
-              <img :src="asset.url" :alt="asset.name">
+              <img v-if="asset.url" :src="asset.url" :alt="asset.name">
+              <span v-else class="video-reference-missing">素材不可用</span>
               <button type="button" aria-label="删除参考图" @click="removeImage(asset)">×</button>
             </div>
           </div>
@@ -225,14 +387,14 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
             </div>
           </div>
         </div>
-      </div>
+      </fieldset>
 
       <div class="video-workbench-action p-6 border-t border-gray-100">
-        <button class="video-generate-button w-full py-3.5 bg-[#18181B] hover:bg-black text-white text-sm font-medium rounded-xl shadow-lg shadow-black/20 ring-1 ring-inset ring-white/10 transition-all flex justify-center items-center gap-2" type="button" :aria-pressed="isGenerating" @click="generate">
-          <span>{{ isGenerating ? '方志编撰中…' : '开始生成视频' }}</span>
+        <button class="video-generate-button w-full py-3.5 bg-[#18181B] hover:bg-black text-white text-sm font-medium rounded-xl shadow-lg shadow-black/20 ring-1 ring-inset ring-white/10 transition-all flex justify-center items-center gap-2" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">
+          <span>{{ isGenerating ? '正在生成视频…' : workflow ? '以此配置再生成' : '开始生成视频' }}</span>
           <span>→</span>
         </button>
-        <p v-if="notice" class="video-generate-notice" role="status">{{ notice }}</p>
+        <p v-if="notice" class="video-generate-notice" :class="{ 'is-error': activeConversation?.error }" role="status">{{ notice }}</p>
       </div>
     </div>
 
@@ -245,7 +407,14 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         </div>
       </div>
 
-      <div class="video-device-stage">
+      <div v-if="isGenerating" class="video-render-stage" role="status" aria-live="polite">
+        <div class="video-seal-loader" aria-hidden="true"><svg viewBox="0 0 80 80" fill="none"><rect class="video-seal-track" x="5" y="5" width="70" height="70" rx="3" /><rect class="video-seal-stroke" x="5" y="5" width="70" height="70" rx="3" /></svg><img src="/images/brand/yifangzhi-mark.png" alt="" /></div>
+        <div class="video-generating-copy"><strong>正在生成视频</strong><p>模型正在渲染画面，长视频或高分辨率任务可能需要更久。</p></div>
+        <div class="video-render-meta"><span>{{ currentCapability.label }}</span><i>·</i><span>{{ duration }} 秒</span><i>·</i><span>{{ resolution }}</span></div>
+        <span class="video-render-stage-label"><i />{{ stageLabel }}</span>
+        <p class="video-render-continue">可以切换创作记录，或开启一段新的创作。</p>
+      </div>
+      <div v-else class="video-device-stage">
         <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[['3:4', '9:16'].includes(format) ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">
           <div class="device-static-border" :class="['3:4', '9:16'].includes(format) ? 'is-phone-border' : 'is-browser-border'" aria-hidden="true" />
 
@@ -263,23 +432,19 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
             <div class="device-state-content relative z-20 flex flex-col items-center gap-4 mt-8">
               <video v-if="outputUrl" class="video-output-preview" :src="outputUrl" controls playsinline />
-              <span class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
-                <svg v-if="!isGenerating && !outputUrl" class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
-                <svg v-else-if="isGenerating" class="w-12 h-12 device-loading-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+              <span v-else class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
+                <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
               </span>
               <div class="device-copy text-center space-y-2">
-                <Transition name="device-state" mode="out-in">
-                  <strong v-if="isGenerating" key="loading" class="text-lg font-medium text-gray-200 tracking-wide"><span>✨ 方志编撰中...</span></strong>
-                  <strong v-else key="idle" class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ outputUrl ? '视频已完成' : '你的故事将在这里成片' }}</span></strong>
-                </Transition>
-                <p class="text-xs text-gray-500 transition-opacity duration-300" :class="isGenerating ? 'opacity-0' : 'opacity-100'">添加素材并描述需求，开始生成</p>
+                <strong class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ outputUrl ? '视频已完成' : '你的故事将在这里成片' }}</span></strong>
+                <p class="text-xs text-gray-500">{{ outputUrl ? '这一段商家故事，已成片。' : '添加素材并描述需求，开始生成' }}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="video-canvas-hint absolute bottom-8 z-10 text-xs text-gray-600 tracking-wider pointer-events-none"><span>AI 将自动匹配镜头节奏、字幕与品牌色</span></div>
+      <div class="video-canvas-hint absolute bottom-8 z-10 text-xs text-gray-600 tracking-wider pointer-events-none"><span>把商家的日常，写成值得记住的影像。</span></div>
     </div>
   </div>
 </template>

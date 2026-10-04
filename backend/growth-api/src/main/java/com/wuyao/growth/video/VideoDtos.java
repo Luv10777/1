@@ -30,6 +30,11 @@ public final class VideoDtos {
             int maxDurationSeconds,
             List<String> resolutions) {}
 
+    public record History(Long id, String prompt, String model, String ratio,
+                          int durationSeconds, String resolution, String status, Instant createdAt) {}
+
+    public record Reference(Long assetId, String name, String url) {}
+
     public record View(
             Long id,
             String requestKey,
@@ -48,5 +53,7 @@ public final class VideoDtos {
             String outputUrl,
             Long outputAssetId,
             Long taskId,
-            Instant createdAt) {}
+            Instant createdAt,
+            List<Reference> referenceImages,
+            Reference referenceVideo) {}
 }
