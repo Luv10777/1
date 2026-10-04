@@ -187,10 +187,10 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         <div class="video-form-section">
           <div class="video-form-heading flex justify-between items-center mb-3">
             <h2 class="text-sm font-semibold text-gray-800">描述你的成片需求</h2>
-            <span class="text-xs text-gray-400">{{ prompt.length }}/500</span>
+            <span class="text-xs text-gray-400">{{ prompt.length }} 字</span>
           </div>
           <div class="video-textarea-shell bg-gray-50/80 rounded-xl p-1 border border-gray-100 focus-within:border-cinnabar-400 focus-within:ring-4 focus-within:ring-cinnabar-500/10 focus-within:bg-white transition-all">
-            <textarea v-model="prompt" maxlength="500" class="w-full h-32 bg-transparent resize-none outline-none p-3 text-sm text-gray-800 placeholder-gray-400" placeholder="例如：为这份双人海鲜套餐制作一段诱人的展示视频，镜头从特写拉远，强调食材的新鲜与就餐的松弛感。" />
+            <textarea v-model="prompt" class="w-full h-32 bg-transparent resize-none outline-none p-3 text-sm text-gray-800 placeholder-gray-400" placeholder="例如：为这份双人海鲜套餐制作一段诱人的展示视频，镜头从特写拉远，强调食材的新鲜与就餐的松弛感。" />
           </div>
         </div>
 
