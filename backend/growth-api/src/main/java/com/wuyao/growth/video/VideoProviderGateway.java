@@ -6,6 +6,7 @@ import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -25,6 +26,7 @@ import java.util.Map;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class VideoProviderGateway {
     private final ObjectMapper json;
     private final AssetService assets;
@@ -108,7 +110,12 @@ public class VideoProviderGateway {
             }
             HttpResponse<String> result = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NEVER).build()
                     .send(builder.build(), HttpResponse.BodyHandlers.ofString());
-            if (result.statusCode() / 100 != 2) throw providerError("供应商响应 HTTP " + result.statusCode());
+            if (result.statusCode() / 100 != 2) {
+                String detail = providerErrorDetail(result.body());
+                log.warn("视频供应商请求失败: method={} path={} status={} detail={}", method, path, result.statusCode(), detail);
+                throw providerError("供应商响应 HTTP " + result.statusCode()
+                        + (detail == null ? "" : ": " + detail));
+            }
             return json.readTree(result.body());
         } catch (BizException e) {
             throw e;
@@ -141,6 +148,16 @@ public class VideoProviderGateway {
     }
 
     private BizException providerError(String message) { return BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, message); }
+
+    private String providerErrorDetail(String body) {
+        if (body == null || body.isBlank()) return null;
+        try {
+            String detail = errorMessage(json.readTree(body));
+            return detail == null || detail.isBlank() ? null : detail.substring(0, Math.min(detail.length(), 300));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
 
     private String normalizeStatus(String status) {
         if (status == null) return "RUNNING";
