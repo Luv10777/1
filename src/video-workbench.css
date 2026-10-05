@@ -300,8 +300,8 @@
 .video-workbench-page :is(.video-ratio-select select,.video-resolution-grid button){border-radius:4px}
 .video-workbench-page .video-model-grid button.selected,.video-workbench-page .video-resolution-grid button.selected{border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 5%,var(--color-bg-surface));box-shadow:none}
 .video-workbench-page .video-workbench-canvas{background:var(--color-bg-canvas)}
-.video-workbench-page .device-screen{background:var(--color-bg-surface)}
-.video-workbench-page .video-output-preview{width:100%;max-height:85%;border-radius:0}
+.video-workbench-canvas .device-screen{background:var(--color-bg-surface)}
+.video-workbench-canvas .video-output-preview{width:100%;max-height:85%;border-radius:0}
 .video-conversation-item-copy strong{font-size:12px}
 .video-conversation-item-copy small{font:10px var(--font-sans)}
 .video-conversation-footnote{font:11px/1.8 var(--font-sans)}

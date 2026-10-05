@@ -1,9 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
+import { useDigitalHumanVideo } from '../composables/useDigitalHumanVideo'
+import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
 import { get } from '../utils/request'
 import { assets as platformAssets, assetSource } from '../stores/assetLibrary'
-import { videoModels } from '../services/videoConversations'
+import { videoModels, videoModelLabel } from '../services/videoConversations'
 
 const avatarInput = ref(null)
 const assetsInput = ref(null)
@@ -28,7 +31,7 @@ const duration = ref(10)
 const ratio = ref('auto')
 const selectedModel = ref('SEEDANCE_2_5')
 const resolution = ref('720p')
-const isGenerating = ref(false)
+const { isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, start } = useDigitalHumanVideo()
 const notice = ref('')
 const showAllAvatars = ref(false)
 const router = useRouter()
@@ -156,7 +159,7 @@ const setUpload = (type, event) => {
     if (type === 'avatar' && !avatarFile.value && imageSlotsRemaining.value <= 0) return
     const target = { avatar: avatarFile }[type]
     if (target.value?.url?.startsWith('blob:')) URL.revokeObjectURL(target.value.url)
-    target.value = { name: files[0].name, url: URL.createObjectURL(files[0]) }
+    target.value = { name: files[0].name, url: URL.createObjectURL(files[0]), file: files[0], type: 'IMAGE' }
   }
   event.target.value = ''
 }
@@ -198,9 +201,17 @@ const selectLibraryItem = asset => {
   closeAssetLibrary()
 }
 const generate = () => {
-  if (!avatarFile.value && !script.value.trim()) { notice.value = '上传一张数字人照片或输入播报文案后再开始。'; return }
-  isGenerating.value = !isGenerating.value
-  notice.value = isGenerating.value ? '数字人视频已进入渲染队列。' : '已暂停本次生成，可随时继续。'
+  if (isGenerating.value) return
+  notice.value = ''
+  try {
+    const input = digitalHumanVideoInput({ script: script.value, avatar: avatarFile.value,
+      images: [productFile.value, packageFile.value, ...extraImages.value].filter(Boolean),
+      videos: referenceVideos.value, voices: [voiceFile.value, ...extraVoices.value].filter(Boolean),
+      model: selectedModel.value, ratio: ratio.value, durationSeconds: duration.value, resolution: resolution.value })
+    start(input)
+  } catch (error) {
+    notice.value = error.message
+  }
 }
 const switchWorkspace = (path) => {
   if (path === router.currentRoute.value.path) return
@@ -223,18 +234,33 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
   <div class="studio-page digital-human-page">
     <main class="dh-workspace">
       <aside class="dh-form-panel" aria-label="数字人视频配置">
-        <div class="dh-form-scroll">
+        <fieldset class="dh-form-scroll" :disabled="isGenerating">
           <section class="dh-form-section dh-asset-section"><div class="dh-section-heading"><div><h2>上传数字人形象</h2></div><span class="dh-section-note">可选</span></div><div class="dh-upload-actions"><button type="button" class="dh-source-button" @click="avatarInput?.click()"><span class="material-symbols-outlined">upload</span><span>从本地上传</span></button><button type="button" class="dh-source-button" @click="openAssetLibrary('image', 'avatar')"><span class="material-symbols-outlined">photo_library</span><span>从素材库上传</span></button></div><div v-if="avatarFile" class="dh-upload-preview"><img :src="avatarFile.url" alt="已选数字人形象"><span class="dh-upload-file">{{ avatarFile.name }}</span><button type="button" aria-label="移除数字人形象" @click="clearUpload('avatar')">×</button></div><input ref="avatarInput" class="video-file-input" type="file" accept="image/*" @change="setUpload('avatar', $event)"><p class="dh-field-hint">支持 JPG、PNG、WEBP · 大小 6MB 以内</p></section>
           <section class="dh-form-section dh-asset-section"><div class="dh-section-heading"><div><h2>上传所需图片</h2></div><span class="dh-section-note">可选 · {{ materialLimits.image }} 张以内</span></div><div class="dh-upload-actions"><button type="button" class="dh-source-button" @click="assetsInput?.click()"><span class="material-symbols-outlined">upload</span><span>从本地上传</span></button><button type="button" class="dh-source-button" @click="openAssetLibrary('image', 'assets')"><span class="material-symbols-outlined">photo_library</span><span>从素材库上传</span></button></div><div v-if="productFile || packageFile || extraImages.length" class="dh-upload-preview-list"><div v-for="asset in [productFile, packageFile].filter(Boolean)" :key="asset.name" class="dh-upload-preview"><img :src="asset.url" :alt="asset.name"><span class="dh-upload-file">{{ asset.name }}</span><button type="button" aria-label="移除参考图片" @click="clearUpload(asset === productFile ? 'product' : 'package')">×</button></div><div v-for="(asset, index) in extraImages" :key="asset.name + index" class="dh-upload-preview"><img :src="asset.url" :alt="asset.name"><span class="dh-upload-file">{{ asset.name }}</span><button type="button" aria-label="移除参考图片" @click="removeExtraImage(index)">×</button></div></div><input ref="assetsInput" class="video-file-input" type="file" accept="image/*" multiple @change="setUpload('assets', $event)"></section>
           <section class="dh-form-section dh-asset-section"><div class="dh-section-heading"><div><h2>上传参考视频</h2></div><span class="dh-section-note">可选 · {{ materialLimits.video }} 个以内</span></div><div class="dh-upload-actions"><button type="button" class="dh-source-button" @click="referenceVideoInput?.click()"><span class="material-symbols-outlined">upload</span><span>从本地上传</span></button><button type="button" class="dh-source-button" @click="openAssetLibrary('video')"><span class="material-symbols-outlined">video_library</span><span>从素材库上传</span></button></div><div v-if="referenceVideos.length" class="dh-upload-preview-list"><div v-for="(asset, index) in referenceVideos" :key="asset.name + index" class="dh-upload-preview"><span class="material-symbols-outlined">movie</span><span class="dh-upload-file">{{ asset.name }}</span><button type="button" aria-label="移除参考视频" @click="removeReferenceVideo(index)">×</button></div></div><input ref="referenceVideoInput" class="video-file-input" type="file" accept="video/*" multiple @change="setUpload('video', $event)"></section>
           <section class="dh-form-section dh-asset-section"><div class="dh-section-heading"><div><h2>上传音色</h2></div><span class="dh-section-note">可选 · {{ materialLimits.audio }} 个以内</span></div><div class="dh-upload-actions"><button type="button" class="dh-source-button" @click="voiceInput?.click()"><span class="material-symbols-outlined">upload</span><span>从本地上传</span></button><button type="button" class="dh-source-button" @click="openAssetLibrary('audio')"><span class="material-symbols-outlined">library_music</span><span>从素材库上传</span></button></div><div v-if="voiceFile || extraVoices.length" class="dh-upload-preview-list"><div v-if="voiceFile" class="dh-upload-preview dh-upload-audio"><span class="material-symbols-outlined">graphic_eq</span><span class="dh-upload-file">{{ voiceFile.name }}</span><button type="button" aria-label="移除音色" @click="clearUpload('voice')">×</button></div><div v-for="(asset, index) in extraVoices" :key="asset.name + index" class="dh-upload-preview dh-upload-audio"><span class="material-symbols-outlined">graphic_eq</span><span class="dh-upload-file">{{ asset.name }}</span><button type="button" aria-label="移除音色" @click="removeExtraVoice(index)">×</button></div></div><input ref="voiceInput" class="video-file-input" type="file" accept="audio/*" multiple @change="setUpload('voice', $event)"><p class="dh-field-hint">支持 MP3、WAV、M4A · 建议 10 秒以上清晰人声</p></section>
           <section class="dh-form-section dh-copy-section"><div class="dh-section-heading"><div><h2>描述内容</h2></div><span class="dh-counter">{{ script.length }}/500</span></div><div class="dh-textarea-shell"><textarea v-model="script" maxlength="500" placeholder="输入视频文案或商品描述，例如：今天给大家分享一款适合敏感肌的春日精华，轻薄好吸收，换季也能保持水润光泽。" /></div></section>
           <section class="dh-form-section dh-setting-section"><div class="dh-section-heading"><div><h2>模型与输出</h2></div><span class="dh-section-note">{{ currentModel.label }} · {{ materialLimitLabel }}</span></div><div class="video-model-grid dh-model-grid"><button v-for="model in videoModels" :key="model.id" type="button" :class="{ selected: selectedModel === model.id }" @click="selectModel(model.id)"><strong>{{ model.label }}</strong></button></div><label class="video-ratio-select dh-ratio-select"><span class="video-setting-label">画面比例</span><select v-model="ratio" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label><div class="dh-setting-row dh-duration-setting"><span>视频时长</span><strong>{{ duration }} 秒</strong></div><input v-model.number="duration" class="video-duration-range" type="range" min="5" :max="currentModel.maxDurationSeconds" step="1"><div class="video-range-meta flex justify-between"><span>5s</span><span>{{ currentModel.maxDurationSeconds }}s</span></div><div class="dh-setting-row dh-resolution-setting"><span>分辨率</span><div class="video-resolution-grid"><button v-for="item in availableResolutions" :key="item" type="button" :class="{ selected: resolution === item }" @click="resolution = item">{{ item }}</button></div></div></section>
-        </div>
-        <div class="dh-form-footer"><button class="dh-generate-button" type="button" :aria-pressed="isGenerating" @click="generate"><span>{{ isGenerating ? '正在生成…' : '立即生成' }}</span><span class="material-symbols-outlined">arrow_forward</span></button><p v-if="notice" class="dh-notice" role="status">{{ notice }}</p><small>预计消耗 12 算力 · 约 1–2 分钟完成</small></div>
+        </fieldset>
+        <div class="dh-form-footer"><button class="dh-generate-button" type="button" :disabled="isGenerating" @click="generate"><span>{{ isGenerating ? '正在生成…' : previewStarted ? '再次生成' : '立即生成' }}</span><span class="material-symbols-outlined">arrow_forward</span></button><p v-if="notice || videoNotice" class="dh-notice" :class="{ 'is-error': videoError }" role="status">{{ notice || videoNotice }}</p><small>预计消耗 12 算力 · 约 1–2 分钟完成</small></div>
       </aside>
 
-      <section class="dh-preview-panel" aria-label="数字人视频预览">
+      <VideoPreviewPanel
+        v-if="previewStarted"
+        class="dh-preview-panel dh-result-panel"
+        :is-generating="isGenerating"
+        :output-url="outputUrl"
+        :format="submittedForm?.ratio || ratio"
+        :model-label="videoModelLabel(submittedForm?.model || selectedModel)"
+        :duration="submittedForm?.durationSeconds || duration"
+        :resolution="submittedForm?.resolution || resolution"
+        :stage-label="stageLabel"
+        :error="isGenerating ? '' : videoError"
+        active-workspace="digital-human"
+        continue-text="生成完成后可直接播放，成片将保存到作品库。"
+        @switch-workspace="switchWorkspace"
+      />
+      <section v-else class="dh-preview-panel" aria-label="数字人视频预览">
         <div class="dh-studio-switcher video-mode-switch" role="group" aria-label="切换工作台">
           <button type="button" @click="switchWorkspace('/video/workbench')"><span class="material-symbols-outlined">auto_awesome</span>视频工作台</button>
           <button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/digital-human/studio')"><span class="material-symbols-outlined">record_voice_over</span>数字人摄影棚</button>
