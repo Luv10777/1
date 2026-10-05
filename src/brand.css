@@ -276,6 +276,62 @@
 /* The application shell, not the document, owns scrolling. */
 body:has(.app-frame) { overflow:hidden; }
 :root .paper-app .page-scroll:has(.digital-human-page) { overflow-y:auto; }
+/* Keep the studio in one desktop viewport; only its configuration pane scrolls. */
+@media(min-width:761px) {
+  :root .paper-app .page-scroll:has(.digital-human-page) {
+    display:flex; flex-direction:column; overflow:hidden;
+    padding:clamp(12px,2.5vh,28px) var(--shell-inline);
+  }
+  :root .paper-app .digital-human-page { flex:1; height:100%; min-height:0; overflow:hidden; }
+  :root .paper-app .digital-human-page .dh-workspace {
+    height:100%; min-height:0; overflow:hidden;
+    grid-template-columns:clamp(300px,32%,410px) minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr);
+  }
+  :root .paper-app .digital-human-page .dh-form-panel { min-height:0; overflow:hidden; }
+  :root .paper-app .digital-human-page .dh-form-scroll {
+    min-height:0; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+  }
+  :root .paper-app .digital-human-page .dh-form-footer { flex-shrink:0; }
+  :root .paper-app .digital-human-page .dh-preview-panel {
+    display:grid; grid-template-rows:auto auto minmax(0,1.25fr) minmax(0,1fr);
+    gap:clamp(10px,1.6vh,18px); min-height:0; overflow:hidden;
+    padding:clamp(16px,2.5vh,25px) clamp(18px,2vw,30px);
+  }
+  :root .paper-app .digital-human-page .dh-studio-switcher { position:static; justify-self:end; }
+  :root .paper-app .digital-human-page .dh-preview-intro { margin:0; padding:0; }
+  :root .paper-app .digital-human-page .dh-preview-intro h2 { margin:0 0 6px; line-height:1.3; }
+  :root .paper-app .digital-human-page .dh-banner { height:auto; min-height:0; }
+  :root .paper-app .digital-human-page .dh-inspiration {
+    display:flex; flex-direction:column; min-height:0; margin:0;
+  }
+  :root .paper-app .digital-human-page .dh-inspiration-heading {
+    flex-shrink:0; align-items:center; margin-bottom:10px;
+  }
+  :root .paper-app .digital-human-page .dh-inspiration-heading > div { min-width:0; }
+  :root .paper-app .digital-human-page .dh-inspiration-heading button { flex-shrink:0; white-space:nowrap; }
+  :root .paper-app .digital-human-page .dh-inspiration-grid {
+    flex:1; min-height:0; grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+  :root .paper-app .digital-human-page .dh-inspiration-card {
+    display:grid; grid-template-rows:minmax(0,1fr) auto; min-width:0; min-height:0;
+  }
+  :root .paper-app .digital-human-page .dh-inspiration-thumb { height:100%; min-height:0; aspect-ratio:auto; }
+}
+@media(min-width:761px) and (max-height:700px) {
+  :root .paper-app .digital-human-page .dh-preview-intro h2 { font-size:26px; }
+  :root .paper-app .digital-human-page .dh-inspiration-heading h3 { font-size:14px; }
+}
+:root .paper-app .digital-human-page fieldset.dh-form-scroll { margin:0; border:0; min-width:0; }
+:root .paper-app .digital-human-page .dh-preview-panel.dh-result-panel {
+  display:flex; flex-direction:column; align-items:center; gap:12px;
+  padding:24px 24px 16px; min-height:0;
+}
+:root .paper-app .digital-human-page .dh-generate-button:disabled { opacity:.65; cursor:wait; transform:none; }
+:root .paper-app .digital-human-page .dh-notice.is-error { color:var(--color-error); }
+@media(max-width:760px) {
+  :root .paper-app .digital-human-page .dh-preview-panel.dh-result-panel { height:480px; min-height:480px; }
+}
 :root .paper-app :is(.account-center-page,.publishing-plan-page) h1 { font-family:var(--font-serif); }
 :root .paper-app :is(.account-center-page,.publishing-plan-page) button { border-radius:4px; }
 .paper-topbar .theme-toggle { flex-shrink:0; white-space:nowrap; }
