@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.asset.Asset;
 import com.wuyao.growth.asset.AssetRepository;
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.asset.VideoMediaProbe;
+import com.wuyao.growth.common.ratelimit.TenantRateLimiter;
 import com.wuyao.growth.common.storage.ObjectStorage;
 import com.wuyao.growth.common.task.Task;
 import com.wuyao.growth.common.task.TaskService;
@@ -16,12 +18,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.util.Timeout;
 
+import java.io.FilterInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,12 +37,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class VideoWorkflowService {
-    private static final int MAX_PROVIDER_BYTES = 1024 * 1024 * 1024;
+    private static final int MAX_REDIRECTS = 5;
 
     private final VideoWorkflowRepository workflows;
     private final VideoProviderJobRepository providerJobs;
@@ -44,8 +50,17 @@ public class VideoWorkflowService {
     private final ObjectStorage storage;
     private final TaskService tasks;
     private final ObjectMapper json;
+    private final TenantRateLimiter rateLimiter;
+    private final HttpClient httpClient;
+    private final VideoMediaProbe videoProbe;
 
     @Value("${growth.video.provider.poll-seconds:15}") private int pollSeconds;
+    @Value("${growth.video.max-polls:360}") private int maxPolls;
+    @Value("${growth.video.max-duration-seconds:7200}") private long maxDurationSeconds;
+    @Value("${growth.video.max-provider-bytes:1073741824}") private long maxProviderBytes;
+    @Value("${growth.video.tenant-max-concurrent:2}") private int tenantMaxConcurrent;
+    @Value("${growth.video.global-max-concurrent:20}") private int globalMaxConcurrent;
+    @Value("${growth.video.concurrency-permit-ttl-seconds:21600}") private long concurrencyPermitTtlSeconds;
 
     @Transactional
     public VideoDtos.View create(VideoDtos.Create request, Long userId) {
@@ -69,21 +84,31 @@ public class VideoWorkflowService {
             return view(existing.get());
         }
 
-        VideoWorkflow workflow = new VideoWorkflow();
-        workflow.setTenantId(tenantId);
-        workflow.setCreatedBy(userId);
-        workflow.setRequestKey(request.requestKey());
-        workflow.setRequestHash(hash);
-        workflow.setRequest(request);
-        workflow.setModel(request.model());
-        workflow.setRatio(request.ratio());
-        workflow.setDurationSeconds(request.durationSeconds());
-        workflow.setResolution(request.resolution());
-        workflows.saveAndFlush(workflow);
-        Task task = tasks.submit(VideoSubmitHandler.TYPE, "VIDEO_PROVIDER", Map.of("workflowId", workflow.getId()),
-                "video-submit-" + workflow.getId(), userId);
-        workflow.setTaskId(task.getId());
-        return view(workflow);
+        if (!rateLimiter.tryAcquireVideoGeneration(tenantId, tenantMaxConcurrent, globalMaxConcurrent,
+                concurrencyPermitTtlSeconds)) {
+            throw BizException.of(ErrorCode.RATE_LIMITED, "当前有较多视频任务正在生成，请稍后重试");
+        }
+        try {
+            VideoWorkflow workflow = new VideoWorkflow();
+            workflow.setTenantId(tenantId);
+            workflow.setCreatedBy(userId);
+            workflow.setRequestKey(request.requestKey());
+            workflow.setRequestHash(hash);
+            workflow.setRequest(request);
+            workflow.setModel(request.model());
+            workflow.setRatio(request.ratio());
+            workflow.setDurationSeconds(request.durationSeconds());
+            workflow.setResolution(request.resolution());
+            workflow.setVideoConcurrencyPermitHeld(true);
+            workflows.saveAndFlush(workflow);
+            Task task = tasks.submit(VideoSubmitHandler.TYPE, "VIDEO_PROVIDER", Map.of("workflowId", workflow.getId()),
+                    "video-submit-" + workflow.getId(), userId);
+            workflow.setTaskId(task.getId());
+            return view(workflow);
+        } catch (RuntimeException e) {
+            rateLimiter.releaseVideoGeneration(tenantId);
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -105,6 +130,10 @@ public class VideoWorkflowService {
         if (!tasks.ownsExecution(task)) return false;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId()) || Set.of("SUCCEEDED", "FAILED", "CANCELED").contains(workflow.getStatus())) return false;
+        if (expired(workflow)) {
+            markFailed(workflow, "VIDEO_TIMEOUT", "视频生成超过最大处理时长");
+            return false;
+        }
         workflow.setStatus("SUBMITTING");
         workflow.setStage("SUBMIT");
         workflow.setProgress(8);
@@ -126,10 +155,14 @@ public class VideoWorkflowService {
         providerJobs.saveAndFlush(job);
         workflow.setProviderJobId(result.providerJobId());
         workflow.setProviderStatus(result.status());
-        workflow.setStatus("GENERATING");
-        workflow.setStage("POLL");
-        workflow.setProgress(18);
-        enqueuePoll(workflow, 0);
+        if ("FAILED".equals(result.status()) || "CANCELED".equals(result.status())) {
+            markFailed(workflow, "VIDEO_PROVIDER_FAILED", "供应商提交失败");
+        } else {
+            workflow.setStatus("GENERATING");
+            workflow.setStage("POLL");
+            workflow.setProgress(18);
+            enqueuePoll(workflow, 0);
+        }
     }
 
     @Transactional
@@ -137,6 +170,10 @@ public class VideoWorkflowService {
         if (!tasks.ownsExecution(task)) return false;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId()) || workflow.getProviderJobId() == null) return false;
+        if (expired(workflow) || workflow.getPollRound() >= maxPolls) {
+            markFailed(workflow, "VIDEO_TIMEOUT", "视频供应商在规定时间内未完成任务");
+            return false;
+        }
         workflow.setStage("POLL");
         workflow.setProgress(Math.min(78, 18 + workflow.getPollRound() * 4));
         return true;
@@ -147,6 +184,10 @@ public class VideoWorkflowService {
         if (!tasks.ownsExecution(task)) return;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId())) return;
+        if (expired(workflow)) {
+            markFailed(workflow, "VIDEO_TIMEOUT", "视频供应商在规定时间内未完成任务");
+            return;
+        }
         workflow.setProviderStatus(result.status());
         workflow.setPollRound(workflow.getPollRound() + 1);
         VideoProviderJob job = providerJobs.findByWorkflowId(workflowId).orElseThrow();
@@ -165,6 +206,8 @@ public class VideoWorkflowService {
             workflow.setTaskId(importTask.getId());
         } else if ("FAILED".equals(result.status()) || "CANCELED".equals(result.status())) {
             markFailed(workflow, "VIDEO_PROVIDER_FAILED", result.error() == null ? "供应商生成失败" : result.error());
+        } else if (workflow.getPollRound() >= maxPolls || expired(workflow)) {
+            markFailed(workflow, "VIDEO_TIMEOUT", "视频供应商在规定时间内未完成任务");
         } else {
             workflow.setStatus("GENERATING");
             enqueuePoll(workflow, nextPollDelay(workflow.getPollRound()));
@@ -176,6 +219,10 @@ public class VideoWorkflowService {
         if (!tasks.ownsExecution(task)) return false;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId()) || workflow.getProviderResultUrl() == null) return false;
+        if (expired(workflow)) {
+            markFailed(workflow, "VIDEO_TIMEOUT", "视频生成超过最大处理时长");
+            return false;
+        }
         workflow.setStage("IMPORT");
         workflow.setProgress(86);
         return true;
@@ -220,11 +267,30 @@ public class VideoWorkflowService {
             markFailed(workflow, "VIDEO_ASSET_MISSING", "视频对象不存在");
             return;
         }
+        try {
+            var metadata = videoProbe.probe(workflow.getOutputStorageKey(), "video/mp4");
+            Asset output = assets.findById(workflow.getOutputAssetId()).orElseThrow();
+            output.setWidth(metadata.width());
+            output.setHeight(metadata.height());
+            output.setDurationMs(metadata.durationMs());
+            output.setMimeType(metadata.mimeType());
+            output.setSizeBytes(storage.stat(workflow.getOutputStorageKey()).orElseThrow().sizeBytes());
+            output.setStatus("READY");
+            assets.saveAndFlush(output);
+        } catch (IllegalStateException e) {
+            assets.findById(workflow.getOutputAssetId()).ifPresent(asset -> {
+                asset.setStatus("INVALID");
+                assets.saveAndFlush(asset);
+            });
+            markFailed(workflow, "VIDEO_ASSET_INVALID", "生成的视频文件无法通过媒体校验");
+            return;
+        }
         workflow.setStatus("SUCCEEDED");
         workflow.setStage("DONE");
         workflow.setProgress(100);
         workflow.setErrorCode(null);
         workflow.setErrorMessage(null);
+        releasePermitIfTerminal(workflow);
     }
 
     @Transactional
@@ -238,6 +304,7 @@ public class VideoWorkflowService {
         workflow.setStage("FAILED");
         workflow.setErrorCode(code);
         workflow.setErrorMessage(message);
+        releasePermitIfTerminal(workflow);
     }
 
     private void enqueuePoll(VideoWorkflow workflow, int delaySeconds) {
@@ -248,6 +315,32 @@ public class VideoWorkflowService {
     }
 
     private int nextPollDelay(int round) { return Math.min(60, Math.max(5, pollSeconds) * Math.max(1, round)); }
+
+    private boolean expired(VideoWorkflow workflow) {
+        Instant created = workflow.getCreatedAt();
+        return created == null || created.plusSeconds(Math.max(1, maxDurationSeconds)).isBefore(Instant.now());
+    }
+
+    private void releasePermitIfTerminal(VideoWorkflow workflow) {
+        if (!workflow.isVideoConcurrencyPermitHeld()
+                || !Set.of("SUCCEEDED", "FAILED", "CANCELED").contains(workflow.getStatus())) return;
+        workflow.setVideoConcurrencyPermitHeld(false);
+        rateLimiter.releaseVideoGeneration(workflow.getTenantId());
+    }
+
+    @Transactional
+    public VideoDtos.View cancel(Long id) {
+        VideoWorkflow workflow = lock(id);
+        if (Set.of("SUCCEEDED", "FAILED", "CANCELED").contains(workflow.getStatus())) return view(workflow);
+        if (workflow.getTaskId() != null) tasks.cancel(workflow.getTaskId());
+        workflow.setStatus("CANCELED");
+        workflow.setStage("CANCELED");
+        workflow.setProgress(Math.min(workflow.getProgress(), 99));
+        workflow.setErrorCode(null);
+        workflow.setErrorMessage("已取消本次视频生成");
+        releasePermitIfTerminal(workflow);
+        return view(workflow);
+    }
 
     private VideoWorkflow find(Long id) {
         return workflows.findById(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "视频任务不存在"));
@@ -282,22 +375,120 @@ public class VideoWorkflowService {
     /** Download the provider's temporary URL into our private object store. */
     public ImportedVideo importUrl(VideoWorkflow workflow) {
         String url = workflow.getProviderResultUrl();
-        if (url == null || !url.startsWith("https://")) throw new IllegalStateException("供应商视频 URL 必须使用 HTTPS");
+        if (url == null) throw new IllegalStateException("供应商视频 URL 为空");
+        URI current;
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(10)).GET().build();
-            HttpResponse<InputStream> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofInputStream());
-            if (response.statusCode() / 100 != 2) throw new IllegalStateException("视频下载 HTTP " + response.statusCode());
-            long contentLength = response.headers().firstValueAsLong("content-length").orElse(-1L);
-            if (contentLength > MAX_PROVIDER_BYTES) throw new IllegalStateException("视频文件超过 1 GB 限制");
-            try (InputStream stream = response.body()) {
-                byte[] bytes = stream.readNBytes(MAX_PROVIDER_BYTES + 1);
-                if (bytes.length > MAX_PROVIDER_BYTES) throw new IllegalStateException("视频文件超过 1 GB 限制");
-                String key = "t" + workflow.getTenantId() + "/generated-video/" + workflow.getId() + "/" + UUID.randomUUID() + ".mp4";
-                storage.put(key, bytes, "video/mp4");
-                return new ImportedVideo(key, bytes.length, "video/mp4");
+            current = VideoUrlSecurity.checkedHttps(url);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+        String key = "t" + workflow.getTenantId() + "/generated-video/" + workflow.getId() + "/output.mp4";
+        try {
+            for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+                HttpGet request = new HttpGet(current);
+                request.setConfig(RequestConfig.custom()
+                        .setConnectionRequestTimeout(Timeout.ofSeconds(10))
+                        .setConnectTimeout(Timeout.ofSeconds(15))
+                        .setResponseTimeout(Timeout.ofMinutes(10))
+                        .build());
+                DownloadResult result = httpClient.execute(request, response -> downloadResponse(response, key));
+                if (result.redirectLocation() != null) {
+                    if (redirects == MAX_REDIRECTS) throw new IllegalStateException("供应商视频重定向次数过多");
+                    try {
+                        current = VideoUrlSecurity.checkedHttps(current.resolve(result.redirectLocation()).toString());
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalStateException(e.getMessage(), e);
+                    }
+                    continue;
+                }
+                return result.imported();
             }
-        } catch (BizException e) { throw e; }
-        catch (Exception e) { throw new IllegalStateException("保存供应商视频失败", e); }
+            throw new IllegalStateException("供应商视频重定向次数过多");
+        } catch (Exception e) {
+            try { storage.delete(key); } catch (RuntimeException ignored) { }
+            if (e instanceof BizException) throw (BizException) e;
+            throw new IllegalStateException("保存供应商视频失败", e);
+        }
+    }
+
+    private DownloadResult downloadResponse(org.apache.hc.core5.http.ClassicHttpResponse response, String key) throws IOException {
+        int status = response.getCode();
+        if (status >= 300 && status < 400) {
+            String location = response.getFirstHeader("Location") == null ? null
+                    : response.getFirstHeader("Location").getValue();
+            EntityUtils.consumeQuietly(response.getEntity());
+            if (location == null || location.isBlank()) throw new IllegalStateException("视频下载响应缺少重定向地址");
+            return new DownloadResult(location, null);
+        }
+        if (status < 200 || status >= 300) {
+            EntityUtils.consumeQuietly(response.getEntity());
+            throw new IllegalStateException("视频下载 HTTP " + status);
+        }
+        HttpEntity entity = response.getEntity();
+        if (entity == null) throw new IllegalStateException("视频下载响应为空");
+        long declaredLength = entity.getContentLength();
+        if (declaredLength > maxProviderBytes) throw new IllegalStateException("视频文件超过大小限制");
+        String contentType = entity.getContentType();
+        if (contentType == null || contentType.isBlank()) contentType = "video/mp4";
+        try (InputStream input = entity.getContent()) {
+            CountingVideoInputStream tracked = new CountingVideoInputStream(input, maxProviderBytes);
+            storage.put(key, tracked, declaredLength > 0 ? declaredLength : -1L, contentType);
+            if (tracked.count() <= 0) throw new IllegalStateException("视频下载内容为空");
+            if (!isVideoContent(contentType, tracked.prefix())) {
+                try { storage.delete(key); } catch (RuntimeException ignored) { }
+                throw new IllegalStateException("供应商返回的内容不是有效视频");
+            }
+            return new DownloadResult(null, new ImportedVideo(key, tracked.count(), contentType));
+        }
+    }
+
+    private boolean isVideoContent(String contentType, byte[] prefix) {
+        String type = contentType.toLowerCase(java.util.Locale.ROOT);
+        if (type.startsWith("video/")) return true;
+        if (!"application/octet-stream".equals(type)) return false;
+        for (int i = 0; i + 4 <= prefix.length && i < 32; i++) {
+            if (prefix[i] == 'f' && prefix[i + 1] == 't' && prefix[i + 2] == 'y' && prefix[i + 3] == 'p') return true;
+        }
+        return prefix.length >= 4 && (prefix[0] == 0x1A && (prefix[1] & 0xff) == 0x45
+                && (prefix[2] & 0xff) == 0xDF && (prefix[3] & 0xff) == 0xA3);
+    }
+
+    private record DownloadResult(String redirectLocation, ImportedVideo imported) {}
+
+    private static final class CountingVideoInputStream extends FilterInputStream {
+        private final long limit;
+        private final java.io.ByteArrayOutputStream prefix = new java.io.ByteArrayOutputStream(64);
+        private long count;
+
+        private CountingVideoInputStream(InputStream input, long limit) {
+            super(input);
+            this.limit = limit;
+        }
+
+        @Override public int read() throws IOException {
+            int value = super.read();
+            if (value >= 0) add(value);
+            return value;
+        }
+
+        @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+            int read = super.read(bytes, offset, length);
+            if (read > 0) {
+                if (prefix.size() < 64) prefix.write(bytes, offset, Math.min(read, 64 - prefix.size()));
+                count += read;
+                if (count > limit) throw new IOException("视频文件超过大小限制");
+            }
+            return read;
+        }
+
+        private void add(int value) throws IOException {
+            count++;
+            if (prefix.size() < 64) prefix.write(value);
+            if (count > limit) throw new IOException("视频文件超过大小限制");
+        }
+
+        private long count() { return count; }
+        private byte[] prefix() { return prefix.toByteArray(); }
     }
 
     public record ImportedVideo(String storageKey, long sizeBytes, String contentType) {}

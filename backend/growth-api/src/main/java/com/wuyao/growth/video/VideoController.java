@@ -28,6 +28,9 @@ public class VideoController {
     @GetMapping("/workflows/{id}")
     public ApiResponse<VideoDtos.View> get(@PathVariable Long id) { return ApiResponse.ok(service.get(id)); }
 
+    @PostMapping("/workflows/{id}/cancel")
+    public ApiResponse<VideoDtos.View> cancel(@PathVariable Long id) { return ApiResponse.ok(service.cancel(id)); }
+
     @GetMapping("/workflows")
     public ApiResponse<PageResult<VideoDtos.History>> history(@RequestParam(defaultValue = "0") int page,
                                                             @RequestParam(defaultValue = "20") int size) {

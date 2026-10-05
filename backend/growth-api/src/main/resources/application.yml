@@ -84,6 +84,17 @@ growth:
     max-polls: ${IMAGE_MAX_POLLS:360}
     font: ${IMAGE_FONT:Microsoft YaHei}
   video:
+    tenant-max-concurrent: ${VIDEO_TENANT_MAX_CONCURRENT:2}
+    global-max-concurrent: ${VIDEO_GLOBAL_MAX_CONCURRENT:20}
+    concurrency-permit-ttl-seconds: ${VIDEO_CONCURRENCY_PERMIT_TTL_SECONDS:21600}
+    max-polls: ${VIDEO_MAX_POLLS:360}
+    max-duration-seconds: ${VIDEO_MAX_DURATION_SECONDS:7200}
+    max-provider-bytes: ${VIDEO_MAX_PROVIDER_BYTES:1073741824}
+    reference-max-bytes: ${VIDEO_REFERENCE_MAX_BYTES:524288000}
+    reference-max-duration-seconds: ${VIDEO_REFERENCE_MAX_DURATION_SECONDS:300}
+    reference-max-width: ${VIDEO_REFERENCE_MAX_WIDTH:4096}
+    reference-max-height: ${VIDEO_REFERENCE_MAX_HEIGHT:4096}
+    ffprobe-path: ${FFPROBE_PATH:ffprobe}
     provider:
       name: ${VIDEO_PROVIDER_NAME:onlyrouter}
       protocol: ${VIDEO_PROVIDER_PROTOCOL:CHAT_COMPLETIONS}

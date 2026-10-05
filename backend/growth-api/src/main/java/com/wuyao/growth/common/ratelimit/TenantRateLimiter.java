@@ -19,7 +19,8 @@ import java.util.List;
 @Component
 public class TenantRateLimiter {
     private static final long PERMIT_TTL_MILLIS = 2 * 60 * 60 * 1000L;
-    private static final String GLOBAL_KEY = "image:global:active";
+    private static final String IMAGE_GLOBAL_KEY = "image:global:active";
+    private static final String VIDEO_GLOBAL_KEY = "video:global:active";
     private static final DefaultRedisScript<Long> ACQUIRE_SCRIPT = new DefaultRedisScript<>("""
             local tenantLimit = tonumber(ARGV[1])
             local globalLimit = tonumber(ARGV[2])
@@ -85,21 +86,8 @@ public class TenantRateLimiter {
             }
         }
         if (tenantLimit < 1 || globalMaxConcurrent < 1) return false;
-        String tenantKey = tenantKey(tenantId);
-        try {
-            Long acquired = redis.execute(ACQUIRE_SCRIPT, List.of(tenantKey, GLOBAL_KEY),
-                Integer.toString(tenantLimit), Integer.toString(globalMaxConcurrent),
-                Long.toString(PERMIT_TTL_MILLIS));
-            if (!Long.valueOf(1L).equals(acquired)) {
-                log.warn("图片生成并发数已达上限: tenant={}/{} global={}", tenantId, tenantLimit, globalMaxConcurrent);
-                return false;
-            }
-            log.debug("租户 {} 获取图片生成许可: tenantLimit={} globalLimit={}", tenantId, tenantLimit, globalMaxConcurrent);
-            return true;
-        } catch (RuntimeException e) {
-            log.error("Redis 图片并发限流不可用，采用闭锁策略: tenant={}", tenantId, e);
-            throw BizException.of(ErrorCode.STORAGE_UNAVAILABLE, "图片并发控制暂时不可用，请稍后重试");
-        }
+        return tryAcquire(tenantId, tenantLimit, globalMaxConcurrent, tenantKey(tenantId), IMAGE_GLOBAL_KEY,
+                PERMIT_TTL_MILLIS, "图片");
     }
 
     /**
@@ -115,12 +103,21 @@ public class TenantRateLimiter {
      * cannot be erased by a later DEL.
      */
     public void releaseImageGeneration(Long tenantId) {
-        try {
-            redis.execute(RELEASE_SCRIPT, List.of(tenantKey(tenantId), GLOBAL_KEY));
-            log.debug("租户 {} 释放图片生成许可", tenantId);
-        } catch (RuntimeException e) {
-            log.error("释放租户图片并发许可失败，等待 TTL 兜底: tenant={}", tenantId, e);
-        }
+        release(tenantKey(tenantId), IMAGE_GLOBAL_KEY, tenantId, "图片");
+    }
+
+    /**
+     * Video jobs use a separate counter namespace. Image and video workloads
+     * therefore cannot consume one another's permits.
+     */
+    public boolean tryAcquireVideoGeneration(Long tenantId, int maxConcurrent, int globalMaxConcurrent,
+                                             long ttlSeconds) {
+        return tryAcquire(tenantId, maxConcurrent, globalMaxConcurrent, videoTenantKey(tenantId),
+                VIDEO_GLOBAL_KEY, Math.max(1L, ttlSeconds) * 1000L, "视频");
+    }
+
+    public void releaseVideoGeneration(Long tenantId) {
+        release(videoTenantKey(tenantId), VIDEO_GLOBAL_KEY, tenantId, "视频");
     }
 
     /**
@@ -131,7 +128,15 @@ public class TenantRateLimiter {
     }
 
     public long getGlobalActiveCount() {
-        return getCount(GLOBAL_KEY);
+        return getCount(IMAGE_GLOBAL_KEY);
+    }
+
+    public long getVideoActiveCount(Long tenantId) {
+        return getCount(videoTenantKey(tenantId));
+    }
+
+    public long getVideoGlobalActiveCount() {
+        return getCount(VIDEO_GLOBAL_KEY);
     }
 
     private long getCount(String key) {
@@ -146,5 +151,36 @@ public class TenantRateLimiter {
 
     private String tenantKey(Long tenantId) {
         return "tenant:" + tenantId + ":image:active";
+    }
+
+    private String videoTenantKey(Long tenantId) {
+        return "tenant:" + tenantId + ":video:active";
+    }
+
+    private boolean tryAcquire(Long tenantId, int tenantLimit, int globalLimit, String tenantKey,
+                               String globalKey, long ttlMillis, String label) {
+        if (tenantLimit < 1 || globalLimit < 1) return false;
+        try {
+            Long acquired = redis.execute(ACQUIRE_SCRIPT, List.of(tenantKey, globalKey),
+                    Integer.toString(tenantLimit), Integer.toString(globalLimit), Long.toString(ttlMillis));
+            if (!Long.valueOf(1L).equals(acquired)) {
+                log.warn("{}生成并发数已达上限: tenant={}/{} global={}", label, tenantId, tenantLimit, globalLimit);
+                return false;
+            }
+            log.debug("租户 {} 获取{}生成许可: tenantLimit={} globalLimit={}", tenantId, label, tenantLimit, globalLimit);
+            return true;
+        } catch (RuntimeException e) {
+            log.error("Redis {}并发限流不可用，拒绝本次创建: tenant={}", label, tenantId, e);
+            throw BizException.of(ErrorCode.STORAGE_UNAVAILABLE, label + "并发控制暂时不可用，请稍后重试");
+        }
+    }
+
+    private void release(String tenantKey, String globalKey, Long tenantId, String label) {
+        try {
+            redis.execute(RELEASE_SCRIPT, List.of(tenantKey, globalKey));
+            log.debug("租户 {} 释放{}生成许可", tenantId, label);
+        } catch (RuntimeException e) {
+            log.error("释放租户{}生成并发许可失败，等待 TTL 兜底: tenant={}", label, tenantId, e);
+        }
     }
 }

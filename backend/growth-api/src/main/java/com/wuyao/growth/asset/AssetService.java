@@ -45,6 +45,14 @@ public class AssetService {
     private Duration presignTtl;
     @Value("${growth.image.upload-max-pixels:50000000}")
     private long maxImagePixels;
+    @Value("${growth.video.reference-max-bytes:524288000}")
+    private long maxVideoReferenceBytes;
+    @Value("${growth.video.reference-max-duration-seconds:300}")
+    private int maxVideoReferenceDurationSeconds;
+    @Value("${growth.video.reference-max-width:4096}")
+    private int maxVideoReferenceWidth;
+    @Value("${growth.video.reference-max-height:4096}")
+    private int maxVideoReferenceHeight;
 
     @Transactional(readOnly = true)
     public ImageReference imageReference(Long id) {
@@ -63,6 +71,16 @@ public class AssetService {
                 .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
         if (!"READY".equals(asset.getStatus()) || !expectedType.equals(asset.getType())) {
             throw BizException.of(ErrorCode.BAD_REQUEST, "请使用已上传完成的" + expectedType + "素材");
+        }
+        if ("VIDEO".equals(expectedType)) {
+            if (asset.getSizeBytes() == null || asset.getSizeBytes() <= 0 || asset.getSizeBytes() > maxVideoReferenceBytes
+                    || asset.getDurationMs() == null || asset.getDurationMs() <= 0
+                    || asset.getDurationMs() > maxVideoReferenceDurationSeconds * 1000L
+                    || asset.getWidth() == null || asset.getWidth() < 1 || asset.getWidth() > maxVideoReferenceWidth
+                    || asset.getHeight() == null || asset.getHeight() < 1 || asset.getHeight() > maxVideoReferenceHeight
+                    || asset.getMimeType() == null || !asset.getMimeType().toLowerCase(java.util.Locale.ROOT).startsWith("video/")) {
+                throw BizException.of(ErrorCode.BAD_REQUEST, "参考视频尚未完成媒体校验，或超过支持范围");
+            }
         }
         return new MediaReference(asset.getId(), asset.getStorageKey(), asset.getMimeType(), asset.getDurationMs());
     }
@@ -97,13 +115,16 @@ public class AssetService {
     public AssetDtos.AssetView confirmUpload(Long assetId, AssetDtos.ConfirmRequest req, Long userId) {
         Asset asset = repository.findForUpdate(assetId)
                 .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
-        if ("READY".equals(asset.getStatus())) return view(asset);
+        if ("READY".equals(asset.getStatus()) && !("VIDEO".equals(asset.getType())
+                && (asset.getDurationMs() == null || asset.getWidth() == null || asset.getHeight() == null))) {
+            return view(asset);
+        }
         var stored = storage.stat(asset.getStorageKey())
                 .orElseThrow(() -> BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "文件尚未上传完成"));
         if (req.sizeBytes() != null && req.sizeBytes() != stored.sizeBytes()) {
             throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "文件大小与上传声明不一致");
         }
-        asset.setStatus("READY");
+        asset.setStatus("VIDEO".equals(asset.getType()) ? "VERIFYING" : "READY");
         asset.setSizeBytes(stored.sizeBytes());
         if ("IMAGE".equals(asset.getType())) {
             byte[] bytes = storage.read(asset.getStorageKey(), 20 * 1024 * 1024);
@@ -122,6 +143,15 @@ public class AssetService {
             asset.setHeight(image.getHeight());
             asset.setMimeType(stored.contentType());
             asset.setSha256(sha256(bytes));
+        } else if ("VIDEO".equals(asset.getType())) {
+            if (stored.sizeBytes() <= 0 || stored.sizeBytes() > maxVideoReferenceBytes) {
+                throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "参考视频超过大小限制");
+            }
+            String type = stored.contentType() == null ? "" : stored.contentType().toLowerCase(java.util.Locale.ROOT);
+            if (!type.isBlank() && !type.startsWith("video/") && !"application/octet-stream".equals(type)) {
+                throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "参考视频的媒体类型无效");
+            }
+            asset.setMimeType(stored.contentType());
         } else {
             asset.setMimeType(stored.contentType());
         }
@@ -129,7 +159,7 @@ public class AssetService {
 
         // 交给 worker 去补宽高/时长这类要读文件才知道的元数据
         taskService.submit(AssetProbeHandler.TYPE, "DEFAULT",
-                Map.of("assetId", assetId), "asset-probe-" + assetId, userId);
+                Map.of("assetId", assetId), "asset-probe-" + assetId + "-" + asset.getUpdatedAt().toEpochMilli(), userId);
 
         return view(asset);
     }

@@ -7,15 +7,22 @@ import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.util.Timeout;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -28,8 +35,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class VideoProviderGateway {
+    private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+
     private final ObjectMapper json;
     private final AssetService assets;
+    private final HttpClient httpClient;
 
     @Value("${growth.video.provider.base-url:https://api.onlyrouter.ai/v1}") private String baseUrl;
     @Value("${growth.video.provider.api-key:}") private String apiKey;
@@ -73,7 +83,7 @@ public class VideoProviderGateway {
             var input = new LinkedHashMap<String, Object>();
             input.put("type", "video");
             input.put("url", assets.presignedReference(request.referenceVideoAssetId(), "VIDEO"));
-            input.put("duration", reference.durationMs() == null ? request.durationSeconds() : Math.max(1, reference.durationMs() / 1000));
+            input.put("duration", Math.max(1, reference.durationMs() / 1000));
             body.put("input_reference", input);
         }
         JsonNode response = send("POST", submitPath, body, idempotencyKey);
@@ -92,70 +102,109 @@ public class VideoProviderGateway {
 
     public String providerName() { return providerName; }
 
+    /** The only protocol currently implemented by this gateway. */
     public String protocol() { return protocol; }
 
     private JsonNode send(String method, String path, Map<String, Object> body, String idempotencyKey) {
         try {
-            String url = baseUrl.replaceAll("/$", "") + (path.startsWith("/") ? path : "/" + path);
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(timeoutSeconds))
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                    .header("Idempotency-Key", idempotencyKey == null ? "" : idempotencyKey)
-                    .header(HttpHeaders.ACCEPT, "application/json");
-            if ("POST".equals(method)) {
-                builder.header(HttpHeaders.CONTENT_TYPE, "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
-            } else {
-                builder.GET();
+            URI endpoint = VideoUrlSecurity.checkedHttps(joinUrl(path));
+            if (!"CHAT_COMPLETIONS".equalsIgnoreCase(protocol)) {
+                throw providerError("视频供应商协议暂不支持: " + protocol);
             }
-            HttpResponse<String> result = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NEVER).build()
-                    .send(builder.build(), HttpResponse.BodyHandlers.ofString());
-            if (result.statusCode() / 100 != 2) {
-                String detail = providerErrorDetail(result.body());
-                log.warn("视频供应商请求失败: method={} path={} status={} detail={}", method, path, result.statusCode(), detail);
-                throw providerError("供应商响应 HTTP " + result.statusCode()
-                        + (detail == null ? "" : ": " + detail));
+            var request = "POST".equals(method) ? new HttpPost(endpoint) : new HttpGet(endpoint);
+            request.setConfig(requestConfig());
+            request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+            request.setHeader(HttpHeaders.ACCEPT, "application/json");
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                request.setHeader("Idempotency-Key", idempotencyKey);
             }
-            return json.readTree(result.body());
+            if (request instanceof HttpPost post) {
+                post.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+                post.setEntity(new StringEntity(json.writeValueAsString(body), ContentType.APPLICATION_JSON));
+            }
+            return httpClient.execute(request, response -> {
+                int status = response.getCode();
+                String responseBody = readBody(response.getEntity(), MAX_RESPONSE_BYTES);
+                if (status / 100 != 2) {
+                    String detail = providerErrorDetail(responseBody);
+                    log.warn("视频供应商请求失败: method={} path={} status={} detail={}", method, path, status, detail);
+                    throw providerError("供应商响应 HTTP " + status + (detail == null ? "" : ": " + detail));
+                }
+                return json.readTree(responseBody);
+            });
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
+            log.warn("视频供应商请求异常: method={} path={} type={}", method, path, e.getClass().getSimpleName());
             throw BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, "视频供应商请求失败，请稍后重试");
         }
     }
 
     private String resolveContentUrl(String jobId) {
         try {
-            URI current = URI.create(baseUrl.replaceAll("/$", "") + "/"
-                    + contentPath.replace("{jobId}", jobId).replaceFirst("^/", ""));
+            URI current = VideoUrlSecurity.checkedHttps(joinUrl(contentPath.replace("{jobId}", jobId)));
             String providerHost = current.getHost();
-            HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
-            for (int redirects = 0; redirects < 5; redirects++) {
-                HttpRequest request = HttpRequest.newBuilder(current).timeout(Duration.ofSeconds(timeoutSeconds))
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey).GET().build();
-                HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
-                if (response.statusCode() / 100 == 2) return current.toString();
-                if (response.statusCode() < 300 || response.statusCode() >= 400
-                        || response.headers().firstValue("location").isEmpty()) {
-                    throw providerError("获取视频内容地址失败，HTTP " + response.statusCode());
+            for (int redirects = 0; redirects <= 5; redirects++) {
+                var request = new HttpGet(current);
+                request.setConfig(requestConfig());
+                if (providerHost.equalsIgnoreCase(current.getHost())) {
+                    request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
                 }
-                URI next = current.resolve(response.headers().firstValue("location").orElseThrow());
-                if (!"https".equalsIgnoreCase(next.getScheme())) {
-                    throw providerError("获取视频内容地址失败，返回地址不是 HTTPS");
+                RedirectResponse response = httpClient.execute(request, result -> {
+                    int status = result.getCode();
+                    String location = result.getFirstHeader(HttpHeaders.LOCATION) == null ? null
+                            : result.getFirstHeader(HttpHeaders.LOCATION).getValue();
+                    EntityUtils.consumeQuietly(result.getEntity());
+                    return new RedirectResponse(status, location);
+                });
+                if (response.status() / 100 == 2) {
+                    if (!providerHost.equalsIgnoreCase(current.getHost())) return current.toString();
+                    throw providerError("获取视频内容地址失败，供应商未返回可下载地址");
                 }
-                if (providerHost == null || !providerHost.equalsIgnoreCase(next.getHost())) return next.toString();
+                if (response.status() < 300 || response.status() >= 400
+                        || response.location() == null || response.location().isBlank()) {
+                    throw providerError("获取视频内容地址失败，HTTP " + response.status());
+                }
+                URI next = VideoUrlSecurity.checkedHttps(current.resolve(response.location()).toString());
+                if (!providerHost.equalsIgnoreCase(next.getHost())) return next.toString();
                 current = next;
             }
             throw providerError("获取视频内容地址失败，重定向次数过多");
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
+            log.warn("获取视频内容地址异常: type={}", e.getClass().getSimpleName());
             throw BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, "获取视频内容地址失败");
+        }
+    }
+
+    private RequestConfig requestConfig() {
+        return RequestConfig.custom()
+                .setConnectionRequestTimeout(Timeout.ofSeconds(10))
+                .setConnectTimeout(Timeout.ofSeconds(15))
+                .setResponseTimeout(Timeout.ofSeconds(Math.max(1, timeoutSeconds)))
+                .build();
+    }
+
+    private String joinUrl(String path) {
+        return baseUrl.replaceAll("/$", "") + "/" + path.replaceFirst("^/", "");
+    }
+
+    private String readBody(HttpEntity entity, int limit) throws IOException {
+        if (entity == null) return "";
+        if (entity.getContentLength() > limit) throw new IOException("供应商响应过大");
+        try (var input = entity.getContent()) {
+            byte[] bytes = input.readNBytes(limit + 1);
+            if (bytes.length > limit) throw new IOException("供应商响应过大");
+            return new String(bytes, StandardCharsets.UTF_8);
         }
     }
 
     private void requireConfigured() {
         if (!configured()) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频供应商尚未配置，请联系管理员");
+        if (!"CHAT_COMPLETIONS".equalsIgnoreCase(protocol)) {
+            throw BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, "视频供应商协议暂不支持: " + protocol);
+        }
     }
 
     private BizException providerError(String message) { return BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, message); }
@@ -207,6 +256,8 @@ public class VideoProviderGateway {
         }
         return firstText(node, "message");
     }
+
+    private record RedirectResponse(int status, String location) {}
 
     public record SubmitResult(String provider, String providerJobId, String status) {}
     public record PollResult(String status, String resultUrl, String error) {}

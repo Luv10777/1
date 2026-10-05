@@ -34,12 +34,6 @@ public interface ObjectStorage {
 
     void put(String key, byte[] data, String contentType);
 
-    /** Stream a provider response directly into object storage. */
-    default void put(String key, InputStream data, long size, String contentType) {
-        try {
-            put(key, data.readAllBytes(), contentType);
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException("读取对象流失败", e);
-        }
-    }
+    /** Stream a provider response directly into object storage. Implementations must not buffer it in the JVM. */
+    void put(String key, InputStream data, long size, String contentType);
 }

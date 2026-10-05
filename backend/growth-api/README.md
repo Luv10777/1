@@ -113,6 +113,22 @@ WHERE tenant_id = 1;
 新租户的 `concurrent_limit` 数据库默认值为 20；该字段有值时优先于
 `IMAGE_TENANT_MAX_CONCURRENT`。修改默认值需要数据库迁移，调整已有租户可用上述 SQL。
 
+视频工作流使用独立的 Redis 许可计数，不与图片任务共用计数：
+
+| 配置 | 默认值 | 含义 |
+|---|---:|---|
+| `VIDEO_TENANT_MAX_CONCURRENT` | `2` | 单租户允许占用的视频工作流许可数 |
+| `VIDEO_GLOBAL_MAX_CONCURRENT` | `20` | 所有租户共享的视频工作流许可数 |
+| `VIDEO_CONCURRENCY_PERMIT_TTL_SECONDS` | `21600` | worker 崩溃后的许可自动回收时间 |
+| `VIDEO_MAX_POLLS` | `360` | 单个视频最多轮询次数 |
+| `VIDEO_MAX_DURATION_SECONDS` | `7200` | 单个视频从创建到终态的最长时间 |
+| `VIDEO_MAX_PROVIDER_BYTES` | `1073741824` | 供应商视频导入大小上限；导入采用流式写入 |
+
+许可只在工作流处于 `QUEUED` 到终态期间持有，成功、失败、取消和超时都会幂等释放。
+许可控制的是可接受的活跃工作流数量；实际同时执行的任务仍由
+`growth.worker.parallelism` 决定。默认 worker 为 1 个执行槽，生产可在确认 CPU、内存和供应商配额后提高，
+但不能超过视频全局许可上限。
+
 生产启动应使用 `--spring.profiles.active=prod`。该 profile 会拒绝本地对象存储、
 开发数据库密码和默认 MinIO 凭证，并默认不公开 Prometheus；监控采集需通过内网或
 受保护的管理入口开启 `MANAGEMENT_EXPOSURE_INCLUDE=health,prometheus`。
@@ -162,12 +178,17 @@ V5 只添加账号字段，不包含任何默认账号或密码；实际凭证�
 但必须定义自己完整的业务契约，不能直接复制占位行为。
 
 上传流程：调用 `POST /api/assets/upload-url`，前端向返回地址 PUT 文件，
-再调用 `POST /api/assets/{id}/confirm`。确认接口只在对象存在时返回 `READY`。
+再调用 `POST /api/assets/{id}/confirm`。图片确认成功后返回 `READY`；视频会先返回
+`VERIFYING`，待媒体探测任务通过后才变成 `READY`。
 
 `sizeBytes` 可省略；提供时必须非负并与对象存储返回的大小一致。
 落库大小取自对象存储。`sha256` 字段仅兼容旧请求，可信哈希由服务端读取对象后计算并保存。
 图片确认阶段会使用 `ImageIO` 实际解码、校验像素上限并保存宽高；探测任务会再次
-验证对象仍存在，结果返回 `objectVerified=true, probed=true`。视频和音频的时长解析仍待后续媒体元数据模块实现。
+验证对象仍存在，结果返回 `objectVerified=true, probed=true`。视频确认后进入
+`VERIFYING`，由 `ffprobe` 解析视频轨道、时长、宽高和容器格式，只有通过校验才会变成
+`READY`。参考视频默认限制为 500 MB、300 秒、4096×4096；可通过
+`VIDEO_REFERENCE_MAX_BYTES`、`VIDEO_REFERENCE_MAX_DURATION_SECONDS`、
+`VIDEO_REFERENCE_MAX_WIDTH` 和 `VIDEO_REFERENCE_MAX_HEIGHT` 调整。
 
 素材分页限制 `size` 在 1–100 之间。重复确认已就绪素材返回已有记录，不重复创建任务。
 

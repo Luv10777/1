@@ -39,6 +39,7 @@ public class VideoWorkflow {
     @Column(name = "provider_status", length = 32) private String providerStatus;
     @Column(name = "provider_result_url", columnDefinition = "text") private String providerResultUrl;
     @Column(name = "poll_round", nullable = false) private int pollRound;
+    @Column(name = "video_concurrency_permit_held", nullable = false) private boolean videoConcurrencyPermitHeld;
     @Column(name = "output_asset_id") private Long outputAssetId;
     @Column(name = "output_storage_key", length = 500) private String outputStorageKey;
     @Column(name = "error_code", length = 64) private String errorCode;
