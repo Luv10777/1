@@ -2,6 +2,7 @@ package com.wuyao.growth.video;
 
 import com.wuyao.growth.common.task.Task;
 import com.wuyao.growth.common.task.TaskHandler;
+import com.wuyao.growth.common.task.NonRetryableTaskException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,10 @@ public class VideoPollHandler implements TaskHandler {
             service.savePoll(workflowId, task, result);
             return Map.of("status", result.status(), "hasUrl", result.resultUrl() != null);
         } catch (RuntimeException e) {
+            if (e instanceof VideoProviderGateway.ProviderHttpException providerError && !providerError.retryable()) {
+                service.markFailed(workflowId, "VIDEO_PROVIDER_FAILED", providerError.getMessage());
+                throw new NonRetryableTaskException("VIDEO_PROVIDER_ERROR", providerError.getMessage(), providerError);
+            }
             if (task.getAttempts() >= task.getMaxAttempts()) service.markFailed(workflowId, "VIDEO_POLL_FAILED", e.getMessage());
             throw e;
         }

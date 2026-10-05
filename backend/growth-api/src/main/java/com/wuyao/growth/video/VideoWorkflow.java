@@ -13,6 +13,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 
 @Entity
 @Table(name = "video_workflows")
@@ -38,6 +39,8 @@ public class VideoWorkflow {
     @Column(name = "provider_job_id", length = 200) private String providerJobId;
     @Column(name = "provider_status", length = 32) private String providerStatus;
     @Column(name = "provider_result_url", columnDefinition = "text") private String providerResultUrl;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "provider_submit_request", columnDefinition = "jsonb")
+    private Map<String, Object> providerSubmitRequest;
     @Column(name = "poll_round", nullable = false) private int pollRound;
     @Column(name = "video_concurrency_permit_held", nullable = false) private boolean videoConcurrencyPermitHeld;
     @Column(name = "output_asset_id") private Long outputAssetId;

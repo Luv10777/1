@@ -36,6 +36,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -138,6 +139,25 @@ public class VideoWorkflowService {
         workflow.setStage("SUBMIT");
         workflow.setProgress(8);
         return true;
+    }
+
+    /**
+     * Keep signed reference URLs stable across retries of the same provider request.
+     * A provider idempotency key is only safe when the request body is byte-for-byte stable.
+     */
+    @Transactional
+    public Optional<Map<String, Object>> prepareSubmissionRequest(Long workflowId, Task task,
+                                                                    Map<String, Object> candidate) {
+        if (!tasks.ownsExecution(task)) return Optional.empty();
+        VideoWorkflow workflow = lock(workflowId);
+        if (!Objects.equals(workflow.getTaskId(), task.getId())
+                || Set.of("SUCCEEDED", "FAILED", "CANCELED").contains(workflow.getStatus())) {
+            return Optional.empty();
+        }
+        if (workflow.getProviderSubmitRequest() == null || workflow.getProviderSubmitRequest().isEmpty()) {
+            workflow.setProviderSubmitRequest(candidate);
+        }
+        return Optional.of(workflow.getProviderSubmitRequest());
     }
 
     @Transactional

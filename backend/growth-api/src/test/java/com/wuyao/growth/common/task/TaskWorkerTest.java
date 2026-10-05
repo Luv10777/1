@@ -132,6 +132,28 @@ class TaskWorkerTest {
         }
     }
 
+    @Test
+    void permanentHandlerFailureDoesNotScheduleAnotherAttempt() {
+        TaskService service = mock(TaskService.class);
+        Task task = task(1L, "VIDEO_TEST");
+        when(service.claim("VIDEO", 1)).thenReturn(List.of(task), List.of());
+        TaskHandler handler = new TaskHandler() {
+            public String type() { return "VIDEO_TEST"; }
+            public Map<String, Object> handle(Task ignored) {
+                throw new NonRetryableTaskException("VIDEO_PROVIDER_ERROR", "invalid provider request", null);
+            }
+        };
+        var worker = new TaskWorker(service, List.of(handler), List.of("VIDEO"), 1,
+            Duration.ofMinutes(30), 20, 1);
+        try {
+            worker.poll();
+            verify(service, timeout(3000)).failPermanently(1L, 1, "VIDEO_PROVIDER_ERROR", "invalid provider request");
+            verify(service, never()).fail(anyLong(), anyInt(), anyString(), anyString());
+        } finally {
+            worker.stop();
+        }
+    }
+
     private Task task(Long id, String type) {
         Task task = new Task();
         task.setId(id);

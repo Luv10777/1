@@ -137,6 +137,19 @@ public class TaskService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean failPermanently(Long taskId, int attempt, String errorCode, String errorMessage) {
+        var owned = repository.findOwnedRunning(taskId, attempt);
+        if (owned.isEmpty()) return false;
+        Task task = owned.get();
+        task.setErrorCode(errorCode);
+        task.setErrorMessage(errorMessage);
+        task.setLeaseExpiresAt(null);
+        task.setStatus(TaskStatus.FAILED);
+        task.setFinishedAt(Instant.now());
+        return true;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int reclaimExpired() {
         List<Long> ids = repository.reclaimExpired();
         if (!ids.isEmpty()) log.warn("回收租约过期或重试耗尽的任务: {}", ids);

@@ -115,7 +115,11 @@ public class TaskWorker {
             }
         } catch (Exception e) {
             log.warn("任务执行异常: id={} type={}", task.getId(), task.getType(), e);
-            taskService.fail(task.getId(), task.getAttempts(), "HANDLER_ERROR", e.getMessage());
+            if (e instanceof NonRetryableTaskException permanent) {
+                taskService.failPermanently(task.getId(), task.getAttempts(), permanent.errorCode(), permanent.getMessage());
+            } else {
+                taskService.fail(task.getId(), task.getAttempts(), "HANDLER_ERROR", e.getMessage());
+            }
         } finally {
             activeTasks.remove(task.getId());
             slots.release();

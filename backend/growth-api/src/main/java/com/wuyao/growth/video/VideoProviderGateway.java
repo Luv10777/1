@@ -60,6 +60,11 @@ public class VideoProviderGateway {
 
     public SubmitResult submit(VideoDtos.Create request, String idempotencyKey) {
         requireConfigured();
+        return submit(buildSubmitRequest(request), idempotencyKey);
+    }
+
+    /** Build once and persist this request before the first provider call. */
+    public Map<String, Object> buildSubmitRequest(VideoDtos.Create request) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerModel(request.model()));
         body.put("seconds", request.durationSeconds());
@@ -72,7 +77,8 @@ public class VideoProviderGateway {
             var content = new java.util.ArrayList<Map<String, Object>>();
             if (!prompt.isBlank()) content.add(Map.of("type", "text", "text", prompt));
             for (Long assetId : request.referenceImageAssetIds()) {
-                content.add(Map.of("type", "image_url", "image_url", Map.of("url", assets.presignedReference(assetId, "IMAGE"))));
+                content.add(Map.of("type", "image_url", "role", "reference_image",
+                        "image_url", Map.of("url", assets.presignedReference(assetId, "IMAGE"))));
             }
             body.put("content", content);
         } else if (!prompt.isBlank()) {
@@ -86,6 +92,11 @@ public class VideoProviderGateway {
             input.put("duration", Math.max(1, reference.durationMs() / 1000));
             body.put("input_reference", input);
         }
+        return body;
+    }
+
+    public SubmitResult submit(Map<String, Object> body, String idempotencyKey) {
+        requireConfigured();
         JsonNode response = send("POST", submitPath, body, idempotencyKey);
         String jobId = firstText(response, "id", "task_id", "job_id");
         if (jobId == null) throw providerError("供应商未返回任务 ID");
@@ -128,7 +139,8 @@ public class VideoProviderGateway {
                 if (status / 100 != 2) {
                     String detail = providerErrorDetail(responseBody);
                     log.warn("视频供应商请求失败: method={} path={} status={} detail={}", method, path, status, detail);
-                    throw providerError("供应商响应 HTTP " + status + (detail == null ? "" : ": " + detail));
+                    throw new ProviderHttpException(status,
+                            "供应商响应 HTTP " + status + (detail == null ? "" : ": " + detail));
                 }
                 return json.readTree(responseBody);
             });
@@ -208,6 +220,22 @@ public class VideoProviderGateway {
     }
 
     private BizException providerError(String message) { return BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, message); }
+
+    /** HTTP validation/conflict errors cannot be repaired by replaying the same task. */
+    public static final class ProviderHttpException extends BizException {
+        private final int status;
+
+        public ProviderHttpException(int status, String message) {
+            super(ErrorCode.VIDEO_PROVIDER_ERROR, message);
+            this.status = status;
+        }
+
+        public int status() { return status; }
+
+        public boolean retryable() {
+            return status == 408 || status == 429 || status >= 500;
+        }
+    }
 
     private String providerErrorDetail(String body) {
         if (body == null || body.isBlank()) return null;
