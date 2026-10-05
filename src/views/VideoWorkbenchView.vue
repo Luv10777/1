@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { get, post } from '../utils/request'
+import { assetSource, assets as platformAssets } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 
 const prompt = ref('')
@@ -13,6 +14,11 @@ const referenceImages = ref([])
 const referenceVideo = ref(null)
 const imageInput = ref(null)
 const videoInput = ref(null)
+const libraryOpen = ref(false)
+const libraryLoading = ref(false)
+const libraryError = ref('')
+const libraryQuery = ref('')
+const libraryAssets = ref([])
 const capabilities = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
@@ -172,6 +178,37 @@ const addImageFiles = (fileList) => {
   referenceImages.value = [...referenceImages.value, ...images.slice(0, remaining).map(file => ({ id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }))]
 }
 const previewUrl = file => { const url = URL.createObjectURL(file); objectUrls.add(url); return url }
+const openImageLibrary = async () => {
+  libraryOpen.value = true
+  libraryLoading.value = true
+  libraryError.value = ''
+  libraryQuery.value = ''
+  try {
+    const page = await get('/api/assets', { page: 0, size: 100 })
+    libraryAssets.value = (page.items || []).filter(asset => asset.type === 'IMAGE').map(asset => ({
+      id: asset.id,
+      assetId: asset.id,
+      name: asset.name,
+      url: asset.previewUrl || asset.mediaUrl || assetSource(asset),
+      file: null,
+    }))
+  } catch (error) {
+    libraryAssets.value = platformAssets.value.filter(asset => asset.kind === 'image').map(asset => ({ id: asset.id, assetId: null, name: asset.name, url: assetSource(asset), file: null }))
+    if (!libraryAssets.value.length) libraryError.value = error.message || '素材库暂时无法加载'
+  } finally {
+    libraryLoading.value = false
+  }
+}
+const visibleLibraryAssets = computed(() => {
+  const query = libraryQuery.value.trim().toLowerCase()
+  return libraryAssets.value.filter(asset => !query || asset.name.toLowerCase().includes(query))
+})
+const selectLibraryImage = asset => {
+  const remaining = Math.max(0, 6 - referenceImages.value.length)
+  if (!remaining) { activeConversation.value.notice = '最多添加 6 张参考图。'; return }
+  referenceImages.value = [...referenceImages.value, { ...asset, id: `library-${asset.assetId || asset.id}` }]
+  libraryOpen.value = false
+}
 const addVideoFile = (fileList) => {
   const file = Array.from(fileList || []).find(item => item.type.startsWith('video/'))
   if (!file) return
@@ -314,11 +351,10 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
             <h2 class="text-sm font-semibold text-gray-800">添加参考图 <em>可选</em></h2>
             <span class="text-xs text-gray-400">{{ referenceImages.length }} 张</span>
           </div>
-          <button class="video-upload-zone w-full h-32 bg-gray-50 rounded-2xl border border-gray-200 hover:border-cinnabar-300 hover:bg-cinnabar-50/30 transition-all flex flex-col items-center justify-center gap-2 group" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleImageDrop">
-            <span class="material-symbols-outlined text-cinnabar-500 group-hover:scale-110 transition-transform">add_photo_alternate</span>
-            <strong class="text-sm font-medium text-gray-600">+ 添加参考图</strong>
-            <small class="text-xs text-gray-400">JPG、PNG · 可拖拽上传</small>
-          </button>
+          <div class="video-upload-actions">
+            <button class="video-upload-source" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleImageDrop"><span class="material-symbols-outlined">upload</span><strong>从本地上传</strong><small>JPG、PNG · 可拖拽上传</small></button>
+            <button class="video-upload-source" type="button" @click="openImageLibrary"><span class="material-symbols-outlined">photo_library</span><strong>从素材库上传</strong><small>选择平台已有素材</small></button>
+          </div>
           <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleImageChange">
           <div v-if="referenceImages.length" class="video-asset-strip flex overflow-x-auto gap-2 mt-3">
             <div v-for="asset in referenceImages" :key="asset.id" class="video-asset-thumb relative">
@@ -446,5 +482,17 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
       <div class="video-canvas-hint absolute bottom-8 z-10 text-xs text-gray-600 tracking-wider pointer-events-none"><span>把商家的日常，写成值得记住的影像。</span></div>
     </div>
+    <Transition name="video-library-fade">
+      <div v-if="libraryOpen" class="video-library-modal" role="dialog" aria-modal="true" aria-label="选择平台素材" @click.self="libraryOpen = false">
+        <section class="video-library-card">
+          <header class="video-library-header"><div><span>YIFANGZHI LIBRARY</span><h2>选择参考图</h2><small>从一方志素材库中选择已上传图片</small></div><button type="button" aria-label="关闭素材库" @click="libraryOpen = false">×</button></header>
+          <label class="video-library-search"><span class="material-symbols-outlined">search</span><input v-model="libraryQuery" autofocus type="search" placeholder="搜索素材名称" /></label>
+          <div v-if="libraryLoading" class="video-library-state" role="status">正在读取素材库…</div>
+          <div v-else-if="libraryError" class="video-library-state is-error" role="status">{{ libraryError }}</div>
+          <div v-else-if="!visibleLibraryAssets.length" class="video-library-state">素材库中暂时没有可用图片。</div>
+          <div v-else class="video-library-grid"><button v-for="asset in visibleLibraryAssets" :key="asset.id" type="button" class="video-library-item" @click="selectLibraryImage(asset)"><span class="video-library-thumb"><img :src="asset.url" :alt="asset.name"></span><span><strong>{{ asset.name }}</strong><small>图片素材</small></span><span class="material-symbols-outlined">arrow_forward</span></button></div>
+        </section>
+      </div>
+    </Transition>
   </div>
 </template>
