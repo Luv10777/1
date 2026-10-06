@@ -122,7 +122,7 @@ public class MinioObjectStorage implements ObjectStorage {
     public void put(String key, java.io.InputStream data, long size, String contentType) {
         try {
             client.putObject(PutObjectArgs.builder().bucket(bucket).object(key)
-                    .stream(data, size, -1)
+                    .stream(data, size, size < 0 ? 10L * 1024 * 1024 : -1)
                     .contentType(contentType == null || contentType.isBlank() ? "application/octet-stream" : contentType)
                     .build());
         } catch (Exception e) {

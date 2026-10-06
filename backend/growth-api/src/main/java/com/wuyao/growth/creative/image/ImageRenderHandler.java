@@ -74,10 +74,15 @@ public class ImageRenderHandler implements TaskHandler {
      // persisted prompt; it never performs a per-image text fallback call.
      String finalPrompt=withTextRequirements(item.getSpec().prompt(),c.getRequest().workflow(),item.getSpec());
       boolean synchronous=directUrl;
+     // Waiting can fail before any paid request. Keep it outside the provider-outcome catch.
+     try {
+       apiRateLimiter.waitForPermission();
+     } catch(RuntimeException e) {
+       service.recordSubmissionWaitFailure(id,task,e.getMessage());
+       throw e;
+     }
       if(item.getProviderJobId()==null && !service.reserveProviderSubmission(id,task)) return Map.of("status","NOT_RESUBMITTED");
      try {
-     // 全局 API 限流,防止压垮图片模型服务
-     apiRateLimiter.waitForPermission();
      long providerStarted=System.nanoTime();
      log.info("图片生成阶段开始: itemId={} model={} singleRequest=true",id,config.getGenerator().getModel());
      var response=gateway.invokeReal(new ProviderRequest(ModelAlias.IMAGE_PRIMARY,c.getTenantId(),

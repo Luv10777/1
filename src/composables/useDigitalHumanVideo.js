@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { isVideoInProgress } from '../services/videoConversations'
+import { isVideoInProgress, videoCompletionNotice } from '../services/videoConversations'
 import { videoApi, uploadVideoReference } from '../services/videoWorkflow'
 
 export function useDigitalHumanVideo() {
@@ -11,7 +11,7 @@ export function useDigitalHumanVideo() {
   const isGenerating = computed(() => submitting.value || isVideoInProgress(workflow.value))
   const outputUrl = computed(() => workflow.value?.outputUrl || '')
   const stageLabel = computed(() => submitting.value ? '正在提交创作' : ({ SUBMIT: '正在提交创作', POLL: '画面渲染中', IMPORT: '正在保存成片', QA: '正在检查成片' }[workflow.value?.stage] || '画面渲染中'))
-  const notice = computed(() => error.value || (submitting.value ? '正在上传参考素材并提交视频任务…' : workflow.value?.status === 'SUCCEEDED' ? '视频已完成并保存到作品库。' : ''))
+  const notice = computed(() => error.value || (submitting.value ? '正在上传参考素材并提交视频任务…' : workflow.value?.status === 'SUCCEEDED' ? videoCompletionNotice(workflow.value) : ''))
   let timer
   let disposed = false
   let requestKey = ''
@@ -19,7 +19,7 @@ export function useDigitalHumanVideo() {
 
   const updateWorkflow = result => {
     workflow.value = result
-    error.value = ['FAILED', 'CANCELED'].includes(result.status) ? result.error || '视频生成失败，请稍后重试。' : ''
+    error.value = ['FAILED', 'CANCELLED'].includes(result.status) ? result.error || '视频生成失败，请稍后重试。' : ''
   }
   const schedulePoll = () => {
     window.clearTimeout(timer)

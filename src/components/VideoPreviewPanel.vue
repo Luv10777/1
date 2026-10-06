@@ -1,8 +1,14 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   isGenerating: Boolean,
   isMorphing: Boolean,
   outputUrl: { type: String, default: '' },
+  actualWidth: { type: Number, default: null },
+  actualHeight: { type: Number, default: null },
+  actualDurationMs: { type: Number, default: null },
+  qaWarnings: { type: Array, default: () => [] },
   format: { type: String, default: 'auto' },
   modelLabel: { type: String, required: true },
   duration: { type: Number, default: 10 },
@@ -12,6 +18,10 @@ defineProps({
   continueText: { type: String, default: '可以切换创作记录，或开启一段新的创作。' },
   error: { type: String, default: '' },
 })
+const actualSummary = computed(() => [
+  props.actualWidth > 0 && props.actualHeight > 0 ? `${props.actualWidth} × ${props.actualHeight} px` : '尺寸未记录',
+  props.actualDurationMs > 0 ? `${props.actualDurationMs / 1000} 秒` : '时长未记录',
+].join(' · '))
 defineEmits(['switch-workspace'])
 </script>
 
@@ -54,13 +64,23 @@ defineEmits(['switch-workspace'])
               <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
             </span>
             <div class="device-copy text-center space-y-2">
-              <strong class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ error ? '视频生成失败' : outputUrl ? '视频已完成' : '你的故事将在这里成片' }}</span></strong>
+              <strong class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ error ? '视频生成失败' : outputUrl ? qaWarnings.length ? '成片参数需核对' : '视频已完成' : '你的故事将在这里成片' }}</span></strong>
               <p class="text-xs text-gray-500">{{ error || (outputUrl ? '这一段商家故事，已成片。' : '添加素材并描述需求，开始生成') }}</p>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <section v-if="outputUrl && !isGenerating" class="video-output-details" aria-label="成片参数">
+      <p><strong>实际成片：</strong>{{ actualSummary }}</p>
+      <p>请求：{{ resolution }} · {{ duration }} 秒 · {{ format === 'auto' ? '自适应比例' : format }}</p>
+      <div v-if="qaWarnings.length" class="video-output-warning" role="status" aria-live="polite">
+        <strong>成片参数需核对</strong>
+        <ul><li v-for="warning in qaWarnings" :key="warning.code">{{ warning.message }}</li></ul>
+        <p>已保留成片，可先预览决定是否接受。重新生成可能再次计费。</p>
+      </div>
+    </section>
 
     <div class="video-canvas-hint absolute bottom-8 z-10 text-xs text-gray-600 tracking-wider pointer-events-none"><span>把商家的日常，写成值得记住的影像。</span></div>
   </div>

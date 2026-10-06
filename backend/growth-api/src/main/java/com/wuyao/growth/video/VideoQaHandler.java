@@ -18,7 +18,12 @@ public class VideoQaHandler implements TaskHandler {
     @Override
     public Map<String, Object> handle(Task task) {
         Long workflowId = ((Number) task.getPayload().get("workflowId")).longValue();
-        service.completeQa(workflowId, task);
-        return Map.of("status", "PASSED", "workflowId", workflowId);
+        try {
+            service.completeQa(workflowId, task);
+            return Map.of("status", "PASSED", "workflowId", workflowId);
+        } catch (RuntimeException e) {
+            if (task.getAttempts() >= task.getMaxAttempts()) service.markFailed(workflowId, task, "VIDEO_QA_FAILED", e.getMessage());
+            throw e;
+        }
     }
 }

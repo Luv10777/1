@@ -57,6 +57,51 @@ test('digital human task lifecycle follows the real video API', async t => {
         assert.equal(timers.size, 0)
       } finally { app.unmount() }
     })
+    await t.test('completed output keeps actual metadata and warns about differences without submitting again', async () => {
+      let posts = 0
+      globalThis.fetch = async () => {
+        posts++
+        return response({ id: 75, status: 'SUCCEEDED', stage: 'DONE', outputUrl: '/test/finished.mp4',
+          actualWidth: 720, actualHeight: 1280, actualDurationMs: 5200,
+          qaWarnings: [{ code: 'VIDEO_RESOLUTION_MISMATCH', message: '分辨率与请求不一致' }] })
+      }
+      const { app, studio } = mount()
+      try {
+        await studio.start(input())
+        assert.equal(studio.isGenerating.value, false)
+        assert.equal(studio.outputUrl.value, '/test/finished.mp4')
+        assert.equal(studio.workflow.value.actualWidth, 720)
+        assert.equal(studio.workflow.value.actualHeight, 1280)
+        assert.equal(studio.workflow.value.actualDurationMs, 5200)
+        assert.match(studio.notice.value, /成片参数需核对/)
+        assert.match(studio.notice.value, /重新生成可能再次计费/)
+        assert.equal(posts, 1)
+        assert.equal(timers.size, 0)
+      } finally { app.unmount() }
+    })
+    await t.test('CANCELLED is terminal, displays the cancellation reason and stops polling', async () => {
+      let gets = 0
+      globalThis.fetch = async (url, options) => {
+        if (options.method === 'POST') return response({ id: 76, status: 'GENERATING', stage: 'POLL' })
+        assert.equal(url, '/api/video/workflows/76')
+        gets++
+        return response({ id: 76, status: 'CANCELLED', stage: 'CANCELLED', error: '已取消本次视频生成' })
+      }
+      const { app, studio } = mount()
+      try {
+        await studio.start(input())
+        assert.equal(studio.isGenerating.value, true)
+        const [id, callback] = timers.entries().next().value
+        timers.delete(id)
+        await callback()
+        assert.equal(studio.workflow.value.status, 'CANCELLED')
+        assert.equal(studio.isGenerating.value, false)
+        assert.equal(studio.error.value, '已取消本次视频生成')
+        assert.equal(studio.outputUrl.value, '')
+        assert.equal(gets, 1)
+        assert.equal(timers.size, 0)
+      } finally { app.unmount() }
+    })
     await t.test('an uncertain submission reuses its key while a known failed task starts a fresh generation', async () => {
       const posts = []
       globalThis.fetch = async (url, options) => {
