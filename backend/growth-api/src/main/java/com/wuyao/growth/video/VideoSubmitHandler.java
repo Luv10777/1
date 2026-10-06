@@ -25,18 +25,22 @@ public class VideoSubmitHandler implements TaskHandler {
         try {
             VideoWorkflow workflow = workflows.findById(workflowId).orElseThrow();
             var candidate = workflow.getProviderSubmitRequest();
-            if (candidate == null || candidate.isEmpty()) candidate = provider.buildSubmitRequest(workflow.getRequest());
+            if (workflow.getProviderSubmitStartedAt() == null) candidate = provider.buildSubmitRequest(workflow.getRequest());
             var request = service.prepareSubmissionRequest(workflowId, task, candidate);
             if (request.isEmpty()) return Map.of("status", "STALE");
-            VideoProviderGateway.SubmitResult result = provider.submit(request.get(), "video-" + workflowId + "-submit");
+            VideoProviderGateway.SubmitResult result = provider.submit(request.get(), VideoWorkflowService.submissionKey(workflow));
             service.saveSubmission(workflowId, task, result);
             return Map.of("status", "SUBMITTED", "providerJobId", result.providerJobId());
         } catch (RuntimeException e) {
+            if (e instanceof VideoWorkflowService.SubmissionRequestException requestError) {
+                service.markFailed(workflowId, task, requestError.errorCode(), requestError.getMessage());
+                throw requestError;
+            }
             if (e instanceof VideoProviderGateway.ProviderHttpException providerError && !providerError.retryable()) {
-                service.markFailed(workflowId, "VIDEO_PROVIDER_FAILED", providerError.getMessage());
+                service.markFailed(workflowId, task, "VIDEO_PROVIDER_REJECTED", providerError.getMessage());
                 throw new NonRetryableTaskException("VIDEO_PROVIDER_ERROR", providerError.getMessage(), providerError);
             }
-            if (task.getAttempts() >= task.getMaxAttempts()) service.markFailed(workflowId, "VIDEO_SUBMIT_FAILED", e.getMessage());
+            if (task.getAttempts() >= task.getMaxAttempts()) service.markFailed(workflowId, task, "VIDEO_SUBMIT_FAILED", e.getMessage());
             throw e;
         }
     }

@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import { get, post } from '../utils/request'
 import { assetSource, assets as platformAssets } from '../stores/assetLibrary'
-import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
+import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 
 const prompt = ref('')
 const format = ref('auto')
@@ -71,9 +71,9 @@ const newConversationId = () => `video-conversation-${crypto.randomUUID()}`
 const conversationStatus = (item) => {
   if (item.submitting) return '提交中'
   if (item.workflow?.status === 'SUCCEEDED') return '已完成'
-  if (item.workflow && !['FAILED', 'CANCELED'].includes(item.workflow.status)) return '生成中'
+  if (item.workflow && !['FAILED', 'CANCELLED'].includes(item.workflow.status)) return '生成中'
   if (item.workflow?.status === 'FAILED') return '生成失败'
-  if (item.workflow?.status === 'CANCELED') return '已取消'
+  if (item.workflow?.status === 'CANCELLED') return '已取消'
   if (item.error) return '提交失败'
   return '草稿'
 }
@@ -107,8 +107,8 @@ const saveActiveConversation = () => {
 }
 const updateWorkflow = (item, result) => {
   item.workflow = result
-  item.error = ['FAILED', 'CANCELED'].includes(result.status)
-  item.notice = result.status === 'SUCCEEDED' ? '视频已完成并保存到作品库。' : item.error ? (result.error || '视频生成失败，请稍后重试。') : ''
+  item.error = ['FAILED', 'CANCELLED'].includes(result.status)
+  item.notice = result.status === 'SUCCEEDED' ? videoCompletionNotice(result) : item.error ? (result.error || '视频生成失败，请稍后重试。') : ''
 }
 const selectConversation = async (item) => {
   saveActiveConversation()
@@ -439,10 +439,14 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       :is-generating="isGenerating"
       :is-morphing="isMorphing"
       :output-url="outputUrl"
-      :format="format"
-      :model-label="currentCapability.label"
-      :duration="duration"
-      :resolution="resolution"
+      :actual-width="workflow?.actualWidth"
+      :actual-height="workflow?.actualHeight"
+      :actual-duration-ms="workflow?.actualDurationMs"
+      :qa-warnings="workflow?.qaWarnings"
+      :format="workflow?.ratio || format"
+      :model-label="workflow?.model ? videoModelLabel(workflow.model) : currentCapability.label"
+      :duration="workflow?.durationSeconds || duration"
+      :resolution="workflow?.resolution || resolution"
       :stage-label="stageLabel"
       @switch-workspace="switchWorkspace"
     />

@@ -18,6 +18,28 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 `VIDEO_MODEL_SEEDANCE_2_5`、`VIDEO_MODEL_SEEDANCE_2_0`、`VIDEO_MODEL_SEEDANCE_2_0_MINI`
 和 `VIDEO_MODEL_SEEDANCE_2_0_FAST` 覆盖。
 
+视频参考素材的预签名 URL 默认有效 6 小时，可用 `VIDEO_REFERENCE_PRESIGN_TTL_SECONDS=21600`
+配置。实际 TTL 为 `max(配置值, VIDEO_MAX_DURATION_SECONDS + 安全余量)`；安全余量为
+`max(VIDEO_REFERENCE_URL_SAFETY_SECONDS, VIDEO_PROVIDER_TIMEOUT_SECONDS + 25)`，默认 300 秒，
+覆盖连接池等待、连接和响应超时。超过 SigV4 的 7 天上限会阻止启动。工作流时限包含停机和
+重试等待，超过时限仍按超时结束，签名有效期不会让任务无限重试。
+
+V18 在 HTTP 前用独立事务保存 `provider_submit_started_at` 和 `provider_submit_body`。
+标记为空时可刷新素材 URL；非空表示请求可能已发出，包括响应丢失或进程崩溃的情况，
+重试必须发送同一原始 JSON 字节。已过期、进入安全余量窗口或无法解析有效期的 URL
+会在本地停止提交，并提示先核对供应商任务记录。V17 历史请求保守标记为可能已发出，
+其原始发送字节无法从 JSONB 还原，需要先核对供应商，确认没有任务后再重新创建视频。
+升级时先停止旧视频 worker，再执行迁移并启动新版本，避免旧代码绕过提交标记继续发送请求。
+
+视频工作流的取消状态统一为 `CANCELLED`，取消接口返回的 `status` 和 `stage` 均使用该值。
+网关兼容供应商输入的 `CANCELED` / `CANCELLED`，统一归一化为 `CANCELLED`，并写入
+`video_workflows.provider_status` 和 `video_provider_jobs.status`。供应商取消仍按原有逻辑
+将本地 workflow 记为 `FAILED`；用户主动取消才记为 `CANCELLED`。
+V22 仅订正上述两张表中历史的 `CANCELED` 值，覆盖 workflow 的 `status`、`stage`、
+`provider_status` 和供应商任务的 `status`；逐租户设置上下文，保留 FORCE RLS 与原有时间戳。
+升级前停止旧 API、视频 worker 和媒体 worker，执行 V22 后再启动新版本，避免旧进程重新
+写入旧拼写。订单与订阅域继续使用 `CANCELED`；现有 `outcome=canceled` 指标标签保持原样。
+
 ## 安装与启动
 
 需要 Java 21、Maven 3.9 和已启动的 Docker。以下命令在 `backend/growth-api` 目录运行，
@@ -96,8 +118,15 @@ java -jar target/growth-api-0.1.0.jar --growth.worker.enabled=true --growth.work
 | `IMAGE_TENANT_MAX_CONCURRENT` | `20` | 未单独配置配额时，单个租户允许的图片任务并发数 |
 | `IMAGE_GLOBAL_MAX_CONCURRENT` | `200` | 所有租户共享的图片任务并发上限；计数由 Redis 原子维护 |
 | `IMAGE_API_RATE_LIMIT` | `100` | 所有 Worker 共享的图片模型速率上限（请求/秒，依赖 Redis） |
+| `IMAGE_API_TIMEOUT` | `10` 秒 | 等待图片模型速率许可的最长时间，在提交意图登记之前执行 |
 | `HTTP_MAX_TOTAL` | `200` | 图片模型 HTTP 客户端连接池总数 |
 | `HTTP_MAX_PER_ROUTE` | `50` | 单个模型地址的最大连接数 |
+
+图片生成先等待 API 速率许可，再登记 `providerCode=SUBMITTING`，最后调用供应商。
+等待超时会显示“图片模型请求过于频繁，请稍后重试”，不登记提交意图，走普通任务重试。
+默认最多 3 次尝试，失败后的退避为 20、40 秒；若每次都等待满 10 秒，持续限流可在约
+90 秒（另加前处理和调度时间）内耗尽预算。图片详情保留限流原因，预算耗尽后可直接
+恢复未提交的任务，不需要核对供应商记录。已有提交意图的记录仍按原来的保守规则处理。
 
 图片许可的租户计数和全局计数通过 Redis Lua 脚本在一次操作中完成获取与释放，
 Redis 不可用时采用拒绝创建的策略。每个新租户会由数据库触发器自动创建默认
@@ -120,9 +149,13 @@ WHERE tenant_id = 1;
 | `VIDEO_TENANT_MAX_CONCURRENT` | `2` | 单租户允许占用的视频工作流许可数 |
 | `VIDEO_GLOBAL_MAX_CONCURRENT` | `20` | 所有租户共享的视频工作流许可数 |
 | `VIDEO_CONCURRENCY_PERMIT_TTL_SECONDS` | `21600` | worker 崩溃后的许可自动回收时间 |
+| `VIDEO_POLL_SECONDS` | `15` | `growth.video.poll-seconds`，轮询基础间隔；按轮次放大并限制在 5–60 秒 |
 | `VIDEO_MAX_POLLS` | `360` | 单个视频最多轮询次数 |
 | `VIDEO_MAX_DURATION_SECONDS` | `7200` | 单个视频从创建到终态的最长时间 |
 | `VIDEO_MAX_PROVIDER_BYTES` | `1073741824` | 供应商视频导入大小上限；导入采用流式写入 |
+
+提交后的首次查询立即入队，后续间隔为 `min(60, max(5, VIDEO_POLL_SECONDS) × max(1, 轮次))`。
+配置键层级、读取方和环境变量的完整核对见[配置键核对报告](../../docs/video-poll-config-audit.md)。
 
 许可只在工作流处于 `QUEUED` 到终态期间持有，成功、失败、取消和超时都会幂等释放。
 许可控制的是可接受的活跃工作流数量；实际同时执行的任务仍由
@@ -145,6 +178,147 @@ WHERE tenant_id = 1;
 
 `TaskService.submit` 与业务操作共用事务；相同租户和幂等键并发提交会返回同一任务。
 不同业务动作不要复用同一个幂等键。不要在长时间外部调用期间持有业务数据库事务。
+
+### 视频导入失败与重试
+
+下载层通过 `VideoImportException.Reason` 表达错误类别及 `retryable()`，handler 不匹配错误消息。
+不可重试错误在第一次执行就调用带 task 领取权校验的 `markFailed`，提交工作流终态、清理未发布
+产物并在提交后释放许可，再抛 `NonRetryableTaskException` 让 tasks 行立即失败。网络/存储异常
+继续使用原退避；默认三次执行对应首次失败后等 20 秒、第二次失败后等 40 秒，最后一次失败仍
+调用原有 `VIDEO_IMPORT_FAILED` 兜底。任务框架、表结构、公开方法签名没有改变。
+
+| 导入错误 | 自动重试同一下载地址 | 分类理由 |
+|---|---|---|
+| 已发布对象、非本工作流对象键、已有 Asset 引用 | 否（`OUTPUT_PROTECTED`） | 禁止覆盖；拒绝发生在 PUT/删除前 |
+| URL 为空或空白 | 否（`MISSING_URL`） | 缺少下载目标；不再把合法领取但缺少 URL 的执行当作 STALE 结束 |
+| URL/重定向格式无效、非 HTTPS、包含凭据/片段、指向受保护网络 | 否（`INVALID_URL`） | 本地安全与格式约束，重复执行无法修复 |
+| 初始地址或重定向主机 DNS 解析失败 | 是（`TRANSFER_FAILED`） | DNS 故障可能恢复；不视为安全校验失败 |
+| 重定向超过 5 次、3xx 缺少/空白 Location | 否（`REDIRECT_LIMIT` / `REDIRECT_LOCATION_MISSING`） | 下载协议不完整或成环 |
+| HTTP 408、429、5xx | 是（`HTTP_TRANSIENT`） | 超时、限流或上游故障，保留原有重试预算 |
+| HTTP 404/410 | 否（`RESULT_URL_UNAVAILABLE`） | 同一地址不可用，允许人工恢复原供应商任务以重新获取地址，避免新付费提交 |
+| 其它非 2xx、非重定向 HTTP 状态 | 否（`HTTP_REJECTED`） | 当前请求被拒绝或响应不符合下载协议 |
+| 2xx 缺少 entity 或正常结束的空内容 | 否（`EMPTY_RESPONSE`） | 没有可导入的产物；声明了正 Content-Length 却提前 EOF 属于传输中断，按可重试处理 |
+| 声明大小超限、未知长度流实际大小超限 | 否（`TOO_LARGE`） | 本地大小策略不因重试改变；流计数保留超限证据，避免 MinIO 包装异常后丢失分类 |
+| 内容类型或 octet-stream 文件头校验失败 | 否（`INVALID_CONTENT`） | 不满足导入格式约束；`video/*` 的真实媒体有效性仍交给 ffprobe，本次不改变格式识别规则 |
+| 连接/连接池/读取超时、连接重置、读/关闭流异常、提前 EOF、对象存储不可用 | 是（`TRANSFER_FAILED` 或原存储 BizException） | 无法证明产物不合格，故障可能恢复 |
+| 其它未分类的运行时/持久化异常 | 是，有界重试 | 不靠消息推断永久失败，耗尽后仍结束工作流 |
+| 候选对象删除失败 | 不替换原错误分类 | 警告并保留登记键，沿用 P1-6 的清理边界 |
+
+`video_provider_jobs.result_expires_at` 在 V15 中存在，但当前网关没有解析到期时间，保存轮询
+结果只写 `result_url`，未写到期字段。因此 404/410 只能描述为“地址不可用，可能已失效”，
+不能确认过期。该路径工作流使用可人工恢复的 `VIDEO_IMPORT_FAILED`；其它永久导入错误使用
+`VIDEO_IMPORT_REJECTED`，阻止直接人工重试。tasks 错误码保留 `VIDEO_IMPORT_<Reason>` 的具体原因。
+人工恢复先申请许可、轮询原 `provider_job_id`，不自动创建新的付费供应商任务。
+
+“相同已完成产物与协议响应在自动重试中稳定”是上述永久分类的策略假设；真实供应商/CDN
+可能有最终一致性、临时 200 错误页等行为，本次没有获取实际错误响应来验证。分类控制流、
+清理和许可用模拟响应及真实 PostgreSQL/Redis/MinIO 验证，不代表供应商行为已验证。
+
+真实 MinIO 测试同时暴露未知长度 PUT 的 SDK 参数错误：`size=-1` 时必须指定有效分片大小。
+存储实现仅将该参数改为 10 MiB，已知长度仍由 SDK 选择分片；ObjectStorage 的签名不变。
+测试用小文件和缩小的上限验证未知长度导入、实际 SDK 包装后的超限分类，没有下载 1 GB 文件。
+
+提交/轮询 handler 的普通 HTTP 路径已有不可重试判断；内容地址 `/videos/{id}/content`
+此前将 HTTP 错误降为普通 BizException，现保留 ProviderHttpException，使轮询 handler 使用
+相同的状态分类。配置缺失/不支持协议、成功响应缺少 ID/地址、异常 JSON 等其它网关异常
+仍走普通有界重试，需另行细化协议契约，不能声称所有供应商错误已有永久分类。
+
+QA 的探测 IllegalStateException（包括 ffprobe 可执行文件缺失）已由 completeQa 立即转为
+`VIDEO_ASSET_INVALID`，并非自动重试三次。同一环境短时间重复启动不存在的程序无益，保留
+该行为并用真实缺失可执行路径验证；修复环境后可显式恢复原供应商任务。QA 存储/数据库等
+外逸异常现在增加耗尽兜底 `VIDEO_QA_FAILED`，避免 tasks 失败而工作流继续持有许可。
+QA 的 `PASSED` 任务结果是既有处理回执，应以工作流终态及 errorCode 判断媒体校验结果。
+
+### 视频成片参数核验
+
+生成视频仍须通过 ffprobe 的视频轨道、有效宽高和时长检查。QA 使用探测出的实际值与工作流
+持久化的请求参数比较，不信任供应商响应中的尺寸或时长。通过媒体检查但参数超出容差时，
+成片仍为 `READY`，工作流仍为 `SUCCEEDED`，同时返回结构化 `qaWarnings` 并在视频工作台和
+数字人页面持续提示差异。保留已付费生成的成片供用户判断是否接受；不会自动重新生成，
+也没有新增退款或计费规则。重新生成可能再次计费。
+
+| 比对项 | 容差与判定 | 设计理由 |
+|---|---|---|
+| 分辨率 | `480p/720p/1080p/4K` 分别按短边 `480/720/1080/2160` 像素比较；允许 `max(16 px, ceil(短边 × 2%))` 的双向偏差，边界包含 | 允许编码对齐带来的小幅尺寸变化；如竖屏 1088×1920 可满足 1080p，不把升降分辨率的明显偏差隐藏掉 |
+| 方向与比例 | 明确比例先检查横屏 `width > height`、竖屏 `height > width`；方向相符后允许相对比例误差不超过 2%；`1:1` 直接按比例检查；`auto` 不约束方向和比例 | 横竖翻转不可用小幅尺寸容差豁免；`auto` 没有固定比例承诺 |
+| 时长 | 将请求整数秒转为毫秒后比较，允许 `max(300 ms, 请求时长 × 2%)` 的双向偏差，边界包含 | 兼容帧和时间基舍入及小幅供应商偏差；5 秒接受 4.7–5.3 秒，30 秒接受 29.4–30.6 秒 |
+
+这些值是当前产品策略，并非已验证的供应商 SLA。分辨率容差在 480p/720p 为 16 px、
+1080p 为 22 px、4K 为 44 px；超过任一项即提示差异，多项差异同时返回。
+接口 `VideoDtos.View` 追加 `actualWidth`、`actualHeight`（像素）、`actualDurationMs`（毫秒）
+三个可空字段及 `qaWarnings: [{code, message}]`。尚未 QA 时实际值为空且警告为空数组；
+历史成功记录缺少元数据时返回 `VIDEO_METADATA_UNAVAILABLE`，提示无法核验。
+其它警告码为 `VIDEO_RESOLUTION_MISMATCH`、`VIDEO_ORIENTATION_MISMATCH`、
+`VIDEO_RATIO_MISMATCH`、`VIDEO_DURATION_MISMATCH`。方向不符时不重复返回比例警告。
+实际值保存在已有 Asset 字段，警告由实际值和原请求推导，无需新迁移。
+
+前端保持原有 `src/utils/request.js` 请求方式，直接接收新增 JSON 字段；两个视频入口复用
+预览组件展示实际参数、原请求和警告，并提醒再次计费。旧响应缺少新增字段时仍可预览。
+参数差异不触发 P1-6 清理：作品发布保护同样适用于带警告的成片，后续取消或迟到失败不会删除。
+ffprobe 失败仍走 `FAILED / VIDEO_ASSET_INVALID / INVALID Asset`，由未发布产物清理路径处理。
+
+本次不增加帧率或编码格式的匹配要求：当前请求和模型能力契约没有这些目标值。
+探测沿用现有编码宽高，不解释旋转矩阵或非方形像素（SAR），也不进行逐帧解码、内容/音轨质量检查；
+特殊旋转/SAR 视频和浏览器解码兼容性需要另行验证。Mockito 探测结果与真实 PostgreSQL/Redis/MinIO
+集成测试覆盖参数比较、持久化、接口序列化和发布保护，不等同于真实供应商或真实 ffprobe 的端到端验证。
+
+### 视频观测
+
+Actuator 的 `video` health 检查 `VIDEO_PROVIDER`、`MEDIA_CPU` 两个队列的 PENDING/RUNNING 数量、
+视频供应商配置，以及当前阶段停留过久的工作流。pending **超过**阈值或卡死工作流数量
+**超过**容忍值时返回 DOWN；数据库读取失败也返回 DOWN。它是运维信号，不会自动重试或释放许可。
+
+| 配置（`growth.video.health.` 前缀） | 环境变量 | 默认值 |
+|---|---|---|
+| `provider-pending-threshold` | `VIDEO_HEALTH_PROVIDER_PENDING_THRESHOLD` | 100 |
+| `media-pending-threshold` | `VIDEO_HEALTH_MEDIA_PENDING_THRESHOLD` | 20 |
+| `stuck-after-seconds` | `VIDEO_HEALTH_STUCK_AFTER_SECONDS` | 跟随 `VIDEO_MAX_DURATION_SECONDS`，默认 7200 秒 |
+| `stuck-workflows-threshold` | `VIDEO_HEALTH_STUCK_WORKFLOWS_THRESHOLD` | 0 |
+| `snapshot-cache-seconds` | `VIDEO_HEALTH_SNAPSHOT_CACHE_SECONDS` | 15 秒；0 禁用缓存 |
+
+卡死定义为 QUEUED/SUBMITTING/GENERATING/IMPORTING/QA 工作流的 `stage_started_at`
+早于当前时间减去 `stuck-after-seconds`。普通轮询、自动退避不刷新阶段开始时间；进入新阶段或
+人工恢复才重置。因此持续收到 RUNNING 响应也不会掩盖超时，历史创建时间不会误伤刚恢复的工作流。
+V21 增加阶段时间和部分索引 `idx_video_workflow_stuck (tenant_id, status, stage_started_at)`，
+旧 V15 的 `(status, created_at DESC)` 索引无法约束阶段时间谓词。历史阶段边界不可恢复，
+V21 对活跃行保守地使用 `COALESCE(attempt_started_at, created_at)`，迁移后可能需要人工核对早期告警。
+
+| Micrometer 指标名称 | 类型 | 标签 | 含义 |
+|---|---|---|---|
+| `video.queue.pending` | Gauge | `queue=VIDEO_PROVIDER/MEDIA_CPU` | 待处理任务，包含尚未到执行时间的轮询 |
+| `video.queue.running` | Gauge | `queue=VIDEO_PROVIDER/MEDIA_CPU` | 正在执行的任务 |
+| `video.workflow.stuck` | Gauge | 无 | 超过阶段年龄阈值的活跃工作流 |
+| `video.submit.duration` | Timer | `outcome` | 创建/恢复到提交阶段结束的墙钟耗时 |
+| `video.poll.duration` | Timer | `outcome` | 整个轮询阶段的耗时，包含任务间等待和重试 |
+| `video.import.duration` | Timer | `outcome` | 导入阶段耗时，包含排队和重试 |
+| `video.qa.duration` | Timer | `outcome` | QA 阶段耗时，包含排队和重试 |
+| `video.poll.rounds` | DistributionSummary | `outcome` | 每个结束的轮询阶段仅采样一次 `poll_round` |
+| `video.concurrency.active` | Gauge | 无 | Redis 全局视频许可占用 |
+| `video.concurrency.tenant.max.active` | Gauge | 无 | 所有租户中最大的 Redis 视频许可占用 |
+| `video.concurrency.limit` | Gauge | `scope=global/tenant` | 对应 `VIDEO_GLOBAL_MAX_CONCURRENT` / `VIDEO_TENANT_MAX_CONCURRENT`，默认 20 / 2 |
+
+`outcome` 固定为 `succeeded/failed/canceled/interrupted`；`interrupted` 在人工恢复中断阶段时记录。
+Timer 和轮次分布在阶段推进或终态事务提交后记录，回滚、过期执行和正常 RUNNING 轮询不采样，
+不会把 QA handler 的正常返回等同于媒体校验成功。Timer 是阶段端到端耗时，不是单次 HTTP/
+ffprobe 调用延迟；`poll_round` 只计入接受的轮询结果，不包含调用失败或未被接受的过期结果。
+Histogram 支持耗时/轮次分布；Prometheus 导出时名称转换为下划线，并带 `_seconds_*` 或 `_rounds_*` 后缀。
+
+Gauge 按采集时拉取，不放在视频业务请求路径上。工作流统计在每个租户上下文中开启独立只读事务，
+保留 FORCE RLS；跨租户卡死计数与最大租户许可共用短缓存，队列与全局许可直接读取。
+数据库/Redis 无法读取时对应 Gauge 返回 NaN，避免把缺失数据当成零占用；失败快照也不会复用旧成功值。
+跨租户汇总不是同一时刻的数据库/Redis原子快照；租户数很大时应评估采集成本并调整缓存时长。
+
+阶段指标由执行阶段转换的进程记录，需同时采集 API、video worker 和 media worker。
+队列/许可 Gauge 是全局视图，不应把多个进程的相同 Gauge 相加；阶段 Timer/轮次样本按实例汇总。
+进程在数据库提交与指标写入之间崩溃可能丢失一个样本，指标不是付费调用的审计账本。
+
+基础配置使用 `management.endpoint.health.show-details=when_authorized` 和 ACTUATOR 角色限制，
+`prod` profile 进一步设为 `never`；当前 JWT filter 未赋予角色，普通业务 JWT 无法看到详情，
+需要受保护的管理接入单独处理。
+默认只公开 health。Prometheus 的开启仍按前面的受保护管理入口要求操作。
+测试使用临时 RANDOM_PORT 服务、测试凭据和测试专属 `show-details=always`，实际通过 HTTP
+访问 health 验证结构。测试专属 Tomcat NIO2 避免本机 Windows/JDK 的 NIO 回环连接异常，
+没有改变生产的 HTTP 协议配置或详情公开策略。
 
 ## 接口与模块约定
 

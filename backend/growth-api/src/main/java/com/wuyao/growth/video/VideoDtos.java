@@ -35,6 +35,10 @@ public final class VideoDtos {
 
     public record Reference(Long assetId, String name, String url) {}
 
+    public record Retry(@NotNull @Positive Long taskId) {}
+
+    public record QaWarning(String code, String message) {}
+
     public record View(
             Long id,
             String requestKey,
@@ -55,5 +59,14 @@ public final class VideoDtos {
             Long taskId,
             Instant createdAt,
             List<Reference> referenceImages,
-            Reference referenceVideo) {}
+            Reference referenceVideo,
+            String errorCode,
+            boolean retryable,
+            String retryStage,
+            boolean retryMayCharge,
+            String retryHint,
+            Integer actualWidth,
+            Integer actualHeight,
+            Integer actualDurationMs,
+            List<QaWarning> qaWarnings) {}
 }

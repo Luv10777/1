@@ -31,6 +31,12 @@ public class VideoController {
     @PostMapping("/workflows/{id}/cancel")
     public ApiResponse<VideoDtos.View> cancel(@PathVariable Long id) { return ApiResponse.ok(service.cancel(id)); }
 
+    @PostMapping("/workflows/{id}/retry")
+    public ApiResponse<VideoDtos.View> retry(@PathVariable Long id, @Valid @RequestBody VideoDtos.Retry request,
+                                             @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.retry(id, request.taskId(), me.userId()));
+    }
+
     @GetMapping("/workflows")
     public ApiResponse<PageResult<VideoDtos.History>> history(@RequestParam(defaultValue = "0") int page,
                                                             @RequestParam(defaultValue = "20") int size) {

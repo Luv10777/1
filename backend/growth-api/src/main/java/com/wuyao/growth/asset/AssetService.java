@@ -7,6 +7,7 @@ import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.common.web.PageResult;
 import com.wuyao.growth.iam.repository.TenantRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -53,6 +54,37 @@ public class AssetService {
     private int maxVideoReferenceWidth;
     @Value("${growth.video.reference-max-height:4096}")
     private int maxVideoReferenceHeight;
+    @Value("${growth.video.reference-presign-ttl-seconds:21600}")
+    private long referencePresignTtlSeconds = 21600;
+    @Value("${growth.video.max-duration-seconds:7200}")
+    private long videoMaxDurationSeconds = 7200;
+    @Value("${growth.video.reference-url-safety-seconds:300}")
+    private long referenceUrlSafetySeconds = 300;
+    @Value("${growth.video.provider.timeout-seconds:60}")
+    private long videoProviderTimeoutSeconds = 60;
+
+    @PostConstruct
+    void validateReferencePresignLifetime() {
+        referencePresignLifetime();
+    }
+
+    private Duration referencePresignLifetime() {
+        // SigV4/MinIO permits at most seven days. Do not silently truncate a longer workflow.
+        long maxSeconds = 604800;
+        if (referencePresignTtlSeconds < 1 || referencePresignTtlSeconds > maxSeconds
+                || videoMaxDurationSeconds < 1 || videoMaxDurationSeconds > maxSeconds
+                || referenceUrlSafetySeconds < 1 || referenceUrlSafetySeconds > maxSeconds
+                || videoProviderTimeoutSeconds < 1 || videoProviderTimeoutSeconds > maxSeconds) {
+            throw new IllegalArgumentException("视频素材签名和时限配置必须在 1 到 604800 秒之间");
+        }
+        // Include connection-pool wait (10s), connect timeout (15s), and provider response timeout.
+        long safetySeconds = Math.max(referenceUrlSafetySeconds, videoProviderTimeoutSeconds + 25);
+        long ttlSeconds = Math.max(referencePresignTtlSeconds, videoMaxDurationSeconds + safetySeconds);
+        if (ttlSeconds > maxSeconds) {
+            throw new IllegalArgumentException("视频处理时限加提交安全余量不能超过对象存储签名的 7 天上限");
+        }
+        return Duration.ofSeconds(ttlSeconds);
+    }
 
     @Transactional(readOnly = true)
     public ImageReference imageReference(Long id) {
@@ -87,7 +119,7 @@ public class AssetService {
 
     public String presignedReference(Long id, String expectedType) {
         MediaReference reference = mediaReference(id, expectedType);
-        return storage.presignGet(reference.storageKey(), Duration.ofHours(1));
+        return storage.presignGet(reference.storageKey(), referencePresignLifetime());
     }
 
     public record MediaReference(Long id, String storageKey, String mimeType, Integer durationMs) {}

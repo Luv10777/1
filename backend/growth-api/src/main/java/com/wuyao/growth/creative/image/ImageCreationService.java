@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.*;
 import java.security.MessageDigest;
 import java.util.*;
@@ -69,19 +71,14 @@ public class ImageCreationService {
    for(var ref:req.references()) assets.imageReference(ref.assetId());
    ImageQuality.dimensions(req.quality(),req.ratio());
    acquirePermit(tenantId);
-   try {
-     var c=new ImageCreation(); c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
-     c.setParentId(parent);c.setVariation(variation);c.setRequest(req);c.setRequestKey(req.requestKey());c.setRequestHash(hash);
-     creations.saveAndFlush(c);
-     var task=tasks.submit("IMAGE_PLAN","DEFAULT",Map.of("creationId",c.getId()),"image-plan-"+c.getId(),userId);
-     c.setTaskId(task.getId());
-     log.info("租户 {} 创建图片任务: creationId={} workflow={} count={}",
-       tenantId, c.getId(), req.workflow(), req.count());
-     return view(c);
-   } catch (RuntimeException e) {
-     rateLimiter.releaseImageGeneration(tenantId);
-     throw e;
-   }
+   var c=new ImageCreation(); c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
+   c.setParentId(parent);c.setVariation(variation);c.setRequest(req);c.setRequestKey(req.requestKey());c.setRequestHash(hash);
+   creations.saveAndFlush(c);
+   var task=tasks.submit("IMAGE_PLAN","DEFAULT",Map.of("creationId",c.getId()),"image-plan-"+c.getId(),userId);
+   c.setTaskId(task.getId());
+   log.info("租户 {} 创建图片任务: creationId={} workflow={} count={}",
+     tenantId, c.getId(), req.workflow(), req.count());
+   return view(c);
  }
  private void requireConfigured(ImageDtos.Create req) {
    if(!gateway.configured(config.selectedTextAlias())||!gateway.configured(ModelAlias.IMAGE_PRIMARY))
@@ -279,8 +276,23 @@ public class ImageCreationService {
  private void checkPage(int p,int s) {if(p<0||s<1||s>50) throw bad("分页参数无效");}
  private BizException bad(String text) {return BizException.of(ErrorCode.BAD_REQUEST,text);}
  private void acquirePermit(Long tenantId) {
+   if (!TransactionSynchronizationManager.isActualTransactionActive()
+       || !TransactionSynchronizationManager.isSynchronizationActive())
+     throw new IllegalStateException("图片并发许可必须在事务中申请");
    if(!rateLimiter.tryAcquireImageGeneration(tenantId,tenantMaxConcurrent,globalMaxConcurrent))
      throw BizException.of(ErrorCode.RATE_LIMITED,"当前有较多图片任务正在生成，请稍后重试");
+   try {
+     // The creation row owns the permit after commit; a rolled-back row cannot release it later.
+     TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+       @Override
+       public void afterCompletion(int status) {
+         if (status == STATUS_ROLLED_BACK) rateLimiter.releaseImageGeneration(tenantId);
+       }
+     });
+   } catch (RuntimeException e) {
+     rateLimiter.releaseImageGeneration(tenantId);
+     throw e;
+   }
  }
  private void releasePermitIfTerminal(ImageCreation creation) {
    if (!creation.isConcurrencyPermitHeld()) return;
@@ -386,6 +398,14 @@ public class ImageCreationService {
  public boolean reserveSynchronousSubmission(Long id,Task task) {
    return reserveProviderSubmission(id, task);
  }
+ /** Record a known pre-submit failure without ending the item or consuming submission rights. */
+ @Transactional
+ public void recordSubmissionWaitFailure(Long id,Task task,String message) {
+   if(!tasks.ownsExecution(task))return;
+   var i=items.lock(id).orElseThrow();
+   if(!Objects.equals(i.getTaskId(),task.getId()) || i.getProviderCode()!=null || i.getProviderJobId()!=null)return;
+   i.setError(message);
+ }
  @Transactional
  public boolean reserveProviderSubmission(Long id,Task task) {
    if(!tasks.ownsExecution(task))return false;
@@ -397,7 +417,7 @@ public class ImageCreationService {
      }
      return false;
    }
-   i.setProviderCode("SUBMITTING");return true;
+   i.setProviderCode("SUBMITTING");i.setError(null);return true;
  }
  @Transactional
  public void failSynchronousSubmission(Long id,Task task,String message) {
@@ -555,7 +575,7 @@ public class ImageCreationService {
        && tasks.statusByIdempotencyKey("image-download-"+i.getId()+"-"+i.getGeneration())==TaskStatus.FAILED;
      if(downloadFailed) status="FAILED";
      return new ImageDtos.ItemView(i.getId(),i.getOrdinal(),i.getSpec().role(),i.getSpec().headline(),i.getSpec().caption(),
-       status,status.equals("INTERRUPTED")?"执行中断，可恢复原任务":downloadFailed?"图片保存失败，临时预览链接可能过期":i.getError(),url,
+       status,status.equals("INTERRUPTED")?Objects.toString(i.getError(),"执行中断，可恢复原任务"):downloadFailed?"图片保存失败，临时预览链接可能过期":i.getError(),url,
        i.getActualWidth()==null?d.width():i.getActualWidth(),
        i.getActualHeight()==null?d.height():i.getActualHeight(),i.getTaskId(),i.isSimilarityWarning(),
        null,i.getPersistedAt()!=null,downloadFailed);

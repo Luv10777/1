@@ -21,6 +21,11 @@ public class TenantRateLimiter {
     private static final long PERMIT_TTL_MILLIS = 2 * 60 * 60 * 1000L;
     private static final String IMAGE_GLOBAL_KEY = "image:global:active";
     private static final String VIDEO_GLOBAL_KEY = "video:global:active";
+    /**
+     * Refresh the aggregate counters so later jobs do not inherit an older job's
+     * expiry. TTL only recovers leaks after successful acquisitions stop; normal
+     * cleanup must pair each acquisition with a release.
+     */
     private static final DefaultRedisScript<Long> ACQUIRE_SCRIPT = new DefaultRedisScript<>("""
             local tenantLimit = tonumber(ARGV[1])
             local globalLimit = tonumber(ARGV[2])

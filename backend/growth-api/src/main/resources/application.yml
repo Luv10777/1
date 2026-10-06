@@ -89,6 +89,15 @@ growth:
     concurrency-permit-ttl-seconds: ${VIDEO_CONCURRENCY_PERMIT_TTL_SECONDS:21600}
     max-polls: ${VIDEO_MAX_POLLS:360}
     max-duration-seconds: ${VIDEO_MAX_DURATION_SECONDS:7200}
+    # 实际签名 TTL 至少为处理时限 + 安全余量，且不超过 SigV4 的 7 天上限。
+    reference-presign-ttl-seconds: ${VIDEO_REFERENCE_PRESIGN_TTL_SECONDS:21600}
+    reference-url-safety-seconds: ${VIDEO_REFERENCE_URL_SAFETY_SECONDS:300}
+    health:
+      provider-pending-threshold: ${VIDEO_HEALTH_PROVIDER_PENDING_THRESHOLD:100}
+      media-pending-threshold: ${VIDEO_HEALTH_MEDIA_PENDING_THRESHOLD:20}
+      stuck-after-seconds: ${VIDEO_HEALTH_STUCK_AFTER_SECONDS:${VIDEO_MAX_DURATION_SECONDS:7200}}
+      stuck-workflows-threshold: ${VIDEO_HEALTH_STUCK_WORKFLOWS_THRESHOLD:0}
+      snapshot-cache-seconds: ${VIDEO_HEALTH_SNAPSHOT_CACHE_SECONDS:15}
     max-provider-bytes: ${VIDEO_MAX_PROVIDER_BYTES:1073741824}
     reference-max-bytes: ${VIDEO_REFERENCE_MAX_BYTES:524288000}
     reference-max-duration-seconds: ${VIDEO_REFERENCE_MAX_DURATION_SECONDS:300}
@@ -150,6 +159,7 @@ growth:
   worker:
     # api 进程设 false，worker 进程设 true。同一个 jar，两条启动命令。
     enabled: ${WORKER_ENABLED:false}
+    # 与 deploy/systemd/ 的 worker 队列并集一致；生产单元通过命令行分别限定队列。
     queues: DEFAULT,IMAGE,VIDEO_PROVIDER,MEDIA_CPU
     poll-interval: 2000
     batch-size: 5

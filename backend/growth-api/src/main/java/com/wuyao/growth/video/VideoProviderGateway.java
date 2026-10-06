@@ -63,7 +63,7 @@ public class VideoProviderGateway {
         return submit(buildSubmitRequest(request), idempotencyKey);
     }
 
-    /** Build once and persist this request before the first provider call. */
+    /** Refresh references only while the workflow is known never to have dispatched a request. */
     public Map<String, Object> buildSubmitRequest(VideoDtos.Create request) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerModel(request.model()));
@@ -96,6 +96,15 @@ public class VideoProviderGateway {
     }
 
     public SubmitResult submit(Map<String, Object> body, String idempotencyKey) {
+        try {
+            return submit(json.writeValueAsString(body), idempotencyKey);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw providerError("视频供应商请求无法序列化");
+        }
+    }
+
+    /** Send the exact persisted JSON bytes; reserializing JSONB can change key order. */
+    public SubmitResult submit(String body, String idempotencyKey) {
         requireConfigured();
         JsonNode response = send("POST", submitPath, body, idempotencyKey);
         String jobId = firstText(response, "id", "task_id", "job_id");
@@ -116,7 +125,7 @@ public class VideoProviderGateway {
     /** The only protocol currently implemented by this gateway. */
     public String protocol() { return protocol; }
 
-    private JsonNode send(String method, String path, Map<String, Object> body, String idempotencyKey) {
+    private JsonNode send(String method, String path, String body, String idempotencyKey) {
         try {
             URI endpoint = VideoUrlSecurity.checkedHttps(joinUrl(path));
             if (!"CHAT_COMPLETIONS".equalsIgnoreCase(protocol)) {
@@ -131,7 +140,7 @@ public class VideoProviderGateway {
             }
             if (request instanceof HttpPost post) {
                 post.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
-                post.setEntity(new StringEntity(json.writeValueAsString(body), ContentType.APPLICATION_JSON));
+                post.setEntity(new StringEntity(body, ContentType.APPLICATION_JSON.withCharset(StandardCharsets.UTF_8)));
             }
             return httpClient.execute(request, response -> {
                 int status = response.getCode();
@@ -173,8 +182,10 @@ public class VideoProviderGateway {
                     if (!providerHost.equalsIgnoreCase(current.getHost())) return current.toString();
                     throw providerError("获取视频内容地址失败，供应商未返回可下载地址");
                 }
-                if (response.status() < 300 || response.status() >= 400
-                        || response.location() == null || response.location().isBlank()) {
+                if (response.status() < 300 || response.status() >= 400) {
+                    throw new ProviderHttpException(response.status(), "获取视频内容地址失败，HTTP " + response.status());
+                }
+                if (response.location() == null || response.location().isBlank()) {
                     throw providerError("获取视频内容地址失败，HTTP " + response.status());
                 }
                 URI next = VideoUrlSecurity.checkedHttps(current.resolve(response.location()).toString());
@@ -252,7 +263,7 @@ public class VideoProviderGateway {
         return switch (status.toUpperCase()) {
             case "SUCCESS", "SUCCEEDED", "COMPLETED", "DONE" -> "SUCCEEDED";
             case "FAIL", "FAILED", "ERROR" -> "FAILED";
-            case "CANCELLED", "CANCELED" -> "CANCELED";
+            case "CANCELLED", "CANCELED" -> "CANCELLED";
             case "QUEUED", "PENDING" -> "QUEUED";
             default -> "RUNNING";
         };
