@@ -186,7 +186,7 @@ const expandActiveGroup = () => {
   saveExpandedGroups()
 }
 
-// 只有老板能用的入口对店员收起；接口本身也会拒绝。
+// 只有管理员能用的入口对店员收起；接口本身也会拒绝。
 const canSee = item => !item.ownerOnly || auth.isOwner
 const searchItems = computed(() => navGroups.flatMap(group => group.items || [group]).filter(canSee).filter(item => {
   const query = search.value.trim().toLowerCase()
@@ -272,7 +272,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
           <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>
-          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : auth.isOwner ? '创建门店后，即可管理商品、维护知识库并配置 AI 实景直播。' : '请联系老板在“员工管理”里把门店分配给你，分配后刷新即可使用。') }}</p>
+          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : auth.isOwner ? '创建门店后，即可管理商品、维护知识库并配置 AI 实景直播。' : '请联系管理员在“员工管理”里把门店分配给你，分配后刷新即可使用。') }}</p>
           <button v-if="storeError" class="secondary-button compact" @click="loadStores">重新加载</button>
           <button v-else-if="!storeLoading && auth.isOwner" class="primary-button compact" @click="openStoreForm()">＋ 新建门店</button>
           <button v-else-if="!storeLoading" class="secondary-button compact" @click="loadStores">刷新</button>

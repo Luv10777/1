@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * 商户内的账号与角色。其他模块判断"这个人是不是老板"、员工管理增删店员，都走这里。
+ * 商户内的账号与角色。其他模块判断"这个人是不是管理员"、员工管理增删店员，都走这里。
  *
  * users 是系统级表，没有行级安全：这里的每个查询都必须自己核对 tenant_id，
  * 否则就会读到或改到别的商户的账号。
@@ -51,10 +51,10 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public void requireOwner(Long userId) {
-        if (!isOwner(userId)) throw BizException.of(ErrorCode.FORBIDDEN, "只有老板可以执行这个操作");
+        if (!isOwner(userId)) throw BizException.of(ErrorCode.FORBIDDEN, "只有管理员可以执行这个操作");
     }
 
-    /** 当前商户未移除的账号，老板在前。 */
+    /** 当前商户未移除的账号，管理员在前。 */
     @Transactional(readOnly = true)
     public List<AccountDtos.Account> members() {
         return users.findAllByTenantIdAndStatusNotOrderByIdAsc(TenantContext.require(), REMOVED).stream()
@@ -139,13 +139,13 @@ public class AccountService {
                 .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "账号不可用或不属于当前商户"));
     }
 
-    /** 员工管理只能改店员；老板的账号不通过这些接口变更。 */
+    /** 员工管理只能改店员；管理员的账号不通过这些接口变更。 */
     private User staffForUpdate(Long userId) {
         Long tenantId = TenantContext.require();
         User user = users.findForUpdate(userId)
                 .filter(candidate -> tenantId.equals(candidate.getTenantId()) && !REMOVED.equals(candidate.getStatus()))
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "成员不存在"));
-        if (!STAFF.equals(user.getRole())) throw BizException.of(ErrorCode.BAD_REQUEST, "老板的账号不能在这里修改");
+        if (!STAFF.equals(user.getRole())) throw BizException.of(ErrorCode.BAD_REQUEST, "管理员的账号不能在这里修改");
         return user;
     }
 }

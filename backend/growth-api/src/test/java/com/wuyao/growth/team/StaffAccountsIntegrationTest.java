@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 账户体系：老板与店员、店员的门店范围、停用与移除，以及声音样本归商户后按门店开放。
+ * 账户体系：管理员与店员、店员的门店范围、停用与移除，以及声音样本归商户后按门店开放。
  * 全部经真实的 HTTP 接口、登录流程和数据库。
  */
 @SpringBootTest(properties = {"growth.worker.enabled=false", "logging.level.root=WARN",
@@ -92,9 +92,9 @@ class StaffAccountsIntegrationTest {
         owner.execute("TRUNCATE sms_codes, tenants RESTART IDENTITY CASCADE");
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('甲商户') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('乙商户') RETURNING id", Long.class);
-        // 没有写角色的旧账号就是老板。
-        bossA = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000001', '甲老板') RETURNING id", Long.class, tenantA);
-        Long bossB = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000009', '乙老板') RETURNING id", Long.class, tenantB);
+        // 没有写角色的旧账号就是管理员。
+        bossA = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000001', '甲管理员') RETURNING id", Long.class, tenantA);
+        Long bossB = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000009', '乙管理员') RETURNING id", Long.class, tenantB);
         boss = jwt.issueAccessToken(bossA, tenantA, "13900000001", 0);
         otherBoss = jwt.issueAccessToken(bossB, tenantB, "13900000009", 0);
         west = api(post("/api/stores"), boss, Map.of("name", "城西店")).path("id").asLong();
@@ -107,7 +107,7 @@ class StaffAccountsIntegrationTest {
 
     @Test
     void theOwnerEntersEveryStoreWithoutBeingListedAnywhereAndSeesWhoBelongsToTheMerchant() throws Exception {
-        assertThat(owner.queryForObject("SELECT count(*) FROM store_members", Long.class)).as("老板不需要门店成员记录").isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM store_members", Long.class)).as("管理员不需要门店成员记录").isZero();
         assertThat(api(get("/api/auth/me"), boss, null).path("role").asText()).isEqualTo("OWNER");
         assertThat(api(get("/api/stores"), boss, null)).extracting(store -> store.path("name").asText()).containsExactly("城西店", "城东店");
         api(post("/api/stores/" + east + "/products"), boss, product("蜂蜜"));
@@ -118,7 +118,7 @@ class StaffAccountsIntegrationTest {
         assertThat(members.get(0).path("allStores").asBoolean()).isTrue();
         assertThat(members.get(0).path("self").asBoolean()).isTrue();
         // 另一个商户看不到这边的任何人。
-        assertThat(api(get("/api/team/members"), otherBoss, null)).extracting(member -> member.path("name").asText()).containsExactly("乙老板");
+        assertThat(api(get("/api/team/members"), otherBoss, null)).extracting(member -> member.path("name").asText()).containsExactly("乙管理员");
     }
 
     @Test
@@ -130,7 +130,7 @@ class StaffAccountsIntegrationTest {
         assertThat(added.path("allStores").asBoolean()).isFalse();
         assertThat(added.path("storeIds")).extracting(JsonNode::asLong).containsExactly(west);
 
-        // 他用自己的手机号验证码登录：进的是老板的商户，不会新开一个商户。
+        // 他用自己的手机号验证码登录：进的是管理员的商户，不会新开一个商户。
         JsonNode session = login(STAFF_PHONE);
         String clerk = session.path("accessToken").asText();
         assertThat(session.path("user").path("tenantId").asLong()).isEqualTo(tenantA);
@@ -147,7 +147,7 @@ class StaffAccountsIntegrationTest {
         refused(get("/api/stores/" + east + "/knowledge-sets"), clerk, null, 403, 1403);
         refused(post("/api/stores/" + east + "/live-sessions"), clerk, Map.of("name", "越界场次"), 403, 1403);
 
-        // 商户级的事只有老板能做；本店的资料店员可以改，但门店归哪个品牌不由他定。
+        // 商户级的事只有管理员能做；本店的资料店员可以改，但门店归哪个品牌不由他定。
         long tea = api(post("/api/brands"), boss, Map.of("name", "青岚茶事")).path("id").asLong();
         long grill = api(post("/api/brands"), boss, Map.of("name", "王记烧烤")).path("id").asLong();
         refused(post("/api/stores"), clerk, Map.of("name", "私自开店"), 403, 1403);
@@ -165,12 +165,12 @@ class StaffAccountsIntegrationTest {
         assertThat(edited.path("brandId").asLong()).isEqualTo(tea);
         refused(put("/api/stores/" + west), clerk, Map.of("name", "城西店", "version", edited.path("version").asLong(), "brandId", grill), 403, 1403);
 
-        // 老板调整范围后立即生效：加上城东店、去掉城西店。
+        // 管理员调整范围后立即生效：加上城东店、去掉城西店。
         JsonNode moved = api(put("/api/team/members/" + clerkId), boss, Map.of("name", "小李", "storeIds", List.of(east)));
         assertThat(moved.path("storeIds")).extracting(JsonNode::asLong).containsExactly(east);
         refused(get("/api/products/" + honey), clerk, null, 403, 1403);
         assertThat(api(get("/api/stores"), clerk, null)).extracting(store -> store.path("id").asLong()).containsExactly(east);
-        assertThat(api(get("/api/team/members"), boss, null)).extracting(member -> member.path("name").asText()).containsExactly("甲老板", "小李");
+        assertThat(api(get("/api/team/members"), boss, null)).extracting(member -> member.path("name").asText()).containsExactly("甲管理员", "小李");
     }
 
     @Test
@@ -179,7 +179,7 @@ class StaffAccountsIntegrationTest {
 
         assertThat(refused(post("/api/team/members"), boss, Map.of("phone", STAFF_PHONE, "name", "重复", "storeIds", List.of()), 409, 1409))
                 .contains("已经是本商户的成员");
-        assertThat(refused(post("/api/team/members"), boss, Map.of("phone", "13900000009", "name", "乙老板", "storeIds", List.of()), 409, 1409))
+        assertThat(refused(post("/api/team/members"), boss, Map.of("phone", "13900000009", "name", "乙管理员", "storeIds", List.of()), 409, 1409))
                 .contains("已经注册了其他商户");
         assertThat(refused(post("/api/team/members"), otherBoss, Map.of("phone", STAFF_PHONE, "name", "挖人", "storeIds", List.of()), 409, 1409))
                 .contains("已经注册了其他商户");
@@ -190,7 +190,7 @@ class StaffAccountsIntegrationTest {
         refused(post("/api/team/members"), boss, Map.of("phone", "13900000004", "name", "小王", "storeIds", List.of(foreignStore)), 400, 1400);
         assertThat(owner.queryForObject("SELECT count(*) FROM users WHERE phone = '13900000004'", Long.class)).isZero();
 
-        // 别的商户够不着这个店员；老板自己的账号不在这里改。
+        // 别的商户够不着这个店员；管理员自己的账号不在这里改。
         refused(put("/api/team/members/" + clerkId), otherBoss, Map.of("name", "改名", "storeIds", List.of()), 404, 1404);
         refused(post("/api/team/members/" + clerkId + "/disable"), otherBoss, null, 404, 1404);
         refused(delete("/api/team/members/" + clerkId), otherBoss, null, 404, 1404);
@@ -233,7 +233,7 @@ class StaffAccountsIntegrationTest {
                 .containsEntry("status", "REMOVED").containsEntry("phone", null);
         refused(put("/api/team/members/" + clerkId), boss, Map.of("name", "小李", "storeIds", List.of(west)), 404, 1404);
 
-        // 同一个手机号现在是个没注册过的号码：自己登录就是新开一个商户，当老板。
+        // 同一个手机号现在是个没注册过的号码：自己登录就是新开一个商户，当管理员。
         JsonNode fresh = login(STAFF_PHONE);
         assertThat(fresh.path("user").path("role").asText()).isEqualTo("OWNER");
         assertThat(fresh.path("user").path("tenantId").asLong()).isNotIn(tenantA, tenantB);
@@ -256,7 +256,7 @@ class StaffAccountsIntegrationTest {
         long eastSession = api(post("/api/stores/" + east + "/live-sessions"), clerk, liveSession(eastProduct, host)).path("id").asLong();
         assertThat(refused(post("/api/live-sessions/" + eastSession + "/start"), clerk, null, 400, 1400)).contains("当前门店");
 
-        // 上传、改名、删除、调整范围都只有老板能做，哪怕是能用这个声音的店员。
+        // 上传、改名、删除、调整范围都只有管理员能做，哪怕是能用这个声音的店员。
         refused(post("/api/stores/" + east + "/voice-samples/upload-url"), clerk, Map.of("name", "我的声音", "mimeType", "audio/wav", "consent", true), 403, 1403);
         refused(put("/api/voice-samples/" + voice + "/stores"), clerk, Map.of("storeIds", List.of(west, east)), 403, 1403);
 
@@ -346,7 +346,7 @@ class StaffAccountsIntegrationTest {
                             + "(SELECT string_agg(sample_id || '>' || store_id || ' by ' || granted_by, ',' ORDER BY sample_id) FROM voice_sample_stores), "
                             + "(SELECT bool_and(created_at = '2026-01-01T00:00:00Z'::timestamptz) FROM voice_sample_stores)")) {
                         assertThat(rows.next()).isTrue();
-                        assertThat(rows.getInt(1)).as("老板不再需要门店成员记录").isZero();
+                        assertThat(rows.getInt(1)).as("管理员不再需要门店成员记录").isZero();
                         assertThat(rows.getString(2)).as("每个未删除的样本只开放给上传时所在的门店")
                                 .isEqualTo((base + 1) + ">" + (base + 1) + " by " + (tenant * 10 + 1) + ","
                                         + (base + 2) + ">" + (base + 2) + " by " + (tenant * 10 + 1));

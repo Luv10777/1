@@ -102,7 +102,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
             <span class="member-avatar" aria-hidden="true">{{ (member.name || '员').slice(0, 1) }}</span>
             <div><strong>{{ member.name || '未填写姓名' }}<em v-if="member.self">当前账号</em></strong><small>{{ member.phone || '未绑定手机号' }}</small></div>
           </div>
-          <span class="role-badge" :class="{ owner: member.role === 'OWNER' }">{{ member.role === 'OWNER' ? '老板' : '店员' }}</span>
+          <span class="role-badge" :class="{ owner: member.role === 'OWNER' }">{{ member.role === 'OWNER' ? '管理员' : '店员' }}</span>
           <span class="member-scope" :class="{ empty: !member.allStores && !member.storeIds.length }">{{ scopeOf(member) }}</span>
           <span class="member-status" :class="{ off: member.status === 'DISABLED' }">{{ member.status === 'DISABLED' ? '已停用' : '正常' }}</span>
           <span class="member-login">{{ lastLogin(member) }}</span>
@@ -117,7 +117,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
         <p v-if="!staffCount" class="member-empty">还没有店员。点击右上角“添加店员”，输入对方的手机号即可。</p>
       </section>
       <ul class="team-notes">
-        <li>老板能进入全部门店，并管理品牌、门店、员工和声音样本；店员只能在分配给他的门店里管理商品、知识库和直播。</li>
+        <li>管理员能进入全部门店，并管理品牌、门店、员工和声音样本；店员只能在分配给他的门店里管理商品、知识库和直播。</li>
         <li>一个手机号目前只能属于一个商户：已经注册过的手机号无法添加。</li>
         <li>移除店员后，他的手机号会被释放，可以重新注册或被其他商户添加。</li>
       </ul>

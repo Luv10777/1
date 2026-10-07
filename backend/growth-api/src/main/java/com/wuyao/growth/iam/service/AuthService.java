@@ -219,7 +219,7 @@ public class AuthService {
         user.setTenantId(tenant.getId());
         user.setPhone(phone);
         user.setName("用户" + phone.substring(7));
-        // 自己注册的人就是这个新商户的老板。老板添加的店员走 AccountService.createStaff，不会到这里。
+        // 自己注册的人就是这个新商户的管理员。管理员添加的店员走 AccountService.createStaff，不会到这里。
         user.setRole(AccountService.OWNER);
         user = userRepository.save(user);
 

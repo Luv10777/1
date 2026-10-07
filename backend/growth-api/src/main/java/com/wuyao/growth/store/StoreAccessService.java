@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 谁能进哪家门店，全系统只在这里判断：老板能进本商户的全部门店，店员只能进分配给他的门店。
+ * 谁能进哪家门店，全系统只在这里判断：管理员能进本商户的全部门店，店员只能进分配给他的门店。
  * 商品、知识库、直播、声音都通过 {@link #requireAccess} 把关，不要各自另写一套。
  */
 @Service

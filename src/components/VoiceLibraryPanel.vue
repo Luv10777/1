@@ -16,7 +16,7 @@ const personaName = computed({
   set: value => { persona.value = { ...persona.value, name: String(value).replace(/[^\p{Script=Han}A-Za-z]/gu, '').slice(0, 12) } },
 })
 const setStyle = style => { persona.value = { ...persona.value, style } }
-// 声音样本归商户：新建、改名、克隆、删除和调整开放门店只有老板能做，能进这家店的人都可以用。
+// 声音样本归商户：新建、改名、克隆、删除和调整开放门店只有管理员能做，能进这家店的人都可以用。
 const isOwner = computed(() => auth.isOwner)
 const capabilities = ref({ configured: false, builtInVoices: [], message: '正在读取语音服务状态…' })
 const capabilitiesLoaded = ref(false)
@@ -298,7 +298,7 @@ async function preview(voice, original = false) {
   } finally { if (requestTicket === playbackTicket) previewBusy.value = '' }
 }
 
-// 老板勾选或取消一家门店。把当前门店取消后，这个声音就不再出现在本页，所以改完重新读一次列表。
+// 管理员勾选或取消一家门店。把当前门店取消后，这个声音就不再出现在本页，所以改完重新读一次列表。
 async function toggleStore(voice, storeId, open) {
   if (busy.value) return
   const ticket = scopeTicket
@@ -404,7 +404,7 @@ onBeforeUnmount(() => { scopeTicket++; stopPreview(); clearPreviewCache(); recor
             </label>
             <p>勾选的门店可以用这个声音直播。至少保留一家；不再需要时请删除音色。</p>
           </template>
-          <p v-else>由老板决定这个声音开放给哪些门店。</p>
+          <p v-else>由管理员决定这个声音开放给哪些门店。</p>
         </details>
         <details v-if="!voice.builtin" class="voice-audit"><summary>授权记录</summary><p>{{ voice.consentText }}</p><dl><dt>确认时间</dt><dd>{{ consentDate(voice.consentAt) }}</dd><dt>操作人</dt><dd>用户 {{ voice.consentBy }}</dd></dl></details>
         <details v-if="voice.providerVoiceId" class="voice-audit"><summary>音色 ID</summary><p class="voice-id">{{ voice.providerVoiceId }}</p></details>

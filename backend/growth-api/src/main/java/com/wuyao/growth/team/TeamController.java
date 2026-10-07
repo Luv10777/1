@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 所有接口只有老板能调用，判断在 {@link TeamService} 里。 */
+/** 所有接口只有管理员能调用，判断在 {@link TeamService} 里。 */
 @RestController
 @RequestMapping("/api/team/members")
 @RequiredArgsConstructor

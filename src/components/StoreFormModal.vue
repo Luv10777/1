@@ -10,7 +10,7 @@ const emit = defineEmits(['close'])
 const form = reactive({ name: props.store?.name || '', address: props.store?.address || '', phone: props.store?.phone || '', businessHours: props.store?.businessHours || '' })
 const busy = ref(false)
 const error = ref('')
-// 只有一个品牌（或还没有品牌）时不用选：后端会把门店归到默认品牌。门店归哪个品牌由老板决定，店员看不到这一项。
+// 只有一个品牌（或还没有品牌）时不用选：后端会把门店归到默认品牌。门店归哪个品牌由管理员决定，店员看不到这一项。
 const brands = ref([])
 const brandId = ref(props.store?.brandId ?? null)
 onMounted(async () => {

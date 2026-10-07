@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 /**
  * 声音样本归商户所有，能在哪些门店使用由 voice_sample_stores 决定。
- * 上传、克隆、改名、删除和调整开放范围只有老板能做；能进某家门店的人可以使用开放给这家店的声音。
+ * 上传、克隆、改名、删除和调整开放范围只有管理员能做；能进某家门店的人可以使用开放给这家店的声音。
  */
 @Service @RequiredArgsConstructor
 public class VoiceSampleService {
@@ -60,7 +60,7 @@ public class VoiceSampleService {
                 + "t%d/voice-samples/%s".formatted(TenantContext.require(), UUID.randomUUID()));
         sample.setConsentAt(Instant.now()); sample.setConsentBy(userId); sample.setConsentText(CONSENT);
         sample = samples.saveAndFlush(sample);
-        // 新样本先只开放给上传时所在的门店；要给别的门店用，由老板另外开放。
+        // 新样本先只开放给上传时所在的门店；要给别的门店用，由管理员另外开放。
         grant(sample, storeId, userId);
         return new VoiceDtos.UploadTicket(VoiceDtos.SampleView.of(sample, List.of(storeId)), storage.presignPut(sample.getStorageKey(), Duration.ofMinutes(10)));
     }
@@ -87,14 +87,14 @@ public class VoiceSampleService {
         return view(sample);
     }
     /**
-     * 老板决定这个声音开放给哪些门店。至少保留一家；正在某家店的直播里使用时，不能把那家店去掉。
+     * 管理员决定这个声音开放给哪些门店。至少保留一家；正在某家店的直播里使用时，不能把那家店去掉。
      */
     @Transactional
     public VoiceDtos.SampleView setStores(Long id, List<Long> storeIds, Long userId) {
         VoiceSample sample = manage(id, userId);
         Set<Long> wanted = new LinkedHashSet<>(storeIds);
         if (wanted.isEmpty()) throw invalid("至少保留一家门店；不再需要这个声音时请直接删除");
-        // 老板对本商户所有营业中的门店都有权限，这里实际核对的是门店存在且属于本商户。
+        // 管理员对本商户所有营业中的门店都有权限，这里实际核对的是门店存在且属于本商户。
         wanted.forEach(storeId -> stores.requireAccess(storeId, userId));
         List<VoiceSampleStore> current = grants.findBySampleIdOrderByStoreIdAsc(id);
         List<VoiceSampleStore> revoked = current.stream().filter(grant -> !wanted.contains(grant.getStoreId())).toList();

@@ -28,7 +28,7 @@ public final class TeamDtos {
     }
 
     /**
-     * @param storeIds 店员能进的门店；老板能进全部门店，这里为空，由 allStores 表示
+     * @param storeIds 店员能进的门店；管理员能进全部门店，这里为空，由 allStores 表示
      * @param self     这一行是不是当前登录的人
      */
     public record MemberView(Long id, String name, String phone, String role, String status,

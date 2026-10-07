@@ -34,7 +34,7 @@ public class VoiceController {
     public ApiResponse<VoiceDtos.SampleView> rename(@PathVariable Long id, @Valid @RequestBody VoiceDtos.RenameRequest request, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(samples.rename(id, request.name(), me.userId()));
     }
-    /** 老板调整这个声音开放给哪些门店。 */
+    /** 管理员调整这个声音开放给哪些门店。 */
     @PutMapping("/voice-samples/{id}/stores")
     public ApiResponse<VoiceDtos.SampleView> setStores(@PathVariable Long id, @Valid @RequestBody VoiceDtos.StoresRequest request, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(samples.setStores(id, request.storeIds(), me.userId()));

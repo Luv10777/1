@@ -22,7 +22,7 @@ public class StoreService {
     private final StoreAccessService accessService;
     private final BrandService brandService;
 
-    /** 老板看到本商户的全部门店，店员只看到分配给他的。 */
+    /** 管理员看到本商户的全部门店，店员只看到分配给他的。 */
     @Transactional(readOnly = true)
     public List<StoreDtos.StoreView> list(Long userId) {
         if (accounts.isOwner(userId)) {
@@ -49,7 +49,7 @@ public class StoreService {
         // 未指定品牌时归到默认品牌；商户还没有品牌时保持为空。
         store.setBrandId(brandService.resolveForStore(request.brandId()));
         try {
-            // 老板自动能进新门店，不需要登记成员；店员由老板在员工管理里分配。
+            // 管理员自动能进新门店，不需要登记成员；店员由管理员在员工管理里分配。
             return StoreDtos.StoreView.of(storeRepository.saveAndFlush(store));
         } catch (DataIntegrityViolationException ex) {
             throw BizException.of(ErrorCode.CONFLICT, "门店名称已存在");
@@ -71,7 +71,7 @@ public class StoreService {
         // 先确认品牌再改门店：确认品牌会查库，不能让它把还没校验的门店改动提前写出去。
         Long brandId = store.getBrandId();
         if (request.brandId() != null && !request.brandId().equals(brandId)) {
-            // 店员可以改本店的地址、电话这些资料，但门店归哪个品牌由老板决定。
+            // 店员可以改本店的地址、电话这些资料，但门店归哪个品牌由管理员决定。
             accounts.requireOwner(userId);
             brandId = brandService.resolveForStore(request.brandId());
         }

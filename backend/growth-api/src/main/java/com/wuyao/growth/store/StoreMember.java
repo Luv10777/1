@@ -6,7 +6,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/** 店员能进哪些门店。老板自动能进全部门店，不在这张表里。 */
+/** 店员能进哪些门店。管理员自动能进全部门店，不在这张表里。 */
 @Entity
 @Table(name = "store_members")
 @Getter

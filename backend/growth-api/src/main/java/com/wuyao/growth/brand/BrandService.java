@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/** 品牌档案属于商户：商户内的成员都能读取，只有老板能新建、修改、删除和设置默认品牌。 */
+/** 品牌档案属于商户：商户内的成员都能读取，只有管理员能新建、修改、删除和设置默认品牌。 */
 @Service
 @RequiredArgsConstructor
 public class BrandService {

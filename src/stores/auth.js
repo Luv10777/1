@@ -12,9 +12,9 @@ const state = reactive({
 
 let timer
 
-// 后端的角色只有 OWNER（老板）和 STAFF（店员）。这里只决定显示哪些入口，真正的限制在服务端。
+// 后端的角色只有 OWNER（管理员）和 STAFF（店员）。这里只决定显示哪些入口，真正的限制在服务端。
 const rolesOf = role => [String(role || 'OWNER').toLowerCase()]
-const roleLabel = role => (role === 'STAFF' ? '店员' : '老板')
+const roleLabel = role => (role === 'STAFF' ? '店员' : '管理员')
 
 function persistSession(data) {
   const tokens = {
@@ -60,8 +60,8 @@ export const auth = {
     return state.user?.tenantId ?? null
   },
   /**
-   * 只有明确是店员才收起管理入口。角色还没从服务端对齐时（旧会话、后端暂时连不上）按老板显示：
-   * 多显示一个按钮顶多被服务端拒绝，把老板的入口藏起来才是真的挡住了人。
+   * 只有明确是店员才收起管理入口。角色还没从服务端对齐时（旧会话、后端暂时连不上）按管理员显示：
+   * 多显示一个按钮顶多被服务端拒绝，把管理员的入口藏起来才是真的挡住了人。
    */
   get isOwner() {
     return !state.user?.roles?.includes('staff')

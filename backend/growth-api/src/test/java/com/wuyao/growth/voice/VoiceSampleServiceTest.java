@@ -53,19 +53,19 @@ class VoiceSampleServiceTest {
 
     @Test void onlyTheOwnerChangesAVoiceWhileAnyoneWhoCanEnterAStoreItIsOpenToMayUseIt() {
         sample.setStatus("READY");
-        doThrow(BizException.of(ErrorCode.FORBIDDEN, "只有老板可以执行这个操作")).when(accounts).requireOwner(7L);
+        doThrow(BizException.of(ErrorCode.FORBIDDEN, "只有管理员可以执行这个操作")).when(accounts).requireOwner(7L);
         when(storage.presignGet(anyString(), any())).thenReturn("https://storage.test/sample");
 
         // A clerk of store 2 can listen to it and see it, and nothing more.
         when(stores.hasAccess(2L, 7L)).thenReturn(true);
         assertThat(service.download(10L, 7L).downloadUrl()).isEqualTo("https://storage.test/sample");
         assertThat(service.get(10L, 7L).storeIds()).containsExactly(2L);
-        assertThatThrownBy(() -> service.rename(10L, "改名", 7L)).hasMessageContaining("只有老板");
-        assertThatThrownBy(() -> service.beginClone(10L, 7L, "p")).hasMessageContaining("只有老板");
-        assertThatThrownBy(() -> service.beginDelete(10L, 7L)).hasMessageContaining("只有老板");
-        assertThatThrownBy(() -> service.setStores(10L, List.of(2L, 5L), 7L)).hasMessageContaining("只有老板");
+        assertThatThrownBy(() -> service.rename(10L, "改名", 7L)).hasMessageContaining("只有管理员");
+        assertThatThrownBy(() -> service.beginClone(10L, 7L, "p")).hasMessageContaining("只有管理员");
+        assertThatThrownBy(() -> service.beginDelete(10L, 7L)).hasMessageContaining("只有管理员");
+        assertThatThrownBy(() -> service.setStores(10L, List.of(2L, 5L), 7L)).hasMessageContaining("只有管理员");
         assertThatThrownBy(() -> service.upload(2L, new VoiceDtos.UploadRequest("声音", "audio/wav", true), 7L))
-                .hasMessageContaining("只有老板");
+                .hasMessageContaining("只有管理员");
         assertThat(sample.getName()).isEqualTo("门店声音");
         assertThat(sample.getStatus()).isEqualTo("READY");
         verify(repository, never()).saveAndFlush(any());
