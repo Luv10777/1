@@ -2,6 +2,7 @@ package com.wuyao.growth.common.storage;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -18,4 +19,9 @@ public class RoutedObjectStorage implements ObjectStorage {
     public String presignGet(String key, Duration ttl) { return forKey(key).presignGet(key, ttl); }
     public Optional<StoredObject> stat(String key) { return forKey(key).stat(key); }
     public void delete(String key) { forKey(key).delete(key); }
+    public byte[] read(String key, int maxBytes) { return forKey(key).read(key, maxBytes); }
+    public void put(String key, byte[] data, String contentType) { forKey(key).put(key, data, contentType); }
+    public void put(String key, InputStream data, long size, String contentType) {
+        forKey(key).put(key, data, size, contentType);
+    }
 }

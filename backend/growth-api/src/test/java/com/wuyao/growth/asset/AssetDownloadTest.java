@@ -4,10 +4,12 @@ import com.wuyao.growth.common.storage.ObjectStorage;
 import com.wuyao.growth.common.task.TaskService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
+import com.wuyao.growth.iam.repository.TenantRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +22,8 @@ import static org.mockito.Mockito.*;
 class AssetDownloadTest {
     private final AssetRepository assets = mock(AssetRepository.class);
     private final ObjectStorage storage = mock(ObjectStorage.class);
-    private final AssetService service = new AssetService(assets, storage, mock(TaskService.class));
+    private final AssetService service = new AssetService(assets, storage, mock(TaskService.class),
+            mock(TenantRepository.class), mock(TransactionTemplate.class));
     private Asset asset;
 
     @BeforeEach

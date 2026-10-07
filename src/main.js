@@ -7,7 +7,6 @@ import { auth } from './stores/auth'
 import './style.css'
 import './creative.css'
 import './image.css'
-import './poster-studio.css'
 import './product-set.css'
 import './consumer.css'
 import './billing.css'
@@ -20,6 +19,7 @@ import './live-studio.css'
 import './publishing.css'
 import './brand.css'
 import './publishing-workspace.css'
+import './image-studio-polish.css'
 
 theme.apply()
 

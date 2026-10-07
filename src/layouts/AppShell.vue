@@ -22,7 +22,7 @@ function openStoreForm(store = null) { editingStore.value = store; storeModalOpe
 // Reviews is a long-form feed and must use the shell's normal page scrolling.
 // Keeping it in the edge-workspace list applies overflow:hidden and prevents
 // the review stream from being scrolled once it exceeds the viewport.
-const edgeWorkspace = computed(() => ['image-create-product-set', 'video-workbench', 'assets', 'messages'].includes(route.name))
+const edgeWorkspace = computed(() => ['image-create-poster', 'image-create-product-set', 'video-workbench', 'assets', 'messages'].includes(route.name))
 const keyboard = (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); searchOpen.value = true }
   if (event.key === 'Escape') { searchOpen.value = false; menuOpen.value = false; accountOpen.value = false }

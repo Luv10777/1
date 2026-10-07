@@ -25,6 +25,36 @@ public class TaskService {
     @Value("${growth.worker.lease:30m}")
     private Duration lease;
 
+    @Transactional(readOnly = true)
+    public TaskStatus statusForTenant(Long id) {
+        return repository.findById(id).filter(t -> t.getTenantId().equals(TenantContext.require()))
+                .map(Task::getStatus).orElseThrow();
+    }
+
+    @Transactional(readOnly = true)
+    public TaskStatus statusByIdempotencyKey(String key) {
+        return repository.findByTenantIdAndIdempotencyKey(TenantContext.require(), key)
+                .map(Task::getStatus).orElse(null);
+    }
+
+    /** Call inside the business commit transaction to fence expired worker executions. */
+    @Transactional
+    public boolean ownsExecution(Task execution) {
+        return execution.getTenantId().equals(TenantContext.require())
+                && repository.findOwnedRunning(execution.getId(), execution.getAttempts()).isPresent();
+    }
+
+    /**
+     * Cancel a pending/running task and fence the current worker attempt.
+     * The handler may still return from an external call, but it can no longer
+     * write a result because ownsExecution will fail after this update.
+     */
+    @Transactional
+    public boolean cancel(Long taskId) {
+        Long tenantId = TenantContext.require();
+        return repository.cancelForTenant(taskId, tenantId) == 1;
+    }
+
     /** 插入与业务写入共用事务。并发冲突等待胜出的事务提交后返回同一任务。 */
     @Transactional
     public Task submit(String type, String queue, Map<String, Object> payload,
@@ -103,6 +133,19 @@ public class TaskService {
             task.setStatus(TaskStatus.FAILED);
             task.setFinishedAt(Instant.now());
         }
+        return true;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean failPermanently(Long taskId, int attempt, String errorCode, String errorMessage) {
+        var owned = repository.findOwnedRunning(taskId, attempt);
+        if (owned.isEmpty()) return false;
+        Task task = owned.get();
+        task.setErrorCode(errorCode);
+        task.setErrorMessage(errorMessage);
+        task.setLeaseExpiresAt(null);
+        task.setStatus(TaskStatus.FAILED);
+        task.setFinishedAt(Instant.now());
         return true;
     }
 

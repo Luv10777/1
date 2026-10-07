@@ -1,5 +1,7 @@
 package com.wuyao.growth.common.web;
 
+import org.springframework.http.HttpStatus;
+
 /**
  * 契约 3：错误码号段。
  *
@@ -40,7 +42,18 @@ public enum ErrorCode {
 
     // ---- asset ----
     ASSET_NOT_FOUND(3001),
-    ASSET_UPLOAD_FAILED(3002);
+    ASSET_UPLOAD_FAILED(3002),
+
+    IMAGE_NOT_CONFIGURED(4001),
+    IMAGE_PROVIDER_ERROR(4002),
+    IMAGE_PLAN_INVALID(4003),
+    IMAGE_QUALITY_UNSUPPORTED(4004),
+
+    VIDEO_NOT_CONFIGURED(4101),
+    VIDEO_PROVIDER_ERROR(4102),
+    VIDEO_MODEL_UNSUPPORTED(4103),
+    VIDEO_PARAMETER_INVALID(4104),
+    VIDEO_TIMEOUT(4105);
 
     private final int code;
 
@@ -50,5 +63,20 @@ public enum ErrorCode {
 
     public int getCode() {
         return code;
+    }
+
+    public HttpStatus httpStatus() {
+        return switch (this) {
+            case UNAUTHORIZED, REFRESH_TOKEN_INVALID, PASSWORD_INVALID, CODE_INVALID, CODE_EXPIRED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case NOT_FOUND, ASSET_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case RATE_LIMITED, SMS_TOO_FREQUENT, SMS_DAILY_LIMIT -> HttpStatus.TOO_MANY_REQUESTS;
+            case STORAGE_UNAVAILABLE, SMS_NOT_CONFIGURED, IMAGE_NOT_CONFIGURED, VIDEO_NOT_CONFIGURED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case SMS_SEND_FAILED, IMAGE_PROVIDER_ERROR, VIDEO_PROVIDER_ERROR -> HttpStatus.BAD_GATEWAY;
+            case VIDEO_TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT;
+            case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
+            default -> HttpStatus.BAD_REQUEST;
+        };
     }
 }

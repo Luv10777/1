@@ -85,6 +85,8 @@ public class LiveReplyLane implements SmartLifecycle {
         if (!running) return;
         running = false;
         scheduler.shutdown();
+        // Each loop owns the thread its tasks run on; these workers are not beans, so nobody else stops them.
+        workers.forEach(TaskWorker::stop);
     }
 
     @Override

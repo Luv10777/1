@@ -19,17 +19,27 @@ import java.util.concurrent.TimeUnit;
 public class MinioObjectStorage implements ObjectStorage {
 
     private final MinioClient client;
+    private final MinioClient signingClient;
     private final String bucket;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public MinioObjectStorage(@Value("${growth.storage.endpoint}") String endpoint,
                               @Value("${growth.storage.access-key}") String accessKey,
                               @Value("${growth.storage.secret-key}") String secretKey,
-                              @Value("${growth.storage.bucket}") String bucket) {
+                              @Value("${growth.storage.bucket}") String bucket,
+                              @Value("${growth.storage.public-endpoint:${growth.storage.endpoint}}") String publicEndpoint,
+                              @Value("${growth.storage.region:us-east-1}") String region) {
         this.client = MinioClient.builder()
                 .endpoint(endpoint)
                 .credentials(accessKey, secretKey)
                 .build();
+        this.signingClient = MinioClient.builder().endpoint(publicEndpoint)
+                .credentials(accessKey, secretKey).region(region).build();
         this.bucket = bucket;
+    }
+
+    public MinioObjectStorage(String endpoint, String accessKey, String secretKey, String bucket) {
+        this(endpoint, accessKey, secretKey, bucket, endpoint, "us-east-1");
     }
 
     @Override
@@ -44,7 +54,7 @@ public class MinioObjectStorage implements ObjectStorage {
 
     private String presign(Method method, String key, Duration ttl) {
         try {
-            return client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            return signingClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(method)
                     .bucket(bucket)
                     .object(key)
@@ -81,7 +91,42 @@ public class MinioObjectStorage implements ObjectStorage {
         try {
             client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(key).build());
         } catch (Exception e) {
-            log.warn("删除对象失败: {}", key, e);
+            log.error("删除对象失败，保留数据库记录以便重试: {}", key, e);
+            throw unavailable(key, e);
+        }
+    }
+
+    @Override
+    public byte[] read(String key, int maxBytes) {
+        try (var stream = client.getObject(GetObjectArgs.builder().bucket(bucket).object(key).build())) {
+            byte[] data = stream.readNBytes(maxBytes + 1);
+            if (data.length > maxBytes) throw new IllegalArgumentException("图片文件过大");
+            return data;
+        } catch (Exception e) {
+            throw unavailable(key, e);
+        }
+    }
+
+    @Override
+    public void put(String key, byte[] data, String contentType) {
+        try {
+            client.putObject(PutObjectArgs.builder().bucket(bucket).object(key)
+                    .stream(new java.io.ByteArrayInputStream(data), data.length, -1)
+                    .contentType(contentType).build());
+        } catch (Exception e) {
+            throw unavailable(key, e);
+        }
+    }
+
+    @Override
+    public void put(String key, java.io.InputStream data, long size, String contentType) {
+        try {
+            client.putObject(PutObjectArgs.builder().bucket(bucket).object(key)
+                    .stream(data, size, size < 0 ? 10L * 1024 * 1024 : -1)
+                    .contentType(contentType == null || contentType.isBlank() ? "application/octet-stream" : contentType)
+                    .build());
+        } catch (Exception e) {
+            throw unavailable(key, e);
         }
     }
 }

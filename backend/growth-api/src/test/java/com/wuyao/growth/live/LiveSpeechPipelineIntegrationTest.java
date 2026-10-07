@@ -17,6 +17,7 @@ import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectArgs;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -99,6 +100,8 @@ class LiveSpeechPipelineIntegrationTest {
         registry.add("spring.flyway.placeholders.app_db_password", () -> "growth_dev_local");
         registry.add("growth.jwt.secret", () -> "test-only-random-signing-secret-0123456789abcdef");
         registry.add("growth.storage.endpoint", LiveSpeechPipelineIntegrationTest::minioEndpoint);
+        // Presigned URLs are signed for the public endpoint, which otherwise comes from the environment.
+        registry.add("growth.storage.public-endpoint", LiveSpeechPipelineIntegrationTest::minioEndpoint);
         registry.add("growth.storage.access-key", () -> "testadmin");
         registry.add("growth.storage.secret-key", () -> "testadmin123");
         registry.add("growth.storage.bucket", () -> "test-assets");
@@ -143,6 +146,11 @@ class LiveSpeechPipelineIntegrationTest {
 
     static String minioEndpoint() {
         return "http://" + MINIO.getHost() + ":" + MINIO.getMappedPort(9000);
+    }
+
+    @AfterEach
+    void stopWorker() {
+        if (worker != null) worker.stop();
     }
 
     @BeforeEach
@@ -462,7 +470,8 @@ class LiveSpeechPipelineIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks", Integer.class)).isZero();
         // Another tenant cannot see, let alone steer, this session's narration.
         Long otherTenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('别家') RETURNING id", Long.class);
-        mvc.perform(get(path("/auto-script")).header("Authorization", "Bearer " + jwt.issueAccessToken(999L, otherTenant, null)))
+        Long outsider = owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?, 'outsider', '外人') RETURNING id", Long.class, otherTenant);
+        mvc.perform(get(path("/auto-script")).header("Authorization", "Bearer " + jwt.issueAccessToken(outsider, otherTenant, null)))
                 .andExpect(jsonPath("$.code").value(1404));
     }
 
@@ -890,6 +899,9 @@ class LiveSpeechPipelineIntegrationTest {
     private void drain() {
         for (int round = 0; round < 20; round++) {
             worker.poll();
+            // poll() hands each task to the worker's own thread; wait for it before looking at what is left.
+            await().atMost(Duration.ofSeconds(30)).until(() ->
+                    owner.queryForObject("SELECT count(*) FROM tasks WHERE status = 'RUNNING'", Integer.class) == 0);
             if (owner.queryForObject("SELECT count(*) FROM tasks WHERE status = 'PENDING'", Integer.class) == 0) return;
         }
         throw new AssertionError("任务没有在 20 轮内处理完");

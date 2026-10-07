@@ -1,6 +1,7 @@
 package com.wuyao.growth.common.storage;
 
 import java.time.Duration;
+import java.io.InputStream;
 import java.util.Optional;
 
 /**
@@ -25,5 +26,14 @@ public interface ObjectStorage {
     record StoredObject(long sizeBytes, String contentType) {
     }
 
+    /** Storage failures must propagate so callers retain records for retry. */
     void delete(String key);
+
+    /** Small image objects only; implementations enforce the byte limit before decoding. */
+    byte[] read(String key, int maxBytes);
+
+    void put(String key, byte[] data, String contentType);
+
+    /** Stream a provider response directly into object storage. Implementations must not buffer it in the JVM. */
+    void put(String key, InputStream data, long size, String contentType);
 }

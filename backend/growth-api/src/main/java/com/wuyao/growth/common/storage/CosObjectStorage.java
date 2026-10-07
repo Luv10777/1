@@ -8,6 +8,8 @@ import com.qcloud.cos.http.HttpMethodName;
 import com.qcloud.cos.http.HttpProtocol;
 import com.qcloud.cos.model.GeneratePresignedUrlRequest;
 import com.qcloud.cos.model.GetObjectRequest;
+import com.qcloud.cos.model.ObjectMetadata;
+import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.region.Region;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
@@ -15,6 +17,8 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
@@ -77,6 +81,29 @@ public class CosObjectStorage implements ObjectStorage {
         catch (CosServiceException error) {
             if (!missingObject(error)) throw unavailable();
         } catch (Exception error) { throw unavailable(); }
+    }
+    public byte[] read(String key, int maxBytes) {
+        requireConfigured();
+        byte[] data;
+        try (var object = client.getObject(new GetObjectRequest(bucket, key));
+             var stream = object.getObjectContent()) {
+            data = stream.readNBytes(maxBytes + 1);
+        } catch (Exception error) { throw unavailable(); }
+        if (data.length > maxBytes) throw new IllegalArgumentException("图片文件过大");
+        return data;
+    }
+    public void put(String key, byte[] data, String contentType) {
+        put(key, new ByteArrayInputStream(data), data.length, contentType);
+    }
+    public void put(String key, InputStream data, long size, String contentType) {
+        requireConfigured();
+        // Without a length the SDK buffers the whole stream in memory.
+        if (size < 0) throw new IllegalArgumentException("COS 流式写入需要已知的内容长度");
+        var metadata = new ObjectMetadata();
+        metadata.setContentLength(size);
+        metadata.setContentType(contentType == null || contentType.isBlank() ? "application/octet-stream" : contentType);
+        try { client.putObject(new PutObjectRequest(bucket, key, data, metadata)); }
+        catch (Exception error) { throw unavailable(); }
     }
     private void requireConfigured() {
         if (client == null) throw BizException.of(ErrorCode.STORAGE_UNAVAILABLE,

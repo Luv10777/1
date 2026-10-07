@@ -24,17 +24,22 @@ public final class AssetDtos {
     public record DownloadTicket(Long assetId, String downloadUrl, Instant expiresAt) {
     }
 
-    // sha256 兼容旧请求；服务端尚未计算校验值，不能把客户端声明存为可信哈希。
+    // sha256 兼容旧请求；可信校验值始终由服务端从对象内容计算。
     public record ConfirmRequest(@PositiveOrZero Long sizeBytes,
                                  @Pattern(regexp = "[a-fA-F0-9]{64}") String sha256) {
     }
 
     public record AssetView(Long id, String name, String type, String status,
-                            String storageKey, Long sizeBytes, Instant createdAt) {
+                            String storageKey, Long sizeBytes, Instant createdAt, String previewUrl) {
 
         public static AssetView of(Asset a) {
             return new AssetView(a.getId(), a.getName(), a.getType(), a.getStatus(),
-                    a.getStorageKey(), a.getSizeBytes(), a.getCreatedAt());
+                    a.getStorageKey(), a.getSizeBytes(), a.getCreatedAt(), null);
+        }
+
+        public static AssetView of(Asset a, String previewUrl) {
+            return new AssetView(a.getId(), a.getName(), a.getType(), a.getStatus(),
+                    a.getStorageKey(), a.getSizeBytes(), a.getCreatedAt(), previewUrl);
         }
     }
 }

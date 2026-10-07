@@ -1,38 +1,46 @@
 <script setup>
-import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import FloatingPromptBar from '../components/FloatingPromptBar.vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import ImageWorkspaceSwitch from '../components/ImageWorkspaceSwitch.vue'
+import PosterControlPanel from '../components/PosterControlPanel.vue'
+import PosterGalleryView from '../components/PosterGalleryView.vue'
+import { useImageCreation } from '../composables/useImageCreation'
+import '../poster-workbench.css'
 
-const generated = ref(false)
-const router = useRouter()
-const route = useRoute()
-const templates = [
-  { image: '/images/marketing-poster-case-1.png', title: '七夕 · 爱意正浓', tag: '浪漫晚宴' },
-  { image: '/images/marketing-poster-case-2.png', title: '年味渐浓', tag: '新春雅宴' },
-  { image: '/images/marketing-poster-case-3.png', title: '端阳 · 风雅入夏', tag: '节气主题' },
-  { image: '/images/marketing-poster-case-1.png', title: '把今晚，留给彼此', tag: '品牌宣发', position: '62% center' },
-  { image: '/images/marketing-poster-case-2.png', title: '新春有席，静候相逢', tag: '活动预热', position: '38% center' },
-  { image: '/images/marketing-poster-case-3.png', title: '纯粹，是更高级的表达', tag: '产品故事', position: '68% center' },
-  { image: '/images/marketing-poster-case-1.png', title: '一席好时光', tag: '门店促销', position: '30% center' },
-  { image: '/images/marketing-poster-case-2.png', title: '见面正当时', tag: '节日活动', position: '72% center' },
-]
-
-const runGenerate = () => { generated.value = true }
-const switchWorkspace = (path) => {
-  if (path === router.currentRoute.value.path) return
-  if (typeof document.startViewTransition === 'function') {
-    document.startViewTransition(() => router.push(path))
-    return
-  }
-  router.push(path)
+const studio = useImageCreation('POSTER')
+const control = ref(null)
+const gallery = ref(null)
+const prompted = ref(false)
+let pulseTimer
+function chooseScenario(scenario) {
+  studio.style = scenario.focus
+  studio.brief = scenario.prompt
+  prompted.value = false
+  nextTick(() => {
+    prompted.value = true
+    control.value?.focus()
+    clearTimeout(pulseTimer)
+    pulseTimer = setTimeout(() => { prompted.value = false }, 700)
+  })
 }
+onBeforeUnmount(() => clearTimeout(pulseTimer))
+watch(() => [studio.optimistic, studio.current?.id], async ([optimistic, id], [wasOptimistic, previousId] = []) => {
+  if ((!optimistic || wasOptimistic) && (!id || id === previousId)) return
+  if (!window.matchMedia('(max-width: 760px)').matches) return
+  await nextTick()
+  gallery.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+})
 </script>
 
 <template>
-  <div class="poster-studio-page">
-    <div class="page-heading"><div><p class="eyebrow accent">一方志 · 图像工坊</p><h1>营销海报</h1><p class="page-intro">为一次相逢，留一张好画面。以下为节气与门店活动的视觉参考。</p></div></div>
-    <header class="poster-studio-header"><div class="history-menu"><button type="button" class="history-trigger" aria-haspopup="menu">◷ <span>历史会话</span><b class="history-chevron">⌄</b></button><div class="history-dropdown" role="menu"><button type="button" role="menuitem"><span>最近使用</span><small>刚刚</small></button><button type="button" role="menuitem"><span>七夕活动海报</span><small>昨天</small></button><button type="button" role="menuitem"><span>门店周末促销</span><small>8 月 26 日</small></button></div></div><div class="image-workspace-switch video-mode-switch" role="group" aria-label="切换图片工作区"><button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/image/create/poster')"><span class="material-symbols-outlined">campaign</span>营销海报</button><button type="button" @click="switchWorkspace('/image/create/product-set')"><span class="material-symbols-outlined">grid_view</span>产品套图</button></div></header>
-    <main class="template-library"><div class="template-grid"><article v-for="(template, index) in templates" :key="`${template.title}-${index}`" class="template-card group"><div class="template-image-wrap"><img :src="template.image" :alt="template.title" :style="{ objectPosition: template.position || 'center' }" class="template-image" /><div class="template-overlay"><span>{{ template.tag }}</span><button type="button" @click="runGenerate">创作同款 <b>→</b></button></div></div></article></div><div v-if="generated" class="generated-toast"><span class="status-pulse" /> 已将模板方向带入创作舱，你可以继续补充灵感</div></main>
-    <FloatingPromptBar :initial-prompt="typeof route.query.prompt === 'string' ? route.query.prompt : ''" :initial-ratio="typeof route.query.ratio === 'string' ? route.query.ratio : ''" :initial-reference="typeof route.query.assets === 'string' ? route.query.assets.split('|')[0] : ''" @generate="runGenerate" />
-  </div>
+  <section class="poster-workbench bg-[#FAF8F5] text-[#2D2826]" aria-label="营销海报工作区">
+    <PosterControlPanel ref="control" :studio="studio" :prompted="prompted" />
+    <div class="poster-showcase">
+      <div class="poster-showcase-head">
+        <div class="poster-showcase-copy"><h2>让门店的故事，一眼被看见。</h2><p>从真实商品与经营场景出发，做一张值得顾客停留的海报。</p></div>
+        <ImageWorkspaceSwitch />
+      </div>
+      <PosterGalleryView ref="gallery" :studio="studio" @choose="chooseScenario" />
+      <footer class="poster-showcase-footer"><img src="/images/brand/yifangzhi-mark.png" alt="" /><span>为每一方商家立传</span><small>一物 · 一景 · 一方志</small></footer>
+    </div>
+  </section>
 </template>

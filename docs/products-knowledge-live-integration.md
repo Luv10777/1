@@ -54,7 +54,7 @@ API 为 `http://localhost:18080`，MinIO 为 `http://localhost:39000`。
 ## 验证
 
 2026-09-28：最新后端 `mvn verify` **117 项测试通过**；前端 `npm test` **104 项测试通过**。类型检查与构建通过；新增语音、播报文件定向 ESLint 无错误。全仓库 lint 仍有原有 `ReviewsView.vue`、`ServiceRulesView.vue` 的 TypeScript 解析错误。
-Flyway V13/V14/V15 已在本机测试数据库应用，分别为音频接法/心跳、配对凭证和声音样本。
+Flyway V30/V31/V32（合并 main 前编号为 V13/V14/V15）已在本机测试数据库应用，分别为音频接法/心跳、配对凭证和声音样本。
 
 以下为此前商品/知识库联调结果，不代表本次手机硬件/供应商联调已完成：
 

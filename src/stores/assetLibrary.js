@@ -10,5 +10,5 @@ export const assets = ref([
 
 // Video thumbnails are not playable sources. The API should supply mediaUrl.
 export function assetSource(asset) {
-  return asset.kind === 'image' ? asset.mediaUrl || asset.src : asset.mediaUrl || ''
+  return asset.kind === 'image' || asset.type === 'IMAGE' ? asset.previewUrl || asset.mediaUrl || asset.src || asset.preview : asset.mediaUrl || ''
 }

@@ -9,8 +9,12 @@ spring:
     username: ${DB_USER:growth_app}
     password: ${DB_PASSWORD:}
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: ${DB_POOL_SIZE:50}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT:10000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT:300000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME:1800000}
+      leak-detection-threshold: ${DB_POOL_LEAK_DETECTION:60000}
 
   jpa:
     open-in-view: false
@@ -27,7 +31,7 @@ spring:
     user: ${DB_MIGRATE_USER:${DB_USER:growth_app}}
     password: ${DB_MIGRATE_PASSWORD:${DB_PASSWORD:}}
     placeholders:
-      # V6 同步应用角色口令，必须和 spring.datasource.password 一致
+      # V23 同步应用角色口令，必须和 spring.datasource.password 一致
       app_db_password: ${DB_PASSWORD:growth_dev_local}
 
   data:
@@ -42,6 +46,8 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # Only ClientIpResolver applies the explicit trusted-proxy boundary.
+  forward-headers-strategy: none
   shutdown: graceful
 
 # ---- 平台自有配置 ----
@@ -70,6 +76,82 @@ growth:
       websocket-url: ${DASHSCOPE_WEBSOCKET_URL:}
       model: ${DASHSCOPE_TTS_MODEL:cosyvoice-v3.5-flash}
       builtin: ${DASHSCOPE_BUILTIN_VOICE:}
+  image:
+    base-url: ${NEW_API_BASE_URL:}
+    tenant-max-concurrent: ${IMAGE_TENANT_MAX_CONCURRENT:20}
+    global-max-concurrent: ${IMAGE_GLOBAL_MAX_CONCURRENT:200}
+    api-rate-limit: ${IMAGE_API_RATE_LIMIT:100}
+    api-timeout: ${IMAGE_API_TIMEOUT:10}
+    upload-max-pixels: ${IMAGE_UPLOAD_MAX_PIXELS:50000000}
+    creation-lock-wait-seconds: ${IMAGE_CREATION_LOCK_WAIT_SECONDS:5}
+    creation-lock-lease-seconds: ${IMAGE_CREATION_LOCK_LEASE_SECONDS:120}
+    text:
+      url: ${IMAGE_TEXT_URL:}
+      api-key: ${IMAGE_TEXT_API_KEY:${NEW_API_API_KEY:}}
+      model: ${IMAGE_TEXT_MODEL:deepseek-flash}
+      temperature: ${IMAGE_TEXT_TEMPERATURE:0.5}
+      max-tokens: ${IMAGE_TEXT_MAX_TOKENS:6000}
+      timeout-seconds: ${IMAGE_TEXT_TIMEOUT_SECONDS:300}
+    generator:
+      protocol: ${IMAGE_GENERATOR_PROTOCOL:OPENAI}
+      url: ${IMAGE_GENERATOR_URL:}
+      edits-url: ${IMAGE_GENERATOR_EDITS_URL:}
+      api-key: ${IMAGE_GENERATOR_API_KEY:${NEW_API_API_KEY:}}
+      model: ${IMAGE_GENERATOR_MODEL:}
+      # Flu waits for generation and returns the final provider URL in the
+      # same response. This long timeout applies only in the image worker.
+      timeout-seconds: ${IMAGE_GENERATOR_TIMEOUT_SECONDS:600}
+      quality: ${IMAGE_GENERATOR_QUALITY:}
+      response-format: ${IMAGE_GENERATOR_RESPONSE_FORMAT:}
+      download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:*.aliyuncs.com}
+    qualities: ${IMAGE_SUPPORTED_QUALITIES:1K,2K,4K}
+    max-output-pixels: ${IMAGE_MAX_OUTPUT_PIXELS:0}
+    timeout-seconds: ${IMAGE_TIMEOUT_SECONDS:120}
+    poll-seconds: ${IMAGE_POLL_SECONDS:5}
+    max-polls: ${IMAGE_MAX_POLLS:360}
+    font: ${IMAGE_FONT:Microsoft YaHei}
+  video:
+    tenant-max-concurrent: ${VIDEO_TENANT_MAX_CONCURRENT:2}
+    global-max-concurrent: ${VIDEO_GLOBAL_MAX_CONCURRENT:20}
+    concurrency-permit-ttl-seconds: ${VIDEO_CONCURRENCY_PERMIT_TTL_SECONDS:21600}
+    max-polls: ${VIDEO_MAX_POLLS:360}
+    max-duration-seconds: ${VIDEO_MAX_DURATION_SECONDS:7200}
+    # 实际签名 TTL 至少为处理时限 + 安全余量，且不超过 SigV4 的 7 天上限。
+    reference-presign-ttl-seconds: ${VIDEO_REFERENCE_PRESIGN_TTL_SECONDS:21600}
+    reference-url-safety-seconds: ${VIDEO_REFERENCE_URL_SAFETY_SECONDS:300}
+    health:
+      provider-pending-threshold: ${VIDEO_HEALTH_PROVIDER_PENDING_THRESHOLD:100}
+      media-pending-threshold: ${VIDEO_HEALTH_MEDIA_PENDING_THRESHOLD:20}
+      stuck-after-seconds: ${VIDEO_HEALTH_STUCK_AFTER_SECONDS:${VIDEO_MAX_DURATION_SECONDS:7200}}
+      stuck-workflows-threshold: ${VIDEO_HEALTH_STUCK_WORKFLOWS_THRESHOLD:0}
+      snapshot-cache-seconds: ${VIDEO_HEALTH_SNAPSHOT_CACHE_SECONDS:15}
+    max-provider-bytes: ${VIDEO_MAX_PROVIDER_BYTES:1073741824}
+    reference-max-bytes: ${VIDEO_REFERENCE_MAX_BYTES:524288000}
+    reference-max-duration-seconds: ${VIDEO_REFERENCE_MAX_DURATION_SECONDS:300}
+    reference-max-width: ${VIDEO_REFERENCE_MAX_WIDTH:4096}
+    reference-max-height: ${VIDEO_REFERENCE_MAX_HEIGHT:4096}
+    ffprobe-path: ${FFPROBE_PATH:ffprobe}
+    provider:
+      name: ${VIDEO_PROVIDER_NAME:onlyrouter}
+      protocol: ${VIDEO_PROVIDER_PROTOCOL:CHAT_COMPLETIONS}
+      base-url: ${VIDEO_PROVIDER_BASE_URL:https://api.onlyrouter.ai}
+      api-key: ${VIDEO_PROVIDER_API_KEY:}
+      submit-path: ${VIDEO_PROVIDER_SUBMIT_PATH:/v1/videos}
+      poll-path: ${VIDEO_PROVIDER_POLL_PATH:/v1/videos/{jobId}}
+      content-path: ${VIDEO_PROVIDER_CONTENT_PATH:/v1/videos/{jobId}/content}
+      timeout-seconds: ${VIDEO_PROVIDER_TIMEOUT_SECONDS:60}
+    model:
+      seedance-2-5: ${VIDEO_MODEL_SEEDANCE_2_5:doubao-seedance-2-5-260628}
+      seedance-2-0: ${VIDEO_MODEL_SEEDANCE_2_0:doubao-seedance-2-0-260128}
+      seedance-2-0-mini: ${VIDEO_MODEL_SEEDANCE_2_0_MINI:doubao-seedance-2-0-mini-260615}
+      seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:doubao-seedance-2-0-fast-260128}
+    poll-seconds: ${VIDEO_POLL_SECONDS:15}
+  http:
+    max-total: ${HTTP_MAX_TOTAL:200}
+    max-per-route: ${HTTP_MAX_PER_ROUTE:50}
+    connection-timeout: ${HTTP_CONNECTION_TIMEOUT:15}
+    # Multimodal planning requests may take longer than a normal API call.
+    socket-timeout: ${HTTP_SOCKET_TIMEOUT:300}
   jwt:
     # 至少 32 字节。生产必须用环境变量注入。
     secret: ${JWT_SECRET:}
@@ -81,11 +163,17 @@ growth:
     code-ttl: 5m
     per-phone-per-minute: 1
     per-phone-per-day: 10
+    per-ip-per-minute: ${SMS_PER_IP_PER_MINUTE:5}
+    per-ip-per-day: ${SMS_PER_IP_PER_DAY:100}
+    global-per-minute: ${SMS_GLOBAL_PER_MINUTE:100}
+    global-per-day: ${SMS_GLOBAL_PER_DAY:10000}
     aliyun:
       access-key-id: ${ALIYUN_SMS_ACCESS_KEY_ID:}
       access-key-secret: ${ALIYUN_SMS_ACCESS_KEY_SECRET:}
       sign-name: ${ALIYUN_SMS_SIGN_NAME:}
       template-code: ${ALIYUN_SMS_TEMPLATE_CODE:}
+  security:
+    trusted-proxies: ${TRUSTED_PROXY_CIDRS:}
   storage:
     cos:
       secret-id: ${COS_SECRET_ID:}
@@ -93,10 +181,13 @@ growth:
       region: ${COS_REGION:ap-shanghai}
       bucket: ${COS_BUCKET:}
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:${MINIO_ENDPOINT:http://localhost:9000}}
+    region: ${MINIO_REGION:us-east-1}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: ${MINIO_BUCKET:growth-assets}
     presign-ttl: 15m
+    cleanup-interval-ms: ${STORAGE_CLEANUP_INTERVAL_MS:3600000}
   worker:
     # api 进程设 false，worker 进程设 true。同一个 jar，两条启动命令。
     enabled: ${WORKER_ENABLED:false}
@@ -104,16 +195,23 @@ growth:
     # 列表里有 LIVE 的进程会自动多跑几条线处理 LIVE_REPLY（弹幕回复），不用写进这里。
     # 同时处理几条弹幕：growth.live.reply-lane.concurrency（默认 3）；
     # 不想要可设 growth.live.reply-lane.enabled=false，那样就得另有进程处理 LIVE_REPLY。
-    queues: DEFAULT,IMAGE,VIDEO,LIVE
+    # 与 deploy/systemd/ 的 worker 队列并集一致；生产单元通过命令行分别限定队列。
+    queues: DEFAULT,IMAGE,VIDEO_PROVIDER,MEDIA_CPU,LIVE
     poll-interval: 2000
     batch-size: 5
+    parallelism: ${WORKER_PARALLELISM:1}
     lease: 30m
     heartbeat-interval: 10000
 
 management:
-  endpoints.web.exposure.include: health,info
-  endpoint.health.show-details: never
+  endpoints.web.exposure.include: ${MANAGEMENT_EXPOSURE_INCLUDE:health}
+  endpoint.health.show-details: when_authorized
+  endpoint.health.roles: ACTUATOR
 
 logging:
   level:
-    com.wuyao.growth: DEBUG
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.wuyao.growth: ${LOG_LEVEL:INFO}
+    com.wuyao.growth.creative.image: ${LOG_LEVEL_IMAGE:DEBUG}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:WARN}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_LEVEL_SQL_PARAMS:WARN}
