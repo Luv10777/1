@@ -253,6 +253,37 @@ class LiveSpeechPipelineIntegrationTest {
     }
 
     @Test
+    void aStoreWithABrandNarratesAndAnswersWithTheBrandsOwnDescription() throws Exception {
+        // The merchant's first brand takes in the store that already exists; nothing is set on the session.
+        api(post("/api/brands"), Map.of("name", "椴语", "slogan", "一勺蜜，一片林", "intro", "2019 年在长白山建起第一座蜂场",
+                "languageStyle", "朴实、不夸张"));
+        api(post(path("/start")), null);
+        connectPlayer();
+        String branded = "椴语 2019 年在长白山建起第一座蜂场，这款椴树蜂蜜 69 元一罐，一罐 500 克，喜欢的朋友可以看看。";
+        writer.reply = request -> Map.of("text", branded);
+
+        api(post(path("/auto-script/start")), null);
+        drain();
+
+        assertThat(writer.requests.get(0).prompt()).contains("名称：椴树蜂蜜", "【品牌资料】\n品牌：椴语", "口号：一勺蜜，一片林",
+                "简介：2019 年在长白山建起第一座蜂场", "表达风格：朴实、不夸张");
+        assertThat(writer.requests.get(0).options().get("system").toString()).contains("9. 【品牌资料】是这家店所属品牌的介绍");
+        // The year comes from the brand, so the segment passes the check that refuses invented numbers.
+        assertThat(scripts("status")).containsOnly("READY");
+        assertThat(scripts("text")).containsOnly(branded);
+        api(post(path("/auto-script/stop")), null);
+
+        int asked = writer.requests.size();
+        writer.reply = request -> decided("提问", 0, "我们是椴语，2019 年就在长白山养蜂了。");
+        api(post(path("/mock-comments")), comment("brand-1", "你们是什么牌子"));
+        drain();
+        ProviderRequest judged = writer.requests.get(asked);
+        assertThat(judged.prompt()).contains("名称：椴树蜂蜜", "【品牌资料】\n品牌：椴语", "【观众弹幕】你们是什么牌子");
+        assertThat(judged.options().get("system").toString()).contains("关于【品牌资料】：它是这家店所属品牌的介绍");
+        assertThat(feed("brand-1")).containsEntry("status", "ANSWERED").containsEntry("source", "AI");
+    }
+
+    @Test
     void manualSpeechIsQueuedForAWorkerAndTheSameIdNeverBuysASecondClip() throws Exception {
         WebSocketSession socket = connectPlayer();
         Map<String, Object> speech = Map.of("id", "manual-1", "mode", "APPEND", "text", "欢迎来到直播间", "builtInVoice", "voice-a");

@@ -408,6 +408,40 @@ docker compose exec postgres psql -U growth_owner -d wuyao_growth \
   -c 'select version, description, success from flyway_schema_history order by installed_rank;'
 ```
 
+### 品牌
+
+层级是 商户（租户）→ 品牌 → 门店：品牌档案属于商户，门店通过 `stores.brand_id` 归到一个品牌名下，
+商品、知识库、直播仍然属于门店。素材和生成的作品属于商户，不随品牌划分。
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/brands` | 当前商户未删除的品牌，默认品牌在前；每项带 `storeCount`（营业中的门店数） |
+| `POST /api/brands` | 新建。只有 `name` 必填 |
+| `GET /api/brands/{id}`、`PUT /api/brands/{id}` | 读取、整份保存。`PUT` 必须带 `version`，没带上的字段视为清空 |
+| `DELETE /api/brands/{id}` | 归档（软删除），归档后名称可以再用 |
+| `POST /api/brands/{id}/default` | 设为默认品牌 |
+
+规则：
+
+- 商户的第一个品牌自动成为默认品牌，已有的门店一并归到它名下；每个商户至多一个默认品牌。
+- 新建门店可以带 `brandId`；不带时归到默认品牌，商户还没有品牌时为空。
+  修改门店时不带 `brandId` 表示不改变归属。门店只能挂到本商户未删除的品牌，否则返回 1400。
+- 还有营业中门店的品牌不能删除；有其他品牌时，默认品牌要先把默认让出去才能删除。两种情况都返回 1409。
+- Logo 和两个二维码保存的是素材 ID（`logoAssetId` 等），必须是本商户已上传完成的图片素材；
+  预览地址由前端向 `/api/assets/{id}/download-url` 获取。
+- 响应不输出值为 null 的字段，未填写的资料在 JSON 里不出现。
+
+V40 建表并启用强制 RLS。`stores` 到 `brands` 是 `(tenant_id, brand_id)` 复合外键：
+外键检查不受行级安全约束，由它保证门店挂不到其他商户的品牌上。
+
+品牌模块通过 `brand/BrandStoreLinks` 了解门店归属，由门店模块实现；其他模块用
+`BrandService.profileForStore(storeId)` 读取门店所属品牌的文字资料。直播的自动讲解和弹幕回复
+已经这样接入：门店有品牌时，品牌名、口号、简介、定位、目标人群和表达风格作为【品牌资料】
+随商品资料一起交给文本模型，生成内容的数字和承诺校验也把它算作依据；门店没有品牌时提示词与原来完全一致。
+这部分用替身模型验证了提示词内容和校验结果，没有用真实模型验证生成效果。图片和视频创作尚未读取品牌资料。
+
+商户内目前不区分角色，任何成员都能新建、修改和删除品牌；加入员工账号时需要在 `BrandService` 补上角色校验。
+
 ### 门店、商品、知识库与直播配置
 
 门店通过 `/api/stores` 管理；创建门店后当前用户成为该门店成员。

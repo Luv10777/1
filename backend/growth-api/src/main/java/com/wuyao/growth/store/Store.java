@@ -21,6 +21,10 @@ public class Store {
     @Column(nullable = false, length = 120)
     private String name;
 
+    /** 所属品牌。商户还没有建过品牌时为空。 */
+    @Column(name = "brand_id")
+    private Long brandId;
+
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
