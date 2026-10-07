@@ -57,7 +57,7 @@ test('digital human task lifecycle follows the real video API', async t => {
         assert.equal(timers.size, 0)
       } finally { app.unmount() }
     })
-    await t.test('completed output keeps actual metadata and warns about differences without submitting again', async () => {
+    await t.test('completed output keeps actual metadata and shows a simple completion notice without submitting again', async () => {
       let posts = 0
       globalThis.fetch = async () => {
         posts++
@@ -73,8 +73,7 @@ test('digital human task lifecycle follows the real video API', async t => {
         assert.equal(studio.workflow.value.actualWidth, 720)
         assert.equal(studio.workflow.value.actualHeight, 1280)
         assert.equal(studio.workflow.value.actualDurationMs, 5200)
-        assert.match(studio.notice.value, /成片参数需核对/)
-        assert.match(studio.notice.value, /重新生成可能再次计费/)
+        assert.equal(studio.notice.value, '视频已完成并保存到作品库。')
         assert.equal(posts, 1)
         assert.equal(timers.size, 0)
       } finally { app.unmount() }

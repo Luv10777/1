@@ -6,7 +6,7 @@ import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { videoCompletionNotice } from '../services/videoConversations.js'
 
-test('video preview displays actual metadata, requested settings and persistent QA warnings', async t => {
+test('completed video preview uses its own aspect ratio without parameter notices', async t => {
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-video-qa-tests',
     plugins: [vue()],
     optimizeDeps: { noDiscovery: true, entries: [] },
@@ -14,29 +14,30 @@ test('video preview displays actual metadata, requested settings and persistent 
   try {
     const { default: Preview } = await vite.ssrLoadModule('/src/components/VideoPreviewPanel.vue')
     const render = props => renderToString(createSSRApp(Preview, { modelLabel: 'Seedance 2.5', ...props }))
-    await t.test('a mismatched result remains playable and shows actual values and additional-cost guidance', async () => {
+    await t.test('a completed video has its own player and no device frame or parameter warnings', async () => {
       const html = await render({ outputUrl: '/test/output.mp4', resolution: '1080p', duration: 5, format: '16:9',
-        actualWidth: 720, actualHeight: 1280, actualDurationMs: 5201,
-        qaWarnings: [{ code: 'VIDEO_ORIENTATION_MISMATCH', message: '画面方向与请求不一致' }] })
+        actualWidth: 720, actualHeight: 1280 })
       assert.match(html, /<video[^>]+src="\/test\/output.mp4"/)
-      assert.match(html, /720 × 1280 px · 5.201 秒/)
-      assert.match(html, /请求：1080p · 5 秒 · 16:9/)
-      assert.match(html, /成片参数需核对/)
-      assert.match(html, /画面方向与请求不一致/)
-      assert.match(html, /重新生成可能再次计费/)
+      assert.match(html, /class="video-result-stage"/)
+      assert.match(html, /--video-aspect-ratio:0.5625/)
+      assert.doesNotMatch(html, /device-player|device-island|device-mac-ui/)
+      assert.doesNotMatch(html, /实际成片|请求：|成片参数需核对|重新生成可能再次计费/)
     })
-    await t.test('a matching result still shows actual values while an old response stays compatible', async () => {
-      const matching = await render({ outputUrl: '/test/output.mp4', actualWidth: 1088, actualHeight: 1920, actualDurationMs: 5200 })
-      assert.match(matching, /1088 × 1920 px · 5.2 秒/)
-      assert.doesNotMatch(matching, /成片参数需核对/)
+    await t.test('an old response remains playable while dimensions are loaded from the file', async () => {
       const old = await render({ outputUrl: '/test/old.mp4' })
-      assert.match(old, /尺寸未记录 · 时长未记录/)
+      assert.match(old, /<video[^>]+src="\/test\/old.mp4"/)
+      assert.match(old, /preload="metadata"/)
+      assert.doesNotMatch(old, /尺寸未记录|时长未记录/)
       assert.equal(videoCompletionNotice({ status: 'SUCCEEDED' }), '视频已完成并保存到作品库。')
     })
-    await t.test('a generating result does not present unknown metadata as a mismatch', async () => {
+    await t.test('the progress and failure views remain available', async () => {
       const html = await render({ isGenerating: true })
       assert.doesNotMatch(html, /aria-label="成片参数"/)
       assert.doesNotMatch(html, /成片参数需核对/)
+      assert.match(html, /正在生成视频/)
+      const failed = await render({ error: '生成失败，请稍后重试。' })
+      assert.match(failed, /视频生成失败/)
+      assert.match(failed, /生成失败，请稍后重试。/)
     })
   } finally { await vite.close() }
 })

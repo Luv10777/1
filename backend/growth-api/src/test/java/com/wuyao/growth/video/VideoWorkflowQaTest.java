@@ -65,29 +65,15 @@ class VideoWorkflowQaTest {
 
     @ParameterizedTest
     @CsvSource({
-            "1080p, 9:16, 1088, 1920, NONE",
-            "1080p, 16:9, 1920, 1088, NONE",
-            "720p, 1:1, 720, 724, NONE",
-            "480p, 4:3, 640, 480, NONE",
-            "480p, 3:4, 480, 640, NONE",
-            "720p, 21:9, 1680, 720, NONE",
-            "4K, 16:9, 3840, 2160, NONE",
-            "720p, auto, 900, 720, NONE",
-            "720p, auto, 1280, 736, NONE",
-            "720p, auto, 1280, 737, VIDEO_RESOLUTION_MISMATCH",
-            "1080p, auto, 1920, 1102, NONE",
-            "1080p, auto, 1920, 1103, VIDEO_RESOLUTION_MISMATCH",
-            "4K, auto, 4000, 2204, NONE",
-            "4K, auto, 4000, 2205, VIDEO_RESOLUTION_MISMATCH",
-            "1080p, 9:16, 720, 1280, VIDEO_RESOLUTION_MISMATCH",
-            "720p, 16:9, 720, 1280, VIDEO_ORIENTATION_MISMATCH",
-            "720p, 9:16, 1280, 720, VIDEO_ORIENTATION_MISMATCH",
-            "720p, 16:9, 1440, 720, VIDEO_RATIO_MISMATCH",
-            "480p, 1:1, 489, 480, NONE",
-            "480p, 1:1, 490, 480, VIDEO_RATIO_MISMATCH"
+            "1080p, 9:16, 1088, 1920",
+            "480p, auto, 752, 560",
+            "4K, 16:9, 3840, 2160",
+            "1080p, 9:16, 720, 1280",
+            "720p, 16:9, 720, 1280",
+            "720p, 9:16, 1280, 720"
     })
-    void actualDimensionsAreExposedAndOnlyOutOfToleranceOutputsHaveWarnings(String resolution, String ratio,
-            int width, int height, String warning) {
+    void validVideoIsPublishedAndActualDimensionsAreKeptWithoutComparingTheRequest(String resolution, String ratio,
+            int width, int height) {
         request(resolution, ratio, 5);
         when(probe.probe(KEY, "video/mp4")).thenReturn(new VideoMediaProbe.Metadata(width, height, 5000, "video/mp4"));
         service.completeQa(42L, task);
@@ -96,37 +82,29 @@ class VideoWorkflowQaTest {
         assertThat(view.actualHeight()).isEqualTo(height);
         assertThat(view.actualDurationMs()).isEqualTo(5000);
         assertThat(view.resolution()).isEqualTo(resolution);
-        if (warning.equals("NONE")) assertThat(view.qaWarnings()).isEmpty();
-        else assertThat(view.qaWarnings()).extracting(VideoDtos.QaWarning::code).containsExactly(warning);
         assertRetainedAndPublished(view);
     }
 
     @ParameterizedTest
     @CsvSource({
-            "5, 4800, false", "5, 5200, false", "5, 4700, false", "5, 5300, false",
-            "5, 4699, true", "5, 5301, true", "5, 4300, true", "5, 7000, true",
-            "15, 14700, false", "15, 15300, false", "15, 15301, true",
-            "30, 29400, false", "30, 30600, false", "30, 29399, true", "30, 30601, true"
+            "5, 4800", "5, 7000", "10, 10042", "30, 30601"
     })
-    void durationComparisonUsesMillisecondsAndAnInclusiveTolerance(int requestedSeconds, int actualMs, boolean warning) {
+    void validVideoDurationIsKeptWithoutComparingTheRequestedSeconds(int requestedSeconds, int actualMs) {
         request("720p", "16:9", requestedSeconds);
         when(probe.probe(KEY, "video/mp4")).thenReturn(new VideoMediaProbe.Metadata(1280, 720, actualMs, "video/mp4"));
         service.completeQa(42L, task);
         var view = service.get(42L);
         assertThat(view.durationSeconds()).isEqualTo(requestedSeconds);
         assertThat(view.actualDurationMs()).isEqualTo(actualMs);
-        if (warning) assertThat(view.qaWarnings()).extracting(VideoDtos.QaWarning::code).containsExactly("VIDEO_DURATION_MISMATCH");
-        else assertThat(view.qaWarnings()).isEmpty();
         assertRetainedAndPublished(view);
     }
 
     @Test
-    void reportsAllIndependentDifferencesInsteadOfStoppingAtTheFirstOne() {
+    void aValidVideoStillSucceedsWhenAllRequestedParametersDiffer() {
         request("1080p", "16:9", 5);
         when(probe.probe(KEY, "video/mp4")).thenReturn(new VideoMediaProbe.Metadata(720, 1280, 7000, "video/mp4"));
         service.completeQa(42L, task);
-        assertThat(service.get(42L).qaWarnings()).extracting(VideoDtos.QaWarning::code)
-                .containsExactly("VIDEO_RESOLUTION_MISMATCH", "VIDEO_ORIENTATION_MISMATCH", "VIDEO_DURATION_MISMATCH");
+        assertRetainedAndPublished(service.get(42L));
     }
 
     @Test
@@ -161,21 +139,19 @@ class VideoWorkflowQaTest {
     }
 
     @Test
-    void beforeQaActualFieldsAreUnknownAndNoMismatchIsClaimed() {
+    void beforeQaActualFieldsAreUnknown() {
         var view = service.get(42L);
         assertThat(view.actualWidth()).isNull();
         assertThat(view.actualHeight()).isNull();
         assertThat(view.actualDurationMs()).isNull();
-        assertThat(view.qaWarnings()).isEmpty();
         assertThat(view.outputUrl()).isNull();
     }
 
     @Test
-    void historicalSuccessWithIncompleteMetadataIsExplicitlyUnverifiedAndNeverDeleted() {
+    void historicalSuccessWithIncompleteMetadataIsNeverDeleted() {
         workflow.setStatus("SUCCEEDED");
         output.setStatus("READY");
         var view = service.get(42L);
-        assertThat(view.qaWarnings()).extracting(VideoDtos.QaWarning::code).containsExactly("VIDEO_METADATA_UNAVAILABLE");
         assertThat(view.actualWidth()).isNull();
         verify(storage, never()).delete(anyString());
         verifyNoInteractions(probe);
@@ -189,7 +165,6 @@ class VideoWorkflowQaTest {
         assertThat(output.getStatus()).isEqualTo("READY");
         assertThat(workflow.getOutputPublishedAt()).isNotNull();
         assertThat(workflow.isVideoConcurrencyPermitHeld()).isFalse();
-        // Publication protection also applies to outputs carrying warnings.
         service.cancel(42L);
         service.markFailed(42L, "VIDEO_ASSET_INVALID", "late error");
         assertThat(workflow.getStatus()).isEqualTo("SUCCEEDED");

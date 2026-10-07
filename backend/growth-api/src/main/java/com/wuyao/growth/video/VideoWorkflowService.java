@@ -555,11 +555,6 @@ public class VideoWorkflowService {
         }
         try {
             var metadata = videoProbe.probe(workflow.getOutputStorageKey(), "video/mp4");
-            var warnings = assessOutput(workflow, metadata.width(), metadata.height(), metadata.durationMs());
-            if (!warnings.isEmpty()) {
-                // A valid paid output is retained. The same assessment is exposed in every successful view.
-                log.warn("视频成片参数与请求需核对，保留成片: workflow={} warnings={}", workflowId, warnings);
-            }
             output.setWidth(metadata.width());
             output.setHeight(metadata.height());
             output.setDurationMs(metadata.durationMs());
@@ -582,50 +577,6 @@ public class VideoWorkflowService {
         workflow.setErrorCode(null);
         workflow.setErrorMessage(null);
         releasePermitIfTerminal(workflow);
-    }
-
-    /** Compare ffprobe metadata, never provider-reported dimensions. No automatic paid resubmission. */
-    private List<VideoDtos.QaWarning> assessOutput(VideoWorkflow workflow, Integer width, Integer height, Integer durationMs) {
-        if (width == null || height == null || durationMs == null || width < 1 || height < 1 || durationMs < 1) {
-            return List.of(new VideoDtos.QaWarning("VIDEO_METADATA_UNAVAILABLE", "成片的实际参数记录不完整，请核对成片或联系管理员。"));
-        }
-        var warnings = new ArrayList<VideoDtos.QaWarning>();
-        int requestedShortEdge = switch (workflow.getResolution()) {
-            case "480p" -> 480;
-            case "720p" -> 720;
-            case "1080p" -> 1080;
-            case "4K" -> 2160; // UHD; p denotes the short edge for portrait/square output too.
-            default -> throw new IllegalStateException("视频请求的分辨率无法核验");
-        };
-        int pixelTolerance = Math.max(16, (int) Math.ceil(requestedShortEdge * 0.02));
-        if (Math.abs(Math.min(width, height) - requestedShortEdge) > pixelTolerance) {
-            warnings.add(new VideoDtos.QaWarning("VIDEO_RESOLUTION_MISMATCH", "分辨率与请求不一致：请求 "
-                    + workflow.getResolution() + "（短边 " + requestedShortEdge + " px），实际 " + width + "×" + height + " px。"));
-        }
-        if (!"auto".equals(workflow.getRatio())) {
-            String[] parts = workflow.getRatio().split(":");
-            int horizontal = Integer.parseInt(parts[0]);
-            int vertical = Integer.parseInt(parts[1]);
-            boolean orientationMismatch = horizontal > vertical && width <= height || horizontal < vertical && width >= height;
-            if (orientationMismatch) {
-                warnings.add(new VideoDtos.QaWarning("VIDEO_ORIENTATION_MISMATCH", "画面方向与请求不一致：请求 "
-                        + workflow.getRatio() + "，实际 " + width + "×" + height + " px。"));
-            } else {
-                long actual = (long) width * vertical;
-                long expected = (long) height * horizontal;
-                if (Math.abs(actual - expected) > expected * 0.02) {
-                    warnings.add(new VideoDtos.QaWarning("VIDEO_RATIO_MISMATCH", "画面比例与请求不一致：请求 "
-                            + workflow.getRatio() + "，实际 " + width + "×" + height + " px。"));
-                }
-            }
-        }
-        long requestedMs = workflow.getDurationSeconds() * 1000L;
-        long durationTolerance = Math.max(300L, requestedMs * 2 / 100);
-        if (Math.abs(durationMs.longValue() - requestedMs) > durationTolerance) {
-            warnings.add(new VideoDtos.QaWarning("VIDEO_DURATION_MISMATCH", "时长与请求不一致：请求 "
-                    + workflow.getDurationSeconds() + " 秒，实际 " + String.format(Locale.ROOT, "%.3f", durationMs / 1000D) + " 秒。"));
-        }
-        return List.copyOf(warnings);
     }
 
     @Transactional
@@ -827,9 +778,6 @@ public class VideoWorkflowService {
         Integer actualWidth = output == null ? null : output.getWidth();
         Integer actualHeight = output == null ? null : output.getHeight();
         Integer actualDurationMs = output == null ? null : output.getDurationMs();
-        // Derive from already persisted Asset metadata: no second source of truth or new migration.
-        List<VideoDtos.QaWarning> warnings = "SUCCEEDED".equals(status)
-                ? assessOutput(workflow, actualWidth, actualHeight, actualDurationMs) : List.of();
         return new VideoDtos.View(workflow.getId(), workflow.getRequestKey(), request.prompt(), request.referenceImageAssetIds(),
                 request.referenceVideoAssetId(), workflow.getModel(), workflow.getRatio(), workflow.getDurationSeconds(),
                 workflow.getResolution(), status, workflow.getStage(), workflow.getProgress(),
@@ -837,7 +785,7 @@ public class VideoWorkflowService {
                 request.referenceImageAssetIds().stream().map(this::referenceView).toList(),
                 request.referenceVideoAssetId() == null ? null : referenceView(request.referenceVideoAssetId()),
                 workflow.getErrorCode(), plan.stage() != null, plan.stage(), "SUBMIT".equals(plan.stage()), plan.hint(),
-                actualWidth, actualHeight, actualDurationMs, warnings);
+                actualWidth, actualHeight, actualDurationMs);
     }
 
     private VideoDtos.Reference referenceView(Long id) {

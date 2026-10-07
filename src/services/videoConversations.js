@@ -9,9 +9,7 @@ export const videoModelLabel = id => videoModels.find(model => model.id === id)?
 export const isVideoInProgress = workflow => Boolean(workflow && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(workflow.status))
 export const videoConversationTitle = prompt => prompt.trim().replace(/\s+/g, ' ').slice(0, 28) || '新的视频创作'
 
-export const videoCompletionNotice = workflow => workflow?.qaWarnings?.length
-  ? '视频已生成，成片参数需核对。已保留成片；重新生成可能再次计费。'
-  : '视频已完成并保存到作品库。'
+export const videoCompletionNotice = () => '视频已完成并保存到作品库。'
 
 // Copy the attachment entries as well as the settings: editing a recalled form must
 // never change the inputs belonging to an earlier generation.

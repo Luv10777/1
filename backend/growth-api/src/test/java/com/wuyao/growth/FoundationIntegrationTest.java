@@ -810,7 +810,7 @@ class FoundationIntegrationTest {
     }
 
     @Test
-    void videoQaMetadataAndWarningsSurviveCommitAndAreSerializedByTheJwtScopedApi() throws Exception {
+    void videoQaMetadataSurvivesCommitAndTheJwtScopedApiHasNoParameterWarnings() throws Exception {
         var created = TenantContext.runAs(tenantA, () -> videoWorkflows.create(new VideoDtos.Create("qa-http-view",
                 "旋转", List.of(), null, "SEEDANCE_2_5", "16:9", 5, "1080p"), null));
         var importing = prepareVideoImport(created.id(), "qa-http-job");
@@ -828,8 +828,7 @@ class FoundationIntegrationTest {
                 .andExpect(jsonPath("$.data.actualWidth").value(640))
                 .andExpect(jsonPath("$.data.actualHeight").value(480))
                 .andExpect(jsonPath("$.data.actualDurationMs").value(5000))
-                .andExpect(jsonPath("$.data.qaWarnings[0].code").value("VIDEO_RESOLUTION_MISMATCH"))
-                .andExpect(jsonPath("$.data.qaWarnings[1].code").value("VIDEO_RATIO_MISMATCH"));
+                .andExpect(jsonPath("$.data.qaWarnings").doesNotExist());
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isZero();
         TenantContext.runAs(tenantA, () -> videoWorkflows.cancel(created.id()));
         assertThat(imageStorage.stat(key)).isPresent();

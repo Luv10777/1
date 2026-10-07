@@ -37,8 +37,6 @@ public final class VideoDtos {
 
     public record Retry(@NotNull @Positive Long taskId) {}
 
-    public record QaWarning(String code, String message) {}
-
     public record View(
             Long id,
             String requestKey,
@@ -67,6 +65,5 @@ public final class VideoDtos {
             String retryHint,
             Integer actualWidth,
             Integer actualHeight,
-            Integer actualDurationMs,
-            List<QaWarning> qaWarnings) {}
+            Integer actualDurationMs) {}
 }

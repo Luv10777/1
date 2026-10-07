@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   isGenerating: Boolean,
@@ -7,8 +7,6 @@ const props = defineProps({
   outputUrl: { type: String, default: '' },
   actualWidth: { type: Number, default: null },
   actualHeight: { type: Number, default: null },
-  actualDurationMs: { type: Number, default: null },
-  qaWarnings: { type: Array, default: () => [] },
   format: { type: String, default: 'auto' },
   modelLabel: { type: String, required: true },
   duration: { type: Number, default: 10 },
@@ -18,16 +16,25 @@ const props = defineProps({
   continueText: { type: String, default: '可以切换创作记录，或开启一段新的创作。' },
   error: { type: String, default: '' },
 })
-const actualSummary = computed(() => [
-  props.actualWidth > 0 && props.actualHeight > 0 ? `${props.actualWidth} × ${props.actualHeight} px` : '尺寸未记录',
-  props.actualDurationMs > 0 ? `${props.actualDurationMs / 1000} 秒` : '时长未记录',
-].join(' · '))
+const videoDimensions = ref(null)
+watch(() => props.outputUrl, () => { videoDimensions.value = null })
+const previewAspectRatio = computed(() => {
+  const width = videoDimensions.value?.width || props.actualWidth
+  const height = videoDimensions.value?.height || props.actualHeight
+  if (width > 0 && height > 0) return width / height
+  const [horizontal, vertical] = props.format.split(':').map(Number)
+  return horizontal > 0 && vertical > 0 ? horizontal / vertical : 16 / 9
+})
+const readVideoDimensions = event => {
+  const { videoWidth: width, videoHeight: height } = event.target
+  if (width > 0 && height > 0) videoDimensions.value = { width, height }
+}
 defineEmits(['switch-workspace'])
 </script>
 
 <template>
   <div class="video-workbench-canvas relative flex-1 bg-[#0A0A0B] flex flex-col items-center justify-center overflow-hidden" aria-label="成片预览">
-    <div class="video-canvas-heading absolute top-6 w-full px-8 z-10 flex justify-between items-center pointer-events-none">
+    <div class="video-canvas-heading absolute top-6 z-10 flex justify-between items-center pointer-events-none">
       <h2 class="text-gray-400 font-medium">成片预览</h2>
       <div class="video-mode-switch" role="group" aria-label="切换工作台">
         <button type="button" :class="{ active: activeWorkspace === 'video' }" :aria-pressed="activeWorkspace === 'video'" @click="$emit('switch-workspace', '/video/workbench')"><span class="material-symbols-outlined">auto_awesome</span>视频工作台</button>
@@ -41,6 +48,9 @@ defineEmits(['switch-workspace'])
       <div class="video-render-meta"><span>{{ modelLabel }}</span><i>·</i><span>{{ duration }} 秒</span><i>·</i><span>{{ resolution }}</span></div>
       <span class="video-render-stage-label"><i />{{ stageLabel }}</span>
       <p class="video-render-continue">{{ continueText }}</p>
+    </div>
+    <div v-else-if="outputUrl && !error" class="video-result-stage">
+      <video class="video-result-player" :src="outputUrl" :style="{ '--video-aspect-ratio': previewAspectRatio }" controls playsinline preload="metadata" aria-label="生成的视频" @loadedmetadata="readVideoDimensions" />
     </div>
     <div v-else class="video-device-stage">
       <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[['3:4', '9:16'].includes(format) ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">
@@ -59,28 +69,17 @@ defineEmits(['switch-workspace'])
           </div>
 
           <div class="device-state-content relative z-20 flex flex-col items-center gap-4 mt-8">
-            <video v-if="outputUrl" class="video-output-preview" :src="outputUrl" controls playsinline />
-            <span v-else class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
+            <span class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
               <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
             </span>
             <div class="device-copy text-center space-y-2">
-              <strong class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ error ? '视频生成失败' : outputUrl ? qaWarnings.length ? '成片参数需核对' : '视频已完成' : '你的故事将在这里成片' }}</span></strong>
-              <p class="text-xs text-gray-500">{{ error || (outputUrl ? '这一段商家故事，已成片。' : '添加素材并描述需求，开始生成') }}</p>
+              <strong class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ error ? '视频生成失败' : '你的故事将在这里成片' }}</span></strong>
+              <p class="text-xs text-gray-500">{{ error || '添加素材并描述需求，开始生成' }}</p>
             </div>
           </div>
         </div>
       </div>
     </div>
-
-    <section v-if="outputUrl && !isGenerating" class="video-output-details" aria-label="成片参数">
-      <p><strong>实际成片：</strong>{{ actualSummary }}</p>
-      <p>请求：{{ resolution }} · {{ duration }} 秒 · {{ format === 'auto' ? '自适应比例' : format }}</p>
-      <div v-if="qaWarnings.length" class="video-output-warning" role="status" aria-live="polite">
-        <strong>成片参数需核对</strong>
-        <ul><li v-for="warning in qaWarnings" :key="warning.code">{{ warning.message }}</li></ul>
-        <p>已保留成片，可先预览决定是否接受。重新生成可能再次计费。</p>
-      </div>
-    </section>
 
     <div class="video-canvas-hint absolute bottom-8 z-10 text-xs text-gray-600 tracking-wider pointer-events-none"><span>把商家的日常，写成值得记住的影像。</span></div>
   </div>
