@@ -1,8 +1,10 @@
 package com.wuyao.growth.live.reply;
 
 import com.wuyao.growth.live.LiveDtos;
+import com.wuyao.growth.store.StoreDtos;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,6 +53,40 @@ class ReplyPromptTest {
                 .contains("关于【品牌资料】：它是这家店所属品牌的介绍", "观众问到品牌时据此回答", "以主播风格为准")
                 // The host's own style and name still close the prompt.
                 .endsWith("不必每一段都重复。");
+    }
+
+    @Test
+    void whatTheMerchantRecordedAboutTheStoreIsOfferedAsFactsAndANameAloneIsNotWorthABlock() {
+        LocalDate today = LocalDate.of(2026, 10, 7);
+        assertThat(ReplyPrompt.store(null, today)).isEmpty();
+        assertThat(ReplyPrompt.store(new StoreDtos.Profile(1L, "蜂蜜小店", null, " ", null, null, List.of(), List.of()), today)).isEmpty();
+
+        var store = new StoreDtos.Profile(1L, "蜂蜜小店", "中山路 8 号", "0571-88880000", "每日 10:00–22:00",
+                "地铁 2 号线中山路站 B 口\n出站右转 50 米", List.of("免费停车", "包间"), List.of(
+                new StoreDtos.SpecialHour("WEEKLY", 1, null, true, null, null, "固定店休"),
+                new StoreDtos.SpecialHour("DATE", null, "2026-10-08", false, "10:00", "18:00", null),
+                // Yesterday's arrangement answers nobody's question any more.
+                new StoreDtos.SpecialHour("DATE", null, "2026-10-06", true, null, null, "盘点")));
+        assertThat(ReplyPrompt.store(store, today)).isEqualTo("""
+                【门店资料】
+                门店：蜂蜜小店
+                地址：中山路 8 号
+                电话：0571-88880000
+                营业时间：每日 10:00–22:00
+                特殊营业安排：每周一休息（固定店休）；2026年10月8日营业 10:00 至 18:00
+                交通指引：地铁 2 号线中山路站 B 口 出站右转 50 米
+                配套服务：免费停车、包间""");
+
+        // Blocks that are empty leave no gap behind.
+        assertThat(ReplyPrompt.material("【商品资料】", "", null, "【品牌资料】")).isEqualTo("【商品资料】\n\n【品牌资料】");
+        assertThat(ReplyPrompt.material("", " ")).isEmpty();
+
+        LiveDtos.Persona persona = new LiveDtos.Persona("小蜜", "专业沉稳");
+        assertThat(ReplyPrompt.system(persona, true, false, true, false)).isEqualTo(ReplyPrompt.system(persona, true, false, true))
+                .doesNotContain("门店资料");
+        assertThat(ReplyPrompt.system(persona, false, false, false, true))
+                .contains("关于【门店资料】：它是这家门店的地址、电话、营业时间、交通和配套服务", "其中没有写的不要猜")
+                .doesNotContain("品牌资料").endsWith("不必每一段都重复。");
     }
 
     @Test

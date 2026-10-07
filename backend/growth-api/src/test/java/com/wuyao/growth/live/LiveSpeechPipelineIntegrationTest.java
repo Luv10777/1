@@ -62,6 +62,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -281,6 +282,34 @@ class LiveSpeechPipelineIntegrationTest {
         assertThat(judged.prompt()).contains("名称：椴树蜂蜜", "【品牌资料】\n品牌：椴语", "【观众弹幕】你们是什么牌子");
         assertThat(judged.options().get("system").toString()).contains("关于【品牌资料】：它是这家店所属品牌的介绍");
         assertThat(feed("brand-1")).containsEntry("status", "ANSWERED").containsEntry("source", "AI");
+    }
+
+    @Test
+    void aViewerAskingWhereTheStoreIsGetsAnAnswerFromWhatTheMerchantRecordedAboutIt() throws Exception {
+        api(post(path("/start")), null);
+        connectPlayer();
+
+        // Nothing but a name is known about the store: the model is not told about a store block at all.
+        writer.reply = request -> decided("其他", 0, "");
+        api(post(path("/mock-comments")), comment("store-0", "你们店在哪"));
+        drain();
+        assertThat(writer.requests.get(0).prompt()).doesNotContain("【门店资料】");
+        assertThat(writer.requests.get(0).options().get("system").toString()).doesNotContain("门店资料");
+
+        api(put("/api/stores/" + store), Map.of("name", "蜂蜜小店", "version", 0, "address", "中山路 8 号",
+                "businessHours", "每日 10:00–22:00", "transportGuide", "地铁 2 号线中山路站 B 口出站右转",
+                "amenities", List.of("免费停车"), "specialHours", List.of(Map.of("scope", "WEEKLY", "weekday", 1, "closed", true))));
+        writer.reply = request -> decided("提问", 0, "我们在中山路 8 号，地铁 2 号线出来右转就到，每周一休息哦。");
+        api(post(path("/mock-comments")), comment("store-1", "你们店在哪"));
+        drain();
+
+        ProviderRequest judged = writer.requests.get(1);
+        assertThat(judged.prompt()).contains("名称：椴树蜂蜜", "【门店资料】\n门店：蜂蜜小店", "地址：中山路 8 号", "营业时间：每日 10:00–22:00",
+                "特殊营业安排：每周一休息", "交通指引：地铁 2 号线中山路站 B 口出站右转", "配套服务：免费停车", "【观众弹幕】你们店在哪");
+        assertThat(judged.options().get("system").toString()).contains("关于【门店资料】：它是这家门店的地址");
+        // The street number and the line number come from the store's own record, so the reply passes the number check.
+        assertThat(feed("store-1")).containsEntry("status", "ANSWERED").containsEntry("source", "AI")
+                .containsEntry("answer", "我们在中山路 8 号，地铁 2 号线出来右转就到，每周一休息哦。");
     }
 
     @Test

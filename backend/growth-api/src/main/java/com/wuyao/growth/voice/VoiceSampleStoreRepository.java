@@ -8,4 +8,5 @@ public interface VoiceSampleStoreRepository extends JpaRepository<VoiceSampleSto
     List<VoiceSampleStore> findBySampleIdOrderByStoreIdAsc(Long sampleId);
     List<VoiceSampleStore> findBySampleIdInOrderByStoreIdAsc(Collection<Long> sampleIds);
     boolean existsBySampleIdAndStoreId(Long sampleId, Long storeId);
+    List<VoiceSampleStore> findByStoreId(Long storeId);
 }

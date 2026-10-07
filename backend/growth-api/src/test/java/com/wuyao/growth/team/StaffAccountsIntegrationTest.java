@@ -288,6 +288,93 @@ class StaffAccountsIntegrationTest {
     }
 
     @Test
+    void aStoreStaysOpenWhileItIsOnAirOrHoldsTheOnlyOpeningOfAVoiceAndItsNameIsFreeOnceClosed() throws Exception {
+        long product = api(post("/api/stores/" + west + "/products"), boss, product("蜂蜜")).path("id").asLong();
+        long session = api(post("/api/stores/" + west + "/live-sessions"), boss, liveSession(product, "builtin:voice-a")).path("id").asLong();
+        api(post("/api/live-sessions/" + session + "/start"), boss, null);
+        assertThat(refused(delete("/api/stores/" + west), boss, null, 409, 1409)).contains("越界不了的场次", "结束这一场后才能关店");
+        api(post("/api/live-sessions/" + session + "/end"), boss, null);
+
+        // 只开放给这家店的声音会随着关店再也找不到：先挪走或删掉。
+        long voice = sample(tenantA, west);
+        assertThat(refused(delete("/api/stores/" + west), boss, null, 409, 1409)).contains("1 个声音样本只开放给这家店");
+        assertThat(api(get("/api/stores"), boss, null)).hasSize(2);
+        api(put("/api/voice-samples/" + voice + "/stores"), boss, Map.of("storeIds", List.of(west, east)));
+
+        api(delete("/api/stores/" + west), boss, null);
+        assertThat(api(get("/api/stores"), boss, null)).extracting(store -> store.path("name").asText()).containsExactly("城东店");
+        refused(get("/api/stores/" + west), boss, null, 404, 1404);
+        refused(get("/api/products/" + product), boss, null, 404, 1404);
+        // 声音留在还营业的城东店，对已关门店的开放记录一并清掉。
+        assertThat(api(get("/api/stores/" + east + "/voice-samples"), boss, null).get(0).path("storeIds")).extracting(JsonNode::asLong).containsExactly(east);
+
+        // 关掉的门店不再占着名字；营业中的门店之间仍然不能重名。
+        long reopened = api(post("/api/stores"), boss, Map.of("name", "城西店")).path("id").asLong();
+        assertThat(reopened).isNotEqualTo(west);
+        refused(post("/api/stores"), boss, Map.of("name", "城东店"), 409, 1409);
+        // 现在城东店成了这个声音唯一开放的门店，同样关不掉。
+        assertThat(refused(delete("/api/stores/" + east), boss, null, 409, 1409)).contains("声音样本只开放给这家店");
+    }
+
+    @Test
+    void aStoresProfileIsKeptWhenAnOlderFormSavesWithoutItAndRefusedWhenAnArrangementDoesNotAddUp() throws Exception {
+        Map<String, Object> closedOnMonday = Map.of("scope", "WEEKLY", "weekday", 1, "closed", true, "note", " 固定店休 ");
+        Map<String, Object> shortDay = Map.of("scope", "DATE", "date", "2026-10-08", "closed", false, "opensAt", "10:00", "closesAt", "18:00");
+        JsonNode saved = api(put("/api/stores/" + west), boss, Map.of("name", "城西店", "version", 0,
+                "transportGuide", " 地铁 2 号线中山路站 B 口 ", "amenities", List.of("免费停车", " 包间 ", "免费停车"),
+                "specialHours", List.of(closedOnMonday, shortDay)));
+        assertThat(saved.path("transportGuide").asText()).isEqualTo("地铁 2 号线中山路站 B 口");
+        assertThat(saved.path("amenities")).extracting(JsonNode::asText).containsExactly("免费停车", "包间");
+        assertThat(saved.path("specialHours")).hasSize(2);
+        assertThat(saved.path("specialHours").get(0).path("note").asText()).isEqualTo("固定店休");
+        // 休息的那一天不留营业时间，按日期的那一条不留星期。
+        assertThat(saved.path("specialHours").get(0).has("opensAt")).isFalse();
+        assertThat(saved.path("specialHours").get(1).has("weekday")).isFalse();
+        assertThat(saved.path("specialHours").get(1).path("closesAt").asText()).isEqualTo("18:00");
+
+        // 只会填四项基本资料的表单保存一次：档案原样还在。带空值才是清空。
+        long version = saved.path("version").asLong();
+        JsonNode basic = api(put("/api/stores/" + west), boss, Map.of("name", "城西店", "address", "中山路 8 号", "version", version));
+        assertThat(basic.path("address").asText()).isEqualTo("中山路 8 号");
+        assertThat(basic.path("transportGuide").asText()).isEqualTo("地铁 2 号线中山路站 B 口");
+        assertThat(basic.path("amenities")).hasSize(2);
+        assertThat(api(get("/api/stores"), boss, null).get(0).path("specialHours")).hasSize(2);
+        JsonNode cleared = api(put("/api/stores/" + west), boss, Map.of("name", "城西店", "version", basic.path("version").asLong(),
+                "transportGuide", "", "amenities", List.of(), "specialHours", List.of()));
+        assertThat(cleared.has("transportGuide")).isFalse();
+        assertThat(cleared.path("amenities")).isEmpty();
+        assertThat(cleared.path("specialHours")).isEmpty();
+
+        // 新建时也可以直接带上档案；没带的就是空的。
+        JsonNode created = api(post("/api/stores"), boss, Map.of("name", "城南店", "amenities", List.of("Wi-Fi")));
+        assertThat(created.path("amenities")).extracting(JsonNode::asText).containsExactly("Wi-Fi");
+        assertThat(created.path("specialHours")).isEmpty();
+
+        long v = cleared.path("version").asLong();
+        for (Map<String, Object> wrong : List.<Map<String, Object>>of(
+                Map.of("scope", "WEEKLY", "closed", true),
+                Map.of("scope", "DATE", "date", "2026-02-30", "closed", true),
+                Map.of("scope", "DATE", "closed", true),
+                Map.of("scope", "WEEKLY", "weekday", 2, "closed", false, "opensAt", "10:00"),
+                Map.of("scope", "WEEKLY", "weekday", 8, "closed", true),
+                Map.of("scope", "MONTHLY", "weekday", 1, "closed", true),
+                Map.of("scope", "WEEKLY", "weekday", 1, "closed", false, "opensAt", "25:00", "closesAt", "26:00"))) {
+            refused(put("/api/stores/" + west), boss, Map.of("name", "城西店", "version", v, "specialHours", List.of(wrong)), 400, 1400);
+        }
+        refused(put("/api/stores/" + west), boss, Map.of("name", "城西店", "version", v, "amenities", List.of("这个配套服务的名字实在是太长了已经超过二十个字")), 400, 1400);
+        assertThat(refused(put("/api/stores/" + west), boss, Map.of("name", "城西店", "version", v,
+                "specialHours", List.of(closedOnMonday, Map.of("scope", "WEEKLY", "closed", true))), 400, 1400)).contains("第 2 条", "星期几");
+        assertThat(api(get("/api/stores/" + west), boss, null).path("specialHours")).as("被拒绝的保存什么都不改").isEmpty();
+
+        // 店员可以维护自己门店的档案，别的门店不行。
+        api(post("/api/team/members"), boss, Map.of("phone", STAFF_PHONE, "name", "小李", "storeIds", List.of(west)));
+        String clerk = login(STAFF_PHONE).path("accessToken").asText();
+        assertThat(api(put("/api/stores/" + west), clerk, Map.of("name", "城西店", "version", v, "amenities", List.of("可开发票")))
+                .path("amenities")).extracting(JsonNode::asText).containsExactly("可开发票");
+        refused(put("/api/stores/" + east), clerk, Map.of("name", "城东店", "version", 0, "amenities", List.of("可开发票")), 403, 1403);
+    }
+
+    @Test
     void theMigrationKeepsEveryExistingAccountAnOwnerAndEveryVoiceInTheStoreItWasUploadedFrom() throws Exception {
         String migration = new ClassPathResource("db/migration/V41__staff_accounts.sql").getContentAsString(StandardCharsets.UTF_8);
         try (Connection connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());

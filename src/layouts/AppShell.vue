@@ -14,11 +14,14 @@ const accountOpen = ref(false)
 const searchOpen = ref(false)
 const search = ref('')
 const pageScroll = ref(null)
+// 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
-const editingStore = ref(null)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
 const needsStore = computed(() => connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
-function openStoreForm(store = null) { editingStore.value = store; storeModalOpen.value = true }
+function openStoreForm() { storeModalOpen.value = true }
+// 侧边栏和顶栏显示的是当前登录的人：名字来自会话，头像取名字的第一个字。
+const userName = computed(() => auth.user?.name || '未命名用户')
+const userInitial = computed(() => userName.value.slice(0, 1))
 // Reviews is a long-form feed and must use the shell's normal page scrolling.
 // Keeping it in the edge-workspace list applies overflow:hidden and prevents
 // the review stream from being scrolled once it exceeds the viewport.
@@ -33,7 +36,6 @@ watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll
 
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
 const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'auto_awesome', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
-const navItemIcons = { team: 'group', dashboard: 'dashboard', creative: 'auto_awesome', analytics: 'monitoring', diagnosis: 'insights', 'analytics-platforms': 'link', acquisition: 'person_search', 'image-create': 'image', 'video-create': 'movie', 'digital-human': 'record_voice_over', 'copy-rewrite': 'edit_note', 'video-analyze': 'query_stats', publishing: 'publish', 'matrix-publishing': 'hub', 'publishing-plan': 'calendar_month', 'publishing-platforms': 'link', messages: 'chat', reviews: 'reviews', 'service-rules': 'rule', 'geo-brand': 'location_on', 'geo-services': 'workspace_premium', 'geo-keywords': 'key', 'geo-visibility': 'visibility', merchants: 'storefront', brands: 'branding_watermark', assets: 'folder', products: 'inventory_2', knowledge: 'menu_book', works: 'gallery_thumbnail', billing: 'card_membership', 'merchant-alliance': 'handshake', notifications: 'notifications', tasks: 'task_alt', settings: 'settings', help: 'help_outline' }
 
 const navGroups = [
   {
@@ -103,8 +105,8 @@ const navGroups = [
     key: 'assets',
     label: '资产中心',
     items: [
-      { name: 'merchants', label: '门店信息', path: '/merchants' },
       { name: 'brands', label: '品牌库', path: '/brands' },
+      { name: 'merchants', label: '门店库', path: '/merchants' },
       { name: 'products', label: '商品库', path: '/assets/products' },
       { name: 'knowledge', label: '知识库', path: '/knowledge' },
       { name: 'assets', label: '素材库', path: '/assets' },
@@ -205,7 +207,17 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         <RouterLink to="/dashboard" class="brand-link" aria-label="一方志总览"><span class="brand-mark seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="brand-copy"><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
         <button class="icon-button sidebar-close" aria-label="关闭导航" @click="closeMenu">×</button>
       </div>
-      <div class="tenant-switcher paper-tenant"><span class="tenant-avatar">{{ selectedStoreRecord?.name?.slice(0, 1) || '店' }}</span><span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span><span class="chevron">⌄</span></div>
+      <div class="tenant-switcher paper-tenant" :class="{ switchable: stores.length > 1 }">
+        <span class="tenant-avatar">{{ selectedStoreRecord?.name?.slice(0, 1) || '店' }}</span>
+        <span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span>
+        <template v-if="stores.length > 1">
+          <span class="chevron" aria-hidden="true">⌄</span>
+          <!-- 透明的原生下拉盖在整块上：点哪里都能切换，键盘和读屏也照常可用。 -->
+          <select v-model="selectedStoreId" class="tenant-select" aria-label="切换门店" :disabled="storeLoading">
+            <option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option>
+          </select>
+        </template>
+      </div>
       <nav class="primary-nav paper-nav" aria-label="主导航">
         <div
           v-for="group in navGroups"
@@ -254,9 +266,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
                   :class="{ active: isActive(item.name) }"
                   @click="closeMenu"
                 >
-                  <span class="material-symbols-outlined nav-item-icon" aria-hidden="true">{{ navItemIcons[item.name] || 'chevron_right' }}</span>
                   <span class="nav-item-label">{{ item.label }}</span>
-                  <span v-if="item.name === 'tasks'" class="nav-count">3</span>
                 </RouterLink>
               </div>
             </div>
@@ -264,10 +274,10 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         </div>
       </nav>
 
-      <div class="sidebar-footer paper-sidebar-footer"><RouterLink to="/creative" class="sidebar-create-button" @click="closeMenu"><span>＋</span><span>新建创作任务</span></RouterLink><div class="status-capsule paper-status"><span class="status-pulse" /><div><small>方志编撰中...</small><strong>AI 提炼烟火中</strong></div></div><div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ auth.user?.initials || '林' }}</span><span class="account-copy"><strong>{{ auth.user?.name || '林知夏' }}</strong><small>{{ auth.user?.role || '运营管理员' }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div></div>
+      <div class="sidebar-footer paper-sidebar-footer"><RouterLink to="/creative" class="sidebar-create-button" @click="closeMenu"><span>＋</span><span>新建创作任务</span></RouterLink><div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ userInitial }}</span><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div></div>
     </aside>
     <main class="main-area paper-main">
-      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><button v-if="selectedStoreRecord" class="icon-button" aria-label="编辑当前门店" title="编辑当前门店" @click="openStoreForm(selectedStoreRecord)"><span class="material-symbols-outlined" style="font-size:18px">edit</span></button><button v-if="auth.isOwner" class="icon-button" aria-label="新建门店" title="新建门店" @click="openStoreForm()">＋</button><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span class="top-account-name">{{ auth.user?.name || '林知夏' }}</span></button></div></div></header>
+      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ userInitial }}</span><span class="top-account-name">{{ userName }}</span></button></div></div></header>
       <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }">
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
@@ -279,7 +289,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         </section>
         <slot v-else />
       </div>
-      <StoreFormModal v-if="storeModalOpen" :store="editingStore" @close="storeModalOpen = false" />
+      <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
       <div v-if="searchOpen" class="quick-search-scrim" @click="searchOpen = false"><section class="quick-search paper-search-modal" role="dialog" aria-modal="true" @click.stop><div class="quick-search-head"><span>⌕</span><input v-model="search" autofocus type="search" placeholder="搜索页面或功能" @keydown.esc="searchOpen = false" /><kbd>ESC</kbd></div><div class="quick-search-results"><RouterLink v-for="item in searchItems" :key="item.path" :to="item.path" class="quick-search-result" @click="searchOpen = false"><span>{{ item.icon }}</span><span>{{ item.label }}</span><span class="quick-search-result-path">{{ item.path }}</span></RouterLink><p v-if="!searchItems.length" class="quick-search-empty">没有匹配的页面</p></div></section></div>
       <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/dashboard" :class="{ active: route.name === 'dashboard' }"><span>⌂</span><small>总览</small></RouterLink><RouterLink to="/creative" :class="{ active: route.name === 'creative' }"><span>✎</span><small>创作</small></RouterLink><RouterLink to="/creative" class="mobile-bottom-primary"><span>＋</span></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span>▤</span><small>方志库</small></RouterLink><RouterLink to="/analytics" :class="{ active: route.name === 'analytics' }"><span>⌁</span><small>数据</small></RouterLink></nav>
     </main>
@@ -291,4 +301,9 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
 .store-context-state > span { font-size: 36px; color: var(--muted, #8d8478); }
 .store-context-state h2 { margin: 20px 0 8px; font-size: 22px; }
 .store-context-state p { margin: 0 0 22px; font-size: 14px; color: var(--muted, #8d8478); }
+.tenant-switcher { position: relative; }
+.tenant-switcher.switchable:hover { border-color: var(--line-strong); }
+.tenant-switcher.switchable:has(.tenant-select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.tenant-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
+.sidebar-footer .account-wrap { margin-top: 14px; }
 </style>

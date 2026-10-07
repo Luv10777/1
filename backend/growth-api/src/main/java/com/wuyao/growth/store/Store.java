@@ -3,6 +3,8 @@ package com.wuyao.growth.store;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -36,6 +38,11 @@ public class Store {
 
     @Column(name = "business_hours", length = 120)
     private String businessHours;
+
+    /** 交通指引、配套服务、特殊营业安排。整体存成一个 JSON 对象。 */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private StoreDtos.Extras profile = StoreDtos.Extras.EMPTY;
 
     @Column(name = "created_by", nullable = false)
     private Long createdBy;

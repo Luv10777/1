@@ -16,6 +16,14 @@ public interface VoiceSampleRepository extends JpaRepository<VoiceSample, Long> 
              order by v.id desc
             """)
     List<VoiceSample> findOpenTo(Long storeId);
+    /** 只开放给这一家门店、尚未删除的样本数。 */
+    @Query("""
+            select count(v) from VoiceSample v
+             where v.status <> 'DELETED'
+               and v.id in (select g.sampleId from VoiceSampleStore g where g.storeId = :storeId)
+               and v.id not in (select g.sampleId from VoiceSampleStore g where g.storeId <> :storeId)
+            """)
+    long countOpenOnlyTo(Long storeId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from VoiceSample v where v.id = :id")
     Optional<VoiceSample> lockById(Long id);

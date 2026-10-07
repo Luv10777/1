@@ -6,7 +6,7 @@ import { createStoreContext } from './storeContext.js'
 let storage
 try { storage = globalThis.localStorage } catch { /* Browsing without local storage is supported. */ }
 const context = createStoreContext(storesApi, storage)
-export const { stores, selectedStoreId, selectedStoreRecord, selectedStore, storeLoading, storeError, loadStores, saveStore, createStore } = context
+export const { stores, selectedStoreId, selectedStoreRecord, selectedStore, storeLoading, storeError, loadStores, saveStore, archiveStore, createStore } = context
 
 watch(() => auth.isAuthenticated ? `${auth.tenantId}:${auth.user.id}` : '', identity => {
   context.setAccount(identity)
