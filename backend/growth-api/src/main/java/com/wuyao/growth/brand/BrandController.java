@@ -41,18 +41,19 @@ public class BrandController {
 
     @PutMapping("/{id}")
     public ApiResponse<BrandDtos.View> update(@PathVariable Long id,
-                                              @Valid @RequestBody BrandDtos.UpdateRequest req) {
-        return ApiResponse.ok(brandService.update(id, req));
+                                              @Valid @RequestBody BrandDtos.UpdateRequest req,
+                                              @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(brandService.update(id, req, me.userId()));
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> archive(@PathVariable Long id) {
-        brandService.archive(id);
+    public ApiResponse<Void> archive(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
+        brandService.archive(id, me.userId());
         return ApiResponse.ok();
     }
 
     @PostMapping("/{id}/default")
-    public ApiResponse<BrandDtos.View> makeDefault(@PathVariable Long id) {
-        return ApiResponse.ok(brandService.makeDefault(id));
+    public ApiResponse<BrandDtos.View> makeDefault(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(brandService.makeDefault(id, me.userId()));
     }
 }

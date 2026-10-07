@@ -62,6 +62,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -284,6 +285,34 @@ class LiveSpeechPipelineIntegrationTest {
     }
 
     @Test
+    void aViewerAskingWhereTheStoreIsGetsAnAnswerFromWhatTheMerchantRecordedAboutIt() throws Exception {
+        api(post(path("/start")), null);
+        connectPlayer();
+
+        // Nothing but a name is known about the store: the model is not told about a store block at all.
+        writer.reply = request -> decided("其他", 0, "");
+        api(post(path("/mock-comments")), comment("store-0", "你们店在哪"));
+        drain();
+        assertThat(writer.requests.get(0).prompt()).doesNotContain("【门店资料】");
+        assertThat(writer.requests.get(0).options().get("system").toString()).doesNotContain("门店资料");
+
+        api(put("/api/stores/" + store), Map.of("name", "蜂蜜小店", "version", 0, "address", "中山路 8 号",
+                "businessHours", "每日 10:00–22:00", "transportGuide", "地铁 2 号线中山路站 B 口出站右转",
+                "amenities", List.of("免费停车"), "specialHours", List.of(Map.of("scope", "WEEKLY", "weekday", 1, "closed", true))));
+        writer.reply = request -> decided("提问", 0, "我们在中山路 8 号，地铁 2 号线出来右转就到，每周一休息哦。");
+        api(post(path("/mock-comments")), comment("store-1", "你们店在哪"));
+        drain();
+
+        ProviderRequest judged = writer.requests.get(1);
+        assertThat(judged.prompt()).contains("名称：椴树蜂蜜", "【门店资料】\n门店：蜂蜜小店", "地址：中山路 8 号", "营业时间：每日 10:00–22:00",
+                "特殊营业安排：每周一休息", "交通指引：地铁 2 号线中山路站 B 口出站右转", "配套服务：免费停车", "【观众弹幕】你们店在哪");
+        assertThat(judged.options().get("system").toString()).contains("关于【门店资料】：它是这家门店的地址");
+        // The street number and the line number come from the store's own record, so the reply passes the number check.
+        assertThat(feed("store-1")).containsEntry("status", "ANSWERED").containsEntry("source", "AI")
+                .containsEntry("answer", "我们在中山路 8 号，地铁 2 号线出来右转就到，每周一休息哦。");
+    }
+
+    @Test
     void manualSpeechIsQueuedForAWorkerAndTheSameIdNeverBuysASecondClip() throws Exception {
         WebSocketSession socket = connectPlayer();
         Map<String, Object> speech = Map.of("id", "manual-1", "mode", "APPEND", "text", "欢迎来到直播间", "builtInVoice", "voice-a");
@@ -421,6 +450,7 @@ class LiveSpeechPipelineIntegrationTest {
         Long sample = owner.queryForObject("INSERT INTO voice_samples(tenant_id,store_id,name,storage_key,mime_type,status,"
                 + "provider_code,provider_voice_id,consent_at,consent_by,consent_text) VALUES (?,?,'店主声音','t/voice','audio/wav','READY',"
                 + "'stub-voice','voice-clone-1',now(),(SELECT id FROM users LIMIT 1),'同意') RETURNING id", Long.class, tenant, store);
+        owner.update("INSERT INTO voice_sample_stores(tenant_id,sample_id,store_id) VALUES (?,?,?)", tenant, sample, store);
         when(voiceProvider.supportsVoice("voice-clone-1")).thenReturn(true);
         long cloned = api(post("/api/stores/" + store + "/live-sessions"), Map.of("name", "克隆音色场",
                 "productIds", List.of(product), "config", Map.of("voiceRoles",
@@ -429,7 +459,7 @@ class LiveSpeechPipelineIntegrationTest {
         api(post("/api/live-sessions/" + cloned + "/start"), null);
         mvc.perform(delete("/api/voice-samples/" + sample).header("Authorization", "Bearer " + token))
                 .andExpect(jsonPath("$.code").value(1400))
-                .andExpect(jsonPath("$.message").value("这个音色正在场次「克隆音色场」中使用，结束这一场后才能删除"));
+                .andExpect(jsonPath("$.message").value("这个音色正在场次「克隆音色场」中使用，结束这一场后才能删除或停止开放"));
         assertThat(owner.queryForObject("SELECT status FROM voice_samples WHERE id=?", String.class, sample)).isEqualTo("READY");
         verify(voiceProvider, never()).deleteVoice(anyString());
 

@@ -36,8 +36,13 @@ public class User {
     @Column(length = 80)
     private String name;
 
+    /** ACTIVE / DISABLED / REMOVED。只有 ACTIVE 能登录和通过请求校验。 */
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
+
+    /** 商户级角色：OWNER 能进全部门店并管理商户，STAFF 只能进分配给他的门店。 */
+    @Column(nullable = false, length = 20)
+    private String role = "OWNER";
 
     @Column(name = "token_version", nullable = false)
     private long tokenVersion = 0;

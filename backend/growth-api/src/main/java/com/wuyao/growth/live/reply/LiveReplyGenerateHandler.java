@@ -20,6 +20,7 @@ import com.wuyao.growth.live.speech.LiveSpeechItem;
 import com.wuyao.growth.live.speech.LiveSpeechItemRepository;
 import com.wuyao.growth.live.speech.LiveSpeechSynthesizeHandler;
 import com.wuyao.growth.live.speech.LiveVoice;
+import com.wuyao.growth.store.StoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,6 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +73,7 @@ public class LiveReplyGenerateHandler implements TaskHandler {
     private final LiveSpeechSynthesizeHandler synthesizer;
     private final LiveScriptService scripts;
     private final BrandService brands;
+    private final StoreService stores;
     private final AiGateway gateway;
     private final TransactionTemplate transactions;
 
@@ -144,7 +148,10 @@ public class LiveReplyGenerateHandler implements TaskHandler {
                 // The exact match is looked for among everything saved, not only what fits in a prompt.
                 LiveReplyKnowledge.exact(saved, comment.getText()), ReplyPrompt.shown(saved),
                 knowledge.productFacts(session, userId),
-                ScriptPrompt.brand(brands.profileForStore(session.getStoreId()).orElse(null)), comment.getVoice(), userId,
+                ScriptPrompt.brand(brands.profileForStore(session.getStoreId()).orElse(null)),
+                // Like the products and the brand, read as it is now; dated arrangements are judged by the shop's own calendar.
+                ReplyPrompt.store(stores.profile(session.getStoreId()).orElse(null), LocalDate.now(ZoneId.of("Asia/Shanghai"))),
+                comment.getVoice(), userId,
                 config == null ? null : config.persona(), scripts.narrating(session),
                 // The voice was fixed when the comment arrived; this only asks whether it was the co-host's.
                 LiveVoice.answerer(config).filter(voice -> voice.equals(comment.getVoice())).isPresent());
@@ -187,8 +194,8 @@ public class LiveReplyGenerateHandler implements TaskHandler {
         if (job.candidates().isEmpty() && job.facts().isBlank()) {
             return new Outcome(LiveComment.UNANSWERED, null, null, "本场没有可用于回答的资料", false);
         }
-        String system = ReplyPrompt.system(job.persona(), job.narrating(), job.byCohost(), !job.brand().isEmpty());
-        String facts = ScriptPrompt.withBrand(job.facts(), job.brand());
+        String system = ReplyPrompt.system(job.persona(), job.narrating(), job.byCohost(), !job.brand().isEmpty(), !job.store().isEmpty());
+        String facts = ReplyPrompt.material(job.facts(), job.store(), job.brand());
         // What the merchant saved, and therefore what the model's wording is checked against.
         // The viewer's text is left out: a number a viewer typed is not a fact.
         String material = ReplyPrompt.user("", job.candidates(), facts, null);
@@ -293,10 +300,11 @@ public class LiveReplyGenerateHandler implements TaskHandler {
     /**
      * @param exact the saved Q&A whose question is this comment word for word, or null
      * @param brand the description of the store's brand as offered to the model; empty when it has none
+     * @param store what the merchant recorded about the store itself, as offered to the model; empty when nothing was
      */
     private record Job(Long tenantId, Long sessionId, String commandId, String question,
                        LiveReplyKnowledge.Candidate exact, List<LiveReplyKnowledge.Candidate> candidates,
-                       String facts, String brand, String voice, Long userId, LiveDtos.Persona persona, boolean narrating,
+                       String facts, String brand, String store, String voice, Long userId, LiveDtos.Persona persona, boolean narrating,
                        boolean byCohost) { }
 
     /**

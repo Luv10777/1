@@ -1369,7 +1369,8 @@ class FoundationIntegrationTest {
 
     /** A real account with no store membership: a token is only accepted for a user that exists. */
     private Long outsider(Long tenantId) {
-        return owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?,?,'外人') RETURNING id",
+        // A member of the merchant who has been given no store: a clerk, since the owner can enter every store.
+        return owner.queryForObject("INSERT INTO users(tenant_id,username,name,role) VALUES (?,?,'外人','STAFF') RETURNING id",
                 Long.class, tenantId, "outsider-" + java.util.UUID.randomUUID());
     }
 

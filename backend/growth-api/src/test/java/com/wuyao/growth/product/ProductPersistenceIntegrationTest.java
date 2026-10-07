@@ -69,8 +69,6 @@ class ProductPersistenceIntegrationTest {
                 Long.class, tenantId);
         storeId = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '测试门店', ?) RETURNING id",
                 Long.class, tenantId, userId);
-        owner.update("INSERT INTO store_members(tenant_id,store_id,user_id,role) VALUES (?, ?, ?, 'OWNER')",
-                tenantId, storeId, userId);
         assetId = owner.queryForObject("INSERT INTO assets(tenant_id,name,type,status,storage_key) VALUES (?, '图片', 'IMAGE', 'READY', 'test/image.png') RETURNING id",
                 Long.class, tenantId);
     }
