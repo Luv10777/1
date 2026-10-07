@@ -38,7 +38,8 @@ public final class AuthDtos {
             @Size(min = 8, max = 64, message = "密码长度需为 8–64 位") String password) {
     }
 
-    public record UserInfo(Long userId, Long tenantId, String phone, String name) {
+    /** @param role OWNER 或 STAFF，前端据此决定显示哪些管理入口；真正的限制在服务端 */
+    public record UserInfo(Long userId, Long tenantId, String phone, String name, String role) {
     }
 
     public record TokenPair(String accessToken, String refreshToken, long expiresIn, UserInfo user) {

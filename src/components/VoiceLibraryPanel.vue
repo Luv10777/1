@@ -3,6 +3,8 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { voiceApi, voiceFileType, measureVoiceFile, voiceDurationProblem } from '../services/voiceApi.js'
 import { createVoiceRecorder } from '../services/voiceRecorder.js'
 import { PERSONA_STYLES } from '../services/liveApi.js'
+import { auth } from '../stores/auth.js'
+import { stores as merchantStores } from '../stores/merchantContext.js'
 
 const props = defineProps({ storeId: { type: [Number, String], default: null }, voiceRoles: { type: Array, default: () => [] } })
 const emit = defineEmits(['loaded', 'change'])
@@ -14,6 +16,8 @@ const personaName = computed({
   set: value => { persona.value = { ...persona.value, name: String(value).replace(/[^\p{Script=Han}A-Za-z]/gu, '').slice(0, 12) } },
 })
 const setStyle = style => { persona.value = { ...persona.value, style } }
+// 声音样本归商户：新建、改名、克隆、删除和调整开放门店只有老板能做，能进这家店的人都可以用。
+const isOwner = computed(() => auth.isOwner)
 const capabilities = ref({ configured: false, builtInVoices: [], message: '正在读取语音服务状态…' })
 const capabilitiesLoaded = ref(false)
 const samples = ref([])
@@ -294,6 +298,26 @@ async function preview(voice, original = false) {
   } finally { if (requestTicket === playbackTicket) previewBusy.value = '' }
 }
 
+// 老板勾选或取消一家门店。把当前门店取消后，这个声音就不再出现在本页，所以改完重新读一次列表。
+async function toggleStore(voice, storeId, open) {
+  if (busy.value) return
+  const ticket = scopeTicket
+  const scopeStoreId = props.storeId
+  const next = open ? [...new Set([...(voice.storeIds || []), storeId])] : (voice.storeIds || []).filter(id => id !== storeId)
+  busy.value = `stores:${voice.id}`; error.value = ''; notice.value = ''
+  try {
+    await voiceApi.setStores(voice.sampleId, next)
+    if (!currentScope(ticket, scopeStoreId)) return
+    notice.value = open ? '已开放给所选门店。' : '已停止向该门店开放。'
+  } catch (failure) {
+    if (currentScope(ticket, scopeStoreId)) error.value = failure.message || '开放门店保存失败，请重试。'
+  } finally {
+    if (currentScope(ticket, scopeStoreId)) {
+      try { samples.value = await voiceApi.list(scopeStoreId); publishLoaded() } catch { /* 保存结果已提示，列表下次刷新时对齐。 */ }
+      busy.value = ''
+    }
+  }
+}
 // 一个主播，可以有多个助播。再点一次已选中的角色就是取消。
 function setRole(voice, role) {
   if (!ready(voice)) return
@@ -332,8 +356,8 @@ onBeforeUnmount(() => { scopeTicket++; stopPreview(); clearPreviewCache(); recor
     <div v-if="!loading" class="ls-voice-grid">
       <article v-for="voice in voices" :key="voice.id" class="ls-voice-card" :class="{ assigned: voice.role !== 'none', selected: voice.role === 'host' }">
         <div class="voice-card-meta">
-          <span class="voice-kind" :class="{ clone: !voice.builtin }">{{ voice.builtin ? '预设音色' : '我的克隆' }}</span>
-          <div v-if="!voice.builtin" class="voice-manage">
+          <span class="voice-kind" :class="{ clone: !voice.builtin }">{{ voice.builtin ? '预设音色' : '商户克隆' }}</span>
+          <div v-if="!voice.builtin && isOwner" class="voice-manage">
             <button type="button" :disabled="!!busy" :aria-label="`编辑${voice.name}名称`" title="编辑名称" @click="startRename(voice)"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
             <button type="button" :disabled="!!busy || (voice.status === 'CLONING' && !voice.stalled)" :aria-label="`删除${voice.name}样本`" title="删除音色" @click="remove(voice)"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
           </div>
@@ -361,7 +385,7 @@ onBeforeUnmount(() => { scopeTicket++; stopPreview(); clearPreviewCache(); recor
         </div>
         <div v-if="!voice.builtin" class="voice-sample-actions">
           <button type="button" class="voice-text-button muted" :disabled="!sampleAvailable(voice) || !!busy || !!previewBusy" @click="preview(voice, true)">{{ previewBusy === `${voice.id}:sample` ? '加载中…' : playingId === `${voice.id}:sample` ? '停止原样本' : '试听原样本' }}</button>
-          <button v-if="['UPLOADED', 'FAILED'].includes(voice.status) || voice.stalled" type="button" class="voice-text-button" :disabled="!capabilities.configured || !!busy" @click="mutate(voice, 'clone')">{{ busy === `clone:${voice.id}` ? '提交中…' : voice.status === 'UPLOADED' ? '开始克隆训练' : '重试克隆' }}</button>
+          <button v-if="isOwner && (['UPLOADED', 'FAILED'].includes(voice.status) || voice.stalled)" type="button" class="voice-text-button" :disabled="!capabilities.configured || !!busy" @click="mutate(voice, 'clone')">{{ busy === `clone:${voice.id}` ? '提交中…' : voice.status === 'UPLOADED' ? '开始克隆训练' : '重试克隆' }}</button>
           <button v-else-if="voice.status === 'CLONING'" type="button" class="voice-text-button" :disabled="!capabilities.configured || !!busy || pollRunning" @click="mutate(voice, 'refresh')">查询训练状态</button>
         </div>
         <div class="ls-voice-foot">
@@ -371,10 +395,21 @@ onBeforeUnmount(() => { scopeTicket++; stopPreview(); clearPreviewCache(); recor
             <button type="button" :disabled="!ready(voice) || !!busy" :class="{ on: voice.role === 'cohost' }" :aria-pressed="voice.role === 'cohost'" title="自动讲解时和主播轮流讲" @click="setRole(voice, 'cohost')">助播</button>
           </div>
         </div>
+        <details v-if="!voice.builtin" class="voice-audit voice-stores">
+          <summary>开放门店 · {{ (voice.storeIds || []).length }} 家</summary>
+          <template v-if="isOwner">
+            <label v-for="store in merchantStores" :key="store.id" class="voice-store-option">
+              <input type="checkbox" :checked="(voice.storeIds || []).includes(store.id)" :disabled="!!busy || ((voice.storeIds || []).length === 1 && voice.storeIds.includes(store.id))" @change="toggleStore(voice, store.id, $event.target.checked)" />
+              <span>{{ store.name }}</span>
+            </label>
+            <p>勾选的门店可以用这个声音直播。至少保留一家；不再需要时请删除音色。</p>
+          </template>
+          <p v-else>由老板决定这个声音开放给哪些门店。</p>
+        </details>
         <details v-if="!voice.builtin" class="voice-audit"><summary>授权记录</summary><p>{{ voice.consentText }}</p><dl><dt>确认时间</dt><dd>{{ consentDate(voice.consentAt) }}</dd><dt>操作人</dt><dd>用户 {{ voice.consentBy }}</dd></dl></details>
         <details v-if="voice.providerVoiceId" class="voice-audit"><summary>音色 ID</summary><p class="voice-id">{{ voice.providerVoiceId }}</p></details>
       </article>
-      <article class="ls-voice-card ls-clone-card" :class="{ open: formOpen }">
+      <article v-if="isOwner" class="ls-voice-card ls-clone-card" :class="{ open: formOpen }">
         <button v-if="!formOpen" ref="uploadEntry" type="button" class="ls-clone-entry" :disabled="!storeId || !!busy" @click="openForm">
           <span class="ls-clone-plus" aria-hidden="true">＋</span><strong>新建声音克隆</strong><small>录音或上传，创建专属音色</small>
         </button>
@@ -464,6 +499,8 @@ onBeforeUnmount(() => { scopeTicket++; stopPreview(); clearPreviewCache(); recor
 .voice-text-button:hover { text-decoration:underline; }
 .voice-audit { font-size:10px; color:var(--ink-muted); }
 .voice-audit summary,.voice-service-details summary { cursor:pointer; width:fit-content; }
+.voice-store-option { display:flex; align-items:center; gap:6px; padding:3px 0; font-size:11px; color:var(--ink-soft); cursor:pointer; }
+.voice-store-option input { margin:0; }
 .voice-audit p { line-height:1.8; }.voice-audit dl { display:grid; grid-template-columns:auto 1fr; gap:7px; }.voice-audit dd { margin:0; }
 .voice-persona { display:flex; flex-wrap:wrap; align-items:center; gap:12px 28px; margin-top:14px; padding:12px 14px; border-radius:8px; background:var(--color-bg-subtle); }
 .voice-persona-name,.voice-persona-style { display:flex; align-items:center; gap:10px; color:var(--ink-soft); font-size:12px; }

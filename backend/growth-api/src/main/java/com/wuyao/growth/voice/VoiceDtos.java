@@ -11,15 +11,24 @@ public final class VoiceDtos {
                                 @AssertTrue(message="请确认声音属于本人或已获得授权") @NotNull Boolean consent) { }
     public record ConfirmRequest(@NotNull @Positive @Max(10485760) Long sizeBytes) { }
     public record RenameRequest(@NotBlank @Size(max=100) String name) { }
-    /** @param stalled a clone submission that was interrupted; it can be submitted again or deleted */
+    public record StoresRequest(@NotNull @Size(max=500) List<@NotNull @Positive Long> storeIds) { }
+    /**
+     * @param storeId  the store the sample was uploaded from; it no longer decides who may use it
+     * @param storeIds the stores the sample is open to
+     * @param stalled  a clone submission that was interrupted; it can be submitted again or deleted
+     */
     public record SampleView(Long id, Long storeId, String name, String status, String providerCode,
                              String providerVoiceId, Instant consentAt, Long consentBy,
-                             String consentText, String storageKey, String errorMessage, boolean stalled) {
+                             String consentText, String storageKey, String errorMessage, boolean stalled,
+                             List<Long> storeIds) {
         static SampleView of(VoiceSample sample) {
+            return of(sample, List.of());
+        }
+        static SampleView of(VoiceSample sample, List<Long> storeIds) {
             return new SampleView(sample.getId(), sample.getStoreId(), sample.getName(), sample.getStatus(),
                     sample.getProviderCode(), sample.getProviderVoiceId(), sample.getConsentAt(), sample.getConsentBy(),
                     sample.getConsentText(), sample.getStorageKey(), sample.getErrorMessage(),
-                    VoiceSampleService.stalled(sample));
+                    VoiceSampleService.stalled(sample), storeIds);
         }
     }
     public record UploadTicket(SampleView sample, String uploadUrl) { }

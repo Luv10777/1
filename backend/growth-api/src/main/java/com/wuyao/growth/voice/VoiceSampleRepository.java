@@ -8,7 +8,14 @@ import java.util.List;
 import java.util.Optional;
 
 public interface VoiceSampleRepository extends JpaRepository<VoiceSample, Long> {
-    List<VoiceSample> findByStoreIdAndStatusNotOrderByIdDesc(Long storeId, String status);
+    /** 开放给这家门店、尚未删除的样本。 */
+    @Query("""
+            select v from VoiceSample v
+             where v.status <> 'DELETED'
+               and v.id in (select g.sampleId from VoiceSampleStore g where g.storeId = :storeId)
+             order by v.id desc
+            """)
+    List<VoiceSample> findOpenTo(Long storeId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from VoiceSample v where v.id = :id")
     Optional<VoiceSample> lockById(Long id);

@@ -4,6 +4,7 @@ import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.iam.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * 品牌档案属于商户，商户内的成员都能读取。
- * 目前商户内没有区分角色，任何成员都能修改品牌；加入员工账号时需要在这里补上角色校验。
- */
+/** 品牌档案属于商户：商户内的成员都能读取，只有老板能新建、修改、删除和设置默认品牌。 */
 @Service
 @RequiredArgsConstructor
 public class BrandService {
@@ -27,6 +25,7 @@ public class BrandService {
     private final BrandRepository brands;
     private final BrandStoreLinks stores;
     private final AssetService assets;
+    private final AccountService accounts;
 
     @Transactional(readOnly = true)
     public List<BrandDtos.View> list() {
@@ -45,6 +44,7 @@ public class BrandService {
     @Transactional
     public BrandDtos.View create(BrandDtos.CreateRequest req, Long userId) {
         Long tenantId = TenantContext.require();
+        accounts.requireOwner(userId);
         brands.lockTenant(tenantId);
         String name = req.name().trim();
         if (brands.existsByNameAndStatus(name, ACTIVE)) {
@@ -62,7 +62,8 @@ public class BrandService {
     }
 
     @Transactional
-    public BrandDtos.View update(Long id, BrandDtos.UpdateRequest req) {
+    public BrandDtos.View update(Long id, BrandDtos.UpdateRequest req, Long userId) {
+        accounts.requireOwner(userId);
         brands.lockTenant(TenantContext.require());
         Brand brand = find(id);
         if (!req.version().equals(brand.getVersion())) {
@@ -78,7 +79,8 @@ public class BrandService {
     }
 
     @Transactional
-    public BrandDtos.View makeDefault(Long id) {
+    public BrandDtos.View makeDefault(Long id, Long userId) {
+        accounts.requireOwner(userId);
         brands.lockTenant(TenantContext.require());
         Brand brand = find(id);
         if (brand.isDefaultBrand()) return view(brand);
@@ -95,7 +97,8 @@ public class BrandService {
 
     /** 归档而不是删除：已归档门店仍可能引用它。还有营业中的门店时不能归档。 */
     @Transactional
-    public void archive(Long id) {
+    public void archive(Long id, Long userId) {
+        accounts.requireOwner(userId);
         brands.lockTenant(TenantContext.require());
         Brand brand = find(id);
         boolean only = brands.countByStatus(ACTIVE) == 1;

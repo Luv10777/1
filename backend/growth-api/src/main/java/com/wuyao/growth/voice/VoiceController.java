@@ -34,6 +34,11 @@ public class VoiceController {
     public ApiResponse<VoiceDtos.SampleView> rename(@PathVariable Long id, @Valid @RequestBody VoiceDtos.RenameRequest request, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(samples.rename(id, request.name(), me.userId()));
     }
+    /** 老板调整这个声音开放给哪些门店。 */
+    @PutMapping("/voice-samples/{id}/stores")
+    public ApiResponse<VoiceDtos.SampleView> setStores(@PathVariable Long id, @Valid @RequestBody VoiceDtos.StoresRequest request, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(samples.setStores(id, request.storeIds(), me.userId()));
+    }
     @PostMapping("/voice-samples/{id}/clone")
     public ApiResponse<VoiceDtos.SampleView> cloneVoice(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(voices.cloneVoice(id, me.userId()));

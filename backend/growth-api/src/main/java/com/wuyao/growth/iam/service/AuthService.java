@@ -149,7 +149,7 @@ public class AuthService {
         return transactions.execute(status -> {
             User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
             if (!"ACTIVE".equals(user.getStatus())) {
-                throw BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用");
+                throw BizException.of(ErrorCode.UNAUTHORIZED, "账号已停用，请联系商户管理员");
             }
             user.setLastLoginAt(Instant.now());
             return issueTokens(user, ip, userAgent, deviceId);
@@ -173,7 +173,7 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                 .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "用户不存在"));
-        return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName());
+        return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole());
     }
 
     /** 刷新即轮换：老的立刻作废，防止 refresh token 被重复使用。 */
@@ -219,6 +219,8 @@ public class AuthService {
         user.setTenantId(tenant.getId());
         user.setPhone(phone);
         user.setName("用户" + phone.substring(7));
+        // 自己注册的人就是这个新商户的老板。老板添加的店员走 AccountService.createStaff，不会到这里。
+        user.setRole(AccountService.OWNER);
         user = userRepository.save(user);
 
         log.info("新用户注册: userId={} tenantId={}", user.getId(), tenant.getId());
@@ -245,7 +247,7 @@ public class AuthService {
                 access,
                 refresh,
                 jwtService.getAccessTtl().toSeconds(),
-                new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName()));
+                new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole()));
     }
 
     private String randomCode() {
