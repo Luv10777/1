@@ -3,16 +3,18 @@ import { onMounted, reactive, ref } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { saveStore } from '../stores/merchantContext.js'
 import { brandApi } from '../services/brandApi.js'
+import { auth } from '../stores/auth.js'
 
 const props = defineProps({ store: { type: Object, default: null } })
 const emit = defineEmits(['close'])
 const form = reactive({ name: props.store?.name || '', address: props.store?.address || '', phone: props.store?.phone || '', businessHours: props.store?.businessHours || '' })
 const busy = ref(false)
 const error = ref('')
-// 只有一个品牌（或还没有品牌）时不用选：后端会把门店归到默认品牌。
+// 只有一个品牌（或还没有品牌）时不用选：后端会把门店归到默认品牌。门店归哪个品牌由管理员决定，店员看不到这一项。
 const brands = ref([])
 const brandId = ref(props.store?.brandId ?? null)
 onMounted(async () => {
+  if (!auth.isOwner) return
   try {
     brands.value = await brandApi.names()
     brandId.value ??= brands.value.find(brand => brand.defaultBrand)?.id ?? null

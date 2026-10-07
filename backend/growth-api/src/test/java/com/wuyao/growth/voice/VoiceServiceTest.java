@@ -21,8 +21,10 @@ class VoiceServiceTest {
     private final ObjectStorage storage = mock(ObjectStorage.class);
     private final StoreAccessService stores = mock(StoreAccessService.class);
     private final VoiceProvider provider = mock(VoiceProvider.class);
-    private final VoiceSampleService samples = new VoiceSampleService(repository, stores, storage);
+    private final VoiceSampleStoreRepository grants = mock(VoiceSampleStoreRepository.class);
+    private final com.wuyao.growth.iam.service.AccountService accounts = mock(com.wuyao.growth.iam.service.AccountService.class);
     private final VoiceUsageGuard guard = mock(VoiceUsageGuard.class);
+    private final VoiceSampleService samples = new VoiceSampleService(repository, grants, stores, accounts, storage, List.of(guard));
     private final VoiceService service = new VoiceService(samples, provider, storage, stores, List.of(guard));
     private VoiceSample sample;
 
@@ -33,6 +35,12 @@ class VoiceServiceTest {
         sample.setConsentAt(Instant.now()); sample.setConsentBy(3L); sample.setConsentText(VoiceSampleService.CONSENT);
         when(repository.lockById(10L)).thenReturn(Optional.of(sample));
         when(repository.findById(10L)).thenReturn(Optional.of(sample));
+        // User 3 owns the merchant; the sample is open to store 2 only.
+        when(accounts.isOwner(3L)).thenReturn(true);
+        VoiceSampleStore grant = new VoiceSampleStore();
+        grant.setTenantId(1L); grant.setSampleId(10L); grant.setStoreId(2L);
+        when(grants.findBySampleIdOrderByStoreIdAsc(10L)).thenReturn(List.of(grant));
+        when(grants.existsBySampleIdAndStoreId(10L, 2L)).thenReturn(true);
         when(storage.presignGet(eq("sample-key"), any())).thenReturn("https://storage.test/sample");
         when(provider.code()).thenReturn("test-provider"); when(provider.configured()).thenReturn(true);
         when(provider.builtInVoices()).thenReturn(List.of("builtin"));
@@ -192,8 +200,8 @@ class VoiceServiceTest {
         sample.setTenantId(99L);
         assertThatThrownBy(() -> service.refresh(10L, 3L)).hasMessageContaining("不存在");
         sample.setTenantId(1L);
-        doThrow(new IllegalStateException("store denied")).when(stores).requireAccess(2L, 3L);
-        assertThatThrownBy(() -> service.refresh(10L, 3L)).hasMessageContaining("store denied");
+        // A clerk who can enter none of the stores the voice is open to.
+        assertThatThrownBy(() -> service.refresh(10L, 9L)).hasMessageContaining("没有使用这个声音的权限");
         verify(provider, never()).voiceStatus(anyString());
     }
 

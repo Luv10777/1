@@ -21,7 +21,7 @@ public class LiveVoiceUsageGuard implements VoiceUsageGuard {
         String voice = new LiveVoice(sampleId, null).encode();
         return sessions.findByStoreIdAndStatusIn(storeId, LiveSessionService.ACTIVE).stream()
                 .filter(session -> LiveVoice.lineup(session.getConfig()).contains(voice))
-                .map(session -> "这个音色正在场次「" + session.getName() + "」中使用，结束这一场后才能删除")
+                .map(session -> "这个音色正在场次「" + session.getName() + "」中使用，结束这一场后才能删除或停止开放")
                 .findFirst();
     }
 }

@@ -58,6 +58,8 @@ export function createVoiceApi({ request = defaultRequest, fetch: uploadFetch = 
     list: storeId => read(`/api/stores/${storeId}/voice-samples`),
     download: id => read(`/api/voice-samples/${id}/download-url`),
     rename: (id, name) => write(`/api/voice-samples/${id}`, 'PATCH', { name }),
+    /** 管理员调整这个声音开放给哪些门店；至少保留一家。 */
+    setStores: (id, storeIds) => write(`/api/voice-samples/${id}/stores`, 'PUT', { storeIds }),
     clone: id => write(`/api/voice-samples/${id}/clone`, 'POST', {}),
     refresh: id => write(`/api/voice-samples/${id}/refresh`, 'POST', {}),
     delete: remove,

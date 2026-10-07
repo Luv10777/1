@@ -33,7 +33,7 @@ watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll
 
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
 const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'auto_awesome', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
-const navItemIcons = { dashboard: 'dashboard', creative: 'auto_awesome', analytics: 'monitoring', diagnosis: 'insights', 'analytics-platforms': 'link', acquisition: 'person_search', 'image-create': 'image', 'video-create': 'movie', 'digital-human': 'record_voice_over', 'copy-rewrite': 'edit_note', 'video-analyze': 'query_stats', publishing: 'publish', 'matrix-publishing': 'hub', 'publishing-plan': 'calendar_month', 'publishing-platforms': 'link', messages: 'chat', reviews: 'reviews', 'service-rules': 'rule', 'geo-brand': 'location_on', 'geo-services': 'workspace_premium', 'geo-keywords': 'key', 'geo-visibility': 'visibility', merchants: 'storefront', brands: 'branding_watermark', assets: 'folder', products: 'inventory_2', knowledge: 'menu_book', works: 'gallery_thumbnail', billing: 'card_membership', 'merchant-alliance': 'handshake', notifications: 'notifications', tasks: 'task_alt', settings: 'settings', help: 'help_outline' }
+const navItemIcons = { team: 'group', dashboard: 'dashboard', creative: 'auto_awesome', analytics: 'monitoring', diagnosis: 'insights', 'analytics-platforms': 'link', acquisition: 'person_search', 'image-create': 'image', 'video-create': 'movie', 'digital-human': 'record_voice_over', 'copy-rewrite': 'edit_note', 'video-analyze': 'query_stats', publishing: 'publish', 'matrix-publishing': 'hub', 'publishing-plan': 'calendar_month', 'publishing-platforms': 'link', messages: 'chat', reviews: 'reviews', 'service-rules': 'rule', 'geo-brand': 'location_on', 'geo-services': 'workspace_premium', 'geo-keywords': 'key', 'geo-visibility': 'visibility', merchants: 'storefront', brands: 'branding_watermark', assets: 'folder', products: 'inventory_2', knowledge: 'menu_book', works: 'gallery_thumbnail', billing: 'card_membership', 'merchant-alliance': 'handshake', notifications: 'notifications', tasks: 'task_alt', settings: 'settings', help: 'help_outline' }
 
 const navGroups = [
   {
@@ -125,6 +125,7 @@ const navGroups = [
     items: [
       { name: 'notifications', label: '消息', path: '/notifications' },
       { name: 'tasks', label: '任务中心', path: '/tasks' },
+      { name: 'team', label: '员工管理', path: '/team', ownerOnly: true },
       { name: 'settings', label: '系统设置', path: '/settings' },
       { name: 'help', label: '帮助与反馈', path: '/help' },
     ],
@@ -185,12 +186,15 @@ const expandActiveGroup = () => {
   saveExpandedGroups()
 }
 
-const searchItems = computed(() => navGroups.flatMap(group => group.items || [group]).filter(item => {
+// 只有管理员能用的入口对店员收起；接口本身也会拒绝。
+const canSee = item => !item.ownerOnly || auth.isOwner
+const searchItems = computed(() => navGroups.flatMap(group => group.items || [group]).filter(canSee).filter(item => {
   const query = search.value.trim().toLowerCase()
   return !query || item.label.toLowerCase().includes(query)
 }))
 const closeMenu = () => { menuOpen.value = false }
-const logout = () => { auth.logout(); router.push({ name: 'login' }) }
+// 先等会话清掉再跳转，否则路由守卫看到的还是已登录，会把人送回工作台而不是登录页。
+const logout = async () => { await auth.logout(); router.push({ name: 'login' }) }
 </script>
 
 <template>
@@ -243,7 +247,7 @@ const logout = () => { auth.logout(); router.push({ name: 'login' }) }
             >
               <div class="nav-group-items-inner">
                 <RouterLink
-                  v-for="item in group.items"
+                  v-for="item in group.items.filter(canSee)"
                   :key="item.name"
                   :to="item.path"
                   class="nav-item paper-nav-item"
@@ -263,14 +267,15 @@ const logout = () => { auth.logout(); router.push({ name: 'login' }) }
       <div class="sidebar-footer paper-sidebar-footer"><RouterLink to="/creative" class="sidebar-create-button" @click="closeMenu"><span>＋</span><span>新建创作任务</span></RouterLink><div class="status-capsule paper-status"><span class="status-pulse" /><div><small>方志编撰中...</small><strong>AI 提炼烟火中</strong></div></div><div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ auth.user?.initials || '林' }}</span><span class="account-copy"><strong>{{ auth.user?.name || '林知夏' }}</strong><small>{{ auth.user?.role || '运营管理员' }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div></div>
     </aside>
     <main class="main-area paper-main">
-      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><button v-if="selectedStoreRecord" class="icon-button" aria-label="编辑当前门店" title="编辑当前门店" @click="openStoreForm(selectedStoreRecord)"><span class="material-symbols-outlined" style="font-size:18px">edit</span></button><button class="icon-button" aria-label="新建门店" title="新建门店" @click="openStoreForm()">＋</button><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span class="top-account-name">{{ auth.user?.name || '林知夏' }}</span></button></div></div></header>
+      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><button v-if="selectedStoreRecord" class="icon-button" aria-label="编辑当前门店" title="编辑当前门店" @click="openStoreForm(selectedStoreRecord)"><span class="material-symbols-outlined" style="font-size:18px">edit</span></button><button v-if="auth.isOwner" class="icon-button" aria-label="新建门店" title="新建门店" @click="openStoreForm()">＋</button><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span class="top-account-name">{{ auth.user?.name || '林知夏' }}</span></button></div></div></header>
       <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }">
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
-          <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : '先创建你的第一家门店' }}</h2>
-          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : '创建门店后，即可管理商品、维护知识库并配置 AI 实景直播。') }}</p>
+          <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>
+          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : auth.isOwner ? '创建门店后，即可管理商品、维护知识库并配置 AI 实景直播。' : '请联系管理员在“员工管理”里把门店分配给你，分配后刷新即可使用。') }}</p>
           <button v-if="storeError" class="secondary-button compact" @click="loadStores">重新加载</button>
-          <button v-else-if="!storeLoading" class="primary-button compact" @click="openStoreForm()">＋ 新建门店</button>
+          <button v-else-if="!storeLoading && auth.isOwner" class="primary-button compact" @click="openStoreForm()">＋ 新建门店</button>
+          <button v-else-if="!storeLoading" class="secondary-button compact" @click="loadStores">刷新</button>
         </section>
         <slot v-else />
       </div>

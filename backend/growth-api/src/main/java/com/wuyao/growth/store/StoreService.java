@@ -4,8 +4,7 @@ import com.wuyao.growth.brand.BrandService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
-import com.wuyao.growth.iam.entity.User;
-import com.wuyao.growth.iam.repository.UserRepository;
+import com.wuyao.growth.iam.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -19,12 +18,16 @@ import java.util.List;
 public class StoreService {
     private final StoreRepository storeRepository;
     private final StoreMemberRepository memberRepository;
-    private final UserRepository userRepository;
+    private final AccountService accounts;
     private final StoreAccessService accessService;
     private final BrandService brandService;
 
+    /** 管理员看到本商户的全部门店，店员只看到分配给他的。 */
     @Transactional(readOnly = true)
     public List<StoreDtos.StoreView> list(Long userId) {
+        if (accounts.isOwner(userId)) {
+            return storeRepository.findAllByStatusOrderByIdAsc("ACTIVE").stream().map(StoreDtos.StoreView::of).toList();
+        }
         return memberRepository.findAllByUserIdAndStatusOrderByStoreIdAsc(userId, "ACTIVE").stream()
                 .map(member -> storeRepository.findByIdAndStatus(member.getStoreId(), "ACTIVE"))
                 .flatMap(java.util.Optional::stream)
@@ -35,27 +38,19 @@ public class StoreService {
     @Transactional
     public StoreDtos.StoreView create(StoreDtos.CreateRequest request, Long userId) {
         Long tenantId = TenantContext.require();
-        User user = userRepository.findById(userId)
-                .filter(candidate -> tenantId.equals(candidate.getTenantId()))
-                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "当前用户不存在"));
+        accounts.requireOwner(userId);
         Store store = new Store();
         store.setTenantId(tenantId);
         store.setName(request.name().trim());
         store.setAddress(trim(request.address()));
         store.setPhone(trim(request.phone()));
         store.setBusinessHours(trim(request.businessHours()));
-        store.setCreatedBy(user.getId());
+        store.setCreatedBy(userId);
         // 未指定品牌时归到默认品牌；商户还没有品牌时保持为空。
         store.setBrandId(brandService.resolveForStore(request.brandId()));
         try {
-            store = storeRepository.save(store);
-            StoreMember member = new StoreMember();
-            member.setTenantId(tenantId);
-            member.setStoreId(store.getId());
-            member.setUserId(userId);
-            member.setRole("OWNER");
-            memberRepository.save(member);
-            return StoreDtos.StoreView.of(store);
+            // 管理员自动能进新门店，不需要登记成员；店员由管理员在员工管理里分配。
+            return StoreDtos.StoreView.of(storeRepository.saveAndFlush(store));
         } catch (DataIntegrityViolationException ex) {
             throw BizException.of(ErrorCode.CONFLICT, "门店名称已存在");
         }
@@ -74,8 +69,12 @@ public class StoreService {
         }
         // 不带 brandId 的保存不改变归属，旧客户端不会把门店的品牌清掉。
         // 先确认品牌再改门店：确认品牌会查库，不能让它把还没校验的门店改动提前写出去。
-        Long brandId = request.brandId() == null || request.brandId().equals(store.getBrandId())
-                ? store.getBrandId() : brandService.resolveForStore(request.brandId());
+        Long brandId = store.getBrandId();
+        if (request.brandId() != null && !request.brandId().equals(brandId)) {
+            // 店员可以改本店的地址、电话这些资料，但门店归哪个品牌由管理员决定。
+            accounts.requireOwner(userId);
+            brandId = brandService.resolveForStore(request.brandId());
+        }
         store.setName(request.name().trim());
         store.setAddress(trim(request.address()));
         store.setPhone(trim(request.phone()));
@@ -91,6 +90,7 @@ public class StoreService {
 
     @Transactional
     public void archive(Long storeId, Long userId) {
+        accounts.requireOwner(userId);
         Store store = accessService.requireAccess(storeId, userId);
         store.setStatus("ARCHIVED");
         store.setUpdatedAt(Instant.now());

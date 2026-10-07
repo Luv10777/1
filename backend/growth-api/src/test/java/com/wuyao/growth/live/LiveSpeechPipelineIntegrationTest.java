@@ -421,6 +421,7 @@ class LiveSpeechPipelineIntegrationTest {
         Long sample = owner.queryForObject("INSERT INTO voice_samples(tenant_id,store_id,name,storage_key,mime_type,status,"
                 + "provider_code,provider_voice_id,consent_at,consent_by,consent_text) VALUES (?,?,'店主声音','t/voice','audio/wav','READY',"
                 + "'stub-voice','voice-clone-1',now(),(SELECT id FROM users LIMIT 1),'同意') RETURNING id", Long.class, tenant, store);
+        owner.update("INSERT INTO voice_sample_stores(tenant_id,sample_id,store_id) VALUES (?,?,?)", tenant, sample, store);
         when(voiceProvider.supportsVoice("voice-clone-1")).thenReturn(true);
         long cloned = api(post("/api/stores/" + store + "/live-sessions"), Map.of("name", "克隆音色场",
                 "productIds", List.of(product), "config", Map.of("voiceRoles",
@@ -429,7 +430,7 @@ class LiveSpeechPipelineIntegrationTest {
         api(post("/api/live-sessions/" + cloned + "/start"), null);
         mvc.perform(delete("/api/voice-samples/" + sample).header("Authorization", "Bearer " + token))
                 .andExpect(jsonPath("$.code").value(1400))
-                .andExpect(jsonPath("$.message").value("这个音色正在场次「克隆音色场」中使用，结束这一场后才能删除"));
+                .andExpect(jsonPath("$.message").value("这个音色正在场次「克隆音色场」中使用，结束这一场后才能删除或停止开放"));
         assertThat(owner.queryForObject("SELECT status FROM voice_samples WHERE id=?", String.class, sample)).isEqualTo("READY");
         verify(voiceProvider, never()).deleteVoice(anyString());
 

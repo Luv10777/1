@@ -6,6 +6,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+/** 店员能进哪些门店。管理员自动能进全部门店，不在这张表里。 */
 @Entity
 @Table(name = "store_members")
 @Getter
@@ -23,9 +24,6 @@ public class StoreMember {
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
-
-    @Column(nullable = false, length = 30)
-    private String role = "STAFF";
 
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";

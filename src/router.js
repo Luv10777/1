@@ -27,6 +27,7 @@ import PlayerView from './views/PlayerView.vue'
 import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
+import TeamView from './views/TeamView.vue'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
@@ -77,6 +78,7 @@ const routes = [
   { path: '/merchant-alliance', name: 'merchant-alliance', component: PlaceholderView, meta: { title: '商家联盟', eyebrow: 'PLANS & BENEFITS', icon: '◇', description: '查看商家合作权益、联合活动和联盟资源。' } },
   { path: '/notifications', name: 'notifications', component: PlaceholderView, meta: { title: '消息', eyebrow: 'SYSTEM', icon: '◌', description: '集中查看系统通知、审核提醒和任务动态。' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
+  { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: PlaceholderView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '管理成员、角色、通知和平台连接配置。' } },
   { path: '/help', name: 'help', component: PlaceholderView, meta: { title: '帮助与反馈', eyebrow: 'SYSTEM', icon: '?', description: '查找使用说明、常见问题并提交产品反馈。' } },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },
@@ -101,6 +103,7 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.role && !auth.hasRole(to.meta.role)) return { name: 'forbidden' }
+  if (to.meta.ownerOnly && !auth.isOwner) return { name: 'forbidden' }
   return true
 })
 

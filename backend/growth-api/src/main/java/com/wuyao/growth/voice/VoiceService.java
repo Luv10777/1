@@ -25,7 +25,7 @@ public class VoiceService {
     }
     public VoiceDtos.SampleView cloneVoice(Long id, Long userId) {
         if (!provider.configured()) throw VoiceSampleService.invalid("请先在服务端配置语音供应商账号");
-        var sample = samples.get(id, userId);
+        var sample = samples.getForManage(id, userId);
         // Reject local-only storage before changing a saved sample to CLONING.
         // An existing voice only needs a status query, not a readable sample URL.
         if (sample.providerVoiceId() == null)
@@ -58,9 +58,12 @@ public class VoiceService {
         };
     }
     public void delete(Long id, Long userId) {
-        var sample = samples.get(id, userId);
-        for (VoiceUsageGuard guard : guards) {
-            guard.inUse(sample.storeId(), id).ifPresent(reason -> { throw VoiceSampleService.invalid(reason); });
+        var sample = samples.getForManage(id, userId);
+        // The voice may be open to several stores; a session on air in any of them keeps it.
+        for (Long storeId : sample.storeIds()) {
+            for (VoiceUsageGuard guard : guards) {
+                guard.inUse(storeId, id).ifPresent(reason -> { throw VoiceSampleService.invalid(reason); });
+            }
         }
         var input = samples.beginDelete(id, userId);
         if (input.voiceId() != null) {
@@ -84,8 +87,9 @@ public class VoiceService {
             if (!provider.builtInVoices().contains(builtInVoice)) throw VoiceSampleService.invalid("请选择可用的系统音色");
             return builtInVoice;
         }
-        var sample = samples.get(sampleId, userId);
-        if (!storeId.equals(sample.storeId()) || !"READY".equals(sample.status()) || !provider.code().equals(sample.providerCode()))
+        // Access to the store was checked above; what remains is whether the voice is open to this store.
+        var sample = samples.openTo(sampleId, storeId);
+        if (!"READY".equals(sample.status()) || !provider.code().equals(sample.providerCode()))
             throw VoiceSampleService.invalid("请选择当前门店已就绪的音色");
         if (!provider.supportsVoice(sample.providerVoiceId())) throw VoiceSampleService.invalid("该音色与当前合成模型不匹配，请使用原模型或重新创建音色");
         return sample.providerVoiceId();
