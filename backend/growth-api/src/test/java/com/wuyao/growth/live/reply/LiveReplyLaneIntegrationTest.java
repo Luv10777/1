@@ -48,7 +48,7 @@ class LiveReplyLaneIntegrationTest {
             .withDatabaseName("lane_test").withUsername("growth_owner").withPassword("test_owner_password");
 
     @Container
-    static final GenericContainer<?> MINIO = new GenericContainer<>("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z")
+    static final GenericContainer<?> MINIO = new GenericContainer<>("cgr.dev/chainguard/minio:latest")
             .withEnv("MINIO_ROOT_USER", "testadmin").withEnv("MINIO_ROOT_PASSWORD", "testadmin123")
             .withCommand("server /data").withExposedPorts(9000)
             .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000));
