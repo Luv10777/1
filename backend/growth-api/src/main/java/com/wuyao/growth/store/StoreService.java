@@ -1,5 +1,6 @@
 package com.wuyao.growth.store;
 
+import com.wuyao.growth.brand.BrandService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
@@ -20,6 +21,7 @@ public class StoreService {
     private final StoreMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final StoreAccessService accessService;
+    private final BrandService brandService;
 
     @Transactional(readOnly = true)
     public List<StoreDtos.StoreView> list(Long userId) {
@@ -43,6 +45,8 @@ public class StoreService {
         store.setPhone(trim(request.phone()));
         store.setBusinessHours(trim(request.businessHours()));
         store.setCreatedBy(user.getId());
+        // 未指定品牌时归到默认品牌；商户还没有品牌时保持为空。
+        store.setBrandId(brandService.resolveForStore(request.brandId()));
         try {
             store = storeRepository.save(store);
             StoreMember member = new StoreMember();
@@ -68,10 +72,15 @@ public class StoreService {
         if (request.version() != null && !request.version().equals(store.getVersion())) {
             throw BizException.of(ErrorCode.CONFLICT, "门店已被其他人更新，请刷新后重试");
         }
+        // 不带 brandId 的保存不改变归属，旧客户端不会把门店的品牌清掉。
+        // 先确认品牌再改门店：确认品牌会查库，不能让它把还没校验的门店改动提前写出去。
+        Long brandId = request.brandId() == null || request.brandId().equals(store.getBrandId())
+                ? store.getBrandId() : brandService.resolveForStore(request.brandId());
         store.setName(request.name().trim());
         store.setAddress(trim(request.address()));
         store.setPhone(trim(request.phone()));
         store.setBusinessHours(trim(request.businessHours()));
+        store.setBrandId(brandId);
         store.setUpdatedAt(Instant.now());
         try {
             return StoreDtos.StoreView.of(storeRepository.saveAndFlush(store));

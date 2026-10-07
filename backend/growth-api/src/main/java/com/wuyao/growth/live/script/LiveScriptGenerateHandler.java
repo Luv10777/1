@@ -1,5 +1,7 @@
 package com.wuyao.growth.live.script;
 
+import com.wuyao.growth.brand.BrandDtos;
+import com.wuyao.growth.brand.BrandService;
 import com.wuyao.growth.common.gateway.AiGateway;
 import com.wuyao.growth.common.gateway.ModelAlias;
 import com.wuyao.growth.common.gateway.ProviderRequest;
@@ -50,6 +52,7 @@ public class LiveScriptGenerateHandler implements TaskHandler {
     private final LiveSpeechQueue queue;
     private final LiveScriptService scripts;
     private final ProductService products;
+    private final BrandService brands;
     private final AiGateway gateway;
     private final TaskService tasks;
     private final TransactionTemplate transactions;
@@ -119,17 +122,19 @@ public class LiveScriptGenerateHandler implements TaskHandler {
                 .map(LiveSpeechItem::getText).orElse(null);
         return new Job(item.getTenantId(), item.getSessionId(), item.getProductId(), beat,
                 ScriptPlan.urgencyLevel(config), recent, previous, item.getCreatedBy(),
-                config == null ? null : config.persona());
+                config == null ? null : config.persona(),
+                // Read as it is now, like the product: a brand edited mid-session is picked up by the next segment.
+                brands.profileForStore(session.getStoreId()).orElse(null));
     }
 
     private String write(Job job, Long taskId) {
         ProductDtos.View product = products.get(job.productId(), job.userId());
-        String facts = ScriptPrompt.facts(product);
+        String facts = ScriptPrompt.material(product, job.brand());
         String rejection = null;
         for (int draft = 1; draft <= MAX_DRAFTS; draft++) {
             ProviderResult result = gateway.invoke(new ProviderRequest(ModelAlias.TEXT_WRITER, job.tenantId(),
-                    ScriptPrompt.user(product, job.beat(), job.urgency(), job.recent(), job.previous(), rejection),
-                    Map.of("system", ScriptPrompt.system(job.persona())),
+                    ScriptPrompt.user(product, job.brand(), job.beat(), job.urgency(), job.recent(), job.previous(), rejection),
+                    Map.of("system", ScriptPrompt.system(job.persona(), job.brand())),
                     // Stable per task and draft, so a retried task does not look like a new request.
                     "live-script-" + taskId + "-" + draft));
             // The placeholder adapter answers every capability but writes nothing: it has no "text".
@@ -163,7 +168,8 @@ public class LiveScriptGenerateHandler implements TaskHandler {
     }
 
     private record Job(Long tenantId, Long sessionId, Long productId, ScriptPlan.Beat beat, int urgency,
-                       List<String> recent, String previous, Long userId, LiveDtos.Persona persona) { }
+                       List<String> recent, String previous, Long userId, LiveDtos.Persona persona,
+                       BrandDtos.Profile brand) { }
 
     private static final class ModelUnavailable extends RuntimeException {
         private ModelUnavailable(String message) { super(message); }

@@ -1,5 +1,6 @@
 package com.wuyao.growth.live.script;
 
+import com.wuyao.growth.brand.BrandDtos;
 import com.wuyao.growth.live.LiveDtos;
 import com.wuyao.growth.product.ProductDtos;
 
@@ -29,6 +30,21 @@ public final class ScriptPrompt {
 
     public static String system(LiveDtos.Persona persona) {
         return system() + persona(persona);
+    }
+
+    /** @param brand the brand the store belongs to, or null; without one the prompt is exactly {@link #system(LiveDtos.Persona)} */
+    public static String system(LiveDtos.Persona persona, BrandDtos.Profile brand) {
+        return system() + brandRule(brand) + persona(persona);
+    }
+
+    /**
+     * How the brand's own description may be used. The description itself travels with the product
+     * facts as material; this only says what it is, and that the style picked for the host wins.
+     */
+    public static String brandRule(BrandDtos.Profile brand) {
+        return brand == null ? "" : """
+                9. 【品牌资料】是这家店所属品牌的介绍，和【商品资料】一样可以引用。可以自然地带出品牌名或口号，说话方式可以参考其中的“表达风格”；已经指定主播风格时以主播风格为准。不要整段照念，也不要补充其中没有的信息。
+                """;
     }
 
     /** Lines appended to a system prompt for the host's chosen style and name; empty when neither is usable. */
@@ -67,7 +83,13 @@ public final class ScriptPrompt {
      */
     public static String user(ProductDtos.View product, ScriptPlan.Beat beat, int urgencyLevel,
                               List<String> recent, String previous, String rejection) {
-        StringBuilder prompt = new StringBuilder(facts(product));
+        return user(product, null, beat, urgencyLevel, recent, previous, rejection);
+    }
+
+    /** @param brand the brand the store belongs to, or null when it has none */
+    public static String user(ProductDtos.View product, BrandDtos.Profile brand, ScriptPlan.Beat beat, int urgencyLevel,
+                              List<String> recent, String previous, String rejection) {
+        StringBuilder prompt = new StringBuilder(material(product, brand));
         prompt.append("\n【这一段要讲】").append(beat.instruction());
         prompt.append("\n【促单节奏】").append(ScriptPlan.urgencyInstruction(urgencyLevel));
         if (previous != null && !previous.isBlank()) {
@@ -95,6 +117,28 @@ public final class ScriptPrompt {
     }
 
     /** Everything the model may draw on, and therefore everything the guard checks its output against. */
+    public static String material(ProductDtos.View product, BrandDtos.Profile brand) {
+        return withBrand(facts(product), brand(brand));
+    }
+
+    /** Product facts followed by the brand's description, when there is one. */
+    public static String withBrand(String facts, String brand) {
+        return brand.isEmpty() ? facts : facts.isBlank() ? brand : facts + "\n\n" + brand;
+    }
+
+    /** What the brand says about itself, in the wording of the product facts; empty when the store has no brand. */
+    public static String brand(BrandDtos.Profile brand) {
+        if (brand == null) return "";
+        StringBuilder facts = new StringBuilder("【品牌资料】");
+        facts.append("\n品牌：").append(clip(brand.name(), 80));
+        line(facts, "口号", clip(brand.slogan(), 120));
+        line(facts, "简介", clip(brand.intro(), 300));
+        line(facts, "定位", clip(brand.positioning(), 200));
+        line(facts, "目标人群", clip(brand.targetAudience(), 200));
+        line(facts, "表达风格", clip(brand.languageStyle(), 200));
+        return facts.toString();
+    }
+
     public static String facts(ProductDtos.View product) {
         StringBuilder facts = new StringBuilder("【商品资料】");
         facts.append("\n名称：").append(product.name());

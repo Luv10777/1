@@ -1,5 +1,6 @@
 package com.wuyao.growth.live.reply;
 
+import com.wuyao.growth.brand.BrandService;
 import com.wuyao.growth.common.gateway.AiGateway;
 import com.wuyao.growth.common.gateway.ModelAlias;
 import com.wuyao.growth.common.gateway.ProviderRequest;
@@ -14,6 +15,7 @@ import com.wuyao.growth.live.player.LiveSpeechDtos;
 import com.wuyao.growth.live.player.LiveSpeechService;
 import com.wuyao.growth.live.script.LiveScriptService;
 import com.wuyao.growth.live.script.ScriptGuard;
+import com.wuyao.growth.live.script.ScriptPrompt;
 import com.wuyao.growth.live.speech.LiveSpeechItem;
 import com.wuyao.growth.live.speech.LiveSpeechItemRepository;
 import com.wuyao.growth.live.speech.LiveSpeechSynthesizeHandler;
@@ -67,6 +69,7 @@ public class LiveReplyGenerateHandler implements TaskHandler {
     private final LiveSpeechService speech;
     private final LiveSpeechSynthesizeHandler synthesizer;
     private final LiveScriptService scripts;
+    private final BrandService brands;
     private final AiGateway gateway;
     private final TransactionTemplate transactions;
 
@@ -140,7 +143,8 @@ public class LiveReplyGenerateHandler implements TaskHandler {
         return new Job(comment.getTenantId(), session.getId(), comment.commandId(), comment.getText(),
                 // The exact match is looked for among everything saved, not only what fits in a prompt.
                 LiveReplyKnowledge.exact(saved, comment.getText()), ReplyPrompt.shown(saved),
-                knowledge.productFacts(session, userId), comment.getVoice(), userId,
+                knowledge.productFacts(session, userId),
+                ScriptPrompt.brand(brands.profileForStore(session.getStoreId()).orElse(null)), comment.getVoice(), userId,
                 config == null ? null : config.persona(), scripts.narrating(session),
                 // The voice was fixed when the comment arrived; this only asks whether it was the co-host's.
                 LiveVoice.answerer(config).filter(voice -> voice.equals(comment.getVoice())).isPresent());
@@ -183,15 +187,16 @@ public class LiveReplyGenerateHandler implements TaskHandler {
         if (job.candidates().isEmpty() && job.facts().isBlank()) {
             return new Outcome(LiveComment.UNANSWERED, null, null, "本场没有可用于回答的资料", false);
         }
-        String system = ReplyPrompt.system(job.persona(), job.narrating(), job.byCohost());
+        String system = ReplyPrompt.system(job.persona(), job.narrating(), job.byCohost(), !job.brand().isEmpty());
+        String facts = ScriptPrompt.withBrand(job.facts(), job.brand());
         // What the merchant saved, and therefore what the model's wording is checked against.
         // The viewer's text is left out: a number a viewer typed is not a fact.
-        String material = ReplyPrompt.user("", job.candidates(), job.facts(), null);
+        String material = ReplyPrompt.user("", job.candidates(), facts, null);
         String rejection = null;
         boolean understood = false;
         boolean gap = false;
         for (int draft = 1; draft <= MAX_DRAFTS; draft++) {
-            String raw = write(job, ReplyPrompt.user(job.question(), job.candidates(), job.facts(), rejection), system,
+            String raw = write(job, ReplyPrompt.user(job.question(), job.candidates(), facts, rejection), system,
                     true, "live-reply-" + taskId + "-" + draft);
             if (raw == null) {
                 throw BizException.of(com.wuyao.growth.common.web.ErrorCode.INTERNAL_ERROR,
@@ -285,10 +290,13 @@ public class LiveReplyGenerateHandler implements TaskHandler {
         return result;
     }
 
-    /** @param exact the saved Q&A whose question is this comment word for word, or null */
+    /**
+     * @param exact the saved Q&A whose question is this comment word for word, or null
+     * @param brand the description of the store's brand as offered to the model; empty when it has none
+     */
     private record Job(Long tenantId, Long sessionId, String commandId, String question,
                        LiveReplyKnowledge.Candidate exact, List<LiveReplyKnowledge.Candidate> candidates,
-                       String facts, String voice, Long userId, LiveDtos.Persona persona, boolean narrating,
+                       String facts, String brand, String voice, Long userId, LiveDtos.Persona persona, boolean narrating,
                        boolean byCohost) { }
 
     /**
