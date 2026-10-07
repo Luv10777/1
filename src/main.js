@@ -3,6 +3,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { theme } from './stores/theme'
+import { auth } from './stores/auth'
 import './style.css'
 import './creative.css'
 import './image.css'
@@ -22,5 +23,13 @@ import './image-studio-polish.css'
 
 theme.apply()
 
-createApp(App).use(router).mount('#app')
+window.addEventListener('auth-expired', () => {
+  auth.clearSession()
+  if (router.currentRoute.value.name !== 'login') router.replace({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+})
 
+async function startApp() {
+  if (auth.isAuthenticated) await auth.restore()
+  createApp(App).use(router).mount('#app')
+}
+startApp()

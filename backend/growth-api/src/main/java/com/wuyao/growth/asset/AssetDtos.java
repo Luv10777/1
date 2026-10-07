@@ -21,6 +21,9 @@ public final class AssetDtos {
     public record UploadTicket(Long assetId, String storageKey, String uploadUrl) {
     }
 
+    public record DownloadTicket(Long assetId, String downloadUrl, Instant expiresAt) {
+    }
+
     // sha256 兼容旧请求；可信校验值始终由服务端从对象内容计算。
     public record ConfirmRequest(@PositiveOrZero Long sizeBytes,
                                  @Pattern(regexp = "[a-fA-F0-9]{64}") String sha256) {

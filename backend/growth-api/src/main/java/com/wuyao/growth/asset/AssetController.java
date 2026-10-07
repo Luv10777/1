@@ -40,4 +40,9 @@ public class AssetController {
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(assetService.list(page, size));
     }
+
+    @GetMapping("/{id}/download-url")
+    public ApiResponse<AssetDtos.DownloadTicket> downloadUrl(@PathVariable Long id) {
+        return ApiResponse.ok(assetService.presignDownload(id));
+    }
 }

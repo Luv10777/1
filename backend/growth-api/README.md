@@ -57,14 +57,13 @@ mvn spring-boot:run
 `init-local.ps1` 会生成随机 JWT 密钥，已有 `.env` 时保留原配置。
 首次运行需等待 PostgreSQL 健康检查通过；可用 `docker compose ps` 检查。
 
-Linux/macOS：
+Linux/macOS（脚本保留已有配置，自动生成随机 JWT 密钥）：
 
 ```bash
-cp .env.example .env
-printf '\nJWT_SECRET=%s\n' "$(openssl rand -base64 48)" >> .env
+bash scripts/init-local.sh
 docker compose up -d
 docker compose wait minio-init
-mvn spring-boot:run
+bash scripts/mvn-local.sh spring-boot:run
 ```
 
 `.env` 使用 Java properties 语法，值不要加引号。应用通过
@@ -78,9 +77,17 @@ mvn spring-boot:run
 如果本地已有服务占用默认端口，在 `.env` 设置 `POSTGRES_PORT`、`REDIS_PORT`、
 `MINIO_PORT`、`MINIO_CONSOLE_PORT`，同时把 `DB_URL` 和 `MINIO_ENDPOINT` 改为对应端口。
 
+声音样本可通过 `VOICE_SAMPLE_STORAGE=cos` 使用腾讯云 COS，配置凭证及浏览器跨域规则见
+[COS 声音样本配置](../../docs/tencent-cos-voice-storage.md)。旧 MinIO 文件仍按原 key 读取。
+
 ## 使用
 
-默认只启动 API，地址为 [本地 API](http://localhost:8080)。
+使用本地 `.env.example` 初始化后，API 地址为 [本地 API](http://localhost:18080)，
+PostgreSQL / Redis / MinIO / MinIO 控制台端口分别为 `35432 / 36379 / 39000 / 39001`。
+这些端口与 `deploy/docker-compose.dev.yml` 的旧开发环境分开。
+`mvn-local.sh` 自动选择 Homebrew 的 Java 21，无需修改全局 shell 配置。
+判断新版是否启动时，请同时检查 `18080/actuator/health` 和对应数据库的 Flyway 记录，
+不要把其他容器的 `8080` 健康检查当作本次代码的验证结果。
 需要后台任务时，再启动一个 worker；两个进程使用同一数据库和配置。
 
 ```bash
@@ -393,6 +400,43 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 ```bash
 mvn verify
 ```
+
+macOS 可用 `bash scripts/mvn-local.sh verify`。迁移状态查询：
+
+```bash
+docker compose exec postgres psql -U growth_owner -d wuyao_growth \
+  -c 'select version, description, success from flyway_schema_history order by installed_rank;'
+```
+
+### 门店、商品、知识库与直播配置
+
+门店通过 `/api/stores` 管理；创建门店后当前用户成为该门店成员。
+商品从 `/api/stores/{storeId}/products` 创建、分页查询，
+通过 `/api/products/{id}` 读取、修改和软删除，图片绑定素材 ID，商品 FAQ 使用 `/faqs`。
+知识集从 `/api/stores/{storeId}/knowledge-sets` 创建，问答保存后显式发布才进入门店知识上下文。
+
+直播配置从 `/api/stores/{storeId}/live-sessions` 创建，
+场次操作使用 `/api/live-sessions/{id}` 下的 `start / pause / resume / end / qa`。
+新增问答的 `persistMode` 默认 `SESSION`；`PRODUCT_FAQ` 的 `targetId` 是本场已选商品 ID，
+`STORE_KNOWLEDGE` 的 `targetId` 是当前门店 FAQ 知识集 ID（保存为草稿，需在知识库发布）。
+本场副本始终保留，开播按本场、商品、门店顺序生成快照，暂停恢复不会重读资产库。
+
+`parse-link` 目前仅设置房间标识；真实平台连接、弹幕接入、语义匹配与 AI 回答尚未接入。
+
+场次规则：一个门店同时只有一场进行中（`LIVE` 或 `PAUSED`，由唯一索引保证）；开始需要至少一件商品和一个可用的主播音色，
+直播间标识不是必填；`DELETE /api/live-sessions/{id}` 只能删除未开始的场次；`POST /api/live-sessions/{id}/duplicate`
+按已有场次的配置、商品和本场问答新建一场；场次列表只返回摘要，不带知识快照。
+
+播报与自动讲解：`POST /api/live-sessions/{id}/speech` 只登记一条播报并提交任务，返回的是受理状态而不是音频；
+`/auto-script`、`/auto-script/start`、`/auto-script/stop` 控制自动讲解，`/speech-items` 返回最近的播报及其进度。
+弹幕回复的任务在单独的队列 `LIVE_REPLY` 上：处理 `LIVE` 的 worker 进程会自动多起几个循环专门处理它，和讲解并行，
+`growth.worker.queues` 里不用写。同时处理几条弹幕由 `growth.live.reply-lane.concurrency` 决定（默认 3）。
+设 `growth.live.reply-lane.enabled=false` 可关掉（那就得另有进程处理 `LIVE_REPLY`）。
+
+话术生成（`LIVE_SCRIPT_GENERATE`）和语音合成（`LIVE_SPEECH_SYNTHESIZE`）都在队列 `LIVE` 上由 worker 执行，
+**没有 worker 时不会有任何声音**。文案模型通过 `TEXT_WRITER_URL / TEXT_WRITER_API_KEY / TEXT_WRITER_MODEL` 配置
+（OpenAI 兼容的 chat completions），缺失时自动讲解明确报错。细节见 [直播音频说明](../../docs/live-browser-audio-integration.md)。
+测试使用独立 Testcontainers 数据库，包括全链路保存、跨租户/门店拒绝、快照冻结和重复商品编辑。
 
 测试需要 Docker，会自动创建并清理独立 PostgreSQL 16 和 MinIO。
 覆盖认证并发、任务幂等与事务回滚、租约及重试上限、长任务续租、
