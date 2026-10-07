@@ -8,7 +8,7 @@ import ForbiddenView from './views/ForbiddenView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import CreativeWorkspaceView from './views/CreativeWorkspaceView.vue'
 import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
-import StoreInfoView from './views/StoreInfoView.vue'
+import StoresView from './views/StoresView.vue'
 import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
@@ -54,7 +54,7 @@ const routes = [
   { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { title: 'AI实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，AI 负责话术、声音克隆与弹幕自动回复。' } },
   { path: '/digital-human/history', name: 'digital-human-history', component: PlaceholderView, meta: { title: '直播弹幕与回复记录', eyebrow: 'CONTENT TOOLS / LIVE HISTORY', icon: '◷', description: '查看本场直播中的观众弹幕与 AI 回复内容。历史记录页将在后续版本接入完整数据。' } },
   { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
-  { path: '/merchants', name: 'merchants', component: StoreInfoView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
+  { path: '/merchants', name: 'merchants', component: StoresView, meta: { title: '门店库', eyebrow: 'ASSET CENTER', icon: '⌂', description: '查看和管理本商户的门店。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
   { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', eyebrow: 'ASSET CENTER', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为 AI 直播讲解与内容创作提供商品事实库。' } },

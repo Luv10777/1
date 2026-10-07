@@ -65,11 +65,14 @@
 .paper-nav .nav-group-icon { flex: 0 0 20px; }
 .paper-nav .nav-group-chevron { transform: rotate(-90deg); transition: transform .15s; }
 .paper-nav .nav-group-chevron.expanded { transform: rotate(0); }
-.paper-nav .nav-group-items { padding-left: 12px; }
-.paper-nav .nav-item { gap: 8px; padding: 8px 10px; color: var(--color-primary); font-family: var(--font-sans); font-size: 13px; font-weight: 500; letter-spacing: .01em; line-height: 1.65; }
+/* 二级菜单与一级拉开层次：不带图标，文字和一级的文字左对齐（12 内边距 + 20 图标 + 10 间距 = 42），
+   颜色退后一档，行距收紧成一组，组尾留白再接下一个一级。 */
+.paper-nav .nav-group-items { padding: 0 0 6px; }
+.paper-nav .nav-item { min-height: 34px; margin: 1px 0; padding: 5px 12px 5px 42px; color: var(--color-text-muted); font-family: var(--font-sans); font-size: 13px; font-weight: 500; letter-spacing: .01em; line-height: 1.65; }
+.paper-nav .nav-item:hover { color: var(--color-primary); }
 .paper-nav .nav-item.active { color: var(--color-accent-text); font-weight: 600; }
-.paper-nav .nav-item-icon { flex: 0 0 18px; font-size: 18px; }
-.paper-nav .nav-group-trigger .nav-group-icon, .paper-nav .nav-item-icon { color: currentColor; }
+.paper-nav .nav-item.active:before { top: 8px; bottom: 8px; }
+.paper-nav .nav-group-trigger .nav-group-icon { color: currentColor; }
 .paper-nav .nav-group-items .nav-item-label { font-family: var(--font-sans); }
 .paper-sidebar .tenant-copy strong { font-family: var(--font-sans); font-size: 12px; font-weight: 500; letter-spacing: .01em; }
 .paper-sidebar .tenant-copy small, .paper-sidebar .status-capsule small { letter-spacing: .08em; }

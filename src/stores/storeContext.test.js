@@ -69,3 +69,33 @@ test('update sends previous version and ignores mutations finished after logout'
   assert.equal(context.selectedStoreId.value, null)
   assert.deepEqual(context.stores.value, [])
 })
+
+test('editing another store keeps it in place and does not pull the user away from the store they are working in', async () => {
+  const listed = [{ id: 1, name: '一店', version: 0 }, { id: 2, name: '二店', version: 3 }, { id: 3, name: '三店', version: 0 }]
+  const context = createStoreContext({ list: async () => listed, update: async (id, values) => ({ id, ...values, version: values.version + 1 }) }, memoryStorage())
+  await context.setAccount('tenant:user')
+  assert.equal(context.selectedStoreId.value, 1)
+  await context.saveStore({ name: '二店（城东）' }, listed[1])
+  assert.deepEqual(context.stores.value.map(store => store.name), ['一店', '二店（城东）', '三店'])
+  assert.equal(context.stores.value[1].version, 4)
+  assert.equal(context.selectedStoreId.value, 1)
+})
+
+test('closing a store removes it, and closing the current one moves on to the first store left', async () => {
+  const closed = []
+  const context = createStoreContext({
+    list: async () => [{ id: 1, name: '一店' }, { id: 2, name: '二店' }, { id: 3, name: '三店' }],
+    archive: async id => { if (id === 3) throw new Error('这家店有正在进行的直播'); closed.push(id) },
+  }, memoryStorage())
+  await context.setAccount('tenant:user')
+  await context.archiveStore({ id: 2 })
+  assert.deepEqual(context.stores.value.map(store => store.id), [1, 3])
+  assert.equal(context.selectedStoreId.value, 1)
+  await context.archiveStore({ id: 1 })
+  assert.equal(context.selectedStoreId.value, 3)
+  // 服务端拒绝时什么都不变，原因原样交给页面显示。
+  await assert.rejects(context.archiveStore({ id: 3 }), /正在进行的直播/)
+  assert.deepEqual(context.stores.value.map(store => store.id), [3])
+  assert.equal(context.selectedStoreId.value, 3)
+  assert.deepEqual(closed, [2, 1])
+})

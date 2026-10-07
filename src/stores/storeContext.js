@@ -62,10 +62,26 @@ export function createStoreContext(api, storage) {
     loadSequence += 1
     storeLoading.value = false
     storeError.value = ''
-    stores.value = [...stores.value.filter(store => String(store.id) !== String(saved.id)), saved]
-    selectedStoreId.value = saved.id
+    // 修改后留在原来的位置；新建的排在最后，和服务端按建店先后返回的顺序一致。
+    const index = stores.value.findIndex(store => String(store.id) === String(saved.id))
+    stores.value = index < 0 ? [...stores.value, saved] : stores.value.map((store, at) => (at === index ? saved : store))
+    // 新建的门店顺手切过去；只是改了某家店的资料，不该把人从正在管理的门店带走。
+    if (!previous) selectedStoreId.value = saved.id
     return saved
   }
 
-  return { stores, selectedStoreId, selectedStoreRecord, selectedStore, storeLoading, storeError, loadStores, setAccount, saveStore, createStore: values => saveStore(values) }
+  /** 关店。关掉的如果正是当前门店，就切到剩下的第一家。 */
+  async function archiveStore(store) {
+    if (!account) throw new Error('请先登录')
+    const currentGeneration = generation
+    await api.archive(store.id)
+    if (currentGeneration !== generation) return
+    loadSequence += 1
+    storeLoading.value = false
+    storeError.value = ''
+    stores.value = stores.value.filter(item => String(item.id) !== String(store.id))
+    if (String(selectedStoreId.value) === String(store.id)) selectedStoreId.value = stores.value[0]?.id ?? null
+  }
+
+  return { stores, selectedStoreId, selectedStoreRecord, selectedStore, storeLoading, storeError, loadStores, setAccount, saveStore, archiveStore, createStore: values => saveStore(values) }
 }
