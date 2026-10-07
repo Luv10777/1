@@ -2,8 +2,9 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { selectedStore, stores } from '../stores/merchantContext'
+import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,11 @@ const accountOpen = ref(false)
 const searchOpen = ref(false)
 const search = ref('')
 const pageScroll = ref(null)
+const storeModalOpen = ref(false)
+const editingStore = ref(null)
+const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
+const needsStore = computed(() => connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
+function openStoreForm(store = null) { editingStore.value = store; storeModalOpen.value = true }
 // Reviews is a long-form feed and must use the shell's normal page scrolling.
 // Keeping it in the edge-workspace list applies overflow:hidden and prevents
 // the review stream from being scrolled once it exceeds the viewport.
@@ -27,7 +33,7 @@ watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll
 
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
 const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'auto_awesome', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
-const navItemIcons = { dashboard: 'dashboard', creative: 'auto_awesome', analytics: 'monitoring', diagnosis: 'insights', 'analytics-platforms': 'link', acquisition: 'person_search', 'image-create': 'image', 'video-create': 'movie', 'digital-human': 'record_voice_over', 'copy-rewrite': 'edit_note', 'video-analyze': 'query_stats', publishing: 'publish', 'matrix-publishing': 'hub', 'publishing-plan': 'calendar_month', 'publishing-platforms': 'link', messages: 'chat', reviews: 'reviews', 'service-rules': 'rule', 'geo-brand': 'location_on', 'geo-services': 'workspace_premium', 'geo-keywords': 'key', 'geo-visibility': 'visibility', merchants: 'storefront', brands: 'branding_watermark', assets: 'folder', knowledge: 'menu_book', works: 'gallery_thumbnail', billing: 'card_membership', 'merchant-alliance': 'handshake', notifications: 'notifications', tasks: 'task_alt', settings: 'settings', help: 'help_outline' }
+const navItemIcons = { dashboard: 'dashboard', creative: 'auto_awesome', analytics: 'monitoring', diagnosis: 'insights', 'analytics-platforms': 'link', acquisition: 'person_search', 'image-create': 'image', 'video-create': 'movie', 'digital-human': 'record_voice_over', 'copy-rewrite': 'edit_note', 'video-analyze': 'query_stats', publishing: 'publish', 'matrix-publishing': 'hub', 'publishing-plan': 'calendar_month', 'publishing-platforms': 'link', messages: 'chat', reviews: 'reviews', 'service-rules': 'rule', 'geo-brand': 'location_on', 'geo-services': 'workspace_premium', 'geo-keywords': 'key', 'geo-visibility': 'visibility', merchants: 'storefront', brands: 'branding_watermark', assets: 'folder', products: 'inventory_2', knowledge: 'menu_book', works: 'gallery_thumbnail', billing: 'card_membership', 'merchant-alliance': 'handshake', notifications: 'notifications', tasks: 'task_alt', settings: 'settings', help: 'help_outline' }
 
 const navGroups = [
   {
@@ -99,8 +105,9 @@ const navGroups = [
     items: [
       { name: 'merchants', label: '门店信息', path: '/merchants' },
       { name: 'brands', label: '品牌库', path: '/brands' },
-      { name: 'assets', label: '素材库', path: '/assets' },
+      { name: 'products', label: '商品库', path: '/assets/products' },
       { name: 'knowledge', label: '知识库', path: '/knowledge' },
+      { name: 'assets', label: '素材库', path: '/assets' },
       { name: 'works', label: '作品库', path: '/works' },
     ],
   },
@@ -194,7 +201,7 @@ const logout = () => { auth.logout(); router.push({ name: 'login' }) }
         <RouterLink to="/dashboard" class="brand-link" aria-label="一方志总览"><span class="brand-mark seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="brand-copy"><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
         <button class="icon-button sidebar-close" aria-label="关闭导航" @click="closeMenu">×</button>
       </div>
-      <div class="tenant-switcher paper-tenant"><span class="tenant-avatar">青</span><span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span><span class="chevron">⌄</span></div>
+      <div class="tenant-switcher paper-tenant"><span class="tenant-avatar">{{ selectedStoreRecord?.name?.slice(0, 1) || '店' }}</span><span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span><span class="chevron">⌄</span></div>
       <nav class="primary-nav paper-nav" aria-label="主导航">
         <div
           v-for="group in navGroups"
@@ -256,10 +263,27 @@ const logout = () => { auth.logout(); router.push({ name: 'login' }) }
       <div class="sidebar-footer paper-sidebar-footer"><RouterLink to="/creative" class="sidebar-create-button" @click="closeMenu"><span>＋</span><span>新建创作任务</span></RouterLink><div class="status-capsule paper-status"><span class="status-pulse" /><div><small>方志编撰中...</small><strong>AI 提炼烟火中</strong></div></div><div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ auth.user?.initials || '林' }}</span><span class="account-copy"><strong>{{ auth.user?.name || '林知夏' }}</strong><small>{{ auth.user?.role || '运营管理员' }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div></div>
     </aside>
     <main class="main-area paper-main">
-      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStore" class="header-store" aria-label="切换门店"><option v-for="store in stores" :key="store">{{ store }}</option></select><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span class="top-account-name">{{ auth.user?.name || '林知夏' }}</span></button></div></div></header>
-      <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }"><slot /></div>
+      <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><button v-if="selectedStoreRecord" class="icon-button" aria-label="编辑当前门店" title="编辑当前门店" @click="openStoreForm(selectedStoreRecord)"><span class="material-symbols-outlined" style="font-size:18px">edit</span></button><button class="icon-button" aria-label="新建门店" title="新建门店" @click="openStoreForm()">＋</button><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ auth.user?.initials || '林' }}</span><span class="top-account-name">{{ auth.user?.name || '林知夏' }}</span></button></div></div></header>
+      <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }">
+        <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
+          <span class="material-symbols-outlined">storefront</span>
+          <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : '先创建你的第一家门店' }}</h2>
+          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : '创建门店后，即可管理商品、维护知识库并配置 AI 实景直播。') }}</p>
+          <button v-if="storeError" class="secondary-button compact" @click="loadStores">重新加载</button>
+          <button v-else-if="!storeLoading" class="primary-button compact" @click="openStoreForm()">＋ 新建门店</button>
+        </section>
+        <slot v-else />
+      </div>
+      <StoreFormModal v-if="storeModalOpen" :store="editingStore" @close="storeModalOpen = false" />
       <div v-if="searchOpen" class="quick-search-scrim" @click="searchOpen = false"><section class="quick-search paper-search-modal" role="dialog" aria-modal="true" @click.stop><div class="quick-search-head"><span>⌕</span><input v-model="search" autofocus type="search" placeholder="搜索页面或功能" @keydown.esc="searchOpen = false" /><kbd>ESC</kbd></div><div class="quick-search-results"><RouterLink v-for="item in searchItems" :key="item.path" :to="item.path" class="quick-search-result" @click="searchOpen = false"><span>{{ item.icon }}</span><span>{{ item.label }}</span><span class="quick-search-result-path">{{ item.path }}</span></RouterLink><p v-if="!searchItems.length" class="quick-search-empty">没有匹配的页面</p></div></section></div>
       <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/dashboard" :class="{ active: route.name === 'dashboard' }"><span>⌂</span><small>总览</small></RouterLink><RouterLink to="/creative" :class="{ active: route.name === 'creative' }"><span>✎</span><small>创作</small></RouterLink><RouterLink to="/creative" class="mobile-bottom-primary"><span>＋</span></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span>▤</span><small>方志库</small></RouterLink><RouterLink to="/analytics" :class="{ active: route.name === 'analytics' }"><span>⌁</span><small>数据</small></RouterLink></nav>
     </main>
   </div>
 </template>
+
+<style scoped>
+.store-context-state { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px; text-align: center; }
+.store-context-state > span { font-size: 36px; color: var(--muted, #8d8478); }
+.store-context-state h2 { margin: 20px 0 8px; font-size: 22px; }
+.store-context-state p { margin: 0 0 22px; font-size: 14px; color: var(--muted, #8d8478); }
+</style>

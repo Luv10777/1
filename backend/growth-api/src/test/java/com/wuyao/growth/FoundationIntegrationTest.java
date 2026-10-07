@@ -10,6 +10,11 @@ import com.wuyao.growth.iam.dto.AuthDtos;
 import com.wuyao.growth.iam.service.AuthService;
 import com.wuyao.growth.iam.service.SmsSender;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.live.player.LivePlayerService;
+import com.wuyao.growth.live.player.LivePlayerWebSocketHandler;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.CloseStatus;
 import io.minio.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,6 +85,8 @@ class FoundationIntegrationTest {
 
     @Autowired AuthService auth;
     @MockitoBean SmsSender smsSender;
+    /** Never the real provider: a session can only start with a voice that is usable. */
+    @MockitoBean com.wuyao.growth.voice.VoiceProvider voiceProvider;
     @Autowired JwtService jwt;
     @Autowired TaskService tasks;
     @Autowired TaskRepository taskRepository;
@@ -88,6 +95,8 @@ class FoundationIntegrationTest {
     @Autowired AssetProbeHandler probe;
     @Autowired TransactionTemplate transactions;
     @Autowired MockMvc mvc;
+    @Autowired LivePlayerService livePlayers;
+    @Autowired LivePlayerWebSocketHandler playerSocketHandler;
     JdbcTemplate owner;
     MinioClient minio;
     Long tenantA;
@@ -103,6 +112,9 @@ class FoundationIntegrationTest {
         owner.execute("TRUNCATE tasks, assets, refresh_tokens, sms_codes, users, tenants RESTART IDENTITY CASCADE");
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('A') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('B') RETURNING id", Long.class);
+        when(voiceProvider.configured()).thenReturn(true);
+        when(voiceProvider.code()).thenReturn("stub-voice");
+        when(voiceProvider.builtInVoices()).thenReturn(List.of("voice-a"));
         minio = MinioClient.builder().endpoint(minioEndpoint()).credentials("testadmin", "testadmin123").build();
         if (!minio.bucketExists(BucketExistsArgs.builder().bucket("test-assets").build())) {
             minio.makeBucket(MakeBucketArgs.builder().bucket("test-assets").build());
@@ -210,6 +222,303 @@ class FoundationIntegrationTest {
         return owner.queryForObject("INSERT INTO users(tenant_id,username,name,password_hash) VALUES (?,?,?,?) RETURNING id",
                 Long.class, tenantA, "IntegrationUser", "IntegrationUser",
                 new BCryptPasswordEncoder(12).encode("integration-password"));
+    }
+
+    @Test
+    void storeProductKnowledgeAndLiveSessionPersistThroughTheirApis() throws Exception {
+        seedPasswordAccount();
+        String token = passwordLogin("integration-password").accessToken();
+        long store = apiData(post("/api/stores"), token, Map.of("name", "联调门店")).path("id").asLong();
+        long product = apiData(post("/api/stores/" + store + "/products"), token, Map.of(
+                "name", "蜂蜜", "type", "PHYSICAL", "category", "食品",
+                "price", 69, "saleUnit", "罐",
+                "faqs", List.of(Map.of("question", "保质期多久", "answer", "12 个月"))))
+                .path("id").asLong();
+        assertThat(apiData(get("/api/stores/" + store + "/products?keyword=69"), token, null)
+                .path("total").asInt()).isEqualTo(1);
+        long set = apiData(post("/api/stores/" + store + "/knowledge-sets"), token,
+                Map.of("name", "门店规则", "kind", "FAQ")).path("id").asLong();
+        long entry = apiData(post("/api/knowledge-sets/" + set + "/entries"), token,
+                Map.of("question", "营业时间", "answer", "每天 9 点至 18 点"))
+                .path("id").asLong();
+        assertThat(apiData(get("/api/stores/" + store + "/knowledge-context"), token, null)
+                .path("entries").size()).isZero();
+        apiData(post("/api/knowledge-sets/" + set + "/publish"), token, null);
+        Map<String, Object> configuration = new LinkedHashMap<>(Map.of(
+                "tone", Map.of("opening", "直接报价", "pain", List.of("需求场景代入", "顾虑问题拆解"),
+                        "detail", List.of("核心特点讲解", "售后与保障")),
+                "urgency", 2.75, "antiRepeat", false, "dailyHours", 4, "rotateRoles", false,
+                "rotationSelection", List.of("builtin:voice-a"),
+                "voiceRoles", List.of(Map.of("id", "builtin:voice-a", "role", "host"))));
+        var createdSession = apiData(post("/api/stores/" + store + "/live-sessions"), token,
+                Map.of("name", "联调场次", "roomId", "123456", "productIds", List.of(product),
+                        "config", configuration));
+        long session = createdSession.path("id").asLong();
+        String path = "/api/live-sessions/" + session;
+        var json = new ObjectMapper();
+        // Each HTTP request has its own transaction: GET must hydrate the typed configuration from JSONB.
+        assertThat(apiData(get(path), token, null).path("config")).isEqualTo(json.valueToTree(configuration));
+        long originalSessionVersion = createdSession.path("version").asLong();
+        configuration.put("urgency", 4.25);
+        var updatedSession = apiData(patch(path), token,
+                Map.of("version", originalSessionVersion, "config", configuration));
+        assertThat(updatedSession.path("version").asLong()).isGreaterThan(originalSessionVersion);
+        assertThat(apiData(get(path), token, null).path("config")).isEqualTo(json.valueToTree(configuration));
+        mvc.perform(patch(path).header("Authorization", "Bearer " + token).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("version", originalSessionVersion, "name", "过期覆盖"))))
+                .andExpect(jsonPath("$.code").value(1409));
+        assertThat(apiData(get(path), token, null).path("name").asText()).isEqualTo("联调场次");
+
+        var firstQa = apiData(post(path + "/qa"), token, Map.of("question", "本场优惠", "answer", "买二送一"));
+        String firstQaPath = path + "/qa/" + firstQa.path("id").asLong();
+        long originalQaVersion = firstQa.path("version").asLong();
+        var editedQa = apiData(put(firstQaPath), token,
+                Map.of("question", "本场优惠怎么用", "answer", "买二送一，仅限今天", "version", originalQaVersion));
+        assertThat(editedQa.path("version").asLong()).isGreaterThan(originalQaVersion);
+        var restoredQa = apiData(get(path + "/qa"), token, null).get(0);
+        assertThat(restoredQa.path("question").asText()).isEqualTo("本场优惠怎么用");
+        assertThat(restoredQa.path("answer").asText()).isEqualTo("买二送一，仅限今天");
+        assertThat(restoredQa.path("version")).isEqualTo(editedQa.path("version"));
+        mvc.perform(put(firstQaPath).header("Authorization", "Bearer " + token).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("question", "本场优惠", "answer", "过期修改",
+                                "version", originalQaVersion))))
+                .andExpect(jsonPath("$.code").value(1409));
+
+        var disposableQa = apiData(post(path + "/qa"), token, Map.of("question", "临时问题", "answer", "待删除"));
+        String disposableQaPath = path + "/qa/" + disposableQa.path("id").asLong();
+        long deleteVersion = disposableQa.path("version").asLong();
+        mvc.perform(delete(disposableQaPath).param("version", String.valueOf(deleteVersion + 1))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.code").value(1409));
+        assertThat(apiData(get(path + "/qa"), token, null).size()).isEqualTo(2);
+        apiData(delete(disposableQaPath).param("version", String.valueOf(deleteVersion)), token, null);
+        assertThat(apiData(get(path + "/qa"), token, null).size()).isEqualTo(1);
+        assertThat(owner.queryForObject("SELECT count(*) FROM live_session_qa WHERE id=?", Integer.class,
+                disposableQa.path("id").asLong())).isZero();
+        apiData(post(path + "/qa"), token, Map.of("question", "如何保存", "answer", "常温避光",
+                "persistMode", "PRODUCT_FAQ", "targetId", product));
+        apiData(post(path + "/qa"), token, Map.of("question", "停车问题", "answer", "门口可停车",
+                "persistMode", "STORE_KNOWLEDGE", "targetId", set));
+        assertThat(apiData(get("/api/products/" + product + "/faqs"), token, null).size()).isEqualTo(2);
+        assertThat(apiData(get("/api/knowledge-sets/" + set + "/entries"), token, null)
+                .path("total").asInt()).isEqualTo(2);
+        assertThat(apiData(get("/api/stores/" + store + "/live-sessions"), token, null).size()).isEqualTo(1);
+        var started = apiData(post(path + "/start"), token, null);
+        assertThat(started.path("status").asText()).isEqualTo("LIVE");
+        // 3 本场问答 + 2 商品问答 + 1 已发布门店规则；沉淀到门店的新草稿不会自动发布。
+        assertThat(started.path("knowledge").size()).isEqualTo(6);
+        assertThat(started.path("knowledge").get(0).path("priority").asInt()).isEqualTo(1);
+        assertThat(started.path("knowledge").get(5).path("priority").asInt()).isEqualTo(3);
+        apiData(patch("/api/knowledge-entries/" + entry), token, Map.of("answer", "次日停业"));
+        apiData(post(path + "/pause"), token, null);
+        var resumed = apiData(post(path + "/resume"), token, null);
+        assertThat(resumed.path("knowledge")).isEqualTo(started.path("knowledge"));
+        assertThat(apiData(post(path + "/end"), token, null).path("status").asText()).isEqualTo("ENDED");
+        assertThat(owner.queryForObject("SELECT count(*) FROM live_session_knowledge_snapshots WHERE session_id=?",
+                Integer.class, session)).isEqualTo(6);
+        mvc.perform(post(path + "/start").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.code").value(1409));
+    }
+
+    @Test
+    void storeMembershipAndTenantIsolationProtectAllNewBusinessResources() throws Exception {
+        Long user = seedPasswordAccount();
+        String token = jwt.issueAccessToken(user, tenantA, null);
+        long store = apiData(post("/api/stores"), token, Map.of("name", "第一家店")).path("id").asLong();
+        long otherStore = apiData(post("/api/stores"), token, Map.of("name", "第二家店")).path("id").asLong();
+        long product = apiData(post("/api/stores/" + store + "/products"), token, Map.of(
+                "name", "团购券", "type", "VOUCHER", "category", "餐饮", "price", 19.9, "saleUnit", "张"))
+                .path("id").asLong();
+        long session = apiData(post("/api/stores/" + store + "/live-sessions"), token,
+                Map.of("name", "场次", "productIds", List.of(product))).path("id").asLong();
+        long set = apiData(post("/api/stores/" + store + "/knowledge-sets"), token,
+                Map.of("name", "规则")).path("id").asLong();
+        String stranger = jwt.issueAccessToken(999L, tenantA, null);
+        String differentTenant = jwt.issueAccessToken(999L, tenantB, null);
+        for (String path : List.of("/api/stores/" + store, "/api/products/" + product,
+                "/api/live-sessions/" + session, "/api/knowledge-sets/" + set)) {
+            mvc.perform(get(path).header("Authorization", "Bearer " + stranger))
+                    .andExpect(jsonPath("$.code").value(1403));
+            mvc.perform(get(path).header("Authorization", "Bearer " + differentTenant))
+                    .andExpect(jsonPath("$.code").value(1404));
+        }
+        mvc.perform(post("/api/stores/" + otherStore + "/live-sessions")
+                        .header("Authorization", "Bearer " + token).contentType("application/json")
+                        .content(new ObjectMapper().writeValueAsString(Map.of(
+                                "name", "禁止跨店选品", "productIds", List.of(product)))))
+                .andExpect(jsonPath("$.code").value(1403));
+        // 身份隔离也必须由真实数据库保证。
+        try (Connection connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), "growth_app", "growth_dev_local")) {
+            connection.createStatement().execute("SELECT set_config('app.tenant_id', '" + tenantB + "', false)");
+            for (String table : List.of("stores", "products", "knowledge_sets", "live_sessions")) {
+                try (var result = connection.createStatement().executeQuery("SELECT count(*) FROM " + table)) {
+                    assertThat(result.next()).isTrue();
+                    assertThat(result.getLong(1)).isZero();
+                }
+            }
+        }
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode apiData(
+            org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request,
+            String token, Object body) throws Exception {
+        request.header("Authorization", "Bearer " + token);
+        if (body != null) request.contentType("application/json").content(new ObjectMapper().writeValueAsString(body));
+        var response = mvc.perform(request).andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200)).andReturn().getResponse();
+        return new ObjectMapper().readTree(response.getContentAsString()).path("data");
+    }
+
+    @Test
+    void voiceUploadReturnsPersistedIdAndSampleLifecycleRetainsConsentAudit() throws Exception {
+        Long user = seedPasswordAccount();
+        String token = jwt.issueAccessToken(user, tenantA, null);
+        long store = apiData(post("/api/stores"), token, Map.of("name", "声音样本门店")).path("id").asLong();
+        String collection = "/api/stores/" + store + "/voice-samples";
+        var ticket = apiData(post(collection + "/upload-url"), token,
+                Map.of("name", "店主声音", "mimeType", "audio/wav", "consent", true));
+        // Hibernate merge may return a different instance; the API must expose its generated ID.
+        assertThat(ticket.path("sample").hasNonNull("id")).isTrue();
+        long id = ticket.path("sample").path("id").asLong();
+        assertThat(id).isPositive();
+        String samplePath = "/api/voice-samples/" + id;
+        String key = ticket.path("sample").path("storageKey").asText();
+        assertThat(key).satisfiesAnyOf(value -> assertThat(value).startsWith("t" + tenantA + "/voice-samples/"),
+                value -> assertThat(value).startsWith("cos/t" + tenantA + "/voice-samples/"));
+        assertThat(ticket.path("sample").path("consentBy").asLong()).isEqualTo(user);
+        assertThat(ticket.path("sample").path("consentAt").asText()).isNotBlank();
+        assertThat(ticket.path("sample").path("consentText").asText())
+                .isEqualTo("我确认这是本人声音，或已获得声音所有者授权用于声音克隆与直播播报。");
+        var auditBefore = owner.queryForMap("SELECT consent_at, consent_by, consent_text, storage_key FROM voice_samples WHERE id=?", id);
+        assertThat(owner.queryForObject("SELECT tenant_id FROM voice_samples WHERE id=?", Long.class, id)).isEqualTo(tenantA);
+        assertThat(owner.queryForObject("SELECT store_id FROM voice_samples WHERE id=?", Long.class, id)).isEqualTo(store);
+        var listed = apiData(get(collection), token, null);
+        assertThat(listed.size()).isEqualTo(1);
+        assertThat(listed.get(0).path("id").asLong()).isEqualTo(id);
+        assertThat(listed.get(0).path("status").asText()).isEqualTo("PENDING_UPLOAD");
+
+        byte[] wav = com.wuyao.growth.live.audio.PcmAudio.wav(new byte[24000 * 2], 24000);
+        var putRequest = java.net.http.HttpRequest.newBuilder(java.net.URI.create(ticket.path("uploadUrl").asText()))
+                .header("Content-Type", "audio/wav")
+                .PUT(java.net.http.HttpRequest.BodyPublishers.ofByteArray(wav)).build();
+        var uploaded = java.net.http.HttpClient.newHttpClient().send(putRequest, java.net.http.HttpResponse.BodyHandlers.discarding());
+        assertThat(uploaded.statusCode()).isEqualTo(200);
+        var confirmed = apiData(post(samplePath + "/confirm"), token, Map.of("sizeBytes", wav.length));
+        assertThat(confirmed.path("id").asLong()).isEqualTo(id);
+        assertThat(confirmed.path("status").asText()).isEqualTo("UPLOADED");
+        assertThat(apiData(get(samplePath + "/download-url"), token, null).path("downloadUrl").asText()).isNotBlank();
+        assertThat(apiData(patch(samplePath), token, Map.of("name", "修改后的声音")).path("name").asText())
+                .isEqualTo("修改后的声音");
+        assertThat(apiData(get(collection), token, null).get(0).path("name").asText()).isEqualTo("修改后的声音");
+
+        apiData(delete(samplePath), token, null);
+        assertThat(apiData(get(collection), token, null).size()).isZero();
+        assertThat(owner.queryForObject("SELECT status FROM voice_samples WHERE id=?", String.class, id)).isEqualTo("DELETED");
+        assertThat(owner.queryForMap("SELECT consent_at, consent_by, consent_text, storage_key FROM voice_samples WHERE id=?", id))
+                .isEqualTo(auditBefore);
+        assertThatThrownBy(() -> minio.statObject(StatObjectArgs.builder().bucket("test-assets").object(key).build()))
+                .isInstanceOf(io.minio.errors.ErrorResponseException.class)
+                .satisfies(error -> assertThat(((io.minio.errors.ErrorResponseException) error).errorResponse().code()).isEqualTo("NoSuchKey"));
+        mvc.perform(get(samplePath + "/download-url").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.code").value(1404));
+    }
+
+    @Test
+    void voiceConsentMembershipAndDatabaseRlsPreventUnauthorizedAccess() throws Exception {
+        Long user = seedPasswordAccount();
+        String token = jwt.issueAccessToken(user, tenantA, null);
+        long store = apiData(post("/api/stores"), token, Map.of("name", "隔离测试门店")).path("id").asLong();
+        String collection = "/api/stores/" + store + "/voice-samples";
+        mvc.perform(post(collection + "/upload-url").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content("{\"name\":\"未授权声音\",\"mimeType\":\"audio/wav\",\"consent\":false}"))
+                .andExpect(jsonPath("$.code").value(1400));
+        assertThat(owner.queryForObject("SELECT count(*) FROM voice_samples", Integer.class)).isZero();
+        long id = apiData(post(collection + "/upload-url"), token,
+                Map.of("name", "授权声音", "mimeType", "audio/wav", "consent", true)).path("sample").path("id").asLong();
+        assertThat(id).isPositive();
+        String stranger = jwt.issueAccessToken(999L, tenantA, null);
+        String otherTenant = jwt.issueAccessToken(999L, tenantB, null);
+        for (var identity : Map.of(stranger, 1403, otherTenant, 1404).entrySet()) {
+            mvc.perform(get(collection).header("Authorization", "Bearer " + identity.getKey()))
+                    .andExpect(jsonPath("$.code").value(identity.getValue()));
+            mvc.perform(post(collection + "/upload-url").header("Authorization", "Bearer " + identity.getKey())
+                            .contentType("application/json").content("{\"name\":\"声音\",\"mimeType\":\"audio/wav\",\"consent\":true}"))
+                    .andExpect(jsonPath("$.code").value(identity.getValue()));
+            mvc.perform(patch("/api/voice-samples/" + id).header("Authorization", "Bearer " + identity.getKey())
+                            .contentType("application/json").content("{\"name\":\"越权修改\"}"))
+                    .andExpect(jsonPath("$.code").value(identity.getValue()));
+            mvc.perform(delete("/api/voice-samples/" + id).header("Authorization", "Bearer " + identity.getKey()))
+                    .andExpect(jsonPath("$.code").value(identity.getValue()));
+        }
+        assertThat(owner.queryForObject("SELECT name FROM voice_samples WHERE id=?", String.class, id)).isEqualTo("授权声音");
+        assertThat(owner.queryForObject("SELECT count(*) FROM voice_samples", Integer.class)).isEqualTo(1);
+        try (Connection connection = DriverManager.getConnection(POSTGRES.getJdbcUrl(), "growth_app", "growth_dev_local")) {
+            connection.createStatement().execute("SELECT set_config('app.tenant_id', '" + tenantA + "', false)");
+            try (var rows = connection.createStatement().executeQuery("SELECT count(*) FROM voice_samples")) {
+                assertThat(rows.next()).isTrue(); assertThat(rows.getLong(1)).isEqualTo(1);
+            }
+            connection.createStatement().execute("SELECT set_config('app.tenant_id', '" + tenantB + "', false)");
+            try (var rows = connection.createStatement().executeQuery("SELECT count(*) FROM voice_samples")) {
+                assertThat(rows.next()).isTrue(); assertThat(rows.getLong(1)).isZero();
+            }
+            assertThat(connection.createStatement().executeUpdate("UPDATE voice_samples SET name='越权' WHERE id=" + id)).isZero();
+        }
+    }
+
+    @Test
+    void playerPairingScopesTokenAndRequiresRealHeartbeatWithoutChangingDraftVersion() throws Exception {
+        Long user = seedPasswordAccount();
+        String token = jwt.issueAccessToken(user, tenantA, null);
+        long store = apiData(post("/api/stores"), token, Map.of("name", "播报测试门店")).path("id").asLong();
+        long session = apiData(post("/api/stores/" + store + "/live-sessions"), token,
+                Map.of("name", "声音测试场次")).path("id").asLong();
+        String path = "/api/live-sessions/" + session + "/player";
+        var pairing = apiData(post(path + "/pairing"), token, null);
+        String playerToken = pairing.path("token").asText();
+        assertThat(playerToken).isNotBlank();
+        assertThat(owner.queryForObject("select token_hash from live_player_pairings", String.class))
+                .hasSize(64).isNotEqualTo(playerToken);
+        assertThat(apiData(get(path + "/status"), token, null).path("connected").asBoolean()).isFalse();
+        long version = apiData(get("/api/live-sessions/" + session), token, null).path("version").asLong();
+        assertThat(livePlayers.authenticate(playerToken).sessionId()).isEqualTo(session);
+        assertThat(TenantContext.get()).isNull();
+        assertThatThrownBy(() -> livePlayers.authenticate(playerToken + "tampered")).isInstanceOf(BizException.class);
+        // Owner access is still required for controls even if somebody knows the numeric session ID.
+        mvc.perform(post(path + "/pairing").header("Authorization", "Bearer " + jwt.issueAccessToken(999L, tenantA, null)))
+                .andExpect(jsonPath("$.code").value(1403));
+        mvc.perform(get(path + "/status").header("Authorization", "Bearer " + jwt.issueAccessToken(999L, tenantB, null)))
+                .andExpect(jsonPath("$.code").value(1404));
+        // Opening the socket does not invent a playback-ready heartbeat.
+        WebSocketSession socket = mock(WebSocketSession.class);
+        when(socket.getUri()).thenReturn(java.net.URI.create("ws://localhost/api/player/ws?token=" + playerToken));
+        when(socket.getAttributes()).thenReturn(new ConcurrentHashMap<>());
+        when(socket.isOpen()).thenReturn(true);
+        playerSocketHandler.afterConnectionEstablished(socket);
+        assertThat(apiData(get(path + "/status"), token, null).path("connected").asBoolean()).isFalse();
+        playerSocketHandler.handleMessage(socket, new TextMessage("{\"type\":\"heartbeat\",\"deviceType\":\"Android Chrome\"}"));
+        var connected = apiData(get(path + "/status"), token, null);
+        assertThat(connected.path("connected").asBoolean()).isTrue();
+        assertThat(connected.path("playerPaired").asBoolean()).isTrue();
+        assertThat(connected.path("playerLastHeartbeatAt").asText()).isNotBlank();
+        assertThat(apiData(get("/api/live-sessions/" + session), token, null).path("version").asLong()).isEqualTo(version);
+        var command = Map.of("id", "audio-1", "mode", "APPEND", "text", "仅测试提示音",
+                "audioUrl", "/api/player/test-audio.wav", "durationMillis", 1, "pauseOffsetsMillis", List.of());
+        assertThat(apiData(post(path + "/commands"), token, command).path("enqueued").asBoolean()).isTrue();
+        assertThat(apiData(post(path + "/commands"), token, command).path("enqueued").asBoolean()).isFalse();
+        assertThat(apiData(get(path + "/status"), token, null).path("queueLength").asInt()).isEqualTo(1);
+        playerSocketHandler.handleMessage(socket, new TextMessage("{\"type\":\"ack\",\"id\":\"audio-1\"}"));
+        assertThat(apiData(get(path + "/status"), token, null).path("queueLength").asInt()).isZero();
+        var badCommand = Map.of("id", "audio-2", "mode", "APPEND", "text", "外部地址",
+                "audioUrl", "http://127.0.0.1/private", "durationMillis", 1000, "pauseOffsetsMillis", List.of());
+        mvc.perform(post(path + "/commands").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content(new ObjectMapper().writeValueAsString(badCommand)))
+                .andExpect(jsonPath("$.code").value(1400));
+        apiData(post(path + "/revoke"), token, null);
+        assertThatThrownBy(() -> livePlayers.authenticate(playerToken)).isInstanceOf(BizException.class);
+        verify(socket).close(CloseStatus.POLICY_VIOLATION);
+        assertThat(apiData(get(path + "/status"), token, null).path("connected").asBoolean()).isFalse();
+        mvc.perform(get("/api/player/test-audio.wav")).andExpect(status().isOk())
+                .andExpect(content().contentType("audio/wav"));
     }
 
     private AuthDtos.TokenPair passwordLogin(String password) {

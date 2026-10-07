@@ -106,9 +106,12 @@ export const auth = {
       const me = await authService.getCurrentUser()
       state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name }
       writeUser(state.user)
+      // 校验过程中 request.js 可能已经换过 token，内存里的那份要跟上。
+      state.token = readTokens()
       return true
-    } catch {
-      this.clearSession()
+    } catch (error) {
+      // 只有服务端明确判定未登录才清会话；网络错误、后端重启时保留登录态。
+      if (error?.code === 1401) this.clearSession()
       return false
     }
   },

@@ -120,7 +120,7 @@ services:
         --growth.storage.secret-key=${MINIO_PASSWORD}
         --growth.storage.bucket=${MINIO_BUCKET}
         --growth.worker.enabled=true
-        --growth.worker.queues=DEFAULT,IMAGE,VIDEO
+        --growth.worker.queues=DEFAULT,IMAGE,VIDEO,LIVE
         --server.port=8090
 
   web:

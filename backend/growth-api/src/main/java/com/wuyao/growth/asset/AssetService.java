@@ -74,6 +74,19 @@ public class AssetService {
     }
 
     @Transactional(readOnly = true)
+    public AssetDtos.DownloadTicket presignDownload(Long assetId) {
+        Long tenantId = TenantContext.require();
+        Asset asset = repository.findById(assetId)
+                .filter(value -> tenantId.equals(value.getTenantId()))
+                .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
+        if (!"READY".equals(asset.getStatus())) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "素材尚未上传完成");
+        }
+        return new AssetDtos.DownloadTicket(assetId, storage.presignGet(asset.getStorageKey(), presignTtl),
+                java.time.Instant.now().plus(presignTtl));
+    }
+
+    @Transactional(readOnly = true)
     public PageResult<AssetDtos.AssetView> list(int page, int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw BizException.of(ErrorCode.BAD_REQUEST, "page 必须非负，size 必须在 1 到 100 之间");

@@ -27,7 +27,7 @@ spring:
     user: ${DB_MIGRATE_USER:${DB_USER:growth_app}}
     password: ${DB_MIGRATE_PASSWORD:${DB_PASSWORD:}}
     placeholders:
-      # V1 用它创建应用角色，必须和 spring.datasource.password 一致
+      # V6 同步应用角色口令，必须和 spring.datasource.password 一致
       app_db_password: ${DB_PASSWORD:growth_dev_local}
 
   data:
@@ -46,6 +46,30 @@ server:
 
 # ---- 平台自有配置 ----
 growth:
+  ai:
+    # 文案能力（TEXT_WRITER），直播自动讲解用它写话术。任何 OpenAI 兼容的 chat completions 接口都可以。
+    # 三项缺任何一项都视为未配置：自动讲解会明确报错，不会用占位内容顶替。
+    writer:
+      url: ${TEXT_WRITER_URL:}
+      api-key: ${TEXT_WRITER_API_KEY:}
+      model: ${TEXT_WRITER_MODEL:}
+      temperature: ${TEXT_WRITER_TEMPERATURE:0.8}
+      max-tokens: ${TEXT_WRITER_MAX_TOKENS:800}
+      timeout-seconds: ${TEXT_WRITER_TIMEOUT_SECONDS:60}
+      # 原样并入请求体的 JSON，用来传供应商自己的开关。默认带思考的模型写一段口播要几十秒，
+      # 直播用不上，应当关掉，例如通义千问：{"enable_thinking":false}
+      extra-body: ${TEXT_WRITER_EXTRA_BODY:}
+      # 需要模型先想清楚再答的调用（判断弹幕要不要回、该怎么回）额外并入的 JSON，盖过上面的默认值。
+      # 留空则这类调用和其他调用一样。通义千问：{"enable_thinking":true}
+      reasoning-extra-body: ${TEXT_WRITER_REASONING_EXTRA_BODY:}
+  voice:
+    sample-storage: ${VOICE_SAMPLE_STORAGE:minio}
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:}
+      clone-url: ${DASHSCOPE_CLONE_URL:}
+      websocket-url: ${DASHSCOPE_WEBSOCKET_URL:}
+      model: ${DASHSCOPE_TTS_MODEL:cosyvoice-v3.5-flash}
+      builtin: ${DASHSCOPE_BUILTIN_VOICE:}
   jwt:
     # 至少 32 字节。生产必须用环境变量注入。
     secret: ${JWT_SECRET:}
@@ -63,6 +87,11 @@ growth:
       sign-name: ${ALIYUN_SMS_SIGN_NAME:}
       template-code: ${ALIYUN_SMS_TEMPLATE_CODE:}
   storage:
+    cos:
+      secret-id: ${COS_SECRET_ID:}
+      secret-key: ${COS_SECRET_KEY:}
+      region: ${COS_REGION:ap-shanghai}
+      bucket: ${COS_BUCKET:}
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
@@ -71,7 +100,11 @@ growth:
   worker:
     # api 进程设 false，worker 进程设 true。同一个 jar，两条启动命令。
     enabled: ${WORKER_ENABLED:false}
-    queues: DEFAULT,IMAGE,VIDEO
+    # LIVE 是直播话术生成和语音合成；直播间多时可单独起一个只处理 LIVE 的 worker。
+    # 列表里有 LIVE 的进程会自动多跑几条线处理 LIVE_REPLY（弹幕回复），不用写进这里。
+    # 同时处理几条弹幕：growth.live.reply-lane.concurrency（默认 3）；
+    # 不想要可设 growth.live.reply-lane.enabled=false，那样就得另有进程处理 LIVE_REPLY。
+    queues: DEFAULT,IMAGE,VIDEO,LIVE
     poll-interval: 2000
     batch-size: 5
     lease: 30m

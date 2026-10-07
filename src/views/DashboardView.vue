@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { auth } from '../stores/auth'
-import { selectedStore, stores } from '../stores/merchantContext'
+import { selectedStoreId, stores } from '../stores/merchantContext'
 
 const month = new Date().getMonth()
 const seasons = [
@@ -27,7 +27,7 @@ const pulseBars = [32, 48, 41, 68, 57, 73, 62, 86, 69, 92, 78, 96]
 
 <template>
   <div class="dashboard-page paper-page">
-    <div class="page-heading dashboard-heading"><div><p class="eyebrow">今日 · {{ today }}</p><h1>{{ greeting }}，{{ auth.user?.name || '林知夏' }}</h1><p class="page-intro">一方水土，一方志。今天也为门店留下几笔真实而有用的记录。</p></div><div class="heading-controls"><label class="store-select"><span class="eyebrow">当前门店</span><select v-model="selectedStore"><option v-for="store in stores" :key="store">{{ store }}</option></select><span class="select-chevron">⌄</span></label><RouterLink to="/creative" class="primary-button compact">＋ 新建内容</RouterLink></div></div>
+    <div class="page-heading dashboard-heading"><div><p class="eyebrow">今日 · {{ today }}</p><h1>{{ greeting }}，{{ auth.user?.name || '林知夏' }}</h1><p class="page-intro">一方水土，一方志。今天也为门店留下几笔真实而有用的记录。</p></div><div class="heading-controls"><label class="store-select"><span class="eyebrow">当前门店</span><select v-model="selectedStoreId"><option v-if="!stores.length" :value="null">尚无门店</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><span class="select-chevron">⌄</span></label><RouterLink to="/creative" class="primary-button compact">＋ 新建内容</RouterLink></div></div>
     <section class="season-banner paper-banner"><div class="season-mark">{{ season.name }}</div><div><p class="eyebrow accent">{{ nextTerm }}经营灵感 · {{ today }}</p><h2>{{ season.idea }} · 为{{ nextTerm }}做准备</h2><p>把一碗热气、一束花、一段慢下来的时间，写进今天的内容里。</p></div><RouterLink to="/creative" class="secondary-button">查看灵感 →</RouterLink></section>
     <section class="creation-hero paper-hero"><div class="creation-copy"><p class="eyebrow accent">一方志 · 快速刊印</p><h2>拖入店铺素材，<br /><span>10 分钟生成全网视频。</span></h2><p>AI 识别店铺特征，提炼真实烟火，自动适配抖音、小红书与视频号。</p><RouterLink to="/publishing" class="primary-button">开始一次创作 <span>→</span></RouterLink></div><div class="hero-steps"><div class="hero-step"><span>01</span><b>上传素材</b><small>照片 / 视频 / 菜单</small></div><div class="hero-line" /><div class="hero-step"><span>02</span><b>AI 提炼</b><small>识别门店特征</small></div><div class="hero-line" /><div class="hero-step"><span>03</span><b>一键刊印</b><small>多端同步发布</small></div></div></section>
     <p class="demo-data-label">经营数据示例 · 尚未接入平台统计，以下数值与清单仅用于展示。</p><section class="metrics-grid paper-metrics"><article v-for="metric in metrics" :key="metric.label" class="metric-card paper-metric" :class="`metric-${metric.tone}`"><div class="metric-header"><span>{{ metric.label }}</span><span class="metric-glyph">↗</span></div><div class="metric-number">{{ metric.value }}<small>{{ metric.unit }}</small></div><div class="metric-foot"><span class="metric-delta">{{ metric.delta }}</span><span>{{ metric.note }}</span></div></article></section>

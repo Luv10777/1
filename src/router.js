@@ -14,6 +14,7 @@ import EcosystemView from './views/EcosystemView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
 import BrandsView from './views/BrandsView.vue'
 import AssetsView from './views/AssetsView.vue'
+const ProductsView = () => import('./views/ProductsView.vue')
 import KnowledgeView from './views/KnowledgeView.vue'
 import WorksView from './views/WorksView.vue'
 import ImageCreateView from './views/ImageCreateView.vue'
@@ -22,6 +23,7 @@ import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
 import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
+import PlayerView from './views/PlayerView.vue'
 import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
@@ -33,6 +35,7 @@ const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
+  { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
   { path: '/ecosystem', name: 'ecosystem', component: EcosystemView, meta: { title: '生态与治理', eyebrow: 'OPEN ECOSYSTEM' }, },
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '经营总览', eyebrow: 'TODAY / OPERATIONS' } },
@@ -53,6 +56,7 @@ const routes = [
   { path: '/merchants', name: 'merchants', component: StoreInfoView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
+  { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', eyebrow: 'ASSET CENTER', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为 AI 直播讲解与内容创作提供商品事实库。' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
   { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
   { path: '/reviews', name: 'reviews', component: ReviewsView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },

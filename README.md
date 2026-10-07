@@ -38,7 +38,12 @@ npm run dev
 Java 21、Maven 和 Docker 为后端前置依赖。Linux/macOS 启动方法、独立 worker 命令
 与两人按模块协作规则见后端 README。后端默认不执行任务，需要另起 worker。
 
-前端 <http://localhost:4173>，`/api` 已代理到后端 8080，无需额外配置。
+前端 <http://localhost:4173>，`/api` 默认代理到后端 `18080`。如使用其他端口，
+在根目录 `.env` 配置 `VITE_DEV_API_TARGET` 后重启 Vite。
+
+商品库、FAQ 知识库、直播配置已使用真实 API。首次登录后从顶部「＋」创建门店；
+门店选择按账号保存，商品、知识集和直播草稿按门店隔离。
+接入范围与联调步骤见 [商品与直播配置联调](docs/products-knowledge-live-integration.md)。
 
 ## 部署到测试服务器
 
