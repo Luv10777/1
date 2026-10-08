@@ -5,6 +5,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { DanmakuCollector } from './danmakuCollector.js'
 import { chatMessage, statusMessage } from './wire.js'
 import { normalizeRoomId, resolveRoom } from './roomLookup.js'
+import { asciiUserAgent } from './userAgent.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const metadata = createRequire(import.meta.url)('../package.json')
@@ -16,6 +17,8 @@ const DIAGNOSTICS = !app.isPackaged || Boolean(metadata.consoleUrl)
 // 网页版里的“打开桌面端”是一条 yifangzhi://live 链接。安装包登记了这个协议；这里只有正式包认领它。
 // 链接里不带任何参数，也不看参数：被它唤起时软件只做一件事，把窗口拿到前面来。
 const LINK_SCHEME = app.isPackaged && !metadata.consoleUrl ? 'yifangzhi' : ''
+// 软件名是中文，不处理的话会被写进浏览器标识，后端因此拒绝建立播报的长连接。要在打开任何窗口之前换掉。
+app.userAgentFallback = asciiUserAgent(app.userAgentFallback, app.getVersion())
 // 数据目录用英文名：软件名是中文，有些 Windows 账户下中文路径会出麻烦。正式包和测试包各用各的。
 if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), metadata.name))
 const LIVE_PATH = '/digital-human'

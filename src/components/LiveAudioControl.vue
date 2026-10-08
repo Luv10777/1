@@ -1,10 +1,10 @@
 <script setup>
-import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowRight, Volume2 } from 'lucide-vue-next'
 import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from '../services/liveApi'
 import { LivePlayerSession } from '../services/livePlayerSession'
 import { inDesktop } from '../utils/desktop'
-import { config } from '../utils/config'
+import { findDesktopDownload } from '../services/desktopDownload'
 
 const props = defineProps({
   sessionId: { type: Number, default: null },
@@ -21,8 +21,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['open-workspace', 'start-session', 'edit-step'])
 const isDevelopment = import.meta.env.DEV
-// 网页版读不到直播间弹幕，要靠桌面端。安装包的地址配置了才给入口；已经在桌面端里就不用再提。
-const desktopDownloadUrl = inDesktop ? '' : config.desktopDownloadUrl
+// 网页版读不到直播间弹幕，要靠桌面端。找得到安装包才给入口；已经在桌面端里就不用再提。
+const desktopDownloadUrl = ref('')
 // 读取直播间弹幕要靠桌面软件，网页版浏览器做不到：只有在桌面端里打开时才加载这一块。
 const LiveDanmakuPanel = inDesktop ? defineAsyncComponent(() => import('./LiveDanmakuPanel.vue')) : null
 const idlePlayback = () => ({ status: 'idle', connectionError: '', current: null, pending: [], paused: false, loading: false, error: '' })
@@ -194,6 +194,7 @@ const send = (mock = false) => run(async current => {
     schedule()
   } finally { if (current()) sending.value = false }
 })
+onMounted(() => { if (!inDesktop) findDesktopDownload().then((url) => { if (mounted) desktopDownloadUrl.value = url }) })
 onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); player?.destroy(); player = null })
 </script>
 
