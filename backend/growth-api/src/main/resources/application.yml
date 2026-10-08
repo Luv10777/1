@@ -58,7 +58,7 @@ growth:
     api-key: ${VIDEO_ANALYSIS_API_KEY:}
     model: ${VIDEO_ANALYSIS_MODEL:gpt-6-luna}
     timeout-seconds: ${VIDEO_ANALYSIS_TIMEOUT_SECONDS:180}
-    max-tokens: ${VIDEO_ANALYSIS_MAX_TOKENS:6000}
+    max-tokens: ${VIDEO_ANALYSIS_MAX_TOKENS:12000}
     max-bytes: ${VIDEO_ANALYSIS_MAX_BYTES:104857600}
     max-duration-seconds: ${VIDEO_ANALYSIS_MAX_DURATION_SECONDS:60}
     max-frames: ${VIDEO_ANALYSIS_MAX_FRAMES:48}
