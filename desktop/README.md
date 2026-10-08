@@ -48,7 +48,9 @@ npm run dist:win -- --test http://192.168.x.x:4173      # 测试包：软件连�
 
 安装包**没有代码签名**，Windows 会提示“未知发布者”，需要点“更多信息 → 仍要运行”。没有自动更新。
 
-正式包会登记 `yifangzhi://` 协议：网页版“启动直播”一步里的“打开桌面端”就是一条 `yifangzhi://live` 链接，点了把已安装的软件唤到前面。测试包不登记，免得抢走正式版的链接。网页上的入口只有在构建前端时配置了 `VITE_DESKTOP_DOWNLOAD_URL` 才出现。
+软件名是中文，Electron 默认会把它写进浏览器标识（User-Agent），后端因此拒绝建立播报的长连接。`src/userAgent.js` 在打开任何窗口之前把它换成英文名；0.1.0 没有这一步，装上后播报会一直“重连中”。
+
+正式包会登记 `yifangzhi://` 协议：网页版“启动直播”一步里的“打开桌面端”就是一条 `yifangzhi://live` 链接，点了把已安装的软件唤到前面。测试包不登记，免得抢走正式版的链接。网页上的入口在网站的 `/downloads/yifangzhi-setup.exe` 存在时出现：出新版本时把服务器上的这个文件换掉，另留一份带版本号的。
 
 不要在 `desktop/` 目录里对打出来的 `app.asar` 运行 `asar extract-file … package.json`：它会把解出来的文件写到当前目录，盖掉这里的 `package.json`。
 

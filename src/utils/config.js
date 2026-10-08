@@ -13,8 +13,6 @@ export const config = {
   // 留空表示同源。开发环境由 vite 代理转发到后端，不需要填。
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',
   authMode: import.meta.env.VITE_AUTH_MODE || 'real',
-  // 桌面端安装包的下载地址。没配置时网页上不出现桌面端的入口。
-  desktopDownloadUrl: import.meta.env.VITE_DESKTOP_DOWNLOAD_URL || '',
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
 }
