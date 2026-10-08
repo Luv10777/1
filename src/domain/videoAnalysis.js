@@ -77,7 +77,7 @@ function analysisProductReferences(result) {
   return [...new Set(references)].filter(value => !['产品', '商品', '如图中产品'].includes(value))
 }
 
-function productTemplateText(value, references) {
+export function productTemplateText(value, references) {
   if (typeof value !== 'string') return value
   let text = value
   // Match complete recorded identities first, so replacing a short name does not leave its recorded appearance behind.

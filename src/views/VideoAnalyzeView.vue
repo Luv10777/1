@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoAnalysisApi, uploadAnalysisVideo } from '../services/videoAnalysis'
-import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, localizeAnalysisPrompts, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
+import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
+import { customizeAnalysisRecreation, analysisRecreationRoute } from '../domain/videoAnalysisCustomization'
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
 
 const router = useRouter()
@@ -29,6 +30,7 @@ const pollingInterrupted = ref(false)
 const historyOpen = ref(false)
 const reverseHistories = ref([])
 const copied = ref('')
+const merchantEdits = ref({})
 let objectUrl = ''
 let pollTimer
 let copyTimer
@@ -37,19 +39,19 @@ let disposed = false
 let submissionKey = ''
 
 const isScanning = computed(() => uploading.value || (current.value && !analysisTerminal(current.value.status)))
-const result = computed(() => current.value?.status === 'SUCCEEDED' ? localizeAnalysisPrompts(current.value) : null)
+const result = computed(() => current.value?.status === 'SUCCEEDED' ? customizeAnalysisRecreation(current.value, merchantEdits.value) : null)
 const reportMode = computed(() => result.value ? analysisReportMode(current.value, videoType.value) : videoType.value)
 const showGeneration = computed(() => reportMode.value === 'ai' || recreationRoute.value === 'ai')
 const recreationSteps = computed(() => analysisRecreationSteps(result.value, reportMode.value, recreationRoute.value))
 const modeHint = computed(() => videoType.value === 'ai'
-  ? '侧重提示词复刻、逐镜生成脚本和人物／画面一致性。'
+  ? '生成可直接复制的中文总提示词和简短分镜，支持替换品牌、对白与字幕。'
   : '侧重机位、运镜、灯光与拍摄步骤，同时提供用 AI 重做的方案。')
 const needPlaceholder = computed(() => videoType.value === 'ai'
-  ? '例如：逐镜头还原提示词，写清首帧、动作和人物一致性…'
+  ? '例如：保留镜头动作和节奏，替换成我的品牌和口播…'
   : '例如：用手机怎么拍？灯光怎么摆？或重点拆解用 AI 重做的方法…')
 const quickFocus = computed(() => videoType.value === 'ai'
-  ? [{ label: '提示词复刻', text: '侧重逐镜头中文提示词、首帧图片提示词和人物一致性' }, { label: '分镜脚本', text: '侧重逐镜头动作、镜头结尾和前后镜头衔接的生成脚本' }]
-  : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '用 AI 重做', text: '侧重把实拍视频用 AI 重做，写清参考图、逐镜提示词和剪辑合成方法' }])
+  ? [{ label: '提示词复刻', text: '侧重可直接复制的中文整体提示词，商品用如图中产品，识别可修改的品牌和文案' }, { label: '分镜脚本', text: '用简短分镜写清时间、动作、运镜和衔接，识别原对白与字幕供修改' }]
+  : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '用 AI 重做', text: '侧重把实拍视频用 AI 重做，给出中文总提示词与简短分镜，识别可修改的品牌、对白与字幕' }])
 const promptText = computed(() => result.value?.prompt || '')
 const duration = computed(() => current.value?.durationMs ? current.value.durationMs / 1000 : previewDuration.value)
 const canStart = computed(() => !isScanning.value && !loadingHistory.value && limits.value.configured
@@ -243,11 +245,11 @@ async function copyText(text, label) {
     copyTimer = window.setTimeout(() => { copied.value = '' }, 1800)
   } catch { error.value = '复制失败，请手动选择文本复制。' }
 }
-function generateSame() { router.push({ path: '/video/workbench', query: { prompt: promptText.value } }) }
+function generateSame() { router.push(analysisRecreationRoute(current.value, merchantEdits.value)) }
 function seek(seconds) { if (player.value) player.value.currentTime = seconds }
 function exportReport() {
   if (!result.value) return
-  const url = URL.createObjectURL(new Blob([buildVideoAnalysisReport(current.value)], { type: 'text/html;charset=utf-8' }))
+  const url = URL.createObjectURL(new Blob([buildVideoAnalysisReport(current.value, merchantEdits.value)], { type: 'text/html;charset=utf-8' }))
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = `${current.value.name.replace(/[\\/:*?"<>|]/g, '_')}-拆解报告.html`
@@ -258,7 +260,7 @@ function exportReport() {
 }
 
 watch(() => route.query.history, id => { if (id && String(current.value?.id) !== String(id)) loadHistory(id) })
-watch(() => current.value?.id, () => { recreationRoute.value = 'filming' })
+watch(() => current.value?.id, () => { recreationRoute.value = 'filming'; merchantEdits.value = {} })
 watch([videoType, reverseNeed, inputMode, videoUrl], () => { if (!uploading.value) submissionKey = '' })
 onMounted(async () => {
   const settled = await Promise.allSettled([videoAnalysisApi.limits(), refreshHistory()])
@@ -335,15 +337,28 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
             <button type="button" :aria-pressed="recreationRoute === 'filming'" :class="{ active: recreationRoute === 'filming' }" @click="recreationRoute = 'filming'"><span class="material-symbols-outlined">videocam</span>照着实拍</button>
             <button type="button" :aria-pressed="recreationRoute === 'ai'" :class="{ active: recreationRoute === 'ai' }" @click="recreationRoute = 'ai'"><span class="material-symbols-outlined">auto_awesome</span>用 AI 重做</button>
           </div>
-          <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '用参考图和逐镜提示词生成相似画面，再剪辑成完整视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
+          <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '上传自己的商品参考图，修改品牌与文案，用总提示词和简短分镜生成相似视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
           <section v-if="showGeneration" class="readable-prompt" aria-label="可直接复制的复刻提示词">
             <div class="reuse-script-head"><span>{{ reportMode === 'real' ? '用 AI 重做的复刻提示词' : '可直接复制的复刻提示词' }}</span><button type="button" @click="copyText(promptText, 'prompt')">{{ copied === 'prompt' ? '已复制' : '复制中文提示词' }}</button></div>
             <p class="product-reference-guide">{{ PRODUCT_REFERENCE_GUIDANCE }}</p>
-            <p class="copyable-content" tabindex="0" aria-label="整体复刻提示词正文">{{ promptText }}</p><button type="button" class="prompt-create" @click="generateSame">带入视频创作 ↗</button><details><summary>生成时需要避免的问题</summary><p>{{ result.negativePrompt }}</p></details>
+            <p class="copyable-content" tabindex="0" aria-label="整体复刻提示词正文">{{ promptText }}</p><details><summary>生成时需要避免的问题</summary><p>{{ result.negativePrompt }}</p></details>
           </section>
           <section class="reuse-script" aria-label="可复制的分镜脚本"><div class="reuse-script-head"><span>{{ showGeneration ? '可直接复制的分镜脚本' : '按顺序执行的拍摄脚本' }}</span><button type="button" @click="copyText(showGeneration ? result.generationScript : result.reuseScript, 'script')">{{ copied === 'script' ? '已复制' : '复制脚本' }}</button></div><p class="copyable-content" tabindex="0" aria-label="复刻脚本正文">{{ showGeneration ? result.generationScript : result.reuseScript }}</p></section>
+          <section v-if="showGeneration" class="merchant-editor" aria-label="修改品牌、对白与字幕">
+            <div class="section-caption"><span>改成你的内容</span><button v-if="Object.keys(merchantEdits).length" type="button" @click="merchantEdits = {}">恢复默认</button></div>
+            <p>对照原文修改，提示词和分镜脚本会自动更新。原品牌默认不使用，相关文案改称“本店”；对白与字幕清空即可移除。</p>
+            <div v-if="result.editableContent.length" class="merchant-edit-table">
+              <div class="merchant-edit-columns" aria-hidden="true"><span>原视频内容</span><span>商家修改内容</span></div>
+              <article v-for="item in result.editableContent" :key="item.id" class="merchant-edit-row">
+                <div class="merchant-original"><strong>{{ item.label }}</strong><small>{{ item.kindLabel }} · {{ item.source === 'audio' ? '声音原文' : '画面文字' }} · {{ item.timeLabel }}</small><p>{{ item.original }}</p></div>
+                <label><span>{{ item.label }} · 修改内容</span><textarea :value="merchantEdits[item.id] ?? item.replacement" :aria-label="`${item.label}修改内容`" maxlength="1000" rows="2" :placeholder="item.kind === 'brand' ? '输入你的品牌，留空不使用原品牌' : '输入替换文案，清空则不使用此项'" @input="merchantEdits = { ...merchantEdits, [item.id]: $event.target.value }" /></label>
+              </article>
+            </div>
+            <p v-else class="merchant-empty">本记录未识别到可修改的品牌、对白或字幕。重新分析可按新版要求识别。</p>
+            <p v-if="!audioReport" class="merchant-empty">{{ analysisAudioSummary(result) }}，当前没有可核对的原对白。</p>
+          </section>
           <details class="analysis-reference"><summary>查看画面拆解与声音参考</summary>
-          <div class="section-caption table-caption"><span>{{ showGeneration ? '原视频逐镜观察' : '逐镜头拍摄指南' }}</span><small>{{ shots.length }} 个估计分镜</small></div>
+          <template v-if="!showGeneration"><div class="section-caption table-caption"><span>逐镜头拍摄指南</span><small>{{ shots.length }} 个估计分镜</small></div>
           <section class="shot-guide" aria-label="逐镜头复刻步骤">
             <article v-for="(shot, index) in shots" :key="index" class="shot-guide-item">
               <div class="shot-guide-head"><h3>镜头 {{ index + 1 }}</h3><button type="button" :aria-label="`跳转到镜头 ${index + 1}`" @click="seek(shot.start)">{{ analysisTime(shot.start) }}–{{ analysisTime(shot.end) }} · {{ (shot.end - shot.start).toFixed(1) }} 秒</button></div>
@@ -351,7 +366,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
               <dl><div v-for="detail in analysisShotDetails(shot, reportMode, recreationRoute)" :key="detail.label"><dt>{{ detail.label }}</dt><dd>{{ detail.text }}</dd></div></dl>
               <p class="shot-mood">画面情绪：{{ shot.emotion }} · 节奏：{{ shot.pacing }}</p>
             </article>
-          </section>
+          </section></template>
           <p class="analysis-summary">{{ result.summary }}</p><p class="analysis-method">基于 {{ current.frames.length }} 张抽样画面；运镜与分镜边界为推断。{{ audioReport ? '已结合音频报告；声音时间戳为模型估计。' : analysisAudioSummary(result) }}</p>
           <p v-if="!result.recreation" class="analysis-legacy">这份历史报告保留了原有拆解，重新分析可获得更具体的逐镜操作步骤。</p>
           <p v-if="result.promptsLocalized" class="analysis-legacy">中文提示词已根据这份记录的画面拆解整理，可直接复制使用；重新分析可获得更完整的分镜提示词。</p>
@@ -384,7 +399,8 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <div v-if="result.limitations.length" class="analysis-limitations"><strong>观察限制</strong><p v-for="(item, index) in result.limitations" :key="index">{{ item }}</p></div>
           </details>
           <p class="report-export-hint">导出为排版好的中文报告，双击即可阅读，也可打印或保存为 PDF。{{ reportMode === 'real' ? '实拍报告同时包含两种复刻方案。' : '' }}</p>
-          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame"><span class="material-symbols-outlined">auto_awesome</span>用此提示词创作视频 <span>↗</span></button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
+          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame"><span class="material-symbols-outlined">auto_awesome</span>一键生成同款 <span>↗</span></button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
+          <p v-if="showGeneration" class="report-export-hint">已修改的总提示词、分镜脚本和画面设置将自动填入视频创作页，上传自己的商品参考图后即可生成。</p>
         </div>
       </section>
     </main>
@@ -420,7 +436,18 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .readable-prompt .product-reference-guide { margin-top: 10px; color: var(--color-text-muted); font-size: 12px; }
 .copyable-content { max-height: 260px; overflow-y: auto; }
 .copyable-content:focus-visible { outline: 2px solid var(--an-cinnabar); outline-offset: 4px; }
-.prompt-create { margin-top: 12px; padding: 6px 0; border: 0; background: transparent; color: var(--an-cinnabar); font: inherit; font-size: 12px; cursor: pointer; }
+.merchant-editor { margin-top: 24px; padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; }
+.merchant-editor > p { margin: 12px 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.8; }
+.merchant-editor .section-caption button { border: 0; background: transparent; color: var(--an-cinnabar); font: inherit; font-size: 12px; cursor: pointer; }
+.merchant-edit-columns, .merchant-edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.merchant-edit-columns { padding: 8px 0; color: var(--color-text-muted); font-size: 11px; }
+.merchant-edit-row { padding: 16px 0; border-top: 1px solid var(--color-border-subtle); }
+.merchant-original strong, .merchant-edit-row label > span { display: block; margin-bottom: 6px; font-size: 12px; color: var(--color-primary); }
+.merchant-original small { color: var(--color-text-muted); font-size: 10px; }
+.merchant-original p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-primary); font-size: 12px; line-height: 1.8; }
+.merchant-edit-row textarea { width: 100%; min-height: 82px; padding: 10px; border: 1px solid var(--color-border-subtle); border-radius: 6px; background: var(--color-bg-surface); color: var(--color-primary); font: inherit; font-size: 12px; line-height: 1.8; resize: vertical; }
+.merchant-edit-row textarea:focus-visible { outline: 2px solid var(--an-cinnabar); outline-offset: 2px; }
+@media (max-width: 720px) { .merchant-edit-columns { display: none; } .merchant-edit-row { grid-template-columns: 1fr; gap: 12px; } }
 .analysis-reference { margin-top: 24px; }
 .analysis-reference > summary { padding: 12px 0; color: var(--color-text-muted); font-size: 12px; cursor: pointer; }
 .shot-guide + .analysis-summary { margin-top: 24px; }

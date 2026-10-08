@@ -67,7 +67,7 @@ test('AI reports put copyable prompts and timed storyboards before the analysis 
   assert.equal(copyBlocks.length, 3, 'overall prompt, optional negative prompt and concise storyboard')
   for (const block of copyBlocks) assert.doesNotMatch(block, /白杯|白色杯子|杯子/)
   assert.ok(copyBlocks.some(block => /镜头 1｜00:00–00:06｜时长 6\.0 秒/.test(block)))
-  assert.ok(html.includes('手从右侧伸向白色杯子。'), 'observations are kept for comparison')
+  assert.ok(!html.includes('手从右侧伸向白色杯子。'), 'AI reports omit the individual shot section')
   assert.ok(html.includes('button type="button" class="copy-button" data-copy'))
   assert.doesNotMatch(html, /本镜头的视频生成提示词|本镜头的首帧图片提示词/)
   assert.ok(html.includes('<details class="reference"><summary>查看画面拆解与声音参考</summary>'))
@@ -87,9 +87,35 @@ test('historical exports present Chinese prompts for both modes without an Engli
     assert.ok(html.includes('生成一段竖屏视频，总时长 6.0 秒'))
     assert.ok(html.includes('镜头 1｜00:00–00:06｜时长 6.0 秒'))
     assert.ok(!html.includes('生成一张竖屏静态参考图片'), 'the concise report omits individual first-frame prompts')
-    assert.ok(html.includes('手从右侧伸向白色杯子'))
+    if (mode === 'real') assert.ok(html.includes('手从右侧伸向白色杯子'))
+    else assert.ok(!html.includes('原视频逐镜观察'))
     assert.ok(html.includes('避免画面模糊'))
     for (const text of ['A white cup near the window', 'distorted fingers', 'A hand picks up the cup', 'Still image of a white cup', '英文原文', 'undefined'])
       assert.ok(!html.includes(text), text)
   }
+})
+
+test('export uses the same merchant edits as copy and generation, while preserving escaped originals for comparison', () => {
+  const value = analysis()
+  value.result.schemaVersion = 4
+  value.result.productReferences = ['旧品牌', '杯子', '白杯']
+  value.result.editableContent = [
+    { id: 'e1', kind: 'brand', label: '品牌名称', original: '旧品牌', source: 'video', start: 0, end: 6 },
+    { id: 'e2', kind: 'subtitle', label: '结尾字幕', original: '旧品牌原字幕', source: 'video', start: 4, end: 6 },
+  ]
+  value.result.prompt = '生成竖屏六秒视频，如图中产品放在窗边，人物伸手拿起，相机固定，柔和侧光。{{edit:e1}} {{edit:e2}}'
+  value.result.reuseScript = '镜头 1｜00:00–00:06｜人物拿起如图中产品，窗边柔光，相机固定。{{edit:e1}} {{edit:e2}}'
+  const html = buildVideoAnalysisReport(value, { e1: '商家的新品牌', e2: '<img src=x onerror="alert(1)"> 新活动 59 元' })
+  const copyBlocks = [...html.matchAll(/<div class="prompt">.*?<p>(.*?)<\/p><\/div>/gs)].map(match => match[1])
+  for (const text of [copyBlocks[0], copyBlocks[2]]) {
+    assert.match(text, /商家的新品牌/)
+    assert.match(text, /新活动 59 元/)
+    assert.doesNotMatch(text, /旧品牌|\{\{edit:/)
+  }
+  assert.match(html, /商家文案修改对照/)
+  assert.match(html, /原视频内容/)
+  assert.match(html, /旧品牌原字幕/)
+  assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/)
+  assert.doesNotMatch(html, /<img src=x/)
+  assert.doesNotMatch(html, /原视频逐镜观察|本镜头的视频生成提示词|本镜头的首帧图片提示词/)
 })

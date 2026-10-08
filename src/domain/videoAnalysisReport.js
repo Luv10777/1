@@ -1,4 +1,5 @@
-import { analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, analysisTime, localizeAnalysisPrompts, PRODUCT_REFERENCE_GUIDANCE } from './videoAnalysis.js'
+import { analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, analysisTime, PRODUCT_REFERENCE_GUIDANCE } from './videoAnalysis.js'
+import { customizeAnalysisRecreation } from './videoAnalysisCustomization.js'
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character])
@@ -27,8 +28,8 @@ function planReport(result, mode, route) {
   return analysisRecreationSteps(result, mode, route).map(step => `<article><h3>${escapeHtml(step.title)}</h3>${paragraph(step.text)}</article>`).join('')
 }
 
-export function buildVideoAnalysisReport(analysis) {
-  const result = localizeAnalysisPrompts(analysis) || {}
+export function buildVideoAnalysisReport(analysis, edits = {}) {
+  const result = customizeAnalysisRecreation(analysis, edits) || {}
   const mode = analysisReportMode(analysis)
   const real = mode === 'real'
   const title = real ? '实拍视频拆解与复刻报告' : 'AI 视频提示词与分镜复刻报告'
@@ -44,6 +45,9 @@ export function buildVideoAnalysisReport(analysis) {
       + `<details><summary>生成时需要避免的问题</summary>${promptBlock('避免出现', result.negativePrompt)}</details>`)
     addSection('可直接复制的分镜脚本', promptBlock('按镜头时间顺序生成', result.generationScript))
   }
+  if (result.editableContent?.length) addSection('商家文案修改对照', result.editableContent.map(item => `<article><h3>${escapeHtml(item.label)} <small>${escapeHtml(item.timeLabel)}</small></h3>${facts([
+    { label: '原视频内容', text: item.original }, { label: '商家修改内容', text: item.replacement || '不使用此项' },
+  ])}</article>`).join(''))
   const primarySectionCount = sections.length
   if (!real) addSection('制作参考', planReport(result, mode, 'ai'))
   addSection('原视频观察与复刻重点', paragraph(result.summary || '暂无视频概要。') + facts([
@@ -61,9 +65,9 @@ export function buildVideoAnalysisReport(analysis) {
     addSection('方案一：照着实拍', planReport(result, mode, 'filming')
       + promptBlock('按顺序执行的拍摄脚本', result.reuseScript) + shotReport(result.shots, mode, 'filming'))
     addSection('方案二：用 AI 重做', paragraph(PRODUCT_REFERENCE_GUIDANCE) + promptBlock('整体视频生成提示词', result.prompt)
-      + promptBlock('可直接复制的分镜脚本', result.generationScript) + shotReport(result.shots, mode, 'ai')
+      + promptBlock('可直接复制的分镜脚本', result.generationScript)
       + promptBlock('生成时需要避免的问题', result.negativePrompt) + planReport(result, mode, 'ai'))
-  } else addSection('原视频逐镜观察', shotReport(result.shots, mode, 'ai'))
+  }
   if (result.keyframes?.length) addSection('关键画面参考', result.keyframes.map(frame => `<article><h3>${analysisTime(frame.seconds)} · ${escapeHtml(frame.title)}</h3>
     ${paragraph(frame.description || frame.title)}</article>`).join(''))
   let sound = paragraph(analysisAudioSummary(result))

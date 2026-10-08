@@ -41,7 +41,7 @@ class VideoAnalysisSynthesizeHandlerTest {
         var request = ArgumentCaptor.forClass(ProviderRequest.class); verify(gateway).invokeReal(request.capture());
         assertThat(request.getValue().options().get("system").toString()).contains("当前模式是 AI 视频反推", "首帧图片").doesNotContain("当前模式是实拍视频拆解");
         var report = ArgumentCaptor.forClass(Map.class); verify(service).completed(eq(2L), eq(task), report.capture());
-        assertThat(report.getValue()).containsEntry("audioAnalyzed", true).containsEntry("schemaVersion", 3);
+        assertThat(report.getValue()).containsEntry("audioAnalyzed", true).containsEntry("schemaVersion", 4);
     }
 
     @Test void realModeUsesTheFilmingAndAiConversionContract() {
@@ -68,6 +68,15 @@ class VideoAnalysisSynthesizeHandlerTest {
                 error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_LANGUAGE"));
         verify(service, never()).completed(anyLong(), any(), anyMap());
         verify(service).failed(2L, task, "模型未返回中文复刻提示词，请重新分析");
+    }
+
+    @Test void fabricatedDialogueCannotBeSavedAsASuccessfulAnalysis() {
+        ready("ai");
+        when(gateway.invokeReal(any())).thenReturn(new ProviderResult(true, "TEST_VISION", null, VideoAnalysisEditableContentTest.linked("ai"), null, null));
+        assertThatThrownBy(() -> handler.handle(task)).isInstanceOfSatisfying(NonRetryableTaskException.class,
+                error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_EDITABLE"));
+        verify(service, never()).completed(anyLong(), any(), anyMap());
+        verify(service).failed(2L, task, "模型未返回与原文对应的可修改内容，请重新分析");
     }
 
     @Test void originalProductLeakageCannotBeSavedAsASuccessfulAnalysis() {

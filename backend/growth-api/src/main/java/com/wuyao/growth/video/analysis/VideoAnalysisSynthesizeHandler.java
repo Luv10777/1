@@ -42,6 +42,7 @@ public class VideoAnalysisSynthesizeHandler implements TaskHandler {
                     Map.of("system", VideoAnalysisOutput.systemFor(analysis.getMode()), "frames", frames), "video-analysis-" + id));
             if (!response.succeeded()) throw new IllegalStateException("视频分析模型未返回有效结果");
             var result = VideoAnalysisOutput.validate(response.output(), analysis.getDurationMs(), analysis.getMode(), json);
+            VideoAnalysisEditableContent.validateAudio((List<Map<String, Object>>) result.get("editableContent"), audio, json);
             result.put("audio", audio);
             result.put("audioAnalyzed", audioAnalyzed);
             boolean completed = service.completed(id, task, result);

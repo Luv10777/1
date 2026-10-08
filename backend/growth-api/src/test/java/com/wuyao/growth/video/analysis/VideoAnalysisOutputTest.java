@@ -26,7 +26,7 @@ class VideoAnalysisOutputTest {
 
     @Test void aiResultsRequireExecutableGenerationStepsAndPerShotPrompts() {
         var result = VideoAnalysisOutput.validate(validFor("ai"), 12000, "ai", new ObjectMapper());
-        assertThat(result).containsEntry("schemaVersion", 3).containsKey("recreation");
+        assertThat(result).containsEntry("schemaVersion", 4).containsKey("recreation");
         assertThat((Map<?, ?>) result.get("recreation")).hasSize(3);
         var invalid = validFor("ai"); invalid.put("recreation", Map.of("workflow", "生成")); assertModeInvalid(invalid, "ai");
         invalid = validFor("ai");
@@ -158,6 +158,7 @@ class VideoAnalysisOutputTest {
     static Map<String, Object> validFor(String mode) {
         var result = valid();
         result.put("productReferences", List.of());
+        result.put("editableContent", List.of());
         result.put("prompt", "生成竖屏视频，桌上的红色物体位于画面中央，相机固定，保持自然光线。");
         result.put("negativePrompt", "避免画面模糊、物体变形和画面闪烁。");
         var shots = new ArrayList<Map<String, Object>>();

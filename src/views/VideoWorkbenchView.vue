@@ -137,9 +137,12 @@ const startNewConversation = () => {
 }
 
 createConversation()
-if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) prompt.value = route.query.prompt
+const recreationPrompt = window.history.state?.recreationPrompt
+if (typeof recreationPrompt === 'string' && recreationPrompt.trim()) prompt.value = recreationPrompt
+else if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) prompt.value = route.query.prompt
 if (typeof route.query.ratio === 'string' && ratioOptions.some(option => option.value === route.query.ratio)) format.value = route.query.ratio
 if (typeof route.query.duration === 'string' && Number(route.query.duration)) duration.value = Math.min(30, Math.max(5, Number(route.query.duration)))
+if (recreationPrompt && Number(route.query.duration) > 30) activeConversation.value.notice = '原视频超过 30 秒，已带入完整脚本。当前模型单次最多生成 30 秒，请缩短脚本或分段使用。'
 saveActiveConversation()
 
 const loadHistory = async (nextPage = 0) => {

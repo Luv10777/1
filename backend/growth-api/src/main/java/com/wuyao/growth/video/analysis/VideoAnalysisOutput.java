@@ -35,12 +35,22 @@ public final class VideoAnalysisOutput {
             以上替换规则适用于 prompt、negativePrompt、每镜 prompt、firstFramePrompt、continuity、keyframes.prompt，
             AI 模式还适用于 reuseScript 和 recreation 全部字段；实拍模式适用于 recreation.aiWorkflow。
             原商品只允许出现在观察字段及实拍拍摄步骤中。原口播和字幕可以在观察中引用；生成脚本不得照抄原商品宣传语，也不得为用户商品编造功效。
+            识别商家可能需要修改的品牌、对白/口播、字幕、价格、活动、联系方式等，返回 editableContent 数组，没有可见/可听证据则返回 []。
+            每项写 id（e1、e2 等唯一编号）、kind（brand/dialogue/subtitle/text）、label（中文名称）、original（原文）、
+            source（audio/video）、start、end（原文出现的起止秒数）。对白只能引用已完成音频报告中对应时间的 transcript 原文，不能改写或虚构。
+            可见文字只录能看清的内容；品牌单独列一项，字幕或对白中同一品牌出现时仍保留完整原文供商家对照。
+            editableContent 最多 30 项；每段口播单独列一项，逐字引用对应 transcript 段落，不能把多段转录拼成一项。
+            prompt 中用 {{edit:e1}} 等标记对应文字安排，每个标记单独表示该项完整的文字/口播安排，不要在标记外再次写原品牌或原句。
+            AI 模式的 reuseScript 也必须在对应镜头写这些标记，所有可修改项都要在整体和脚本引用，不允许不存在的标记。
+            商家修改后由程序填入标记；原品牌及商品文案只放 original 字段，画面商品继续使用“如图中产品”。
             用“相机从左向右慢慢移动”等操作描述，专业词首次出现时顺带解释含义。
             把“画面观察”“根据帧间变化推测”“建议做法”分清楚，不能把推荐设备或参数写成原片事实。
             简洁返回 JSON，不要 Markdown、代码围栏、样式代码或 HTML。必须返回以下基础结构，并补齐当前模式的专属字段：
+            negativePrompt 是必填字段，用中文列出要避免的画面问题，不得遗漏；返回前核对所有基础字段与可修改项标记齐全。
             {"summary":"用两三句话说明视频拍了什么、吸引力在哪、复刻要抓住什么",
              "prompt":"中文整体生成提示词","negativePrompt":"中文描述需要避免的画面问题",
              "reuseScript":"按时间顺序写的中文复刻执行脚本","productReferences":["原商品描述及简称，没有商品则为空数组"],
+             "editableContent":[{"id":"e1","kind":"subtitle","label":"结尾字幕","original":"看清的原字幕","source":"video","start":0,"end":3}],
              "parameters":[{"key":"主体人物","value":"可见主体"},{"key":"场景环境","value":"场景"},
               {"key":"镜头运动","value":"推断并说明不确定性"},{"key":"光线氛围","value":"光线"},
               {"key":"画面风格","value":"风格"},{"key":"景深质感","value":"可见质感"}],
@@ -148,7 +158,8 @@ public final class VideoAnalysisOutput {
         result.put("shots", shots);
         result.put("recreation", recreation);
         result.put("productReferences", productReferences);
-        result.put("schemaVersion", 3);
+        result.put("editableContent", VideoAnalysisEditableContent.validate(root, durationMs / 1000D, real));
+        result.put("schemaVersion", 4);
         return result;
     }
 
