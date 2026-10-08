@@ -1,0 +1,63 @@
+{
+  "name": "yifangzhi-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "一方志桌面端：在商家自己的电脑上开播，读取直播间弹幕交给 AI 回复。试用阶段。",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "probe": "electron src/probe.js",
+    "test": "node --test \"src/**/*.test.js\"",
+    "dist:win": "node scripts/dist-win.js"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  },
+  "productName": "一方志",
+  "author": "一方志",
+  "build": {
+    "appId": "com.yifangzhi.desktop",
+    "productName": "一方志",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "!src/**/*.test.js",
+      "!src/probe.js",
+      "package.json"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "artifactName": "yifangzhi-setup-${version}.${ext}"
+    },
+    "protocols": [
+      {
+        "name": "一方志",
+        "schemes": [
+          "yifangzhi"
+        ]
+      }
+    ]
+  }
+}

@@ -199,6 +199,8 @@ test('弹幕流区分商家原话与 AI 回答，未回复时给出原因', () =
   assert.equal(saved.sourceLabel, '本场问答')
   assert.equal(saved.stateLabel, '已回复')
   assert.equal(saved.providerLabel, '模拟弹幕')
+  // 桌面端从直播间读到的弹幕和控制台里手动输入的要分得清。
+  assert.equal(toCommentFeedItem({ id: '9', text: '在哪里', state: 'ANSWERING', provider: 'DOUYIN_WEB' }).providerLabel, '直播间弹幕')
   assert.equal(toCommentFeedItem({ id: '2', text: '一罐多大', answer: '500 克', source: 'AI', state: 'ANSWERED' }).sourceLabel, 'AI 依据资料回答')
 
   const waiting = toCommentFeedItem({ id: '3', text: '能停车吗', state: 'ANSWERING' })

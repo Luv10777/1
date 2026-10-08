@@ -5,9 +5,11 @@ import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.live.LiveDtos;
 import com.wuyao.growth.live.LiveSession;
 import com.wuyao.growth.live.LiveSessionRepository;
+import com.wuyao.growth.live.reply.CommentScreen;
 import com.wuyao.growth.live.reply.LiveComment;
 import com.wuyao.growth.live.reply.LiveCommentRepository;
 import com.wuyao.growth.live.reply.LiveReplyGenerateHandler;
+import com.wuyao.growth.live.reply.LiveReplyLane;
 import com.wuyao.growth.store.StoreAccessService;
 import com.wuyao.growth.voice.VoiceService;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,15 +25,15 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-class MockCommentServiceTest {
+class LiveCommentIntakeTest {
     private final LiveSessionRepository sessions = mock(LiveSessionRepository.class);
     private final StoreAccessService stores = mock(StoreAccessService.class);
     private final LiveCommentRepository comments = mock(LiveCommentRepository.class);
     private final VoiceService voices = mock(VoiceService.class);
     private final TaskService tasks = mock(TaskService.class);
     private final TransactionTemplate tx = mock(TransactionTemplate.class);
-    private final MockCommentService service = new MockCommentService(new MockCommentProvider(), sessions, comments,
-            stores, voices, tasks, tx);
+    private final MockCommentProvider simulated = new MockCommentProvider();
+    private final LiveCommentIntake service = new LiveCommentIntake(new CommentScreen(List.of()), sessions, comments, stores, voices, tasks, tx);
     private LiveSession session;
 
     @BeforeEach
@@ -56,7 +58,7 @@ class MockCommentServiceTest {
 
     @Test
     void aCommentIsOnlyRecordedAndHandedToAWorkerWhereItIsDecidedWhetherAndHowToAnswer() {
-        var result = service.receive(2L, new LiveSpeechDtos.CommentRequest("comment-2", " 可以停车吗 ", null, "voice"), 3L);
+        var result = service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("comment-2", " 可以停车吗 ", null, "voice"), 3L);
         assertThat(result.status()).isEqualTo("answering");
         assertThat(result.answer()).isNull();
         assertThat(saved()).returns("ANSWERING", LiveComment::getStatus).returns(true, LiveComment::isModelUsed)
@@ -73,10 +75,10 @@ class MockCommentServiceTest {
         LiveComment earlier = new LiveComment();
         earlier.setStatus("ANSWERED"); earlier.setAnswer("可以，门口有车位"); earlier.setSource("STORE");
         when(comments.findBySessionIdAndProviderAndExternalId(eq(2L), eq("MOCK"), anyString())).thenReturn(Optional.of(earlier));
-        assertThat(service.receive(2L, new LiveSpeechDtos.CommentRequest("comment-2", "可以停车吗", null, "voice"), 3L))
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("comment-2", "可以停车吗", null, "voice"), 3L))
                 .isEqualTo(new LiveSpeechDtos.CommentResult("answered", "可以，门口有车位", "STORE"));
         earlier.setStatus("SKIPPED"); earlier.setAnswer(null); earlier.setSource(null);
-        assertThat(service.receive(2L, new LiveSpeechDtos.CommentRequest("comment-2", "可以停车吗", null, "voice"), 3L).status())
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("comment-2", "可以停车吗", null, "voice"), 3L).status())
                 .isEqualTo("skipped");
         verify(comments, never()).save(any());
         verify(comments, never()).saveAndFlush(any());
@@ -86,8 +88,8 @@ class MockCommentServiceTest {
     @Test
     void modelCallsPerSessionAreCapped() {
         when(comments.countBySessionIdAndModelUsedTrueAndCreatedAtAfter(eq(2L), any()))
-                .thenReturn((long) MockCommentService.MAX_AI_PER_TEN_MINUTES);
-        assertThat(service.receive(2L, new LiveSpeechDtos.CommentRequest("comment-3", "可以停车吗", null, "voice"), 3L).status())
+                .thenReturn((long) LiveCommentIntake.MAX_AI_PER_TEN_MINUTES);
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("comment-3", "可以停车吗", null, "voice"), 3L).status())
                 .isEqualTo("unanswered");
         assertThat(saved()).returns("UNANSWERED", LiveComment::getStatus).returns(false, LiveComment::isModelUsed)
                 .returns(false, LiveComment::isKnowledgeGap);
@@ -99,15 +101,51 @@ class MockCommentServiceTest {
     void aSessionSetUpForItHasItsCoHostAnswerWhateverVoiceTheConsoleAskedFor() {
         session.setConfig(new LiveDtos.Config(null, null, null, null, null, null,
                 List.of(new LiveDtos.VoiceRole("builtin:host", "host"), new LiveDtos.VoiceRole("sample:8", "cohost")), true, null, true));
-        service.receive(2L, new LiveSpeechDtos.CommentRequest("comment-1", "可以停车吗", null, "host"), 3L);
+        service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("comment-1", "可以停车吗", null, "host"), 3L);
         assertThat(saved().getVoice()).isEqualTo("sample:8");
         verify(voices).resolveVoice(4L, 8L, null, 3L);
     }
 
     @Test
+    void aCommentReadFromTheLiveRoomIsKeptApartFromASimulatedOneEvenUnderTheSameId() {
+        var liveRoom = new LiveRoomCommentProvider();
+        service.receive(liveRoom, 2L, new LiveSpeechDtos.CommentRequest("7694182886523032630", " 在哪里 ", null, "voice"), 3L);
+        assertThat(saved().getProvider()).isEqualTo("DOUYIN_WEB");
+        assertThat(saved().getText()).isEqualTo("在哪里");
+        // Whether it has been seen before is asked per source: the two never deduplicate each other.
+        verify(comments).findBySessionIdAndProviderAndExternalId(eq(2L), eq("DOUYIN_WEB"), anyString());
+        verify(comments, never()).findBySessionIdAndProviderAndExternalId(eq(2L), eq("MOCK"), anyString());
+    }
+
+    @Test
+    void greetingsAndAbuseAreTurnedAwayBeforeAnythingIsStoredOrAnyModelIsAsked() {
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("c-1", "哈哈哈哈", null, "voice"), 3L).status())
+                .isEqualTo("skipped");
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("c-2", "加我微信领福利", null, "voice"), 3L).status())
+                .isEqualTo("blocked");
+        verifyNoInteractions(sessions, comments, tasks, voices);
+    }
+
+    @Test
+    void inABusyRoomQuestionsKeepBeingJudgedAfterChatterHasStopped() {
+        when(comments.countBySessionIdAndModelUsedTrueAndCreatedAtAfter(eq(2L), any()))
+                .thenReturn((long) LiveCommentIntake.ORDINARY_PER_TEN_MINUTES);
+
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("c-1", "上次去过你们店", null, "voice"), 3L).status())
+                .isEqualTo("unanswered");
+        assertThat(saved().getNote()).isEqualTo("弹幕较多，优先处理提问，这条没有处理");
+        assertThat(saved().isModelUsed()).isFalse();
+        verifyNoInteractions(tasks);
+
+        assertThat(service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("c-2", "多少钱一杯？", null, "voice"), 3L).status())
+                .isEqualTo("answering");
+        verify(tasks).submit(eq(LiveReplyGenerateHandler.TYPE), eq(LiveReplyLane.QUEUE), any(), anyString(), eq(3L));
+    }
+
+    @Test
     void anEndedSessionTakesNoMoreComments() {
         session.setStatus("ENDED");
-        assertThatThrownBy(() -> service.receive(2L, new LiveSpeechDtos.CommentRequest("comment-1", "在吗", null, "voice"), 3L))
+        assertThatThrownBy(() -> service.receive(simulated, 2L, new LiveSpeechDtos.CommentRequest("comment-1", "在吗", null, "voice"), 3L))
                 .isInstanceOf(BizException.class).hasMessageContaining("已结束");
         verifyNoInteractions(comments, tasks);
     }

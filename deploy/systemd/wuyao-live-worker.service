@@ -1,0 +1,21 @@
+[Unit]
+Description=Wuyao Growth Live Worker
+After=network-online.target postgresql.service redis-server.service wuyao-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/wuyao-current/backend/growth-api
+ExecStart=/usr/bin/java -Xms256m -Xmx1024m -jar /home/ubuntu/wuyao-current/backend/growth-api/target/growth-api-0.1.0.jar --spring.config.import=file:/etc/wuyao/growth-api.env[.properties] --growth.worker.enabled=true --growth.worker.queues=LIVE --growth.worker.parallelism=2 --spring.datasource.hikari.maximum-pool-size=10 --spring.datasource.hikari.minimum-idle=2 --server.port=8096 --server.address=127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+SuccessExitStatus=143
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

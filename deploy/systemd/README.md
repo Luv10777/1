@@ -1,33 +1,33 @@
 # systemd deployment
 
-These units run the API and dedicated workers for all four production task queues.
-Runtime: Spring Boot 3.5 / Java 21. Updated: 2026-10-05.
+These units run the API and dedicated workers for all five production task queues.
+Runtime: Spring Boot 3.5 / Java 21. Updated: 2026-10-08.
 
 Copy these unit files to `/etc/systemd/system/` on the production host, then run:
 
 ```bash
 sudo systemd-analyze verify /etc/systemd/system/wuyao-video-worker.service \
-  /etc/systemd/system/wuyao-media-worker.service
+  /etc/systemd/system/wuyao-media-worker.service /etc/systemd/system/wuyao-live-worker.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now wuyao-api.service wuyao-worker.service \
   wuyao-image-worker@1.service wuyao-image-worker@2.service wuyao-image-worker@3.service \
-  wuyao-video-worker.service wuyao-media-worker.service
+  wuyao-video-worker.service wuyao-media-worker.service wuyao-live-worker.service
 ```
 
 The units reference the release symlink at `/home/ubuntu/wuyao-current`.
 Deploy a built Jar to a new release directory and switch that symlink before restarting services.
 Never rebuild or replace the Jar used by running services. After switching the symlink,
-restart the API and all default, image, video, and media workers so every process loads the same
+restart the API and all default, image, video, media, and live workers so every process loads the same
 release:
 
 ```bash
 sudo systemctl restart wuyao-api.service wuyao-worker.service \
   wuyao-image-worker@1.service wuyao-image-worker@2.service wuyao-image-worker@3.service \
-  wuyao-video-worker.service wuyao-media-worker.service
+  wuyao-video-worker.service wuyao-media-worker.service wuyao-live-worker.service
 ```
 
 The image instances listen on `127.0.0.1:8091` through `8093`; the default worker uses `8090`.
-The video and media workers use `127.0.0.1:8094` and `127.0.0.1:8095`, respectively.
+The video and media workers use `127.0.0.1:8094` and `127.0.0.1:8095`, respectively; the live worker uses `127.0.0.1:8096`.
 All units use `ubuntu:ubuntu`, the same working directory and configuration import, and the existing
 restart, shutdown, permission, and journal logging conventions.
 
@@ -37,6 +37,15 @@ restart, shutdown, permission, and journal logging conventions.
 | `IMAGE` | `wuyao-image-worker@.service` | 4 per instance | 1024 MiB per instance |
 | `VIDEO_PROVIDER` | `wuyao-video-worker.service` | 2 | 1024 MiB |
 | `MEDIA_CPU` | `wuyao-media-worker.service` | 2 | 4096 MiB |
+| `LIVE` (and `LIVE_REPLY`) | `wuyao-live-worker.service` | 2, plus 3 reply loops | 1024 MiB |
+
+The live worker writes narration scripts and synthesises speech for AI live sessions (queue `LIVE`).
+Any process whose queue list contains `LIVE` also starts the reply loops for viewer comments
+(queue `LIVE_REPLY`, `growth.live.reply-lane.concurrency`, default 3), so no separate unit is needed
+for them. Without this unit a live session can be started but nothing is ever spoken: narration stays
+at "正在合成" and comments at "AI 正在回答". It needs the text model (`TEXT_WRITER_*`) and the voice
+provider (`DASHSCOPE_*`) configured in `/etc/wuyao/growth-api.env`, the same as the API. Added
+2026-10-08; this unit has not yet been run on the production host.
 
 Keep the video and media queues in separate processes: downloads and media probing must not occupy
 the provider worker's execution slots or heap. Provider submissions and polls use two slots because

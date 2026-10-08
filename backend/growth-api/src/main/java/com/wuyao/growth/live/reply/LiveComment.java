@@ -73,9 +73,13 @@ public class LiveComment {
     @Column(name = "answered_at")
     private Instant answeredAt;
 
-    /** The speech command a reply to this comment is queued under; stable so a retry cannot speak twice. */
+    /**
+     * The speech command a reply to this comment is queued under; stable so a retry cannot speak twice.
+     * Two sources may use the same id for different comments, so the source is part of it. Simulated
+     * comments keep the form they have always been queued under.
+     */
     public String commandId() {
-        return "comment:" + externalId;
+        return "MOCK".equals(provider) ? "comment:" + externalId : "comment:" + provider + ":" + externalId;
     }
 
     public void settle(String status, String answer, String source, String note) {

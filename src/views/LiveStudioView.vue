@@ -6,6 +6,7 @@ import { selectedStore, selectedStoreId } from '../stores/merchantContext'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import VoiceLibraryPanel from '../components/VoiceLibraryPanel.vue'
 import LiveAudioControl from '../components/LiveAudioControl.vue'
+import { inDesktop } from '../utils/desktop'
 import { productApi } from '../services/productApi'
 import { knowledgeApi } from '../services/knowledgeApi'
 import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSessionName, pickCurrentSession, describeSession, sessionStatusLabel, isActiveSession, startBlockers, toCommentFeedItem, answeringCohostId } from '../services/liveApi'
@@ -529,7 +530,8 @@ watch(() => [stage.value, activeSessionId.value], ([nextStage, id]) => {
   if (nextStage === 'live' && id) { loadRealtime(); realtimePoll = setInterval(loadRealtime, 3000) }
 }, { immediate: true })
 onBeforeUnmount(() => clearInterval(realtimePoll))
-const stageFor = (status) => (isActiveSession({ status }) ? 'live' : status === 'ENDED' ? 'review' : 'setup')
+// 桌面端是用来开播的：只要这一场还没结束，打开就是直播工作台；配置在旁边的页签里。
+const stageFor = (status) => (status === 'ENDED' ? 'review' : isActiveSession({ status }) || inDesktop ? 'live' : 'setup')
 const loadSessionCore = async (id, ticket, storeId) => {
   const [session, rows] = await Promise.all([liveApi.get(id), liveApi.listQa(id)])
   if (!isCurrent(ticket, storeId)) return
@@ -923,7 +925,8 @@ onBeforeUnmount(() => {
       <div class="ls-live-main">
         <article class="panel ls-feed-panel">
           <div class="panel-heading"><div><p class="eyebrow">REALTIME</p><h3>弹幕流与 AI 回复</h3></div><span class="ls-pending-badge" :class="{ ready: commentFeed.length }">{{ commentFeed.length ? `${commentFeed.length} 条` : '暂无弹幕' }}</span></div>
-          <p class="ls-card-note">真实抖音弹幕尚未接入，这里显示的是下方“模拟弹幕互动”发出的问题与回复。</p>
+          <p v-if="inDesktop" class="ls-card-note">连接直播间后，这里显示从直播间读到的弹幕和 AI 的回复。</p>
+          <p v-else class="ls-card-note">真实抖音弹幕尚未接入，这里显示的是下方“模拟弹幕互动”发出的问题与回复。</p>
           <div v-if="commentFeed.length" class="ls-realtime-feed"><article v-for="item in commentFeed" :key="item.id" class="ls-realtime-item" :class="{ attention: item.needsPerson }"><div class="ls-realtime-line"><span class="ls-realtime-kind">{{ item.providerLabel || '观众' }}</span><strong>{{ item.question }}</strong><small class="ls-realtime-state" :class="item.tone">{{ item.stateLabel }}</small></div><div v-if="item.answer" class="ls-realtime-line"><span class="ls-realtime-kind reply">回复</span><p>{{ item.answer }}</p><small v-if="item.sourceLabel">{{ item.sourceLabel }}</small></div><p v-else-if="item.note" class="ls-realtime-note">{{ item.note }}</p></article></div><div v-else class="ls-workspace-empty"><MessageSquare :size="32" :stroke-width="1.4" aria-hidden="true" /><strong>还没有弹幕</strong><p>在“开发测试 · 模拟弹幕互动”里发一条问题：与知识库文字一致的直接用原话回复，其余由 AI 依据本场问答和商品资料回答。</p><button type="button" class="ls-ghost compact" @click="editStep('script')">查看互动知识库</button></div>
         </article>
       </div>

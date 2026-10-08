@@ -32,8 +32,9 @@ public class LiveCommentFeed {
         LiveSession session = sessions.findById(sessionId)
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "直播场次不存在"));
         stores.requireAccess(session.getStoreId(), userId);
-        // No platform is connected: whatever is listed came from the console's simulated comments.
-        return new LiveDtos.RealtimeView("NOT_CONNECTED", "真实抖音弹幕尚未接入",
+        // The server is not connected to any platform. Real comments only arrive when the merchant's
+        // desktop app reads them from the live room and sends them in; the rest are simulated.
+        return new LiveDtos.RealtimeView("NOT_CONNECTED", "未接入抖音官方弹幕接口；直播间弹幕由桌面端读取后送入",
                 comments.findTop50BySessionIdOrderByIdDesc(sessionId).stream()
                         .map(comment -> new LiveDtos.RealtimeItem(String.valueOf(comment.getId()), "COMMENT",
                                 comment.getText(), comment.getAnswer(), comment.getSource(), comment.getStatus(),
