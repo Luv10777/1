@@ -48,6 +48,32 @@ public class MinioObjectStorage implements ObjectStorage {
     }
 
     @Override
+    public void download(String key, java.nio.file.Path target, int maxBytes) throws java.io.IOException {
+        try {
+            var object = stat(key).orElseThrow(() -> new java.io.IOException("视频文件不存在"));
+            if (object.sizeBytes() <= 0 || object.sizeBytes() > maxBytes) {
+                throw new java.io.IOException("视频文件超过大小限制");
+            }
+            try (var input = client.getObject(GetObjectArgs.builder().bucket(bucket).object(key).build());
+                 var output = java.nio.file.Files.newOutputStream(target)) {
+                byte[] buffer = new byte[64 * 1024];
+                long total = 0;
+                int length;
+                while ((length = input.read(buffer)) != -1) {
+                    total += length;
+                    if (total > maxBytes) throw new java.io.IOException("视频文件超过大小限制");
+                    output.write(buffer, 0, length);
+                }
+                if (total != object.sizeBytes()) throw new java.io.IOException("视频文件下载不完整");
+            }
+        } catch (java.io.IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new java.io.IOException("视频文件读取失败");
+        }
+    }
+
+    @Override
     public String presignGet(String key, Duration ttl) {
         return presign(Method.GET, key, ttl);
     }

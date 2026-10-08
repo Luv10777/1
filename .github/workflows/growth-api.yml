@@ -25,6 +25,10 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: backend/growth-api/pom.xml
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
       - name: Verify with PostgreSQL and MinIO
         working-directory: backend/growth-api
         run: mvn -B -ntp verify

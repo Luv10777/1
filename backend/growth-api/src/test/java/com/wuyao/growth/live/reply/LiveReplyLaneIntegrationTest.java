@@ -37,6 +37,7 @@ import static org.awaitility.Awaitility.await;
 // database until the context closes, and closing waits for them.
 @Testcontainers
 @SpringBootTest(properties = {"growth.worker.enabled=true", "growth.worker.poll-interval=200",
+        "growth.worker.parallelism=1",
         "logging.level.root=WARN", "logging.level.com.wuyao.growth=WARN",
         // A developer's local .env must not point this test at a real model or bucket.
         "growth.ai.writer.url=", "growth.voice.sample-storage=minio"})

@@ -20,6 +20,9 @@ public class RoutedObjectStorage implements ObjectStorage {
     public Optional<StoredObject> stat(String key) { return forKey(key).stat(key); }
     public void delete(String key) { forKey(key).delete(key); }
     public byte[] read(String key, int maxBytes) { return forKey(key).read(key, maxBytes); }
+    public void download(String key, java.nio.file.Path target, int maxBytes) throws java.io.IOException {
+        forKey(key).download(key, target, maxBytes);
+    }
     public void put(String key, byte[] data, String contentType) { forKey(key).put(key, data, contentType); }
     public void put(String key, InputStream data, long size, String contentType) {
         forKey(key).put(key, data, size, contentType);

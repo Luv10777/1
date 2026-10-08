@@ -32,6 +32,11 @@ public interface ObjectStorage {
     /** Small image objects only; implementations enforce the byte limit before decoding. */
     byte[] read(String key, int maxBytes);
 
+    /** Download bounded media to a worker's temporary file. */
+    default void download(String key, java.nio.file.Path target, int maxBytes) throws java.io.IOException {
+        java.nio.file.Files.write(target, read(key, maxBytes));
+    }
+
     void put(String key, byte[] data, String contentType);
 
     /** Stream a provider response directly into object storage. Implementations must not buffer it in the JVM. */

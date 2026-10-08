@@ -2003,6 +2003,21 @@ class FoundationIntegrationTest {
     }
 
     @Test
+    void routedMediaDownloadRejectsOversizedFilesBeforeWritingToDisk(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        String key = "t" + tenantA + "/video-analysis/download-test.mp4";
+        byte[] content = {1, 2, 3, 4};
+        imageStorage.put(key, content, "video/mp4");
+        var target = directory.resolve("video.mp4");
+        imageStorage.download(key, target, content.length);
+        assertThat(java.nio.file.Files.readAllBytes(target)).isEqualTo(content);
+        var oversized = directory.resolve("oversized.mp4");
+        assertThatThrownBy(() -> imageStorage.download(key, oversized, content.length - 1))
+                .isInstanceOf(java.io.IOException.class).hasMessageContaining("大小限制");
+        assertThat(java.nio.file.Files.exists(oversized)).isFalse();
+    }
+
+    @Test
     void cleanupProcessesAllTenantsUnderRlsAndKeepsReadyAndRecentUploads() throws Exception {
         var a = ticket();
         var b = TenantContext.runAs(tenantB, () -> assets.presignUpload(new AssetDtos.PresignRequest("test", "IMAGE", "image/png"), null));

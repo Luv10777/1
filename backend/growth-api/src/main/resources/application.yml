@@ -36,6 +36,7 @@ spring:
 
   data:
     redis:
+      client-type: ${REDIS_CLIENT_TYPE:lettuce}
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
@@ -52,6 +53,26 @@ server:
 
 # ---- 平台自有配置 ----
 growth:
+  video-analysis:
+    base-url: ${VIDEO_ANALYSIS_BASE_URL:https://api.onlyrouter.ai/v1}
+    api-key: ${VIDEO_ANALYSIS_API_KEY:}
+    model: ${VIDEO_ANALYSIS_MODEL:gpt-6-luna}
+    timeout-seconds: ${VIDEO_ANALYSIS_TIMEOUT_SECONDS:180}
+    max-tokens: ${VIDEO_ANALYSIS_MAX_TOKENS:6000}
+    max-bytes: ${VIDEO_ANALYSIS_MAX_BYTES:104857600}
+    max-duration-seconds: ${VIDEO_ANALYSIS_MAX_DURATION_SECONDS:60}
+    max-frames: ${VIDEO_ANALYSIS_MAX_FRAMES:48}
+    frame-long-edge: ${VIDEO_ANALYSIS_FRAME_LONG_EDGE:1280}
+    fps: ${VIDEO_ANALYSIS_FPS:2}
+    audio:
+      base-url: ${VIDEO_ANALYSIS_AUDIO_BASE_URL:}
+      api-key: ${VIDEO_ANALYSIS_AUDIO_API_KEY:}
+      model: ${VIDEO_ANALYSIS_AUDIO_MODEL:}
+      input-encoding: ${VIDEO_ANALYSIS_AUDIO_INPUT_ENCODING:DATA_URL}
+      timeout-seconds: ${VIDEO_ANALYSIS_AUDIO_TIMEOUT_SECONDS:120}
+      max-tokens: ${VIDEO_ANALYSIS_AUDIO_MAX_TOKENS:4000}
+    ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${FFPROBE_PATH:ffprobe}
   ai:
     # 文案能力（TEXT_WRITER），直播自动讲解用它写话术。任何 OpenAI 兼容的 chat completions 接口都可以。
     # 三项缺任何一项都视为未配置：自动讲解会明确报错，不会用占位内容顶替。
@@ -147,6 +168,7 @@ growth:
       seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:doubao-seedance-2-0-fast-260128}
     poll-seconds: ${VIDEO_POLL_SECONDS:15}
   http:
+    server-protocol: ${SERVER_PROTOCOL:}
     max-total: ${HTTP_MAX_TOTAL:200}
     max-per-route: ${HTTP_MAX_PER_ROUTE:50}
     connection-timeout: ${HTTP_CONNECTION_TIMEOUT:15}
