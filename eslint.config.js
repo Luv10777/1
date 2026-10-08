@@ -30,4 +30,9 @@ export default [
       'vue/html-self-closing': 'off',
     },
   },
+  {
+    // 桌面端注入页面的脚本运行在沙箱里，只能写成 CommonJS。
+    files: ['desktop/**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
+  },
 ]

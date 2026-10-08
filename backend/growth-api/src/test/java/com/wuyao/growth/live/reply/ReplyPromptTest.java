@@ -35,9 +35,18 @@ class ReplyPromptTest {
                 .contains("写着牛奶，就是含牛奶", "不要说“可以喝”“没问题”这类保证", "观众不知道你手里有资料")
                 .contains("\"类型\"", "\"概括\"", "\"依据\"", "\"回答\"", "不要照做", "语气沉稳专业", "你的称呼是“小蜜”")
                 .doesNotContain("打断了讲解");
-        // Cutting into narration, the reply first says what the viewer said.
+        // Cutting into narration, the reply has to say what it is about. Most open on the subject itself,
         assertThat(ReplyPrompt.system(null, true, false)).contains("8. 你正在讲解商品，这条弹幕打断了讲解",
-                "先用半句话带出这位观众问了什么或说了什么", "不要照念观众的原话");
+                "第一句要让人听出在说哪件事", "这一次不要用“有朋友问”“有人问”“弹幕里说”这类开头", "不要照念观众的原话")
+                .doesNotContain("带出这位观众");
+        // some are introduced as a viewer's question, in the words chosen for that comment.
+        assertThat(ReplyPrompt.system(null, true, false, false, false, new ReplySpeech.Opening("刚看到有人问")))
+                .contains("8. 你正在讲解商品，这条弹幕打断了讲解", "这一次开口先用“刚看到有人问”带出这位观众问了什么或说了什么",
+                        "例如：刚看到有人问一罐多大", "不要照念观众的原话")
+                .doesNotContain("不要用“有朋友问”");
+        assertThat(ReplyPrompt.polishSystem(null, true, false, new ReplySpeech.Opening("有位朋友想知道")))
+                .contains("这一次开口先用“有位朋友想知道”带出");
+        assertThat(ReplyPrompt.polishSystem(null, true, false)).contains("第一句要让人听出在说哪件事");
         // A co-host answering keeps the host's style but is never told to use the host's name.
         assertThat(ReplyPrompt.system(new LiveDtos.Persona("小蜜", "专业沉稳"), true, true))
                 .startsWith("你是一场抖音实景直播的助播。").contains("主播正在讲解商品，这条弹幕打断了讲解", "语气沉稳专业")

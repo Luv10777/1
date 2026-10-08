@@ -89,6 +89,11 @@ growth:
       # 需要模型先想清楚再答的调用（判断弹幕要不要回、该怎么回）额外并入的 JSON，盖过上面的默认值。
       # 留空则这类调用和其他调用一样。通义千问：{"enable_thinking":true}
       reasoning-extra-body: ${TEXT_WRITER_REASONING_EXTRA_BODY:}
+  live:
+    comment-screen:
+      # 观众弹幕里出现就不回答、AI 的回复里出现就不播出的词，逗号分隔：竞品名、不想在直播里提到的名字等。
+      # 辱骂和站外引流（加微信、发网址、留手机号）已经内置，不用写在这里。
+      blocked-terms: ${LIVE_BLOCKED_TERMS:}
   voice:
     sample-storage: ${VOICE_SAMPLE_STORAGE:minio}
     dashscope:

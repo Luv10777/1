@@ -28,6 +28,7 @@ import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
 import TeamView from './views/TeamView.vue'
+import { inDesktop } from './utils/desktop'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
@@ -94,13 +95,16 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   if (to.meta.public) {
-    if (to.name === 'login' && auth.isAuthenticated) return { name: 'dashboard' }
+    if (to.name === 'login' && auth.isAuthenticated) return { name: inDesktop ? 'digital-human' : 'dashboard' }
     return true
   }
 
   if (!auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
+
+  // 桌面端只做直播这一件事：别的页面一律回到直播页。
+  if (inDesktop && to.name !== 'digital-human') return { name: 'digital-human' }
 
   if (to.meta.role && !auth.hasRole(to.meta.role)) return { name: 'forbidden' }
   if (to.meta.ownerOnly && !auth.isOwner) return { name: 'forbidden' }

@@ -74,7 +74,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"growth.worker.enabled=false", "logging.level.root=WARN",
         "logging.level.com.wuyao.growth=WARN",
         // A developer's local .env must not point this test at a real model or bucket.
-        "growth.ai.writer.url=", "growth.voice.sample-storage=minio"})
+        "growth.ai.writer.url=", "growth.voice.sample-storage=minio",
+        // A name the operator has said must never be spoken on air.
+        "growth.live.comment-screen.blocked-terms=隔壁茶铺"})
 @AutoConfigureMockMvc
 @Testcontainers
 class LiveSpeechPipelineIntegrationTest {
@@ -658,6 +660,28 @@ class LiveSpeechPipelineIntegrationTest {
         assertThat(realtime.path("items").get(0).path("state").asText()).isEqualTo("ATTENTION");
         assertThat(realtime.path("items").get(2).path("state").asText()).isEqualTo("SKIPPED");
         assertThat(realtime.path("items").get(0).path("provider").asText()).isEqualTo("MOCK");
+
+        // A comment the desktop app read from the live room goes down the same path under its own
+        // source: the id of a simulated comment does not make it a repeat.
+        writer.reply = request -> decided("其他", 0, "");
+        assertThat(api(post(path("/comments")), comment("c-3", "上次去过你们店")).path("status").asText()).isEqualTo("answering");
+        drain();
+        JsonNode latest = api(get(path("/realtime")), null).path("items").get(0);
+        assertThat(latest.path("text").asText()).isEqualTo("上次去过你们店");
+        assertThat(latest.path("provider").asText()).isEqualTo("DOUYIN_WEB");
+        assertThat(latest.path("state").asText()).isEqualTo("SKIPPED");
+        assertThat(api(post(path("/comments")), comment("c-3", "上次去过你们店")).path("status").asText()).isEqualTo("skipped");
+        assertThat(owner.queryForObject("SELECT count(*) FROM live_comments", Integer.class)).isEqualTo(7);
+
+        // Greetings, filler and advertising are settled by rules: nothing is stored and no model is asked,
+        // from either source.
+        int asked = writer.requests.size();
+        assertThat(api(post(path("/comments")), comment("c-20", "哈哈哈哈")).path("status").asText()).isEqualTo("skipped");
+        assertThat(api(post(path("/mock-comments")), comment("c-21", "666")).path("status").asText()).isEqualTo("skipped");
+        assertThat(api(post(path("/comments")), comment("c-22", "加我微信领福利")).path("status").asText()).isEqualTo("blocked");
+        drain();
+        assertThat(writer.requests).hasSize(asked);
+        assertThat(owner.queryForObject("SELECT count(*) FROM live_comments", Integer.class)).isEqualTo(7);
     }
 
     @Test
@@ -729,7 +753,10 @@ class LiveSpeechPipelineIntegrationTest {
         });
         assertThat(replies.get(0).get("text")).isEqualTo("有朋友问几点关门，我们每天晚上 9 点关门哈。");
         assertThat(replies.get(1).get("text")).isEqualTo("有朋友问一罐多大，这款椴树蜂蜜一罐是 500 克的。");
-        assertThat((String) replies.get(2).get("text")).endsWith("问几点关门，我们每天晚上 9 点关门。");
+        // A saved answer spoken as it stands is told apart from the narration by naming the question first,
+        // in one of several ways.
+        assertThat((String) replies.get(2).get("text")).endsWith("几点关门，我们每天晚上 9 点关门。")
+                .isNotEqualTo("几点关门，我们每天晚上 9 点关门。");
 
         // The player is told where the closing line starts, so it can leave it out.
         assertThat(commands(socket)).filteredOn(command -> command.path("id").asText().startsWith("comment:"))
@@ -851,6 +878,32 @@ class LiveSpeechPipelineIntegrationTest {
         api(post("/api/products/" + product + "/faqs"), Map.of("question", "能打包吗", "answer", "可以打包带走"));
         assertThat(api(get(path("/unanswered-questions")), null)).extracting(gap -> gap.path("text").asText())
                 .containsExactlyInAnyOrder("保质期多久", "能便宜点吗", "两罐是不是 88 元");
+    }
+
+    @Test
+    void aTermThatMustNotBeSpokenStaysOffAirWhetherAViewerOrTheModelBringsItUp() throws Exception {
+        WebSocketSession socket = connectPlayer();
+        // A viewer who names it is not answered at all: nothing is stored and the model is not asked.
+        assertThat(api(post(path("/mock-comments")), comment("c-1", "隔 壁 茶 铺是不是更便宜")).path("status").asText()).isEqualTo("blocked");
+        drain();
+        assertThat(writer.requests).isEmpty();
+        assertThat(owner.queryForObject("SELECT count(*) FROM live_comments", Integer.class)).isZero();
+
+        // The model bringing it up on its own is sent back to word the reply again.
+        writer.reply = request -> decided("提问", 0, request.prompt().contains("上一版不合格")
+                ? "咱们家的蜂蜜都是当季现采的，喜欢的朋友可以放心拍。" : "比隔壁茶铺的好，咱们家的蜂蜜都是当季现采的。");
+        api(post(path("/mock-comments")), comment("c-2", "别家是不是更便宜"));
+        drain();
+        assertThat(writer.requests.get(1).prompt()).contains("上一版不合格", "不能在直播里说的词");
+        assertThat(feed("c-2")).containsEntry("status", "ANSWERED").containsEntry("answer", "咱们家的蜂蜜都是当季现采的，喜欢的朋友可以放心拍。");
+
+        // And if it will not let go of it, nothing is said.
+        writer.reply = request -> decided("提问", 0, "隔壁茶铺确实便宜一些，咱们家胜在当季现采。");
+        api(post(path("/mock-comments")), comment("c-3", "和别家比怎么样"));
+        drain();
+        assertThat(feed("c-3")).containsEntry("status", "UNANSWERED").containsEntry("answer", null);
+        assertThat((String) feed("c-3").get("note")).contains("未通过校验", "不能在直播里说的词");
+        assertThat(commands(socket)).extracting(command -> command.path("text").asText()).noneMatch(text -> text.contains("隔壁茶铺"));
     }
 
     @Test

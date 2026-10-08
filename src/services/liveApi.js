@@ -18,6 +18,8 @@ export const liveApi = {
   playerCommand: (id, data) => post(`/api/live-sessions/${id}/player/commands`, data),
   speech: (id, data) => post(`/api/live-sessions/${id}/speech`, data),
   mockComment: (id, data) => post(`/api/live-sessions/${id}/mock-comments`, data),
+  // 桌面端从直播间读到的弹幕。
+  comment: (id, data) => post(`/api/live-sessions/${id}/comments`, data),
   autoScript: (id) => get(`/api/live-sessions/${id}/auto-script`),
   startAutoScript: (id) => post(`/api/live-sessions/${id}/auto-script/start`, {}),
   stopAutoScript: (id) => post(`/api/live-sessions/${id}/auto-script/stop`, {}),
@@ -172,7 +174,7 @@ const COMMENT_STATES = {
   ATTENTION: { label: '需要人工处理', tone: 'failed' },
 }
 const ANSWER_SOURCES = { SESSION: '本场问答', PRODUCT_FAQ: '商品问答', PRODUCT: '商品知识', STORE: '门店知识库', AI: 'AI 依据资料回答' }
-const COMMENT_PROVIDERS = { MOCK: '模拟弹幕' }
+const COMMENT_PROVIDERS = { MOCK: '模拟弹幕', DOUYIN_WEB: '直播间弹幕' }
 
 /** 弹幕流里的一条：观众问了什么、回了什么、回答出自哪里；没回的要说明原因。 */
 export function toCommentFeedItem(item) {

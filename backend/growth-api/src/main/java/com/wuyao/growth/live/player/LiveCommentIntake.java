@@ -5,6 +5,7 @@ import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.live.LiveSession;
 import com.wuyao.growth.live.LiveSessionRepository;
+import com.wuyao.growth.live.reply.CommentScreen;
 import com.wuyao.growth.live.reply.LiveComment;
 import com.wuyao.growth.live.reply.LiveCommentRepository;
 import com.wuyao.growth.live.reply.LiveReplyGenerateHandler;
@@ -23,18 +24,24 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Takes a simulated viewer comment. The request only records it and hands it to a worker: whether
- * it is answered, and in which words, is decided there, where the text model can be asked without a
- * user waiting on the call.
+ * Takes a viewer comment, whichever source it came from: typed into the console as a simulated one,
+ * or read from the merchant's live room by their desktop app. The request only records it and hands
+ * it to a worker: whether it is answered, and in which words, is decided there, where the text model
+ * can be asked without a user waiting on the call.
  */
 @Service
 @RequiredArgsConstructor
-public class MockCommentService {
+public class LiveCommentIntake {
     /** Ceiling on model calls per session, whatever the comment source sends. */
     static final int MAX_AI_PER_TEN_MINUTES = 30;
+    /**
+     * Comments that do not read like a question, a wish to buy or a complaint stop being judged at
+     * this many, so that in a busy room the rest of the budget is left for the ones that do.
+     */
+    static final int ORDINARY_PER_TEN_MINUTES = 20;
     private static final Set<String> ACTIVE = Set.of("DRAFT", "LIVE", "PAUSED");
 
-    private final MockCommentProvider provider;
+    private final CommentScreen screen;
     private final LiveSessionRepository sessions;
     private final LiveCommentRepository comments;
     private final StoreAccessService stores;
@@ -42,8 +49,14 @@ public class MockCommentService {
     private final TaskService tasks;
     private final TransactionTemplate transactions;
 
-    public LiveSpeechDtos.CommentResult receive(Long sessionId, LiveSpeechDtos.CommentRequest request, Long userId) {
-        var incoming = provider.receive(request.id(), request.text());
+    public LiveSpeechDtos.CommentResult receive(LiveCommentProvider source, Long sessionId,
+                                                LiveSpeechDtos.CommentRequest request, Long userId) {
+        var incoming = source.receive(request.id(), request.text());
+        // Decided by rules, before anything is stored or any model is asked. A real room is mostly
+        // greetings and laughter: none of it is listed, so the feed stays what a person wants to read.
+        CommentScreen.Verdict verdict = screen.screen(incoming.text());
+        if (verdict == CommentScreen.Verdict.NOISE) return new LiveSpeechDtos.CommentResult("skipped", null, null);
+        if (verdict == CommentScreen.Verdict.BLOCKED) return new LiveSpeechDtos.CommentResult("blocked", null, null);
         String externalId = PlayerTokenService.sha256(incoming.id());
         return transactions.execute(tx -> {
             // The row lock is what makes look-up-then-insert safe against the same comment arriving twice.
@@ -69,9 +82,14 @@ public class MockCommentService {
             comment.setVoice(voice.encode());
             comment.setCreatedBy(userId);
 
-            if (comments.countBySessionIdAndModelUsedTrueAndCreatedAtAfter(sessionId,
-                    Instant.now().minus(Duration.ofMinutes(10))) >= MAX_AI_PER_TEN_MINUTES) {
+            long judged = comments.countBySessionIdAndModelUsedTrueAndCreatedAtAfter(sessionId,
+                    Instant.now().minus(Duration.ofMinutes(10)));
+            if (judged >= MAX_AI_PER_TEN_MINUTES) {
                 comment.settle(LiveComment.UNANSWERED, null, null, "弹幕过于频繁，这条没有处理");
+                return result(comments.save(comment));
+            }
+            if (verdict == CommentScreen.Verdict.ORDINARY && judged >= ORDINARY_PER_TEN_MINUTES) {
+                comment.settle(LiveComment.UNANSWERED, null, null, "弹幕较多，优先处理提问，这条没有处理");
                 return result(comments.save(comment));
             }
             // Fail here, where the user is waiting, rather than after a model call has been paid for.

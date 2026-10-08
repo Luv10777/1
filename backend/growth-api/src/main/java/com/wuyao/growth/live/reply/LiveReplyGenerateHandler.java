@@ -65,6 +65,7 @@ public class LiveReplyGenerateHandler implements TaskHandler {
     private static final int MAX_SPOKEN = 1000;
     private static final Set<String> ACTIVE = Set.of("DRAFT", "LIVE", "PAUSED");
 
+    private final CommentScreen screen;
     private final LiveCommentRepository comments;
     private final LiveSessionRepository sessions;
     private final LiveSpeechItemRepository items;
@@ -169,7 +170,7 @@ public class LiveReplyGenerateHandler implements TaskHandler {
                 ? new Outcome(LiveComment.UNANSWERED, null, saved.source(), "命中的问答回复超过 1000 字，请先缩短知识库回复", false)
                 : new Outcome(LiveComment.ANSWERED, asWritten, saved.source(), null, false);
         try {
-            String system = ReplyPrompt.polishSystem(job.persona(), job.narrating(), job.byCohost());
+            String system = ReplyPrompt.polishSystem(job.persona(), job.narrating(), job.byCohost(), ReplySpeech.opening(job.commandId()));
             String material = ReplyPrompt.polishUser(saved.question(), saved.answer(), null);
             // Spoken words run longer than a written note, and the lead-in repeats the question.
             int maxChars = Math.min(MAX_SPOKEN, saved.answer().length() * 2 + saved.question().length() + 60);
@@ -194,7 +195,8 @@ public class LiveReplyGenerateHandler implements TaskHandler {
         if (job.candidates().isEmpty() && job.facts().isBlank()) {
             return new Outcome(LiveComment.UNANSWERED, null, null, "本场没有可用于回答的资料", false);
         }
-        String system = ReplyPrompt.system(job.persona(), job.narrating(), job.byCohost(), !job.brand().isEmpty(), !job.store().isEmpty());
+        String system = ReplyPrompt.system(job.persona(), job.narrating(), job.byCohost(), !job.brand().isEmpty(), !job.store().isEmpty(),
+                ReplySpeech.opening(job.commandId()));
         String facts = ReplyPrompt.material(job.facts(), job.store(), job.brand());
         // What the merchant saved, and therefore what the model's wording is checked against.
         // The viewer's text is left out: a number a viewer typed is not a fact.
@@ -255,9 +257,11 @@ public class LiveReplyGenerateHandler implements TaskHandler {
     }
 
     /** The checks every model-worded reply passes before it is spoken. */
-    private static Optional<String> violation(String text, String material, int maxChars) {
+    private Optional<String> violation(String text, String material, int maxChars) {
         Optional<String> violation = ReplyPrompt.speaksOfIdentity(text)
                 ? Optional.of("不能谈论主播是真人还是 AI，两种说法都不要出现")
+                // The reply opens by saying what the viewer said: this is where their words could get on air.
+                : screen.unspeakable(text) ? Optional.of("出现了不能在直播里说的词，换一种说法，不要复述观众的原话")
                 : ScriptGuard.violation(text, material, ReplyPrompt.MIN_CHARS, maxChars);
         // What was refused is kept nowhere else; without it a wrong refusal cannot be told from a right one.
         violation.ifPresent(reason -> log.info("直播弹幕回复未通过校验: reason={} text={}", reason, text));

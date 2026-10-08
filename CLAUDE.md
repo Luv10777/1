@@ -9,6 +9,7 @@
 | `legacy/` | 已退休的旧实现，只为查阅保留 |
 | `docs/` | 设计文档。`adr/` 记录架构决策的来龙去脉 |
 | `deploy/` | 测试服务器部署（Docker Compose 全栈），步骤见 `deploy/README.md` |
+| `desktop/` | 桌面端（Electron），在商家电脑上读取直播间弹幕；试用阶段，说明见 `desktop/README.md` |
 
 ## ⛔ legacy/ 目录
 

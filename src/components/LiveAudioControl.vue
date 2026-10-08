@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowRight, Volume2 } from 'lucide-vue-next'
 import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from '../services/liveApi'
 import { LivePlayerSession } from '../services/livePlayerSession'
+import { inDesktop } from '../utils/desktop'
+import { config } from '../utils/config'
 
 const props = defineProps({
   sessionId: { type: Number, default: null },
@@ -19,6 +21,10 @@ const props = defineProps({
 })
 const emit = defineEmits(['open-workspace', 'start-session', 'edit-step'])
 const isDevelopment = import.meta.env.DEV
+// 网页版读不到直播间弹幕，要靠桌面端。安装包的地址配置了才给入口；已经在桌面端里就不用再提。
+const desktopDownloadUrl = inDesktop ? '' : config.desktopDownloadUrl
+// 读取直播间弹幕要靠桌面软件，网页版浏览器做不到：只有在桌面端里打开时才加载这一块。
+const LiveDanmakuPanel = inDesktop ? defineAsyncComponent(() => import('./LiveDanmakuPanel.vue')) : null
 const idlePlayback = () => ({ status: 'idle', connectionError: '', current: null, pending: [], paused: false, loading: false, error: '' })
 const busy = ref(false)
 const notice = ref('')
@@ -176,7 +182,13 @@ const send = (mock = false) => run(async current => {
       : await liveApi.speech(id, { id: crypto.randomUUID(), mode: mode.value, text, ...voice })
     if (!current()) return
     notice.value = mock
-      ? result.status === 'answering' ? '已收到。AI 会先判断这条弹幕该不该回、怎么回，结果见上方弹幕流。' : result.status === 'unanswered' ? '这条没有处理，原因见上方弹幕流。' : '这条弹幕之前已经处理过，结果见上方弹幕流。'
+      ? ({
+          answering: '已收到。AI 会先判断这条弹幕该不该回、怎么回，结果见上方弹幕流。',
+          unanswered: '这条没有处理，原因见上方弹幕流。',
+          // 这两类按规则直接放过，不问 AI，也不记入弹幕流。
+          skipped: '这条属于打招呼、刷屏一类，不需要回复，没有交给 AI。',
+          blocked: '这条含有辱骂、引流或被屏蔽的词，不会回复。',
+        })[result.status] || '这条弹幕之前已经处理过，结果见上方弹幕流。'
       : '已提交合成，完成后自动加入播报队列，进度见下方播报记录。'
     await refresh()
     schedule()
@@ -200,11 +212,18 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="!storeId || blockers.length > 0" @click="emit('start-session')">开始本场<ArrowRight :size="15" /></button>
         <button v-else-if="sessionStatus !== 'ENDED'" type="button" class="primary-button compact" :disabled="!storeId" @click="emit('open-workspace')">前往直播工作台<ArrowRight :size="15" /></button>
       </div>
+      <div v-if="desktopDownloadUrl" class="audio-desktop">
+        <div class="audio-desktop-head">
+          <div><strong>让 AI 回答直播间弹幕<span>试用</span></strong><p>网页版读不到抖音直播间里的弹幕。装上桌面端、在桌面端里开播，AI 才能看到观众发的弹幕并回答。商品、话术和问答仍在这里配置，桌面端只负责开播。目前只有 Windows 版。</p></div>
+          <div class="audio-desktop-actions"><a class="ls-ghost compact" href="yifangzhi://live">打开桌面端</a><a class="primary-button compact" :href="desktopDownloadUrl" download>下载 Windows 版</a></div>
+        </div>
+        <p class="audio-help">点“打开桌面端”没有反应，说明这台电脑还没有安装，请先下载。安装包暂时没有数字签名，Windows 会提示“未知发布者”，点“更多信息 → 仍要运行”即可。读取弹幕用的不是抖音官方接口，抖音网页改版时可能暂时失效。</p>
+      </div>
     </template>
     <template v-else>
       <div class="audio-live-bar">
         <span class="audio-preparation-icon"><Volume2 :size="18" /></span>
-        <div class="audio-live-copy"><strong>网页播报</strong><span class="audio-status" :class="{ online }"><i />{{ playbackView.label }}</span><small>{{ playbackView.detail }}</small></div>
+        <div class="audio-live-copy"><strong>{{ inDesktop ? '播报' : '网页播报' }}</strong><span class="audio-status" :class="{ online }"><i />{{ playbackView.label }}</span><small>{{ playbackView.detail }}</small></div>
         <div class="audio-live-actions">
           <button v-if="!online" type="button" class="primary-button compact" :disabled="connecting || ended || !storeId" @click="startPlayback()">{{ connecting ? '正在连接…' : '开始播报' }}</button>
           <template v-else>
@@ -225,6 +244,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         <p v-if="autoScript?.lastError" class="audio-error" role="alert">{{ autoScript.lastError }}</p>
         <p v-if="autoScript?.hint" class="audio-warning" role="status">{{ autoScript.hint }}</p>
       </div>
+      <component :is="LiveDanmakuPanel" v-if="LiveDanmakuPanel" :session-id="sessionId" :session-status="sessionStatus" :online="online" :voice-input="voiceInput" />
       <details class="audio-secondary">
         <summary>临时播报<span>手动补充一段讲解</span></summary>
         <div class="audio-secondary-body">
@@ -270,6 +290,14 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-blockers li { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); font-size: 12px; }
 .audio-launch-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 18px; }
 .audio-launch-footer p { margin: 0; color: var(--ink-muted); font-size: 12px; }
+.audio-desktop { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; }
+.audio-desktop-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.audio-desktop-head > div:first-child { min-width: 0; }
+.audio-desktop-head strong { font-size: 13px; font-weight: 600; }
+.audio-desktop-head strong span { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 11px; font-weight: 400; }
+.audio-desktop-head p { margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+.audio-desktop-actions { display: flex; flex-shrink: 0; gap: 10px; }
+.audio-desktop-actions a { display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; }
 .audio-control-live { padding: 18px 22px; }
 .audio-live-bar { display: flex; align-items: center; gap: 12px; }
 .audio-live-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; flex: 1; }
@@ -322,6 +350,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
   .audio-control .panel-heading { flex-wrap: wrap; }
   .audio-launch-footer { align-items: flex-start; flex-direction: column; }
   .audio-launch-footer > button { width: 100%; }
+  .audio-desktop-head { align-items: flex-start; flex-direction: column; }
   .audio-auto-head { align-items: flex-start; flex-direction: column; }
   .audio-live-bar { flex-wrap: wrap; }
   .audio-live-actions { margin-left: 48px; }
