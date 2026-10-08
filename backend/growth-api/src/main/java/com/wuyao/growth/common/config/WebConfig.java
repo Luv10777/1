@@ -1,6 +1,8 @@
 package com.wuyao.growth.common.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -11,6 +13,14 @@ import java.util.List;
 
 @Configuration
 public class WebConfig {
+
+    @Bean
+    public WebServerFactoryCustomizer<TomcatServletWebServerFactory> serverProtocol(
+            @Value("${growth.http.server-protocol:}") String protocol) {
+        return factory -> {
+            if (!protocol.isBlank()) factory.setProtocol(protocol);
+        };
+    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
