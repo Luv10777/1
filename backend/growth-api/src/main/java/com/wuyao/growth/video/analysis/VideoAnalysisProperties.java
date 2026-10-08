@@ -15,7 +15,7 @@ public class VideoAnalysisProperties {
     private String apiKey = "";
     private String model = "gpt-6-luna";
     private int timeoutSeconds = 180;
-    private int maxTokens = 6000;
+    private int maxTokens = 12000;
     private long maxBytes = 100L * 1024 * 1024;
     private int maxDurationSeconds = 60;
     private int maxFrames = 48;
