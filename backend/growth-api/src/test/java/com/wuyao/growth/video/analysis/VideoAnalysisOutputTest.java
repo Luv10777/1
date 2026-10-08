@@ -26,7 +26,7 @@ class VideoAnalysisOutputTest {
 
     @Test void aiResultsRequireExecutableGenerationStepsAndPerShotPrompts() {
         var result = VideoAnalysisOutput.validate(validFor("ai"), 12000, "ai", new ObjectMapper());
-        assertThat(result).containsEntry("schemaVersion", 2).containsKey("recreation");
+        assertThat(result).containsEntry("schemaVersion", 3).containsKey("recreation");
         assertThat((Map<?, ?>) result.get("recreation")).hasSize(3);
         var invalid = validFor("ai"); invalid.put("recreation", Map.of("workflow", "生成")); assertModeInvalid(invalid, "ai");
         invalid = validFor("ai");
@@ -79,11 +79,75 @@ class VideoAnalysisOutputTest {
                         error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_LANGUAGE"));
     }
 
-    @Test void ChinesePromptsMayKeepNecessaryBrandNamesAndAbbreviations() {
-        var output = validFor("real");
-        String prompt = "生成一段竖屏 AI 视频，人物从右侧拿起 DJI 产品，镜头固定，窗边柔和侧光，动作自然连续。";
+    @Test void ChinesePromptsKeepAbbreviationsWhileUsingTheUsersProductReference() {
+        var output = productVideo("real");
+        String prompt = "生成一段竖屏 AI 视频，人物从右侧拿起如图中产品，外观依据用户上传的商品参考图，镜头固定，窗边柔和侧光，动作自然连续。";
         output.put("prompt", prompt);
         assertThat(VideoAnalysisOutput.validate(output, 12000, "real", new ObjectMapper())).containsEntry("prompt", prompt);
+    }
+
+    @Test void productTemplatesPreserveOriginalObservationsAndRealFilmingInstructions() {
+        for (String mode : List.of("ai", "real")) {
+            var result = VideoAnalysisOutput.validate(productVideo(mode), 12000, mode, new ObjectMapper());
+            assertThat(result.get("summary").toString()).contains("某牌白色陶瓷杯子");
+            assertThat(result.get("productReferences")).isEqualTo(List.of("某牌白色陶瓷杯子", "某牌", "杯子", "白杯"));
+            if ("real".equals(mode)) assertThat(result.get("reuseScript").toString()).contains("白杯");
+            else assertThat(result.get("reuseScript").toString()).contains("如图中产品").doesNotContain("白杯");
+        }
+    }
+
+    @Test void originalProductIdentitiesAreRejectedInEveryGenerationFieldInBothModes() {
+        for (String mode : List.of("ai", "real")) {
+            var fields = new ArrayList<>(List.of("prompt", "negativePrompt", "shotPrompt", "firstFramePrompt", "continuity", "keyframePrompt", "workflow"));
+            if ("ai".equals(mode)) fields.add("reuseScript");
+            for (String field : fields) {
+                var output = productVideo(mode);
+                String leaked = "如图中产品为某牌白色陶瓷杯子，人物从右侧伸手拿起白杯。";
+                switch (field) {
+                    case "shotPrompt", "firstFramePrompt", "continuity" -> ((List<Map<String, Object>>) output.get("shots"))
+                            .getFirst().put(field.equals("shotPrompt") ? "prompt" : field, leaked);
+                    case "keyframePrompt" -> output.put("keyframes", List.of(Map.of("seconds", 0, "title", "首帧", "description", "白杯", "prompt", leaked)));
+                    case "workflow" -> ((Map<String, Object>) output.get("recreation")).put("real".equals(mode) ? "aiWorkflow" : "workflow", leaked);
+                    default -> output.put(field, leaked);
+                }
+                assertThatThrownBy(() -> VideoAnalysisOutput.validate(output, 12000, mode, new ObjectMapper()))
+                        .as("%s mode, %s", mode, field).isInstanceOfSatisfying(NonRetryableTaskException.class,
+                                error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_PRODUCT"));
+            }
+        }
+    }
+
+    @Test void productVideosRequireTheReferencePlaceholderInTheOverallPromptAndAiScript() {
+        for (String field : List.of("prompt", "reuseScript")) {
+            var output = productVideo("ai"); output.put(field, "一段竖屏视频，窗边柔光，相机缓慢向前移动。");
+            assertThatThrownBy(() -> VideoAnalysisOutput.validate(output, 12000, "ai", new ObjectMapper()))
+                    .isInstanceOfSatisfying(NonRetryableTaskException.class,
+                            error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_PRODUCT"));
+        }
+        var output = productVideo("ai"); output.remove("productReferences"); assertModeInvalid(output, "ai");
+        output = productVideo("ai"); output.put("productReferences", List.of("")); assertModeInvalid(output, "ai");
+        // A graphic/landscape video with no product keeps its real subject and does not invent a product reference.
+        assertThat(VideoAnalysisOutput.validate(validFor("ai"), 12000, "ai", new ObjectMapper()).get("prompt").toString())
+                .doesNotContain("如图中产品");
+    }
+
+    static Map<String, Object> productVideo(String mode) {
+        var output = validFor(mode);
+        output.put("summary", "某牌白色陶瓷杯子放在窗边。");
+        output.put("productReferences", List.of("某牌白色陶瓷杯子", "某牌", "杯子", "白杯"));
+        output.put("prompt", "如图中产品位于木桌中央，人物从右侧伸手拿起，窗边柔光，竖屏视频。");
+        output.put("reuseScript", "real".equals(mode) ? "手机固定在白杯前方，先拍白杯再拍人物拿起。"
+                : "镜头一｜零至六秒｜如图中产品位于木桌中央｜人物从右侧拿起｜相机固定｜结束时商品被拿起｜接下一镜。");
+        for (var shot : (List<Map<String, Object>>) output.get("shots")) {
+            shot.put("scene", "白杯放在木桌中央，人物从右侧伸手拿起杯子。");
+            shot.put("prompt", "竖屏六秒，如图中产品在木桌中央，人物从右侧伸手拿起，镜头固定，窗边柔光。");
+            shot.put("firstFramePrompt", "如图中产品在木桌中央，人物尚未伸手，窗边柔光，竖屏静态画面。");
+            shot.put("continuity", "如图中产品依据用户商品参考图保持外观一致。");
+            if ("real".equals(mode)) shot.put("filming", "手机固定在白杯前方，人物从右侧伸手拿起杯子。");
+        }
+        output.put("keyframes", List.of(Map.of("seconds", 0, "title", "窗边白杯", "description", "白杯在木桌中央",
+                "prompt", "竖屏静态画面，木桌中央的如图中产品，窗边柔光。")));
+        return output;
     }
 
     private void assertModeInvalid(Map<String, Object> output, String mode) {
@@ -93,6 +157,7 @@ class VideoAnalysisOutputTest {
 
     static Map<String, Object> validFor(String mode) {
         var result = valid();
+        result.put("productReferences", List.of());
         result.put("prompt", "生成竖屏视频，桌上的红色物体位于画面中央，相机固定，保持自然光线。");
         result.put("negativePrompt", "避免画面模糊、物体变形和画面闪烁。");
         var shots = new ArrayList<Map<String, Object>>();

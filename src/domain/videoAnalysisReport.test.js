@@ -24,9 +24,9 @@ function analysis(mode = 'ai') {
     } }
 }
 
-test('AI export is a Chinese reading report with complete per-shot prompts and no internal metadata', () => {
+test('AI export is a concise Chinese reading report with optional observations and no internal metadata', () => {
   const html = buildVideoAnalysisReport(analysis())
-  for (const text of ['AI 视频提示词与分镜复刻报告', '按什么顺序生成', '逐镜头生成脚本', '首帧图片提示词', '00:00–00:06', '打印 / 保存为 PDF', '10:00']) assert.ok(html.includes(text), text)
+  for (const text of ['AI 视频提示词与分镜复刻报告', '按什么顺序生成', '可直接复制的分镜脚本', '00:00–00:06', '打印 / 保存为 PDF', '10:00']) assert.ok(html.includes(text), text)
   assert.ok(html.includes('本次没有完成声音分析'))
   assert.ok(!html.includes('照着拍的操作步骤'))
   for (const text of ['internal-provider-name', 'privateTokenCount', '"shots":', '"negativePrompt":', '<pre>', '<code>']) assert.ok(!html.includes(text), text)
@@ -35,7 +35,7 @@ test('AI export is a Chinese reading report with complete per-shot prompts and n
 test('real export includes filming and AI conversion even when the page is viewing only one route', () => {
   const html = buildVideoAnalysisReport(analysis('real'))
   for (const text of ['实拍视频拆解与复刻报告', '方案一：照着实拍', '方案二：用 AI 重做', '灯光怎么布置', '声音怎么录',
-    '手机固定在杯子前方', '先用杯子参考图生成首帧', '本镜头的视频生成提示词']) assert.ok(html.includes(text), text)
+    '手机固定在杯子前方', '先用如图中产品参考图生成首帧', '可直接复制的分镜脚本']) assert.ok(html.includes(text), text)
   assert.ok(!html.includes('按什么顺序生成'))
 })
 
@@ -51,10 +51,26 @@ test('report escapes filenames, model text, prompts and transcripts instead of e
   value.result.audio = { status: 'ANALYZED', summary: '口播清晰', speech: '轻声', music: '无', ambience: '无',
     transcript: [{ start: 0, end: 1, text: unsafe }], effects: [], limitations: [] }
   const html = buildVideoAnalysisReport(value)
-  assert.ok(!html.includes('<script>'))
+  assert.ok(!html.includes('<script>alert'))
   assert.ok(!html.includes('<img src=x'))
   assert.ok(html.includes('&lt;script&gt;alert(&quot;name&quot;)&lt;/script&gt;'))
   assert.ok(html.includes('原视频口播'))
+})
+
+test('AI reports put copyable prompts and timed storyboards before the analysis and remove old products from copy blocks', () => {
+  const html = buildVideoAnalysisReport(analysis())
+  const titles = [...html.matchAll(/<h2>(.*?)<\/h2>/g)].map(match => match[1])
+  assert.match(titles[0], /可直接复制的复刻提示词/)
+  assert.match(titles[1], /可直接复制的分镜脚本/)
+  assert.ok(html.includes('先在生成工具上传你自己的商品参考图'))
+  const copyBlocks = [...html.matchAll(/<div class="prompt">.*?<p>(.*?)<\/p><\/div>/gs)].map(match => match[1])
+  assert.equal(copyBlocks.length, 3, 'overall prompt, optional negative prompt and concise storyboard')
+  for (const block of copyBlocks) assert.doesNotMatch(block, /白杯|白色杯子|杯子/)
+  assert.ok(copyBlocks.some(block => /镜头 1｜00:00–00:06｜时长 6\.0 秒/.test(block)))
+  assert.ok(html.includes('手从右侧伸向白色杯子。'), 'observations are kept for comparison')
+  assert.ok(html.includes('button type="button" class="copy-button" data-copy'))
+  assert.doesNotMatch(html, /本镜头的视频生成提示词|本镜头的首帧图片提示词/)
+  assert.ok(html.includes('<details class="reference"><summary>查看画面拆解与声音参考</summary>'))
 })
 
 test('historical exports present Chinese prompts for both modes without an English appendix', () => {
@@ -69,8 +85,8 @@ test('historical exports present Chinese prompts for both modes without an Engli
     const html = buildVideoAnalysisReport(value)
     assert.ok(html.includes('中文提示词根据本记录已有的画面拆解整理'))
     assert.ok(html.includes('生成一段竖屏视频，总时长 6.0 秒'))
-    assert.ok(html.includes('镜头 1，生成竖屏视频，时长 6.0 秒'))
-    assert.ok(html.includes('生成一张竖屏静态参考图片'))
+    assert.ok(html.includes('镜头 1｜00:00–00:06｜时长 6.0 秒'))
+    assert.ok(!html.includes('生成一张竖屏静态参考图片'), 'the concise report omits individual first-frame prompts')
     assert.ok(html.includes('手从右侧伸向白色杯子'))
     assert.ok(html.includes('避免画面模糊'))
     for (const text of ['A white cup near the window', 'distorted fingers', 'A hand picks up the cup', 'Still image of a white cup', '英文原文', 'undefined'])

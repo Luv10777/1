@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoAnalysisApi, uploadAnalysisVideo } from '../services/videoAnalysis'
-import { VIDEO_ANALYSIS_LIMITS, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, localizeAnalysisPrompts, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
+import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, localizeAnalysisPrompts, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
 
 const router = useRouter()
@@ -18,6 +18,7 @@ const selectedFile = shallowRef(null)
 const selectedName = ref('')
 const previewUrl = ref('')
 const previewDuration = ref(0)
+const previewAspectRatio = ref(16 / 9)
 const uploadedAssetId = ref(null)
 const limits = ref({ ...VIDEO_ANALYSIS_LIMITS, configured: false })
 const current = ref(null)
@@ -154,6 +155,7 @@ async function loadHistory(id) {
     selectedName.value = analysis.name
     uploadedAssetId.value = analysis.assetId
     previewUrl.value = analysis.videoUrl || ''
+    previewAspectRatio.value = analysis.width > 0 && analysis.height > 0 ? analysis.width / analysis.height : 16 / 9
     videoType.value = analysis.mode
     reverseNeed.value = analysis.reverseNeed || ''
     inputMode.value = 'upload'
@@ -183,6 +185,7 @@ function selectFile(file) {
   uploadedAssetId.value = null
   current.value = null
   previewDuration.value = 0
+  previewAspectRatio.value = 16 / 9
   objectUrl = URL.createObjectURL(file)
   previewUrl.value = objectUrl
   inputMode.value = 'upload'
@@ -198,6 +201,8 @@ function onFile(event) {
 }
 function onDrop(event) { const file = event.dataTransfer?.files?.[0]; if (file) selectFile(file) }
 function onMetadata(event) {
+  if (event.target.videoWidth > 0 && event.target.videoHeight > 0)
+    previewAspectRatio.value = event.target.videoWidth / event.target.videoHeight
   previewDuration.value = event.target.duration
   if (selectedFile.value && (!Number.isFinite(event.target.duration) || event.target.duration > limits.value.maxDurationSeconds)) {
     error.value = `视频最长支持 ${limits.value.maxDurationSeconds} 秒，请剪辑后上传。`
@@ -304,7 +309,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         </section>
         <section class="premium-panel preview-panel">
           <div class="panel-head"><div><span class="material-symbols-outlined panel-icon">play_circle</span><strong>视频预览</strong></div><small>{{ duration ? analysisTime(duration) : '等待输入' }}</small></div>
-          <video v-if="previewUrl" ref="player" class="analysis-video" :src="previewUrl" controls playsinline preload="metadata" @loadedmetadata="onMetadata" />
+          <video v-if="previewUrl" ref="player" class="analysis-video" :src="previewUrl" :style="{ aspectRatio: previewAspectRatio }" controls playsinline preload="metadata" @loadedmetadata="onMetadata" />
           <div v-else class="skeleton-player" :class="{ scanning: isScanning }"><div v-if="isScanning" class="scan-beam" /><div class="skeleton-grid" /><div class="skeleton-center"><span class="material-symbols-outlined">movie</span><p>{{ statusLabel }}</p><small>选择视频后点击开始分析</small></div></div>
         </section>
         <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan"><span class="material-symbols-outlined">auto_awesome</span>{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }} <span>↗</span></button>
@@ -326,12 +331,28 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         <div v-if="loadingHistory || isScanning" class="analysis-state" role="status" aria-live="polite"><span class="material-symbols-outlined">frame_inspect</span><h3>{{ loadingHistory ? '正在读取分析记录' : statusLabel }}</h3><p>分析完成后，将在这里显示关键帧、镜头拆解、声音报告和复刻提示词。</p><progress v-if="!loadingHistory" :value="progress" max="100" :aria-label="statusLabel" /><small v-if="current?.frames?.length">已提取 {{ current.frames.length }} 张画面</small></div>
         <div v-else-if="!result" class="analysis-state"><span class="material-symbols-outlined">movie_filter</span><h3>{{ current?.status === 'FAILED' ? '本次分析未完成' : '从一条视频开始' }}</h3><p>{{ current?.status === 'FAILED' ? current.errorMessage || '请重新提交分析。' : '上传视频并选择分析模式，提炼画面风格与可复用的镜头语言。' }}</p></div>
         <div v-else class="console-body" :class="{ 'real-console': reportMode === 'real' }">
-          <p class="analysis-summary">{{ result.summary }}</p><p class="analysis-method">基于 {{ current.frames.length }} 张抽样画面；运镜与分镜边界为推断。{{ audioReport ? '已结合音频报告；声音时间戳为模型估计。' : analysisAudioSummary(result) }}</p>
           <div v-if="reportMode === 'real'" class="recreation-tabs" role="group" aria-label="选择复刻方式">
             <button type="button" :aria-pressed="recreationRoute === 'filming'" :class="{ active: recreationRoute === 'filming' }" @click="recreationRoute = 'filming'"><span class="material-symbols-outlined">videocam</span>照着实拍</button>
             <button type="button" :aria-pressed="recreationRoute === 'ai'" :class="{ active: recreationRoute === 'ai' }" @click="recreationRoute = 'ai'"><span class="material-symbols-outlined">auto_awesome</span>用 AI 重做</button>
           </div>
           <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '用参考图和逐镜提示词生成相似画面，再剪辑成完整视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
+          <section v-if="showGeneration" class="readable-prompt" aria-label="可直接复制的复刻提示词">
+            <div class="reuse-script-head"><span>{{ reportMode === 'real' ? '用 AI 重做的复刻提示词' : '可直接复制的复刻提示词' }}</span><button type="button" @click="copyText(promptText, 'prompt')">{{ copied === 'prompt' ? '已复制' : '复制中文提示词' }}</button></div>
+            <p class="product-reference-guide">{{ PRODUCT_REFERENCE_GUIDANCE }}</p>
+            <p class="copyable-content" tabindex="0" aria-label="整体复刻提示词正文">{{ promptText }}</p><button type="button" class="prompt-create" @click="generateSame">带入视频创作 ↗</button><details><summary>生成时需要避免的问题</summary><p>{{ result.negativePrompt }}</p></details>
+          </section>
+          <section class="reuse-script" aria-label="可复制的分镜脚本"><div class="reuse-script-head"><span>{{ showGeneration ? '可直接复制的分镜脚本' : '按顺序执行的拍摄脚本' }}</span><button type="button" @click="copyText(showGeneration ? result.generationScript : result.reuseScript, 'script')">{{ copied === 'script' ? '已复制' : '复制脚本' }}</button></div><p class="copyable-content" tabindex="0" aria-label="复刻脚本正文">{{ showGeneration ? result.generationScript : result.reuseScript }}</p></section>
+          <details class="analysis-reference"><summary>查看画面拆解与声音参考</summary>
+          <div class="section-caption table-caption"><span>{{ showGeneration ? '原视频逐镜观察' : '逐镜头拍摄指南' }}</span><small>{{ shots.length }} 个估计分镜</small></div>
+          <section class="shot-guide" aria-label="逐镜头复刻步骤">
+            <article v-for="(shot, index) in shots" :key="index" class="shot-guide-item">
+              <div class="shot-guide-head"><h3>镜头 {{ index + 1 }}</h3><button type="button" :aria-label="`跳转到镜头 ${index + 1}`" @click="seek(shot.start)">{{ analysisTime(shot.start) }}–{{ analysisTime(shot.end) }} · {{ (shot.end - shot.start).toFixed(1) }} 秒</button></div>
+              <p class="shot-observation"><strong>原视频画面</strong>{{ shot.scene }}</p>
+              <dl><div v-for="detail in analysisShotDetails(shot, reportMode, recreationRoute)" :key="detail.label"><dt>{{ detail.label }}</dt><dd>{{ detail.text }}</dd></div></dl>
+              <p class="shot-mood">画面情绪：{{ shot.emotion }} · 节奏：{{ shot.pacing }}</p>
+            </article>
+          </section>
+          <p class="analysis-summary">{{ result.summary }}</p><p class="analysis-method">基于 {{ current.frames.length }} 张抽样画面；运镜与分镜边界为推断。{{ audioReport ? '已结合音频报告；声音时间戳为模型估计。' : analysisAudioSummary(result) }}</p>
           <p v-if="!result.recreation" class="analysis-legacy">这份历史报告保留了原有拆解，重新分析可获得更具体的逐镜操作步骤。</p>
           <p v-if="result.promptsLocalized" class="analysis-legacy">中文提示词已根据这份记录的画面拆解整理，可直接复制使用；重新分析可获得更完整的分镜提示词。</p>
           <section v-if="recreationSteps.length" class="recreation-plan" aria-label="复刻制作方案">
@@ -341,18 +362,13 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <template v-if="reportMode === 'ai'">
             <div class="insight-grid">
               <article class="insight-card radar-card"><div class="section-caption"><span>画面观察充分度</span><small>模型主观估计</small></div><div class="radar-visual"><svg viewBox="-8 -12 196 174" role="img" aria-label="五个画面维度的模型主观估计"><polygon points="90,14 157,63 132,138 48,138 23,63" fill="none" stroke="#f1eae8" /><polygon points="90,34 137,68 120,120 60,120 43,68" fill="none" stroke="#f5f0ee" /><polygon :points="radarPoints" fill="rgba(185,138,126,.18)" stroke="#c58372" stroke-width="2" /><text x="90" y="8" text-anchor="middle">光影</text><text x="176" y="65" text-anchor="end">运镜</text><text x="132" y="147" text-anchor="middle">主体</text><text x="25" y="147" text-anchor="middle">场景</text><text x="1" y="65" text-anchor="start">色彩</text></svg></div></article>
-              <article class="insight-card keyframe-card"><div class="section-caption"><span>关键画面</span><small>{{ keyframes.length }} 个时刻</small></div><div class="keyframe-row"><article v-for="frame in keyframes" :key="frame.seconds" class="keyframe"><button type="button" class="frame-art" :aria-label="`跳转到 ${analysisTime(frame.seconds)}`" @click="seek(frame.seconds)"><img :src="frame.imageUrl" :alt="frame.title" loading="lazy"><b>{{ analysisTime(frame.seconds) }}</b></button><strong>{{ frame.title }}</strong><p>{{ frame.description || frame.title }}</p><details class="keyframe-prompt"><summary>画面提示词</summary><p>{{ frame.prompt }}</p><button type="button" @click="copyText(frame.prompt, `key-${frame.seconds}`)">{{ copied === `key-${frame.seconds}` ? '已复制' : '复制画面提示词' }}</button></details></article></div></article>
+              <article class="insight-card keyframe-card"><div class="section-caption"><span>关键画面</span><small>{{ keyframes.length }} 个时刻</small></div><div class="keyframe-row"><article v-for="frame in keyframes" :key="frame.seconds" class="keyframe"><button type="button" class="frame-art" :aria-label="`跳转到 ${analysisTime(frame.seconds)}`" @click="seek(frame.seconds)"><img :src="frame.imageUrl" :alt="frame.title" loading="lazy"><b>{{ analysisTime(frame.seconds) }}</b></button><strong>{{ frame.title }}</strong><p>{{ frame.description || frame.title }}</p></article></div></article>
             </div>
           </template>
           <template v-if="reportMode === 'real'">
             <div class="metric-row"><article v-for="metric in realMetrics" :key="metric.label" class="metric-card"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><small>{{ metric.delta }}</small></article></div>
-            <article class="insight-card keyframe-card"><div class="section-caption"><span>关键画面参考</span><small>{{ keyframes.length }} 个时刻</small></div><div class="keyframe-row"><article v-for="frame in keyframes" :key="frame.seconds" class="keyframe"><button type="button" class="frame-art" :aria-label="`跳转到 ${analysisTime(frame.seconds)}`" @click="seek(frame.seconds)"><img :src="frame.imageUrl" :alt="frame.title" loading="lazy"><b>{{ analysisTime(frame.seconds) }}</b></button><strong>{{ frame.title }}</strong><p>{{ frame.description || frame.title }}</p><details v-if="showGeneration" class="keyframe-prompt"><summary>画面提示词</summary><p>{{ frame.prompt }}</p><button type="button" @click="copyText(frame.prompt, `key-${frame.seconds}`)">{{ copied === `key-${frame.seconds}` ? '已复制' : '复制画面提示词' }}</button></details></article></div></article>
+            <article class="insight-card keyframe-card"><div class="section-caption"><span>关键画面参考</span><small>{{ keyframes.length }} 个时刻</small></div><div class="keyframe-row"><article v-for="frame in keyframes" :key="frame.seconds" class="keyframe"><button type="button" class="frame-art" :aria-label="`跳转到 ${analysisTime(frame.seconds)}`" @click="seek(frame.seconds)"><img :src="frame.imageUrl" :alt="frame.title" loading="lazy"><b>{{ analysisTime(frame.seconds) }}</b></button><strong>{{ frame.title }}</strong><p>{{ frame.description || frame.title }}</p></article></div></article>
           </template>
-          <section v-if="showGeneration" class="readable-prompt">
-            <div class="reuse-script-head"><span>{{ reportMode === 'real' ? '用 AI 重做的中文提示词' : '整体中文视频提示词' }}</span><button type="button" @click="copyText(promptText, 'prompt')">{{ copied === 'prompt' ? '已复制' : '复制中文提示词' }}</button></div>
-            <p>{{ promptText }}</p><details><summary>生成时需要避免的问题</summary><p>{{ result.negativePrompt }}</p></details>
-          </section>
-          <section v-if="reportMode === 'ai' || !showGeneration" class="reuse-script"><div class="reuse-script-head"><span>{{ reportMode === 'ai' ? '按顺序执行的分镜脚本' : '按顺序执行的拍摄脚本' }}</span><button type="button" @click="copyText(result.reuseScript, 'script')">{{ copied === 'script' ? '已复制' : '复制脚本' }}</button></div><p>{{ result.reuseScript }}</p></section>
           <div class="section-caption parameter-caption"><span>画面特点与复刻重点</span><small>{{ parameters.length }} 项</small></div><div class="parameter-grid"><div v-for="param in parameters" :key="param.key" class="parameter-row"><span>{{ param.key }}</span><strong>{{ param.value }}</strong></div></div>
           <section v-if="audioReport" class="audio-report" aria-label="声音分析">
             <div class="section-caption"><span>声音分析</span><small>口播、配乐与音效</small></div>
@@ -364,19 +380,9 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
             <template v-if="audioReport.effects.length"><strong class="audio-effects-label">音效与环境声事件</strong><div v-for="(effect, index) in audioReport.effects" :key="index" class="audio-segment"><button type="button" :aria-label="`播放 ${analysisTime(effect.start)} 的声音事件`" @click="seek(effect.start)">{{ analysisTime(effect.start) }}–{{ analysisTime(effect.end) }}</button><p>{{ effect.description }}</p></div></template>
             <div v-if="audioReport.limitations.length" class="audio-limitations"><p v-for="(item, index) in audioReport.limitations" :key="index">{{ item }}</p></div>
           </section>
-          <div class="section-caption table-caption"><span>{{ showGeneration ? '逐镜头生成脚本' : '逐镜头拍摄指南' }}</span><small>{{ shots.length }} 个估计分镜</small></div>
-          <section class="shot-guide" aria-label="逐镜头复刻步骤">
-            <article v-for="(shot, index) in shots" :key="index" class="shot-guide-item">
-              <div class="shot-guide-head"><h3>镜头 {{ index + 1 }}</h3><button type="button" :aria-label="`跳转到镜头 ${index + 1}`" @click="seek(shot.start)">{{ analysisTime(shot.start) }}–{{ analysisTime(shot.end) }} · {{ (shot.end - shot.start).toFixed(1) }} 秒</button></div>
-              <p class="shot-observation"><strong>原视频画面</strong>{{ shot.scene }}</p>
-              <dl><div v-for="detail in analysisShotDetails(shot, reportMode, recreationRoute)" :key="detail.label"><dt>{{ detail.label }}</dt><dd>{{ detail.text }}</dd></div></dl>
-              <p class="shot-mood">画面情绪：{{ shot.emotion }} · 节奏：{{ shot.pacing }}</p>
-              <div v-if="showGeneration && shot.prompt" class="shot-prompt"><div class="reuse-script-head"><span>本镜头的视频生成提示词</span><button type="button" @click="copyText(shot.prompt, `shot-${index}`)">{{ copied === `shot-${index}` ? '已复制' : '复制本镜提示词' }}</button></div><p>{{ shot.prompt }}</p></div>
-              <details v-if="showGeneration && shot.firstFramePrompt" class="first-frame-prompt"><summary>本镜头的首帧图片提示词</summary><p>{{ shot.firstFramePrompt }}</p><button type="button" @click="copyText(shot.firstFramePrompt, `frame-${index}`)">{{ copied === `frame-${index}` ? '已复制' : '复制首帧提示词' }}</button></details>
-            </article>
-          </section>
           <div class="insights-grid"><article class="insight-good"><h3>可复用亮点</h3><p v-for="(item, index) in result.highlights" :key="index">{{ item }}</p></article><article class="insight-warn"><h3>复刻建议</h3><p v-for="(item, index) in result.suggestions" :key="index">{{ item }}</p></article></div>
           <div v-if="result.limitations.length" class="analysis-limitations"><strong>观察限制</strong><p v-for="(item, index) in result.limitations" :key="index">{{ item }}</p></div>
+          </details>
           <p class="report-export-hint">导出为排版好的中文报告，双击即可阅读，也可打印或保存为 PDF。{{ reportMode === 'real' ? '实拍报告同时包含两种复刻方案。' : '' }}</p>
           <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame"><span class="material-symbols-outlined">auto_awesome</span>用此提示词创作视频 <span>↗</span></button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
         </div>
@@ -388,7 +394,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 <style scoped>
 .console-footer { flex-wrap: wrap; }
 @media (max-width: 720px) { .console-footer .premium-secondary { width: 100%; min-width: 0; } }
-.analysis-video { display: block; width: 100%; max-height: 260px; border-radius: 10px; background: #171b1d; }
+.analysis-video { display: block; width: 100%; height: auto; min-height: 220px; max-height: 420px; object-fit: contain; border-radius: 10px; background: #171b1d; }
 .analysis-error { padding: 12px; border: 1px solid var(--color-border-subtle); border-radius: 10px; color: var(--color-accent-text); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .analysis-error button { display: block; margin-top: 8px; color: var(--color-success); background: transparent; border: 0; cursor: pointer; }
 .analysis-state { display: flex; min-height: 380px; padding: 50px 20px; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--color-primary); }
@@ -409,20 +415,23 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .recreation-plan h3 { margin: 0 0 5px; font-size: 13px; color: var(--color-primary); }
 .recreation-plan p { margin: 0; font-size: 12px; line-height: 1.9; color: var(--color-primary); white-space: pre-line; overflow-wrap: anywhere; }
 .readable-prompt { margin: 20px 0; padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: var(--color-bg-surface); }
-.readable-prompt p, .shot-prompt p, .first-frame-prompt p, .reuse-script p { white-space: pre-line; overflow-wrap: anywhere; }
-.readable-prompt p, .shot-prompt p, .first-frame-prompt p { margin: 12px 0 0; color: var(--color-primary); font-size: 13px; line-height: 1.9; }
+.readable-prompt p, .reuse-script p { white-space: pre-line; overflow-wrap: anywhere; }
+.readable-prompt p { margin: 12px 0 0; color: var(--color-primary); font-size: 13px; line-height: 1.9; }
+.readable-prompt .product-reference-guide { margin-top: 10px; color: var(--color-text-muted); font-size: 12px; }
+.copyable-content { max-height: 260px; overflow-y: auto; }
+.copyable-content:focus-visible { outline: 2px solid var(--an-cinnabar); outline-offset: 4px; }
+.prompt-create { margin-top: 12px; padding: 6px 0; border: 0; background: transparent; color: var(--an-cinnabar); font: inherit; font-size: 12px; cursor: pointer; }
+.analysis-reference { margin-top: 24px; }
+.analysis-reference > summary { padding: 12px 0; color: var(--color-text-muted); font-size: 12px; cursor: pointer; }
+.shot-guide + .analysis-summary { margin-top: 24px; }
 .readable-prompt details { margin-top: 14px; }
-.readable-prompt summary, .first-frame-prompt summary { color: var(--color-text-muted); font-size: 12px; cursor: pointer; }
+.readable-prompt summary { color: var(--color-text-muted); font-size: 12px; cursor: pointer; }
 .real-console .keyframe-card { margin-top: 18px; }
-.keyframe-prompt { margin-top: 8px; }
-.keyframe-prompt summary { color: var(--color-text-muted); font-size: 11px; cursor: pointer; }
-.keyframe-prompt p { white-space: pre-line; overflow-wrap: anywhere; }
-.keyframe-prompt button { padding: 4px 0; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 11px; cursor: pointer; }
 .shot-guide { display: grid; gap: 16px; }
 .shot-guide-item { padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; }
 .shot-guide-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .shot-guide-head h3 { margin: 0; color: var(--color-primary); font-size: 14px; }
-.shot-guide-head button, .first-frame-prompt button { padding: 4px 0; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.shot-guide-head button { padding: 4px 0; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .shot-observation { margin: 14px 0; color: var(--color-primary); font-size: 13px; line-height: 1.9; }
 .shot-observation strong { display: block; margin-bottom: 4px; font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
 .shot-guide dl { margin: 0; }
@@ -430,7 +439,6 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .shot-guide dt { color: var(--color-text-muted); }
 .shot-guide dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; color: var(--color-primary); }
 .shot-mood { margin: 10px 0 0; font-size: 11px; line-height: 1.8; color: var(--color-text-muted); }
-.shot-prompt { margin-top: 16px; padding: 12px; border-radius: 8px; background: var(--color-bg-subtle); }
 .first-frame-prompt { margin-top: 14px; }
 .report-export-hint { margin: 20px 0 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.8; }
 @media (max-width: 720px) { .shot-guide dl > div { grid-template-columns: 1fr; gap: 2px; } .shot-guide-head { flex-wrap: wrap; gap: 4px; } .recreation-tabs button { flex: 1; } }
@@ -455,8 +463,8 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .live-analysis button:disabled { cursor: not-allowed; opacity: .5; }
 .live-analysis :is(button, [role='button'], input, textarea, summary):focus-visible { outline: 2px solid var(--an-cinnabar); outline-offset: 3px; }
 @media (min-width: 721px) {
-  /* Fit between the 56px app bar and the shell's 28px top/bottom padding. */
-  .live-analysis .premium-left { position: sticky; top: 0; height: calc(100dvh - 112px); gap: 8px; }
+  /* Scroll the controls on short screens so the video keeps a usable size. */
+  .live-analysis .premium-left { position: sticky; top: 0; max-height: calc(100dvh - 112px); overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; gap: 8px; }
   .live-analysis .premium-panel { flex-shrink: 0; padding: 12px; }
   .live-analysis .panel-head, .live-analysis .type-panel .panel-head { margin-bottom: 8px; }
   .live-analysis .compact-tabs button, .live-analysis .pill-switch button { height: 28px; }
@@ -467,9 +475,8 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
   .live-analysis .need-field > div { position: absolute; top: 0; right: 0; margin-top: 0; }
   .live-analysis .need-field button { padding: 2px 5px; font-size: 10px; line-height: 1.5; }
   .live-analysis .need-field textarea { display: block; height: 56px; min-height: 56px; resize: none; }
-  .live-analysis .preview-panel { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; }
-  .live-analysis .preview-panel .panel-head, .live-analysis .analyze-trigger { flex-shrink: 0; }
-  .live-analysis .analysis-video, .live-analysis .skeleton-player { flex: 1; height: 0; min-height: 0; max-height: none; object-fit: contain; }
+  .live-analysis .preview-panel { flex: 0 0 auto; }
+  .live-analysis .analyze-trigger, .live-analysis .privacy-note, .live-analysis .analysis-error { flex-shrink: 0; }
   .live-analysis .privacy-note { font-size: 10px; line-height: 1.5; }
 }
 @media (min-width: 721px) and (max-height: 740px) {

@@ -24,13 +24,23 @@ public final class VideoAnalysisOutput {
             reuseScript 是中文复刻建议脚本，必须将建议台词和建议字幕与原视频观察及原口播区分。
             有音频报告时，结合口播、音乐、音效时间线分析声画节奏，并在整体提示词与复刻脚本中体现。
             所有内容（包括整体、分镜、首帧、关键帧及负面提示词）使用通俗中文；口播原文保留原语言。
-            所有生成提示词的正文必须是中文，不要返回英文提示词或中英双语版本；仅保留必要的品牌名和简短缩写。
+            所有生成提示词的正文必须是中文，不要返回英文提示词或中英双语版本；仅保留 AI 等简短缩写。
+            用户要用自己的商品快速复刻视频。所有用于 AI 生成的内容，商品只能称为“如图中产品”。
+            “图”指用户在生成工具上传的自己的商品参考图，不是原视频截图；商品外观以用户参考图为唯一依据。
+            不得带入原商品的品牌、名称、品类、颜色、材质、形状、包装、标识、卖点或宣传语，
+            也不能写成“如图中产品是一瓶红色香水”这样的变相商品描述。只复刻场景、构图、动作、运镜、光线和节奏。
+            人物、服装和环境等非商品描述可以保留；没有商品的视频不要凭空增加商品。
+            productReferences 列出原商品的完整描述、品牌、商品名、简称和部件称呼，供检查生成内容是否混入原商品；
+            例如 [“某牌白色陶瓷杯子”,“某牌”,“白色陶瓷杯子”,“杯子”,“白杯”,“杯沿”]。不要列出无关人物或布景道具；没有商品返回 []。
+            以上替换规则适用于 prompt、negativePrompt、每镜 prompt、firstFramePrompt、continuity、keyframes.prompt，
+            AI 模式还适用于 reuseScript 和 recreation 全部字段；实拍模式适用于 recreation.aiWorkflow。
+            原商品只允许出现在观察字段及实拍拍摄步骤中。原口播和字幕可以在观察中引用；生成脚本不得照抄原商品宣传语，也不得为用户商品编造功效。
             用“相机从左向右慢慢移动”等操作描述，专业词首次出现时顺带解释含义。
             把“画面观察”“根据帧间变化推测”“建议做法”分清楚，不能把推荐设备或参数写成原片事实。
             简洁返回 JSON，不要 Markdown、代码围栏、样式代码或 HTML。必须返回以下基础结构，并补齐当前模式的专属字段：
             {"summary":"用两三句话说明视频拍了什么、吸引力在哪、复刻要抓住什么",
              "prompt":"中文整体生成提示词","negativePrompt":"中文描述需要避免的画面问题",
-             "reuseScript":"按时间顺序写的中文复刻执行脚本",
+             "reuseScript":"按时间顺序写的中文复刻执行脚本","productReferences":["原商品描述及简称，没有商品则为空数组"],
              "parameters":[{"key":"主体人物","value":"可见主体"},{"key":"场景环境","value":"场景"},
               {"key":"镜头运动","value":"推断并说明不确定性"},{"key":"光线氛围","value":"光线"},
               {"key":"画面风格","value":"风格"},{"key":"景深质感","value":"可见质感"}],
@@ -70,9 +80,15 @@ public final class VideoAnalysisOutput {
                  "editing":"按哪些时刻剪切、怎样做字幕、调色与声音衔接",
                  "aiWorkflow":"用 AI 重做的完整步骤：准备参考图、逐镜首帧与短片生成、主体一致性检查、剪辑与配音合成"}
                 """ : """
-                当前模式是 AI 视频反推。核心目标是提示词复刻与具体分镜生成脚本，不要将报告写成实拍器材教学。
-                reuseScript 按每个镜头时间写：首帧是什么、主体如何运动、相机如何运动、镜头结尾是什么、下一镜头如何接。
-                prompt 组织成可直接使用的中文整体提示词；逐镜 shots.prompt 要独立完整，明确动作顺序和镜头时长。
+                当前模式是 AI 视频反推。首要交付是用户复制到 AI 视频工具就能使用的中文整体复刻提示词和具体分镜脚本。
+                prompt 和 reuseScript 是报告最先展示的两项，必须独立完整，不能只写分析结论或工具操作教程。
+                reuseScript 每镜只写一行约 30–60 字：镜头编号、起止秒数、画面与动作、运镜、结束或衔接。
+                不重复每镜的完整提示词，不写首帧图片制作教程，不扩写成长篇分析。涉及商品的行都使用“如图中产品”。
+                保留原片的动作和镜头节奏，画面与动作需具体可执行。
+                prompt 组织成可直接使用的中文整体提示词，写清画幅、总时长、风格、按时间顺序的镜头动作和衔接；
+                有商品时首先说明商品为“如图中产品”，外观完全依据用户上传的商品参考图。不要在可复制文本中夹带分析说明或不确定性免责声明。
+                整体提示词约 200–400 字，把镜头顺序写成连贯的一段可直接复制文本；报告主内容只有整体提示词和精简分镜脚本。
+                逐镜 shots.prompt 要独立完整，明确动作顺序和镜头时长。不要将报告写成实拍器材教学。
                 firstFramePrompt 用于先生成参考图片；continuity 说明人物、服装、产品形状、色彩与场景如何保持一致。
                 不要猜测原片使用哪个模型、随机种子或精确生成参数；给出的生成流程必须标为复刻建议。
                 必须增加 recreation 对象，完整包含三个非空中文字段：
@@ -88,11 +104,25 @@ public final class VideoAnalysisOutput {
         chinesePrompt(root, "prompt");
         chinesePrompt(root, "negativePrompt");
         boolean real = "real".equals(mode);
+        array(root, "productReferences", 0, 40);
+        var productReferences = new java.util.ArrayList<String>();
+        for (var reference : root.get("productReferences")) {
+            if (!reference.isTextual() || reference.asText().isBlank() || reference.asText().length() > 120
+                    || reference.asText().contains("如图中产品")) invalid();
+            productReferences.add(reference.asText().trim());
+        }
+        for (String key : List.of("prompt", "negativePrompt")) productNeutral(root, key, productReferences, false);
+        productNeutral(root, "prompt", productReferences, true);
+        if (!real) {
+            chinesePrompt(root, "reuseScript");
+            productNeutral(root, "reuseScript", productReferences, true);
+        }
         var fields = real ? List.of("preparation", "cameraSetup", "lightingSetup", "recording", "editing", "aiWorkflow")
                 : List.of("workflow", "consistency", "assembly");
         var recreation = new java.util.LinkedHashMap<String, Object>();
         for (String key : fields) {
             text(root.path("recreation"), key, true);
+            if (!real || "aiWorkflow".equals(key)) productNeutral(root.path("recreation"), key, productReferences, false);
             recreation.put(key, root.path("recreation").get(key).asText());
         }
         var shots = new java.util.ArrayList<Map<String, Object>>();
@@ -106,16 +136,19 @@ public final class VideoAnalysisOutput {
             }
             chinesePrompt(shot, "prompt");
             chinesePrompt(shot, "firstFramePrompt");
+            for (String key : List.of("prompt", "firstFramePrompt", "continuity")) productNeutral(shot, key, productReferences, false);
             if (real) { text(shot, "filming", true); normalized.put("filming", shot.get("filming").asText()); }
             shots.add(normalized);
         }
         for (var frame : root.get("keyframes")) {
             text(frame, "description", true);
             chinesePrompt(frame, "prompt");
+            productNeutral(frame, "prompt", productReferences, false);
         }
         result.put("shots", shots);
         result.put("recreation", recreation);
-        result.put("schemaVersion", 2);
+        result.put("productReferences", productReferences);
+        result.put("schemaVersion", 3);
         return result;
     }
 
@@ -182,5 +215,11 @@ public final class VideoAnalysisOutput {
     }
     private static void invalid() {
         throw new NonRetryableTaskException("VIDEO_ANALYSIS_OUTPUT", "模型返回的分析结构或时间线不完整，请重新分析", null);
+    }
+    private static void productNeutral(JsonNode node, String key, List<String> references, boolean requireReference) {
+        String value = node.path(key).asText();
+        if ((!references.isEmpty() && requireReference && !value.contains("如图中产品"))
+                || references.stream().anyMatch(value::contains))
+            throw new NonRetryableTaskException("VIDEO_ANALYSIS_PRODUCT", "模型未将原商品替换为“如图中产品”，请重新分析", null);
     }
 }
