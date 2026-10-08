@@ -12,6 +12,10 @@ const state = reactive({
 
 let timer
 
+// 后端的角色只有 OWNER（管理员）和 STAFF（店员）。这里只决定显示哪些入口，真正的限制在服务端。
+const rolesOf = role => [String(role || 'OWNER').toLowerCase()]
+const roleLabel = role => (role === 'STAFF' ? '店员' : '管理员')
+
 function persistSession(data) {
   const tokens = {
     accessToken: data.accessToken,
@@ -27,7 +31,8 @@ function persistSession(data) {
     tenantId: data.user.tenantId,
     phone: data.user.phone,
     name: data.user.name || (data.user.phone ? `用户${data.user.phone.slice(-4)}` : '用户'),
-    roles: ['user'],
+    roles: rolesOf(data.user.role),
+    role: roleLabel(data.user.role),
   }
   state.user = user
   writeUser(user)
@@ -53,6 +58,13 @@ export const auth = {
   },
   get tenantId() {
     return state.user?.tenantId ?? null
+  },
+  /**
+   * 只有明确是店员才收起管理入口。角色还没从服务端对齐时（旧会话、后端暂时连不上）按管理员显示：
+   * 多显示一个按钮顶多被服务端拒绝，把管理员的入口藏起来才是真的挡住了人。
+   */
+  get isOwner() {
+    return !state.user?.roles?.includes('staff')
   },
 
   async sendCode(phone) {
@@ -104,11 +116,14 @@ export const auth = {
     if (!state.token?.accessToken) return false
     try {
       const me = await authService.getCurrentUser()
-      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name }
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role) }
       writeUser(state.user)
+      // 校验过程中 request.js 可能已经换过 token，内存里的那份要跟上。
+      state.token = readTokens()
       return true
-    } catch {
-      this.clearSession()
+    } catch (error) {
+      // 只有服务端明确判定未登录才清会话；网络错误、后端重启时保留登录态。
+      if (error?.code === 1401) this.clearSession()
       return false
     }
   },

@@ -61,14 +61,13 @@ mvn spring-boot:run
 `init-local.ps1` 会生成随机 JWT 密钥，已有 `.env` 时保留原配置。
 首次运行需等待 PostgreSQL 健康检查通过；可用 `docker compose ps` 检查。
 
-Linux/macOS：
+Linux/macOS（脚本保留已有配置，自动生成随机 JWT 密钥）：
 
 ```bash
-cp .env.example .env
-printf '\nJWT_SECRET=%s\n' "$(openssl rand -base64 48)" >> .env
+bash scripts/init-local.sh
 docker compose up -d
 docker compose wait minio-init
-mvn spring-boot:run
+bash scripts/mvn-local.sh spring-boot:run
 ```
 
 `.env` 使用 Java properties 语法，值不要加引号。应用通过
@@ -82,9 +81,17 @@ mvn spring-boot:run
 如果本地已有服务占用默认端口，在 `.env` 设置 `POSTGRES_PORT`、`REDIS_PORT`、
 `MINIO_PORT`、`MINIO_CONSOLE_PORT`，同时把 `DB_URL` 和 `MINIO_ENDPOINT` 改为对应端口。
 
+声音样本可通过 `VOICE_SAMPLE_STORAGE=cos` 使用腾讯云 COS，配置凭证及浏览器跨域规则见
+[COS 声音样本配置](../../docs/tencent-cos-voice-storage.md)。旧 MinIO 文件仍按原 key 读取。
+
 ## 使用
 
-默认只启动 API，地址为 [本地 API](http://localhost:8080)。
+使用本地 `.env.example` 初始化后，API 地址为 [本地 API](http://localhost:18080)，
+PostgreSQL / Redis / MinIO / MinIO 控制台端口分别为 `35432 / 36379 / 39000 / 39001`。
+这些端口与 `deploy/docker-compose.dev.yml` 的旧开发环境分开。
+`mvn-local.sh` 自动选择 Homebrew 的 Java 21，无需修改全局 shell 配置。
+判断新版是否启动时，请同时检查 `18080/actuator/health` 和对应数据库的 Flyway 记录，
+不要把其他容器的 `8080` 健康检查当作本次代码的验证结果。
 需要后台任务时，再启动一个 worker；两个进程使用同一数据库和配置。
 
 ```bash
@@ -392,11 +399,168 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 创建 Flyway 脚本前双方登记下一个版本号，并先同步主干，避免重复版本。
 已合并的迁移不修改。当前 V1–V4 保持不变，后续变更新增迁移。
 
+尚未合入主干的迁移在这里登记。新建迁移前先同步主干、看这张表，取下一个空号并补一行；合入主干后把对应的行删掉。
+
+| 版本 | 内容 | 分支 |
+|---|---|---|
+| V40 | 品牌库：`brands` 表，`stores.brand_id` | `feat/brand-backend` |
+| V41 | 账号角色、店员的门店范围、声音样本按门店开放 | `feat/staff-accounts` |
+| V42 | 门店名只在营业中的门店之间唯一，关店后可再用 | `feat/store-library` |
+| V43 | 门店档案：`stores.profile`（交通指引、配套服务、特殊营业安排） | `feat/store-library` |
+
+下一个可用编号：V44。
+
 后端检查：
 
 ```bash
 mvn verify
 ```
+
+macOS 可用 `bash scripts/mvn-local.sh verify`。迁移状态查询：
+
+```bash
+docker compose exec postgres psql -U growth_owner -d wuyao_growth \
+  -c 'select version, description, success from flyway_schema_history order by installed_rank;'
+```
+
+### 品牌
+
+层级是 商户（租户）→ 品牌 → 门店：品牌档案属于商户，门店通过 `stores.brand_id` 归到一个品牌名下，
+商品、知识库、直播仍然属于门店。素材和生成的作品属于商户，不随品牌划分。
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/brands` | 当前商户未删除的品牌，默认品牌在前；每项带 `storeCount`（营业中的门店数） |
+| `POST /api/brands` | 新建。只有 `name` 必填 |
+| `GET /api/brands/{id}`、`PUT /api/brands/{id}` | 读取、整份保存。`PUT` 必须带 `version`，没带上的字段视为清空 |
+| `DELETE /api/brands/{id}` | 归档（软删除），归档后名称可以再用 |
+| `POST /api/brands/{id}/default` | 设为默认品牌 |
+
+规则：
+
+- 商户的第一个品牌自动成为默认品牌，已有的门店一并归到它名下；每个商户至多一个默认品牌。
+- 新建门店可以带 `brandId`；不带时归到默认品牌，商户还没有品牌时为空。
+  修改门店时不带 `brandId` 表示不改变归属。门店只能挂到本商户未删除的品牌，否则返回 1400。
+- 还有营业中门店的品牌不能删除；有其他品牌时，默认品牌要先把默认让出去才能删除。两种情况都返回 1409。
+- Logo 和两个二维码保存的是素材 ID（`logoAssetId` 等），必须是本商户已上传完成的图片素材；
+  预览地址由前端向 `/api/assets/{id}/download-url` 获取。
+- 响应不输出值为 null 的字段，未填写的资料在 JSON 里不出现。
+
+V40 建表并启用强制 RLS。`stores` 到 `brands` 是 `(tenant_id, brand_id)` 复合外键：
+外键检查不受行级安全约束，由它保证门店挂不到其他商户的品牌上。
+
+品牌模块通过 `brand/BrandStoreLinks` 了解门店归属，由门店模块实现；其他模块用
+`BrandService.profileForStore(storeId)` 读取门店所属品牌的文字资料。直播的自动讲解和弹幕回复
+已经这样接入：门店有品牌时，品牌名、口号、简介、定位、目标人群和表达风格作为【品牌资料】
+随商品资料一起交给文本模型，生成内容的数字和承诺校验也把它算作依据；门店没有品牌时提示词与原来完全一致。
+这部分用替身模型验证了提示词内容和校验结果，没有用真实模型验证生成效果。图片和视频创作尚未读取品牌资料。
+
+品牌的新建、修改、删除和设为默认只有管理员能做，商户内的成员都能读取。
+
+### 账号、角色与门店范围
+
+一个商户里有两种账号，角色记在账号上（`users.role`），不记在门店上：
+
+| 角色 | 能进的门店 | 额外能做的事 |
+|---|---|---|
+| `OWNER` 管理员 | 本商户全部门店，不需要任何登记 | 建店、关店、换门店的品牌；管理品牌；员工管理；上传、克隆、改名、删除声音样本并决定开放给哪些门店 |
+| `STAFF` 店员 | 只有 `store_members` 里列出的门店 | 无。可以改本店的地址、电话、营业时间 |
+
+进了门店的人都可以管理该店的商品、知识库、直播，使用开放给该店的声音。素材库、图片和视频创作不分门店，所有成员可用。
+判断只有两个入口，新模块不要另写一套：
+
+- `StoreAccessService.requireAccess(storeId, userId)`：这个人能不能进这家门店。
+- `AccountService.requireOwner(userId)`：这个人是不是管理员。
+
+两者都按 `userId` 查库，不依赖令牌里的内容，所以 worker 里的任务同样受约束：
+账号被停用或移除后，它名下排队中的任务（包括自己开播场次的自动讲解）会因无权访问而失败。
+
+员工管理接口都在 `/api/team/members` 下，只有管理员能调用：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/team/members` | 本商户未移除的账号，管理员在前；店员带 `storeIds`，管理员为 `allStores=true` |
+| `POST /api/team/members` | `{phone, name, storeIds}` 添加店员。对方用这个手机号验证码登录后直接进入本商户 |
+| `PUT /api/team/members/{id}` | `{name, storeIds}` 改姓名和门店范围，立即生效 |
+| `POST /api/team/members/{id}/disable`、`/enable` | 停用后令牌版本加一，已签发的访问令牌和刷新令牌立即失效，也无法再登录 |
+| `DELETE /api/team/members/{id}` | 移除：账号行保留（业务记录的创建人仍指向它），状态记为 `REMOVED` 并清空手机号，门店范围清空 |
+
+约束与已知边界：
+
+- 一个手机号只属于一个商户。已注册的手机号（包括自己注册后什么都没做的空商户）加不进来，返回 1409；
+  移除后手机号被释放，可以重新注册或被别的商户添加。
+- 添加店员不需要对方确认：管理员登记了某个手机号，该手机号的主人登录时就会进入这个商户，而不是开自己的商户。
+  需要"邀请—接受"时，应与多商户归属一起做。
+- 管理员的账号不能通过这些接口修改；目前没有转让管理员、增设多个管理员或更多角色的接口。
+  V41 把迁移前已有的账号全部记为 `OWNER`（此前产品里无法给商户加第二个人）。
+- `/api/auth/me` 和登录响应里的 `user.role` 供前端决定显示哪些入口，不是权限依据。
+
+V41 同时删除了 `store_members.role`，并清掉管理员名下的成员记录。
+
+### 声音样本的归属
+
+声音样本归商户所有，能在哪些门店使用由 `voice_sample_stores` 决定（V41）。
+`voice_samples.store_id` 保留为"上传时所在的门店"，不再决定谁能用；迁移把每个现有样本开放给它原来的门店，可用范围不变。
+
+- 新上传的样本只开放给上传时所在的门店。管理员用 `PUT /api/voice-samples/{id}/stores` `{storeIds}` 调整，
+  每条开放记录带 `granted_by` 和时间；取消开放会删除对应记录。
+- 至少保留一家门店；某家门店有进行中的场次正在用这个声音时，不能对这家门店取消开放，也不能删除样本。
+- 直播选音色、试听合成都按"样本是否开放给当前门店"判断；`GET /api/stores/{storeId}/voice-samples` 只返回开放给该店的样本，
+  每项带 `storeIds`。
+- `voice_sample_stores` 到样本和门店都是带 `tenant_id` 的复合外键，样本开放不到别的商户的门店。
+
+### 门店、商品、知识库与直播配置
+
+门店通过 `/api/stores` 管理；建店和关店只有管理员能做，`GET /api/stores` 对管理员返回全部门店，对店员只返回分配给他的门店。
+关店（`DELETE /api/stores/{id}`）之后门店不再出现在任何接口里，目前没有恢复的入口，名下的商品、知识库和直播记录保留在库里但无法访问。
+所以关店前由依赖门店的模块把关（`store/StoreClosureGuard`），不满足时返回 1409：
+
+- 这家店有进行中的直播（`LIVE` 或 `PAUSED`）时不能关。
+- 有声音样本只开放给这家店时不能关，需要先开放给其他门店或删除；关店成功后，样本对这家店的开放记录一并删除。
+
+门店名只在营业中的门店之间唯一（V42），关店后可以用同样的名字再建一家。
+
+门店档案（V43，`stores.profile` 一个 JSONB 字段）在基本资料之外记三项，新建和修改门店时随请求提交：
+
+| 字段 | 内容 |
+|---|---|
+| `transportGuide` | 交通指引，500 字以内 |
+| `amenities` | 配套服务，最多 20 项，每项 20 字以内；不限定取值，前端给了一组常用项 |
+| `specialHours` | 特殊营业安排，最多 30 条。每条：`scope`（`WEEKLY` 每周 / `DATE` 指定日期）、`weekday`（1–7，周一为 1）或 `date`（yyyy-MM-dd）、`closed`、不休息时的 `opensAt` / `closesAt`（HH:mm）、`note` |
+
+这三项**不带（null）表示不改动，带空字符串或空列表表示清空**，所以只提交四项基本资料的表单不会把档案抹掉；
+名称、地址、电话、营业时间仍然是整项替换。字段搭配不对（每周却没选星期、日期无效、不休息却没填时间）返回 1400，并指出是第几条。
+
+直播的弹幕回复会用到门店资料：门店填了地址、电话、营业时间或档案中的任何一项时，
+这些内容作为【门店资料】随商品资料一起交给文本模型（`StoreService.profile(storeId)` → `ReplyPrompt.store`），
+回复里的数字校验也把它算作依据；已经过去的指定日期安排不会交给模型。只有门店名、别的都没填时不加这一块，提示词与原来一致。
+自动讲解（话术）不使用门店资料。这部分用替身模型验证了提示词内容和校验结果，没有用真实模型验证回答效果。
+商品从 `/api/stores/{storeId}/products` 创建、分页查询，
+通过 `/api/products/{id}` 读取、修改和软删除，图片绑定素材 ID，商品 FAQ 使用 `/faqs`。
+知识集从 `/api/stores/{storeId}/knowledge-sets` 创建，问答保存后显式发布才进入门店知识上下文。
+
+直播配置从 `/api/stores/{storeId}/live-sessions` 创建，
+场次操作使用 `/api/live-sessions/{id}` 下的 `start / pause / resume / end / qa`。
+新增问答的 `persistMode` 默认 `SESSION`；`PRODUCT_FAQ` 的 `targetId` 是本场已选商品 ID，
+`STORE_KNOWLEDGE` 的 `targetId` 是当前门店 FAQ 知识集 ID（保存为草稿，需在知识库发布）。
+本场副本始终保留，开播按本场、商品、门店顺序生成快照，暂停恢复不会重读资产库。
+
+`parse-link` 目前仅设置房间标识；真实平台连接、弹幕接入、语义匹配与 AI 回答尚未接入。
+
+场次规则：一个门店同时只有一场进行中（`LIVE` 或 `PAUSED`，由唯一索引保证）；开始需要至少一件商品和一个可用的主播音色，
+直播间标识不是必填；`DELETE /api/live-sessions/{id}` 只能删除未开始的场次；`POST /api/live-sessions/{id}/duplicate`
+按已有场次的配置、商品和本场问答新建一场；场次列表只返回摘要，不带知识快照。
+
+播报与自动讲解：`POST /api/live-sessions/{id}/speech` 只登记一条播报并提交任务，返回的是受理状态而不是音频；
+`/auto-script`、`/auto-script/start`、`/auto-script/stop` 控制自动讲解，`/speech-items` 返回最近的播报及其进度。
+弹幕回复的任务在单独的队列 `LIVE_REPLY` 上：处理 `LIVE` 的 worker 进程会自动多起几个循环专门处理它，和讲解并行，
+`growth.worker.queues` 里不用写。同时处理几条弹幕由 `growth.live.reply-lane.concurrency` 决定（默认 3）。
+设 `growth.live.reply-lane.enabled=false` 可关掉（那就得另有进程处理 `LIVE_REPLY`）。
+
+话术生成（`LIVE_SCRIPT_GENERATE`）和语音合成（`LIVE_SPEECH_SYNTHESIZE`）都在队列 `LIVE` 上由 worker 执行，
+**没有 worker 时不会有任何声音**。文案模型通过 `TEXT_WRITER_URL / TEXT_WRITER_API_KEY / TEXT_WRITER_MODEL` 配置
+（OpenAI 兼容的 chat completions），缺失时自动讲解明确报错。细节见 [直播音频说明](../../docs/live-browser-audio-integration.md)。
+测试使用独立 Testcontainers 数据库，包括全链路保存、跨租户/门店拒绝、快照冻结和重复商品编辑。
 
 测试需要 Docker，会自动创建并清理独立 PostgreSQL 16 和 MinIO。
 覆盖认证并发、任务幂等与事务回滚、租约及重试上限、长任务续租、

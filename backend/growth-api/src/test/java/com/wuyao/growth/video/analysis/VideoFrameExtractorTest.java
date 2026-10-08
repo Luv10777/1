@@ -33,7 +33,8 @@ class VideoFrameExtractorTest {
     }
     @Test void overlongAndDisguisedVideosFailBeforeModelAnalysis() throws Exception {
         var extractor = new VideoFrameExtractor(new VideoAnalysisProperties(), new ObjectMapper());
-        assertThatThrownBy(() -> extractor.extract(video(61), directory))
+        Path overlong = video(61);
+        assertThatThrownBy(() -> extractor.extract(overlong, directory))
                 .isInstanceOf(NonRetryableTaskException.class).hasMessageContaining("60 秒");
         Path bad = directory.resolve("fake.mp4"); java.nio.file.Files.writeString(bad, "not a video");
         assertThatThrownBy(() -> extractor.extract(bad, directory)).isInstanceOf(NonRetryableTaskException.class);

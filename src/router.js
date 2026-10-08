@@ -8,12 +8,13 @@ import ForbiddenView from './views/ForbiddenView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import CreativeWorkspaceView from './views/CreativeWorkspaceView.vue'
 import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
-import StoreInfoView from './views/StoreInfoView.vue'
+import StoresView from './views/StoresView.vue'
 import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
 import BrandsView from './views/BrandsView.vue'
 import AssetsView from './views/AssetsView.vue'
+const ProductsView = () => import('./views/ProductsView.vue')
 import KnowledgeView from './views/KnowledgeView.vue'
 import WorksView from './views/WorksView.vue'
 import ImageCreateView from './views/ImageCreateView.vue'
@@ -22,9 +23,11 @@ import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
 import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
+import PlayerView from './views/PlayerView.vue'
 import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
+import TeamView from './views/TeamView.vue'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
@@ -33,6 +36,7 @@ const routes = [
   { path: '/', redirect: '/dashboard' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
+  { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
   { path: '/ecosystem', name: 'ecosystem', component: EcosystemView, meta: { title: '生态与治理', eyebrow: 'OPEN ECOSYSTEM' }, },
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '经营总览', eyebrow: 'TODAY / OPERATIONS' } },
@@ -50,9 +54,10 @@ const routes = [
   { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { title: 'AI实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，AI 负责话术、声音克隆与弹幕自动回复。' } },
   { path: '/digital-human/history', name: 'digital-human-history', component: PlaceholderView, meta: { title: '直播弹幕与回复记录', eyebrow: 'CONTENT TOOLS / LIVE HISTORY', icon: '◷', description: '查看本场直播中的观众弹幕与 AI 回复内容。历史记录页将在后续版本接入完整数据。' } },
   { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
-  { path: '/merchants', name: 'merchants', component: StoreInfoView, meta: { title: '门店信息', eyebrow: 'ASSET CENTER', icon: '⌂', description: '管理商家资料、门店信息与运营边界。' } },
+  { path: '/merchants', name: 'merchants', component: StoresView, meta: { title: '门店库', eyebrow: 'ASSET CENTER', icon: '⌂', description: '查看和管理本商户的门店。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
+  { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', eyebrow: 'ASSET CENTER', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为 AI 直播讲解与内容创作提供商品事实库。' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
   { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
   { path: '/reviews', name: 'reviews', component: ReviewsView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },
@@ -73,6 +78,7 @@ const routes = [
   { path: '/merchant-alliance', name: 'merchant-alliance', component: PlaceholderView, meta: { title: '商家联盟', eyebrow: 'PLANS & BENEFITS', icon: '◇', description: '查看商家合作权益、联合活动和联盟资源。' } },
   { path: '/notifications', name: 'notifications', component: PlaceholderView, meta: { title: '消息', eyebrow: 'SYSTEM', icon: '◌', description: '集中查看系统通知、审核提醒和任务动态。' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
+  { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: PlaceholderView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '管理成员、角色、通知和平台连接配置。' } },
   { path: '/help', name: 'help', component: PlaceholderView, meta: { title: '帮助与反馈', eyebrow: 'SYSTEM', icon: '?', description: '查找使用说明、常见问题并提交产品反馈。' } },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },
@@ -97,6 +103,7 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.role && !auth.hasRole(to.meta.role)) return { name: 'forbidden' }
+  if (to.meta.ownerOnly && !auth.isOwner) return { name: 'forbidden' }
   return true
 })
 

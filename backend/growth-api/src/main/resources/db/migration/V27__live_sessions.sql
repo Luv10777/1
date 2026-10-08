@@ -1,0 +1,14 @@
+CREATE TABLE live_sessions (
+ id BIGSERIAL PRIMARY KEY, tenant_id BIGINT NOT NULL REFERENCES tenants(id), store_id BIGINT NOT NULL REFERENCES stores(id),
+ name VARCHAR(160) NOT NULL, room_id VARCHAR(200), status VARCHAR(20) NOT NULL DEFAULT 'DRAFT', knowledge_version INT NOT NULL DEFAULT 0,
+ started_at TIMESTAMPTZ, ended_at TIMESTAMPTZ, created_by BIGINT REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), version BIGINT NOT NULL DEFAULT 0,
+ CONSTRAINT ck_live_sessions_status CHECK(status IN ('DRAFT','LIVE','PAUSED','ENDED','CANCELLED')));
+CREATE INDEX idx_live_sessions_store ON live_sessions(tenant_id,store_id,status,updated_at DESC);
+CREATE TABLE live_session_products (id BIGSERIAL PRIMARY KEY, tenant_id BIGINT NOT NULL REFERENCES tenants(id), session_id BIGINT NOT NULL REFERENCES live_sessions(id) ON DELETE CASCADE, product_id BIGINT NOT NULL REFERENCES products(id), sort_order INT NOT NULL DEFAULT 0, UNIQUE(session_id,product_id));
+CREATE INDEX idx_live_session_products_session ON live_session_products(tenant_id,session_id,sort_order);
+CREATE TABLE live_session_qa (id BIGSERIAL PRIMARY KEY, tenant_id BIGINT NOT NULL REFERENCES tenants(id), session_id BIGINT NOT NULL REFERENCES live_sessions(id) ON DELETE CASCADE, question VARCHAR(500) NOT NULL, answer TEXT NOT NULL, persist_mode VARCHAR(30) NOT NULL DEFAULT 'SESSION', target_id BIGINT, created_by BIGINT REFERENCES users(id), created_at TIMESTAMPTZ NOT NULL DEFAULT now(), CONSTRAINT ck_live_qa_persist CHECK(persist_mode IN ('SESSION','PRODUCT_FAQ','STORE_KNOWLEDGE')));
+CREATE TABLE live_session_knowledge_snapshots (id BIGSERIAL PRIMARY KEY, tenant_id BIGINT NOT NULL REFERENCES tenants(id), session_id BIGINT NOT NULL REFERENCES live_sessions(id) ON DELETE CASCADE, source_type VARCHAR(30) NOT NULL, source_id BIGINT, question VARCHAR(500) NOT NULL, answer TEXT NOT NULL, priority INT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX idx_live_snapshot_session ON live_session_knowledge_snapshots(tenant_id,session_id,priority,id);
+DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['live_sessions','live_session_products','live_session_qa','live_session_knowledge_snapshots'] LOOP EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t); EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY',t); EXECUTE format('CREATE POLICY tenant_isolation ON %I USING (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::bigint) WITH CHECK (tenant_id = NULLIF(current_setting(''app.tenant_id'', true), '''')::bigint)',t); END LOOP; END $$;
+GRANT SELECT,INSERT,UPDATE,DELETE ON live_sessions,live_session_products,live_session_qa,live_session_knowledge_snapshots TO growth_app;
+GRANT USAGE,SELECT ON SEQUENCE live_sessions_id_seq,live_session_products_id_seq,live_session_qa_id_seq,live_session_knowledge_snapshots_id_seq TO growth_app;

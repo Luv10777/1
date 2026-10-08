@@ -1,0 +1,2 @@
+ALTER TABLE live_sessions ADD COLUMN config JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE live_session_qa ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

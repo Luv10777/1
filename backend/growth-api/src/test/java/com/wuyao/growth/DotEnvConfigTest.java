@@ -26,4 +26,15 @@ class DotEnvConfigTest {
         runner.withSystemProperties("JWT_SECRET=external-secret").run(context ->
                 assertThat(context.getEnvironment().getProperty("growth.jwt.secret")).isEqualTo("external-secret"));
     }
+
+    @Test
+    void aJsonValueInDotEnvReachesTheSettingExactlyAsWritten() throws Exception {
+        Path env = directory.resolve(".env");
+        Files.writeString(env, "TEXT_WRITER_EXTRA_BODY={\"enable_thinking\":false}\n");
+        new ApplicationContextRunner()
+                .withInitializer(new ConfigDataApplicationContextInitializer())
+                .withPropertyValues("spring.config.import=" + env.toUri() + "[.properties]")
+                .run(context -> assertThat(context.getEnvironment().getProperty("growth.ai.writer.extra-body"))
+                        .isEqualTo("{\"enable_thinking\":false}"));
+    }
 }

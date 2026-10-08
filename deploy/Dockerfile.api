@@ -1,0 +1,33 @@
+# 后端镜像：Maven 构建 → JRE 运行
+# 国内服务器构建慢的话，下面已经配了阿里云 Maven 镜像
+
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+
+# 阿里云 Maven 镜像，国内拉依赖快很多
+RUN mkdir -p /root/.m2 && printf '%s\n' \
+  '<settings>' \
+  '  <mirrors><mirror>' \
+  '    <id>aliyun</id><name>aliyun</name>' \
+  '    <url>https://maven.aliyun.com/repository/public</url>' \
+  '    <mirrorOf>central</mirrorOf>' \
+  '  </mirror></mirrors>' \
+  '</settings>' > /root/.m2/settings.xml
+
+# 先只拷 pom，让依赖层能被缓存
+COPY backend/growth-api/pom.xml .
+RUN mvn -B -ntp dependency:go-offline
+
+COPY backend/growth-api/src ./src
+RUN mvn -B -ntp clean package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+RUN addgroup -S app && adduser -S app -G app
+COPY --from=build /build/target/growth-api-*.jar app.jar
+RUN chown -R app:app /app
+USER app
+
+EXPOSE 8080
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -Duser.timezone=Asia/Shanghai"
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar $APP_ARGS"]

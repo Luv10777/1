@@ -32,6 +32,9 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/password-login",
                                 "/api/auth/refresh",
+                                "/api/player/ws",
+                                "/api/player/test-audio.wav",
+                                "/api/player/audio/**",
                                 "/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
