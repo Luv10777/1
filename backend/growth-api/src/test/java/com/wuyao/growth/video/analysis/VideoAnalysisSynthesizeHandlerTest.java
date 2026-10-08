@@ -198,6 +198,71 @@ class VideoAnalysisSynthesizeHandlerTest {
         verify(service, never()).failed(anyLong(), any(), anyString());
     }
 
+    @Test void productDescriptionsCanBeRepairedAcrossCopyFieldsWhileKeepingSpeechAndObservations() {
+        ready("ai");
+        var fixed = VideoAnalysisOutputTest.productVideo("ai");
+        fixed.put("prompt", fixed.get("prompt") + " {{edit:e1}}");
+        fixed.put("reuseScript", fixed.get("reuseScript") + " {{edit:e1}}");
+        fixed.put("editableContent", List.of(Map.of("id", "e1", "kind", "dialogue", "source", "audio", "label", "口播 1",
+                "original", "The password is silver lantern nine.", "start", 0, "end", 3)));
+        var output = new ObjectMapper().convertValue(fixed, Map.class);
+        output.put("prompt", output.get("prompt") + " 原商品是某牌白杯");
+        output.put("negativePrompt", "避免某牌杯子变形");
+        ((Map<String, Object>) output.get("recreation")).put("workflow", "先生成某牌杯子的图片");
+        for (var shot : (List<Map<String, Object>>) output.get("shots")) {
+            for (String field : List.of("prompt", "firstFramePrompt", "continuity")) shot.put(field, "画面中保持某牌杯子");
+        }
+        ((List<Map<String, Object>>) output.get("keyframes")).getFirst().put("prompt", "生成某牌白杯的画面");
+        var patch = new ObjectMapper().convertValue(fixed, Map.class);
+        patch.put("summary", "不应修改原观察"); patch.put("productReferences", List.of());
+        for (var shot : (List<Map<String, Object>>) patch.get("shots")) {
+            shot.put("scene", "不应修改原镜头观察"); shot.put("start", 99); shot.put("end", 100);
+        }
+        ((List<Map<String, Object>>) patch.get("keyframes")).getFirst().put("seconds", 99);
+        when(gateway.invokeReal(any())).thenReturn(response(output), response(patch));
+        assertThat(handler.handle(task)).containsEntry("status", "SUCCEEDED");
+        var requests = ArgumentCaptor.forClass(ProviderRequest.class); verify(gateway, times(2)).invokeReal(requests.capture());
+        assertThat(requests.getAllValues().get(1).idempotencyKey()).isEqualTo("video-analysis-2-product-repair");
+        var report = ArgumentCaptor.forClass(Map.class); verify(service).completed(eq(2L), eq(task), report.capture());
+        var result = report.getValue();
+        assertThat(result).containsEntry("summary", output.get("summary")).containsEntry("productReferences", output.get("productReferences"))
+                .containsEntry("prompt", fixed.get("prompt")).containsEntry("negativePrompt", fixed.get("negativePrompt"));
+        var shots = (List<Map<String, Object>>) result.get("shots");
+        assertThat(shots.getFirst()).containsEntry("scene", ((List<Map<String, Object>>) output.get("shots")).getFirst().get("scene"))
+                .containsEntry("start", 0D).containsEntry("end", 6D)
+                .containsEntry("prompt", ((List<Map<String, Object>>) fixed.get("shots")).getFirst().get("prompt"));
+        assertThat(((List<Map<String, Object>>) result.get("keyframes")).getFirst()).containsEntry("seconds", 0);
+        assertThat(((List<Map<String, Object>>) result.get("editableContent")).getFirst())
+                .containsEntry("original", "The password is silver lantern nine.");
+        assertThat(result).containsEntry("audioAnalyzed", true);
+        verify(service, never()).failed(anyLong(), any(), anyString());
+    }
+
+    @Test void productRepairKeepsTheRealFilmingGuideWhileFixingAiInstructions() {
+        ready("real");
+        var output = VideoAnalysisOutputTest.productVideo("real");
+        output.put("prompt", output.get("prompt") + " 保留某牌");
+        var patch = VideoAnalysisOutputTest.productVideo("real");
+        patch.put("reuseScript", "不要保留的拍摄脚本");
+        ((Map<String, Object>) patch.get("recreation")).put("preparation", "不要保留的开拍准备");
+        when(gateway.invokeReal(any())).thenReturn(response(output), response(patch));
+        assertThat(handler.handle(task)).containsEntry("status", "SUCCEEDED");
+        var report = ArgumentCaptor.forClass(Map.class); verify(service).completed(eq(2L), eq(task), report.capture());
+        assertThat(report.getValue()).containsEntry("reuseScript", output.get("reuseScript")).containsEntry("recreation", output.get("recreation"));
+        verify(gateway, times(2)).invokeReal(any());
+    }
+
+    @Test void productRepairCannotChangeTheShotCountAndStopsAfterOneCorrection() {
+        ready("ai");
+        var output = VideoAnalysisOutputTest.productVideo("ai"); output.put("prompt", output.get("prompt") + " 保留某牌");
+        var patch = VideoAnalysisOutputTest.productVideo("ai"); patch.put("shots", List.of());
+        when(gateway.invokeReal(any())).thenReturn(response(output), response(patch));
+        assertThatThrownBy(() -> handler.handle(task)).isInstanceOfSatisfying(NonRetryableTaskException.class,
+                error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_OUTPUT"));
+        verify(gateway, times(2)).invokeReal(any());
+        verify(service, never()).completed(anyLong(), any(), anyMap());
+    }
+
     private Map<String, Object> editable(String kind, String source, String original) {
         var output = VideoAnalysisOutputTest.validFor("ai");
         output.put("prompt", output.get("prompt") + " 口播安排：{{edit:e1}}");
