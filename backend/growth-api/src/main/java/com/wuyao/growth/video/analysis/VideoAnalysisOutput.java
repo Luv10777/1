@@ -38,6 +38,8 @@ public final class VideoAnalysisOutput {
             识别商家可能需要修改的品牌、对白/口播、字幕、价格、活动、联系方式等，返回 editableContent 数组，没有可见/可听证据则返回 []。
             每项写 id（e1、e2 等唯一编号）、kind（brand/dialogue/subtitle/text）、label（中文名称）、original（原文）、
             source（audio/video）、start、end（原文出现的起止秒数）。对白只能引用已完成音频报告中对应时间的 transcript 原文，不能改写或虚构。
+            价格、活动、联系方式归入 text，不用这些名称作为 kind；画面中的台词归入 subtitle，只有听到的口播归入 dialogue。
+            来源只用 audio 或 video，抽样图片中的品牌与文字都归入 video，不返回 image、frame 或混合来源。
             可见文字只录能看清的内容；品牌单独列一项，字幕或对白中同一品牌出现时仍保留完整原文供商家对照。
             editableContent 最多 30 项；每段口播单独列一项，逐字引用对应 transcript 段落，不能把多段转录拼成一项。
             prompt 中用 {{edit:e1}} 等标记对应文字安排，每个标记单独表示该项完整的文字/口播安排，不要在标记外再次写原品牌或原句。

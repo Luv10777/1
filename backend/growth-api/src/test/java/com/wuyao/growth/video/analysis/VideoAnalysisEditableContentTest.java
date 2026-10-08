@@ -21,6 +21,42 @@ class VideoAnalysisEditableContentTest {
         assertThat(result.get("prompt").toString()).contains("{{edit:e1}}", "{{edit:e2}}").doesNotContain("旧牌", "杯子");
     }
 
+    @Test void equivalentLabelsAreNormalizedWithoutChangingOriginalWordsOrEvidence() {
+        for (var labels : List.of(List.of(" 品牌 ", " IMAGE ", "口播", "音频"),
+                List.of("brand_name", "frame", "VoiceOver", "audio_transcript"))) {
+            var output = linked("ai");
+            output.put("editableContent", List.of(item(" e1 ", labels.get(0), labels.get(1), "旧牌", 0, 3),
+                    item("e2", labels.get(2), labels.get(3), "试试旧牌的杯子", 0, 3)));
+            var items = (List<Map<String, Object>>) VideoAnalysisOutput.validate(output, 12000, "ai", json).get("editableContent");
+            assertThat(items.getFirst()).containsEntry("id", "e1").containsEntry("kind", "brand").containsEntry("source", "video");
+            assertThat(items.get(1)).containsEntry("kind", "dialogue").containsEntry("source", "audio").containsEntry("original", "试试旧牌的杯子");
+            assertThatCode(() -> VideoAnalysisEditableContent.validateAudio(items, audio(), json)).doesNotThrowAnyException();
+            assertThat(((List<Map<String, Object>>) output.get("editableContent")).getFirst()).containsEntry("kind", labels.get(0));
+        }
+    }
+
+    @Test void CaptionsAndMerchantBusinessTextUseSupportedTypes() {
+        for (String alias : List.of("caption", "字幕", "price", "promotion", "contact_info", "联系方式")) {
+            var output = linked("ai");
+            output.put("editableContent", List.of(item("e1", alias, "画面", "旧牌", 0, 3),
+                    item("e2", "dialogue", "audio", "试试旧牌的杯子", 0, 3)));
+            var items = (List<Map<String, Object>>) VideoAnalysisOutput.validate(output, 12000, "ai", json).get("editableContent");
+            assertThat(items.getFirst()).containsEntry("kind", Set.of("caption", "字幕").contains(alias) ? "subtitle" : "text")
+                    .containsEntry("source", "video");
+        }
+    }
+
+    @Test void ambiguousSourcesAndVisualDialogueAreNotConvertedIntoAudioEvidence() {
+        for (String source : List.of("both", "画面", "image")) {
+            var output = linked("ai");
+            output.put("editableContent", List.of(item("e1", "brand", "video", "旧牌", 0, 3),
+                    item("e2", "speech", source, "试试旧牌的杯子", 0, 3)));
+            assertThatThrownBy(() -> VideoAnalysisOutput.validate(output, 12000, "ai", json))
+                    .isInstanceOf(NonRetryableTaskException.class).hasMessageContaining("来源")
+                    .hasMessageNotContaining("试试旧牌的杯子");
+        }
+    }
+
     @Test void everyEditableItemMustBeLinkedToBothAiCopyBlocks() {
         for (String key : List.of("prompt", "reuseScript")) {
             var output = linked("ai");
