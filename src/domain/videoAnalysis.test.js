@@ -49,6 +49,13 @@ test('Chinese prompt recognition allows brands and rejects English bodies with a
   assert.equal(isChineseAnalysisPrompt('生成竖屏 AI 视频，人物从右侧拿起 DJI 产品，窗边柔光，镜头固定。'), true)
 })
 
+test('speech slots do not turn Chinese copy blocks into English or make English bodies pass', () => {
+  const slots = Array.from({ length: 60 }, (_, index) => `{{edit:e${index + 1}}}`).join(' ')
+  assert.equal(isChineseAnalysisPrompt('竖屏短片，如图中产品位于木桌中央，相机缓慢靠近。' + slots), true)
+  assert.equal(isChineseAnalysisPrompt('A cinematic product video with a fixed camera.' + slots), false)
+  assert.equal(isChineseAnalysisPrompt(slots), false)
+})
+
 test('historical prompts become Chinese from observed scenes, movement and actual shot timing in either mode', () => {
   for (const mode of ['ai', 'real']) {
     const value = historicalAnalysis(mode)

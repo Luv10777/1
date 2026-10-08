@@ -1,7 +1,7 @@
-import { analysisTime, localizeAnalysisPrompts, productTemplateText } from './videoAnalysis.js'
+import { analysisTime, localizeAnalysisPrompts } from './videoAnalysis.js'
 
-const kinds = { brand: '品牌', dialogue: '对白／口播', subtitle: '画面字幕', text: '其他文字' }
 const owns = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
+const overlaps = (a, b) => Number(a.start) < Number(b.end) + 0.15 && Number(a.end) > Number(b.start) - 0.15
 
 function replaceText(value, replacements) {
   const entries = [...new Map(replacements.filter(([from]) => from)).entries()].sort((a, b) => b[0].length - a[0].length)
@@ -11,55 +11,66 @@ function replaceText(value, replacements) {
   return value.replace(pattern, match => values.get(match))
 }
 
+function protectSpokenText(value, items) {
+  if (!items.length) return value
+  const originals = new Map(items.map(item => [item.original, `{{speech:${item.id}}}`]))
+  const phrases = [...originals.keys()].sort((a, b) => b.length - a.length).map(text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  // Historical reports may quote speech inline. Match a speech label so a short utterance does not preserve a visual product description.
+  const pattern = new RegExp(`((?:口播|对白|对话|台词|配音|说|问|回答|开口)(?:内容)?\\s*[：:为是]?\\s*[“"'「]?)(${phrases.join('|')})`, 'g')
+  return value.replace(pattern, (match, label, original) => label + originals.get(original))
+}
+
 export function analysisEditableContent(analysis) {
   const result = analysis?.result
-  if (!result) return []
-  if (Array.isArray(result.editableContent)) return result.editableContent.map(item => ({ ...item }))
-  const items = (result.parameters || []).filter(item => /^(品牌|品牌名称|品牌信息)$/.test(item.key) && item.value)
-    .map((item, index) => ({ id: `brand${index}`, kind: 'brand', label: '原视频品牌', original: item.value, source: 'video', start: 0, end: analysis.durationMs / 1000 }))
-  if (result.audioAnalyzed === true && result.audio?.status === 'ANALYZED') {
-    items.push(...(result.audio.transcript || []).filter(item => item.text).map((item, index) => ({
-      id: `speech${index}`, kind: 'dialogue', label: `对白／口播 ${index + 1}`, original: item.text, source: 'audio', start: item.start, end: item.end,
-    })))
-  }
-  return items
+  if (result?.audioAnalyzed !== true || result.audio?.status !== 'ANALYZED') return []
+  const recorded = (result.editableContent || []).filter(item => item.kind === 'dialogue' && item.source === 'audio')
+  const used = new Set()
+  return (result.audio.transcript || []).filter(item => typeof item.text === 'string' && item.text.trim()).map((segment, index) => {
+    const match = recorded.find(item => !used.has(item.id) && item.original === segment.text && overlaps(item, segment))
+    const id = match?.id || `speech${index}`
+    used.add(id)
+    return { id, kind: 'dialogue', label: `口播 ${index + 1}`, original: segment.text, source: 'audio', start: segment.start, end: segment.end }
+  })
 }
 
 export function customizeAnalysisRecreation(analysis, edits = {}) {
-  const result = localizeAnalysisPrompts(analysis)
-  if (!result) return null
+  if (!analysis?.result) return null
   const items = analysisEditableContent(analysis)
-  const brands = items.filter(item => item.kind === 'brand')
-  const brandValues = new Map(brands.map(item => [item.id, owns(edits, item.id) ? String(edits[item.id]).trim() : '']))
-  const values = new Map(items.map(item => {
-    if (owns(edits, item.id)) return [item.id, String(edits[item.id]).trim()]
-    if (item.kind === 'brand') return [item.id, '']
-    // Protect nested brand edits while removing the original product's physical identity.
-    const protectedText = replaceText(item.original, brands.map(brand => [brand.original, `{{brand:${brand.id}}}`]))
-    const neutral = productTemplateText(protectedText, (result.productReferences || []).filter(reference => !brands.some(brand => brand.original === reference)))
-    return [item.id, replaceText(neutral, brands.map(brand => [`{{brand:${brand.id}}}`, brandValues.get(brand.id) || '本店']))]
-  }))
+  const values = new Map(items.map(item => [item.id, owns(edits, item.id) ? String(edits[item.id]) : item.original]))
+  // Protect spoken words before visual product descriptions are prepared for the merchant's reference image.
+  const tokens = (analysis.result.editableContent || []).map(item => {
+    const candidates = item.kind === 'dialogue' && item.source === 'audio'
+      ? items.filter(segment => segment.original.includes(item.original) && overlaps(item, segment)) : []
+    const speech = candidates.find(segment => segment.id === item.id) || candidates.sort((a, b) =>
+      Math.abs(a.start - item.start) + Math.abs(a.end - item.end) - Math.abs(b.start - item.start) - Math.abs(b.end - item.end))[0]
+    return [`{{edit:${item.id}}}`, speech ? `{{speech:${speech.id}}}` : '']
+  })
+  const prepare = value => typeof value === 'string' ? protectSpokenText(replaceText(value, tokens), items)
+    .replace(/\{\{edit:[^}]+}}/g, '')
+    .replace(/(?:卡片)?(?:品牌|字幕|画面文字|文字)(?:内容)?(?:安排为|使用|为|：|:)\s*(?=[，；。])/g, '')
+    .replace(/(?:[、，；]\s*)+(?=[、，；。])/g, '') : value
+  const result = localizeAnalysisPrompts(analysis, prepare)
   const time = item => `${analysisTime(item.start)}–${analysisTime(item.end)}`
   const directive = item => {
     const value = values.get(item.id)
-    if (!value) return item.kind === 'brand' ? '不使用原视频品牌文字。' : `${time(item)}不安排${kinds[item.kind] || '文字'}。`
-    return `${item.kind === 'brand' ? '' : time(item) + ' '}${kinds[item.kind] || '文字'}：“${value}”${item.kind === 'brand' ? '，只用于文字表达，商品外观依据用户参考图。' : '。'}`
+    return value.trim() ? `${time(item)} 口播：“${value}”。` : `${time(item)}不安排口播。`
   }
-  const render = value => {
+  const render = (value, includeAll = true) => {
     const text = value || ''
-    const used = new Set(items.filter(item => text.includes(`{{edit:${item.id}}}`)).map(item => item.id))
-    // Resolve slots and historical phrases in one pass. Never scan the merchant's inserted words again.
-    const replacements = items.filter(item => !used.has(item.id)).flatMap(item => [
-      [item.original, values.get(item.id)],
-      [productTemplateText(item.original, result.productReferences || []), values.get(item.id)],
-    ]).filter(([from]) => from && from !== '如图中产品')
-    const rendered = replaceText(text, [...replacements, ...items.map(item => [`{{edit:${item.id}}}`, directive(item)])])
-    const extra = items.filter(item => !used.has(item.id)).map(directive)
-    return [rendered, extra.length ? `文字与对白安排：\n${extra.join('\n')}` : ''].filter(Boolean).join('\n\n')
+    const used = new Set(items.filter(item => text.includes(`{{speech:${item.id}}}`)).map(item => item.id))
+    // Insert the transcript or the merchant's literal words last; never replace product or brand names inside them.
+    const rendered = replaceText(text, items.map(item => [`{{speech:${item.id}}}`, directive(item)]))
+    const extra = includeAll ? items.filter(item => !used.has(item.id)).map(directive) : []
+    return [rendered, extra.length ? `口播内容：\n${extra.join('\n')}` : ''].filter(Boolean).join('\n\n')
   }
   const prompt = render(result.prompt), generationScript = render(result.generationScript)
-  return { ...result, prompt, generationScript, reuseScript: analysis.mode === 'real' ? result.reuseScript : generationScript,
-    editableContent: items.map(item => ({ ...item, kindLabel: kinds[item.kind] || '文字', replacement: values.get(item.id),
+  return { ...result, prompt, generationScript, reuseScript: analysis.mode === 'real' ? render(prepare(result.reuseScript)) : generationScript,
+    negativePrompt: render(result.negativePrompt, false),
+    recreation: result.recreation && Object.fromEntries(Object.entries(result.recreation).map(([key, value]) => [key, render(value, false)])),
+    shots: result.shots.map(shot => ({ ...shot, prompt: render(shot.prompt, false), firstFramePrompt: render(shot.firstFramePrompt, false),
+      ...(shot.continuity ? { continuity: render(shot.continuity, false) } : {}) })),
+    keyframes: result.keyframes.map(frame => ({ ...frame, prompt: render(frame.prompt, false) })),
+    editableContent: items.map(item => ({ ...item, kindLabel: '口播', replacement: values.get(item.id),
       changed: owns(edits, item.id), timeLabel: time(item) })) }
 }
 

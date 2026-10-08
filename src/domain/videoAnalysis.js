@@ -57,8 +57,9 @@ export function analysisShotDetails(shot, mode, route = 'filming') {
 
 export function isChineseAnalysisPrompt(value) {
   if (typeof value !== 'string') return false
-  const chinese = value.match(/\p{Script=Han}/gu)?.length || 0
-  const englishWords = value.match(/[A-Za-z]+/g)?.length || 0
+  const text = value.replace(/\{\{(?:edit:e[1-9]\d?|speech:(?:e[1-9]\d?|speech\d+))}}/g, '')
+  const chinese = text.match(/\p{Script=Han}/gu)?.length || 0
+  const englishWords = text.match(/[A-Za-z]+/g)?.length || 0
   return chinese >= Math.max(1, englishWords * 2)
 }
 
@@ -92,11 +93,11 @@ export function productTemplateText(value, references) {
 }
 
 // Historical prompts are prepared for reuse without changing the saved observations or stored report.
-export function localizeAnalysisPrompts(analysis) {
+export function localizeAnalysisPrompts(analysis, prepareText = value => value) {
   const result = analysis?.result
   if (!result) return null
   const references = analysisProductReferences(result)
-  const neutral = value => productTemplateText(value, references)
+  const neutral = value => productTemplateText(prepareText(value), references)
   const chinese = value => isChineseAnalysisPrompt(value) ? neutral(value.trim()) : ''
   const referenceRule = references.length ? '画面中的商品统一为如图中产品，外观、颜色、材质、包装及标识完全以用户上传的商品参考图为准。' : ''
   const format = analysis.width && analysis.height

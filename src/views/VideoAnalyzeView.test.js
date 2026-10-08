@@ -42,12 +42,14 @@ test('merchant edits immediately update the real view, copy, export and generati
   })
   const fixture = id => ({ id, mode: 'ai', status: 'SUCCEEDED', name: '界面测试视频', frames: [], durationMs: 6000, width: 1080, height: 1920,
     result: { schemaVersion: 4, productReferences: ['旧牌'], parameters: [], dimensions: [], shots: [], keyframes: [], highlights: [], suggestions: [], limitations: [],
-      prompt: '生成竖屏六秒视频，如图中产品位于窗边，人物缓慢拿起，相机固定，柔和侧光。{{edit:e1}} {{edit:e2}}',
-      reuseScript: '镜头 1｜00:00–00:06｜人物拿起如图中产品，相机固定，柔和侧光。{{edit:e1}} {{edit:e2}}',
+      prompt: '生成竖屏六秒视频，如图中产品位于窗边，人物缓慢拿起，相机固定，柔和侧光。{{edit:e1}} {{edit:e2}} {{edit:e3}}',
+      reuseScript: '镜头 1｜00:00–00:06｜人物拿起如图中产品，相机固定，柔和侧光。{{edit:e1}} {{edit:e2}} {{edit:e3}}',
       negativePrompt: '避免画面模糊和商品变形。', editableContent: [
         { id: 'e1', kind: 'brand', label: '品牌名称', original: '旧牌', source: 'video', start: 0, end: 6 },
         { id: 'e2', kind: 'subtitle', label: '活动字幕', original: '旧牌，活动 99 元', source: 'video', start: 0, end: 6 },
-      ] } })
+        { id: 'e3', kind: 'dialogue', label: '原口播', original: '旧牌新品，活动 99 元，欢迎选购。', source: 'audio', start: 0, end: 6 },
+      ], audioAnalyzed: true, audio: { status: 'ANALYZED', summary: '原口播清晰', speech: '自然口播', music: '轻音乐', ambience: '无',
+        transcript: [{ start: 0, end: 6, text: '旧牌新品，活动 99 元，欢迎选购。' }], effects: [], limitations: [] } } })
   let app
   try {
     const { videoAnalysisApi } = await vite.ssrLoadModule('/src/services/videoAnalysis.js')
@@ -72,13 +74,15 @@ test('merchant edits immediately update the real view, copy, export and generati
     const edit = async (label, value) => { field(label).props.onInput({ target: { value } }); await nextTick() }
     const copyText = () => text(block('整体复刻提示词正文'))
 
-    await edit('品牌名称修改内容', '欢喜')
-    assert.match(copyText(), /品牌：“欢喜”/)
-    assert.equal(field('活动字幕修改内容').props.value, '欢喜，活动 99 元')
-    assert.doesNotMatch(copyText(), /旧牌|\{\{edit:/)
-    await edit('活动字幕修改内容', ' 欢喜新品 59 元 ')
-    assert.equal(field('活动字幕修改内容').props.value, ' 欢喜新品 59 元 ', 'editing keeps spaces while the copy text is trimmed')
-    assert.match(copyText(), /画面字幕：“欢喜新品 59 元”/)
+    assert.equal(field('口播 1修改内容').props.value, '旧牌新品，活动 99 元，欢迎选购。')
+    assert.match(copyText(), /口播：“旧牌新品，活动 99 元，欢迎选购。”/)
+    assert.equal(field('品牌名称修改内容'), undefined)
+    assert.equal(field('活动字幕修改内容'), undefined)
+    assert.equal([...nodes(root)].filter(node => node.tag === 'textarea' && node.props['aria-label']).length, 1)
+    await edit('口播 1修改内容', ' 欢喜新品 59 元 ')
+    assert.equal(field('口播 1修改内容').props.value, ' 欢喜新品 59 元 ', 'editing preserves the merchant\'s literal text')
+    assert.match(copyText(), /口播：“ 欢喜新品 59 元 ”/)
+    assert.doesNotMatch(copyText(), /旧牌|本店|\{\{edit:/)
     assert.match(text(block('复刻脚本正文')), /欢喜新品 59 元/)
     await button('复制中文提示词').props.onClick()
     assert.equal(clipboard.at(-1), copyText())
@@ -86,21 +90,23 @@ test('merchant edits immediately update the real view, copy, export and generati
     assert.equal(clipboard.at(-1), text(block('复刻脚本正文')))
     button('导出拆解报告').props.onClick()
     const report = await downloads.at(-1).text()
-    assert.match(report, /商家文案修改对照/)
+    assert.match(report, /口播修改对照/)
     assert.match(report, /欢喜新品 59 元/)
-    assert.match(report, /旧牌，活动 99 元/)
+    assert.match(report, /旧牌新品，活动 99 元，欢迎选购。/)
+    assert.doesNotMatch(report, /<h3>品牌名称|<h3>活动字幕/)
     button('一键生成同款').props.onClick()
     assert.equal(navigations.at(-1).path, '/video/workbench')
     assert.ok(navigations.at(-1).state.recreationPrompt.includes(copyText()))
     assert.ok(navigations.at(-1).state.recreationPrompt.includes(text(block('复刻脚本正文'))))
     assert.deepEqual(navigations.at(-1).query, { ratio: '9:16', duration: '6' })
-    button('恢复默认').props.onClick(); await nextTick()
-    assert.equal(field('品牌名称修改内容').props.value, '')
-    assert.equal(field('活动字幕修改内容').props.value, '本店，活动 99 元')
-    await edit('品牌名称修改内容', '上条记录的改名')
+    await edit('口播 1修改内容', '')
+    assert.match(copyText(), /00:00–00:06不安排口播/)
+    button('恢复原口播').props.onClick(); await nextTick()
+    assert.equal(field('口播 1修改内容').props.value, '旧牌新品，活动 99 元，欢迎选购。')
+    await edit('口播 1修改内容', '上条记录的口播')
     await realPush('/video/analyze?history=2'); await settle()
-    assert.equal(field('品牌名称修改内容').props.value, '')
-    assert.doesNotMatch(copyText(), /上条记录的改名|欢喜/)
+    assert.equal(field('口播 1修改内容').props.value, '旧牌新品，活动 99 元，欢迎选购。')
+    assert.doesNotMatch(copyText(), /上条记录的口播|欢喜/)
   } finally {
     app?.unmount()
     URL.createObjectURL = savedCreateUrl

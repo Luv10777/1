@@ -101,20 +101,24 @@ test('export uses the same merchant edits as copy and generation, while preservi
   value.result.productReferences = ['旧品牌', '杯子', '白杯']
   value.result.editableContent = [
     { id: 'e1', kind: 'brand', label: '品牌名称', original: '旧品牌', source: 'video', start: 0, end: 6 },
-    { id: 'e2', kind: 'subtitle', label: '结尾字幕', original: '旧品牌原字幕', source: 'video', start: 4, end: 6 },
+    { id: 'e2', kind: 'dialogue', label: '口播 1', original: '试试旧品牌的杯子，今日活动 99 元。', source: 'audio', start: 0, end: 6 },
   ]
+  value.result.audioAnalyzed = true
+  value.result.audio = { status: 'ANALYZED', speech: '口播清晰', music: '无', ambience: '无', effects: [], limitations: [],
+    transcript: [{ start: 0, end: 6, text: '试试旧品牌的杯子，今日活动 99 元。' }] }
   value.result.prompt = '生成竖屏六秒视频，如图中产品放在窗边，人物伸手拿起，相机固定，柔和侧光。{{edit:e1}} {{edit:e2}}'
   value.result.reuseScript = '镜头 1｜00:00–00:06｜人物拿起如图中产品，窗边柔光，相机固定。{{edit:e1}} {{edit:e2}}'
-  const html = buildVideoAnalysisReport(value, { e1: '商家的新品牌', e2: '<img src=x onerror="alert(1)"> 新活动 59 元' })
+  const html = buildVideoAnalysisReport(value, { e2: '商家的新品牌 <img src=x onerror="alert(1)"> 新活动 59 元' })
   const copyBlocks = [...html.matchAll(/<div class="prompt">.*?<p>(.*?)<\/p><\/div>/gs)].map(match => match[1])
   for (const text of [copyBlocks[0], copyBlocks[2]]) {
     assert.match(text, /商家的新品牌/)
     assert.match(text, /新活动 59 元/)
     assert.doesNotMatch(text, /旧品牌|\{\{edit:/)
   }
-  assert.match(html, /商家文案修改对照/)
-  assert.match(html, /原视频内容/)
-  assert.match(html, /旧品牌原字幕/)
+  assert.match(html, /口播修改对照/)
+  assert.match(html, /原视频口播/)
+  assert.match(html, /试试旧品牌的杯子，今日活动 99 元。/)
+  assert.doesNotMatch(html, /<h3>品牌名称/)
   assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/)
   assert.doesNotMatch(html, /<img src=x/)
   assert.doesNotMatch(html, /原视频逐镜观察|本镜头的视频生成提示词|本镜头的首帧图片提示词/)

@@ -103,6 +103,32 @@ class VideoAnalysisEditableContentTest {
         assertThat(result.get("prompt").toString()).contains("{{edit:e1}}", "{{edit:e2}}");
     }
 
+    @Test void everySupportedTranscriptSegmentFitsWithoutTruncatingLongOriginalSpeech() {
+        var output = VideoAnalysisOutputTest.productVideo("ai");
+        var items = new ArrayList<Map<String, Object>>();
+        var transcript = new ArrayList<Map<String, Object>>();
+        var tokens = new StringBuilder();
+        for (int index = 0; index < 60; index++) {
+            String original = index == 0 ? "旧牌杯子".repeat(500) : "原视频口播 " + index;
+            double start = index / 5D, end = (index + 1) / 5D;
+            items.add(item("e" + (index + 1), "dialogue", "audio", original, start, end));
+            transcript.add(Map.of("start", start, "end", end, "text", original));
+            tokens.append(" {{edit:e").append(index + 1).append("}}");
+        }
+        output.put("editableContent", items);
+        output.put("prompt", output.get("prompt") + tokens.toString());
+        output.put("reuseScript", output.get("reuseScript") + tokens.toString());
+        var result = (List<Map<String, Object>>) VideoAnalysisOutput.validate(output, 12000, "ai", json).get("editableContent");
+        assertThat(result).hasSize(60);
+        assertThat(result.getFirst()).containsEntry("original", transcript.getFirst().get("text"));
+        assertThatCode(() -> VideoAnalysisEditableContent.validateAudio(result,
+                Map.of("status", "ANALYZED", "transcript", transcript), json)).doesNotThrowAnyException();
+        output.put("prompt", "A cinematic product video with a fixed camera." + tokens);
+        assertThatThrownBy(() -> VideoAnalysisOutput.validate(output, 12000, "ai", json))
+                .isInstanceOfSatisfying(NonRetryableTaskException.class,
+                        error -> assertThat(error.errorCode()).isEqualTo("VIDEO_ANALYSIS_LANGUAGE"));
+    }
+
     static Map<String, Object> linked(String mode) {
         var output = VideoAnalysisOutputTest.productVideo(mode);
         output.put("prompt", output.get("prompt") + " 文字安排：{{edit:e1}} 口播安排：{{edit:e2}}");

@@ -44,14 +44,14 @@ const reportMode = computed(() => result.value ? analysisReportMode(current.valu
 const showGeneration = computed(() => reportMode.value === 'ai' || recreationRoute.value === 'ai')
 const recreationSteps = computed(() => analysisRecreationSteps(result.value, reportMode.value, recreationRoute.value))
 const modeHint = computed(() => videoType.value === 'ai'
-  ? '生成可直接复制的中文总提示词和简短分镜，支持替换品牌、对白与字幕。'
+  ? '生成可直接复制的中文总提示词和简短分镜，保留原口播，也可改成你想说的话。'
   : '侧重机位、运镜、灯光与拍摄步骤，同时提供用 AI 重做的方案。')
 const needPlaceholder = computed(() => videoType.value === 'ai'
-  ? '例如：保留镜头动作和节奏，替换成我的品牌和口播…'
+  ? '例如：保留镜头动作和节奏，列出原视频口播供我修改…'
   : '例如：用手机怎么拍？灯光怎么摆？或重点拆解用 AI 重做的方法…')
 const quickFocus = computed(() => videoType.value === 'ai'
-  ? [{ label: '提示词复刻', text: '侧重可直接复制的中文整体提示词，商品用如图中产品，识别可修改的品牌和文案' }, { label: '分镜脚本', text: '用简短分镜写清时间、动作、运镜和衔接，识别原对白与字幕供修改' }]
-  : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '用 AI 重做', text: '侧重把实拍视频用 AI 重做，给出中文总提示词与简短分镜，识别可修改的品牌、对白与字幕' }])
+  ? [{ label: '提示词复刻', text: '侧重可直接复制的中文整体提示词，画面商品用如图中产品，逐字保留原口播供我修改' }, { label: '分镜脚本', text: '用简短分镜写清时间、动作、运镜和衔接，逐字保留原口播供我修改' }]
+  : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '用 AI 重做', text: '侧重把实拍视频用 AI 重做，给出中文总提示词与简短分镜，逐字保留原口播供我修改' }])
 const promptText = computed(() => result.value?.prompt || '')
 const duration = computed(() => current.value?.durationMs ? current.value.durationMs / 1000 : previewDuration.value)
 const canStart = computed(() => !isScanning.value && !loadingHistory.value && limits.value.configured
@@ -337,25 +337,24 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
             <button type="button" :aria-pressed="recreationRoute === 'filming'" :class="{ active: recreationRoute === 'filming' }" @click="recreationRoute = 'filming'"><span class="material-symbols-outlined">videocam</span>照着实拍</button>
             <button type="button" :aria-pressed="recreationRoute === 'ai'" :class="{ active: recreationRoute === 'ai' }" @click="recreationRoute = 'ai'"><span class="material-symbols-outlined">auto_awesome</span>用 AI 重做</button>
           </div>
-          <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '上传自己的商品参考图，修改品牌与文案，用总提示词和简短分镜生成相似视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
+          <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '上传自己的商品参考图，把口播改成你想说的话，复制总提示词和简短分镜生成相似视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
           <section v-if="showGeneration" class="readable-prompt" aria-label="可直接复制的复刻提示词">
             <div class="reuse-script-head"><span>{{ reportMode === 'real' ? '用 AI 重做的复刻提示词' : '可直接复制的复刻提示词' }}</span><button type="button" @click="copyText(promptText, 'prompt')">{{ copied === 'prompt' ? '已复制' : '复制中文提示词' }}</button></div>
             <p class="product-reference-guide">{{ PRODUCT_REFERENCE_GUIDANCE }}</p>
             <p class="copyable-content" tabindex="0" aria-label="整体复刻提示词正文">{{ promptText }}</p><details><summary>生成时需要避免的问题</summary><p>{{ result.negativePrompt }}</p></details>
           </section>
           <section class="reuse-script" aria-label="可复制的分镜脚本"><div class="reuse-script-head"><span>{{ showGeneration ? '可直接复制的分镜脚本' : '按顺序执行的拍摄脚本' }}</span><button type="button" @click="copyText(showGeneration ? result.generationScript : result.reuseScript, 'script')">{{ copied === 'script' ? '已复制' : '复制脚本' }}</button></div><p class="copyable-content" tabindex="0" aria-label="复刻脚本正文">{{ showGeneration ? result.generationScript : result.reuseScript }}</p></section>
-          <section v-if="showGeneration" class="merchant-editor" aria-label="修改品牌、对白与字幕">
-            <div class="section-caption"><span>改成你的内容</span><button v-if="Object.keys(merchantEdits).length" type="button" @click="merchantEdits = {}">恢复默认</button></div>
-            <p>对照原文修改，提示词和分镜脚本会自动更新。原品牌默认不使用，相关文案改称“本店”；对白与字幕清空即可移除。</p>
+          <section v-if="showGeneration" class="merchant-editor" aria-label="修改口播">
+            <div class="section-caption"><span>修改口播</span><button v-if="Object.keys(merchantEdits).length" type="button" @click="merchantEdits = {}">恢复原口播</button></div>
+            <p>默认保留原视频口播。改成你想说的话后，直接复制上面的提示词即可，分镜脚本也会同步更新。</p>
             <div v-if="result.editableContent.length" class="merchant-edit-table">
-              <div class="merchant-edit-columns" aria-hidden="true"><span>原视频内容</span><span>商家修改内容</span></div>
+              <div class="merchant-edit-columns" aria-hidden="true"><span>原视频口播</span><span>你的口播</span></div>
               <article v-for="item in result.editableContent" :key="item.id" class="merchant-edit-row">
-                <div class="merchant-original"><strong>{{ item.label }}</strong><small>{{ item.kindLabel }} · {{ item.source === 'audio' ? '声音原文' : '画面文字' }} · {{ item.timeLabel }}</small><p>{{ item.original }}</p></div>
-                <label><span>{{ item.label }} · 修改内容</span><textarea :value="merchantEdits[item.id] ?? item.replacement" :aria-label="`${item.label}修改内容`" maxlength="1000" rows="2" :placeholder="item.kind === 'brand' ? '输入你的品牌，留空不使用原品牌' : '输入替换文案，清空则不使用此项'" @input="merchantEdits = { ...merchantEdits, [item.id]: $event.target.value }" /></label>
+                <div class="merchant-original"><strong>{{ item.label }}</strong><small>{{ item.timeLabel }}</small><p>{{ item.original }}</p></div>
+                <label><span>{{ item.label }} · 你的口播</span><textarea :value="merchantEdits[item.id] ?? item.replacement" :aria-label="`${item.label}修改内容`" maxlength="2000" rows="3" placeholder="输入你想说的话，清空则不安排这段口播" @input="merchantEdits = { ...merchantEdits, [item.id]: $event.target.value }" /></label>
               </article>
             </div>
-            <p v-else class="merchant-empty">本记录未识别到可修改的品牌、对白或字幕。重新分析可按新版要求识别。</p>
-            <p v-if="!audioReport" class="merchant-empty">{{ analysisAudioSummary(result) }}，当前没有可核对的原对白。</p>
+            <p v-else class="merchant-empty">{{ audioReport ? '未识别到可转录的口播。' : analysisAudioSummary(result) + '，当前没有可核对的原口播。' }}</p>
           </section>
           <details class="analysis-reference"><summary>查看画面拆解与声音参考</summary>
           <template v-if="!showGeneration"><div class="section-caption table-caption"><span>逐镜头拍摄指南</span><small>{{ shots.length }} 个估计分镜</small></div>

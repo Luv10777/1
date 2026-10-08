@@ -14,7 +14,7 @@ final class VideoAnalysisEditableContent {
 
     static List<Map<String, Object>> validate(JsonNode root, double duration, boolean real) {
         JsonNode items = root.path("editableContent");
-        if (!items.isArray() || items.size() > 30) invalid("可修改内容列表格式不完整");
+        if (!items.isArray() || items.size() > 60) invalid("可修改内容列表格式不完整");
         var ids = new HashSet<String>();
         var result = new ArrayList<Map<String, Object>>();
         for (var item : items) {
@@ -24,7 +24,7 @@ final class VideoAnalysisEditableContent {
             if (!Set.of("brand", "dialogue", "subtitle", "text").contains(kind)) invalid("可修改内容类型不正确");
             if (!Set.of("audio", "video").contains(source)) invalid("可修改内容来源不明确");
             if ("dialogue".equals(kind) && !"audio".equals(source)) invalid("口播来源必须是已分析的音频");
-            String label = text(item, "label", 60), original = text(item, "original", 1000);
+            String label = text(item, "label", 60), original = text(item, "original", 2000);
             if (original.contains("{{")) invalid("可修改内容原文包含内部标记");
             if (!item.path("start").isNumber() || !item.path("end").isNumber()) invalid("可修改内容时间格式不正确");
             double start = item.path("start").asDouble(), end = item.path("end").asDouble();

@@ -45,8 +45,8 @@ export function buildVideoAnalysisReport(analysis, edits = {}) {
       + `<details><summary>生成时需要避免的问题</summary>${promptBlock('避免出现', result.negativePrompt)}</details>`)
     addSection('可直接复制的分镜脚本', promptBlock('按镜头时间顺序生成', result.generationScript))
   }
-  if (result.editableContent?.length) addSection('商家文案修改对照', result.editableContent.map(item => `<article><h3>${escapeHtml(item.label)} <small>${escapeHtml(item.timeLabel)}</small></h3>${facts([
-    { label: '原视频内容', text: item.original }, { label: '商家修改内容', text: item.replacement || '不使用此项' },
+  if (result.editableContent?.length) addSection('口播修改对照', result.editableContent.map(item => `<article><h3>${escapeHtml(item.label)} <small>${escapeHtml(item.timeLabel)}</small></h3>${facts([
+    { label: '原视频口播', text: item.original }, { label: '你的口播', text: item.replacement.trim() ? item.replacement : '不安排这段口播' },
   ])}</article>`).join(''))
   const primarySectionCount = sections.length
   if (!real) addSection('制作参考', planReport(result, mode, 'ai'))
