@@ -20,4 +20,15 @@ contextBridge.exposeInMainWorld('yifangzhiDesktop', {
       return () => ipcRenderer.removeListener('danmaku:message', handler)
     },
   },
+  // 在网页版点“打开桌面端”唤起软件时带来的信息。
+  link: {
+    /** 取走最近一次带来的信息（{ storeId }，没带门店时 storeId 为 null）；没有被链接唤起过则为 null。 */
+    take: () => ask('link:take'),
+    /** 软件开着时又被唤起：通知页面再来取一次。返回取消订阅的函数。 */
+    onOpen: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on('link:open', handler)
+      return () => ipcRenderer.removeListener('link:open', handler)
+    },
+  },
 })

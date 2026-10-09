@@ -1,6 +1,6 @@
 {
   "name": "yifangzhi-desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "一方志桌面端：在商家自己的电脑上开播，读取直播间弹幕交给 AI 回复。试用阶段。",
   "type": "module",
