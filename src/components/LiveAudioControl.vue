@@ -4,7 +4,7 @@ import { ArrowRight, Volume2 } from 'lucide-vue-next'
 import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from '../services/liveApi'
 import { LivePlayerSession } from '../services/livePlayerSession'
 import { inDesktop } from '../utils/desktop'
-import { findDesktopDownload } from '../services/desktopDownload'
+import { findDesktopDownloads } from '../services/desktopDownload'
 
 const props = defineProps({
   sessionId: { type: Number, default: null },
@@ -22,7 +22,9 @@ const props = defineProps({
 const emit = defineEmits(['open-workspace', 'start-session', 'edit-step'])
 const isDevelopment = import.meta.env.DEV
 // 网页版读不到直播间弹幕，要靠桌面端。找得到安装包才给入口；已经在桌面端里就不用再提。
-const desktopDownloadUrl = ref('')
+const desktopDownloads = ref({ windows: '', mac: '' })
+// 两个系统的安装包都有时，把正在用的这台电脑的那个放在显眼的位置。
+const onMac = /Macintosh|Mac OS X/.test(navigator.userAgent)
 // 读取直播间弹幕要靠桌面软件，网页版浏览器做不到：只有在桌面端里打开时才加载这一块。
 const LiveDanmakuPanel = inDesktop ? defineAsyncComponent(() => import('./LiveDanmakuPanel.vue')) : null
 const idlePlayback = () => ({ status: 'idle', connectionError: '', current: null, pending: [], paused: false, loading: false, error: '' })
@@ -194,7 +196,7 @@ const send = (mock = false) => run(async current => {
     schedule()
   } finally { if (current()) sending.value = false }
 })
-onMounted(() => { if (!inDesktop) findDesktopDownload().then((url) => { if (mounted) desktopDownloadUrl.value = url }) })
+onMounted(() => { if (!inDesktop) findDesktopDownloads().then((found) => { if (mounted) desktopDownloads.value = found }) })
 onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); player?.destroy(); player = null })
 </script>
 
@@ -213,12 +215,16 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="!storeId || blockers.length > 0" @click="emit('start-session')">开始本场<ArrowRight :size="15" /></button>
         <button v-else-if="sessionStatus !== 'ENDED'" type="button" class="primary-button compact" :disabled="!storeId" @click="emit('open-workspace')">前往直播工作台<ArrowRight :size="15" /></button>
       </div>
-      <div v-if="desktopDownloadUrl" class="audio-desktop">
+      <div v-if="desktopDownloads.windows || desktopDownloads.mac" class="audio-desktop">
         <div class="audio-desktop-head">
-          <div><strong>让 AI 回答直播间弹幕<span>试用</span></strong><p>网页版读不到抖音直播间里的弹幕。装上桌面端、在桌面端里开播，AI 才能看到观众发的弹幕并回答。商品、话术和问答仍在这里配置，桌面端只负责开播。目前只有 Windows 版。</p></div>
-          <div class="audio-desktop-actions"><a class="ls-ghost compact" href="yifangzhi://live">打开桌面端</a><a class="primary-button compact" :href="desktopDownloadUrl" download>下载 Windows 版</a></div>
+          <div><strong>让 AI 回答直播间弹幕<span>试用</span></strong><p>网页版读不到抖音直播间里的弹幕。装上桌面端、在桌面端里开播，AI 才能看到观众发的弹幕并回答。商品、话术和问答仍在这里配置，桌面端只负责开播。<template v-if="!desktopDownloads.mac">目前只有 Windows 版。</template><template v-else-if="!desktopDownloads.windows">目前只有 Mac 版。</template></p></div>
+          <div class="audio-desktop-actions">
+            <a class="ls-ghost compact" href="yifangzhi://live">打开桌面端</a>
+            <a v-if="desktopDownloads.windows" :class="onMac && desktopDownloads.mac ? 'ls-ghost compact' : 'primary-button compact'" :href="desktopDownloads.windows" download>下载 Windows 版</a>
+            <a v-if="desktopDownloads.mac" :class="onMac || !desktopDownloads.windows ? 'primary-button compact' : 'ls-ghost compact'" :href="desktopDownloads.mac" download>下载 Mac 版</a>
+          </div>
         </div>
-        <p class="audio-help">点“打开桌面端”没有反应，说明这台电脑还没有安装，请先下载。安装包暂时没有数字签名，Windows 会提示“未知发布者”，点“更多信息 → 仍要运行”即可。读取弹幕用的不是抖音官方接口，抖音网页改版时可能暂时失效。</p>
+        <p class="audio-help">点“打开桌面端”没有反应，说明这台电脑还没有安装，请先下载。安装包暂时没有数字签名：<template v-if="desktopDownloads.windows">Windows 会提示“未知发布者”，点“更多信息 → 仍要运行”即可。</template><template v-if="desktopDownloads.mac">Mac 第一次打开会被系统拦下，要到“系统设置 → 隐私与安全性”里点“仍要打开”。</template>读取弹幕用的不是抖音官方接口，抖音网页改版时可能暂时失效。</p>
       </div>
     </template>
     <template v-else>
@@ -297,7 +303,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-desktop-head strong { font-size: 13px; font-weight: 600; }
 .audio-desktop-head strong span { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 11px; font-weight: 400; }
 .audio-desktop-head p { margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
-.audio-desktop-actions { display: flex; flex-shrink: 0; gap: 10px; }
+.audio-desktop-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
 .audio-desktop-actions a { display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; }
 .audio-control-live { padding: 18px 22px; }
 .audio-live-bar { display: flex; align-items: center; gap: 12px; }

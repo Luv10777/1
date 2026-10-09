@@ -1,6 +1,6 @@
 {
   "name": "yifangzhi-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "一方志桌面端：在商家自己的电脑上开播，读取直播间弹幕交给 AI 回复。试用阶段。",
   "type": "module",
@@ -9,7 +9,8 @@
     "start": "electron .",
     "probe": "electron src/probe.js",
     "test": "node --test \"src/**/*.test.js\"",
-    "dist:win": "node scripts/dist-win.js"
+    "dist:win": "node scripts/dist-win.js",
+    "dist:mac": "electron-builder --mac dmg --universal"
   },
   "devDependencies": {
     "electron": "^44.7.0",
@@ -58,6 +59,27 @@
           "yifangzhi"
         ]
       }
-    ]
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.business",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "artifactName": "yifangzhi-${version}-mac.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "录制声音样本时需要使用麦克风。"
+      },
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "一方志 ${version}"
+    }
   }
 }

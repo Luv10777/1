@@ -22,6 +22,7 @@ npm install
 ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/" node node_modules/electron/install.js
 
 npm run dist:win   # 打 Windows 安装包，见下面“打包”
+npm run dist:mac   # 打 macOS 安装包（Intel 和苹果芯片通用），见下面“打包”
 npm start          # 打开桌面端窗口，里面是本机开发服务器上的控制台（http://localhost:4173）
 npm test           # 解码器和消息格式的测试
 npm run probe -- <抖音分享链接或直播间号> [分钟]   # 不开控制台，只把读到的弹幕打印出来
@@ -50,7 +51,19 @@ npm run dist:win -- --test http://192.168.x.x:4173      # 测试包：软件连�
 
 软件名是中文，Electron 默认会把它写进浏览器标识（User-Agent），后端因此拒绝建立播报的长连接。`src/userAgent.js` 在打开任何窗口之前把它换成英文名；0.1.0 没有这一步，装上后播报会一直“重连中”。
 
-正式包会登记 `yifangzhi://` 协议：网页版“启动直播”一步里的“打开桌面端”就是一条 `yifangzhi://live` 链接，点了把已安装的软件唤到前面。测试包不登记，免得抢走正式版的链接。网页上的入口在网站的 `/downloads/yifangzhi-setup.exe` 存在时出现：出新版本时把服务器上的这个文件换掉，另留一份带版本号的。
+正式包会登记 `yifangzhi://` 协议：网页版“启动直播”一步里的“打开桌面端”就是一条 `yifangzhi://live` 链接，点了把已安装的软件唤到前面。测试包不登记，免得抢走正式版的链接。网页上的入口看网站的 `/downloads/` 下有哪个安装包：有 `yifangzhi-setup.exe` 就给“下载 Windows 版”，有 `yifangzhi-mac.dmg` 就给“下载 Mac 版”，都没有就整块不显示。出新版本时把服务器上的这两个文件换掉，各另留一份带版本号的。
+
+### macOS
+
+```bash
+npm run dist:mac    # 出 dist/yifangzhi-<版本>-mac.dmg，软件连 https://yifangzhi.com
+```
+
+打出来的是“通用版”：一个安装包里同时带 Intel 芯片和苹果芯片（M 系列）两份程序，两种 Mac 都能装，代价是体积大一倍（0.1.2 是 216 MB；只带苹果芯片那一份时是 114 MB）。要求 macOS 13 及以上。两份程序都在一台 M2 的 Mac 上跑过（Intel 那一份靠系统的转译运行）：能打开线上的登录页、播报的长连接能建立、直播间号能解析。**没有在真正的 Intel Mac 上试过。**
+
+安装包**没有苹果开发者签名，也没有经过苹果公证**（`codesign` 显示 `Signature=adhoc`）。本机打出来的包可以直接打开；从网上下载的副本第一次打开会被 macOS 拦下。在 macOS 26.6 上模拟过一次下载后打开：系统弹出提示并结束了程序，同时把它记成一次“被拦下的打开”——“系统设置 → 隐私与安全性”里的“仍要打开”放行的就是这种记录。**放行这一步本身没有点过。** 这种包只适合给愿意自己放行的人试用；要让商家下载后双击就能装，需要 Apple Developer 账号：把 `package.json` 里 `build.mac` 的 `identity: "-"` 换成 Developer ID 证书、`hardenedRuntime` 改回 `true`，再加上公证。
+
+本机试 Mac 包之前先退出 `npm start` 开着的窗口：两边共用一份数据目录，软件只允许开一个，后开的会把先开的唤到前面然后自己退出。
 
 不要在 `desktop/` 目录里对打出来的 `app.asar` 运行 `asar extract-file … package.json`：它会把解出来的文件写到当前目录，盖掉这里的 `package.json`。
 
