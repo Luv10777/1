@@ -93,9 +93,10 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
-router.beforeEach((to) => {
+router.beforeEach((to, from) => {
   if (to.meta.public) {
-    if (to.name === 'login' && auth.isAuthenticated) return { name: inDesktop ? 'digital-human' : 'dashboard' }
+    const wechatCallback = [to, from].some(location => location.query.wechat_ticket || location.hash.startsWith('#wechat_ticket=') || location.query.wechat_error)
+    if (to.name === 'login' && auth.isAuthenticated && !wechatCallback) return { name: inDesktop ? 'digital-human' : 'dashboard' }
     return true
   }
 
