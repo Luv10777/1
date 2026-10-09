@@ -2,11 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ChevronDown, MessageSquare, Package, BarChart3 } from 'lucide-vue-next'
-import { selectedStore, selectedStoreId } from '../stores/merchantContext'
+import { selectedStore, selectedStoreId, stores } from '../stores/merchantContext'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import VoiceLibraryPanel from '../components/VoiceLibraryPanel.vue'
 import LiveAudioControl from '../components/LiveAudioControl.vue'
-import { inDesktop } from '../utils/desktop'
+import { desktopBridge, inDesktop } from '../utils/desktop'
 import { productApi } from '../services/productApi'
 import { knowledgeApi } from '../services/knowledgeApi'
 import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSessionName, pickCurrentSession, describeSession, sessionStatusLabel, isActiveSession, startBlockers, toCommentFeedItem, answeringCohostId } from '../services/liveApi'
@@ -669,15 +669,43 @@ const sessionBadge = computed(() => {
   return `${sessionStatusLabel('DRAFT')} · ${draftDirty.value ? '有未保存的修改' : activeSessionId.value ? '已保存' : '尚未保存'}`
 })
 watch(selectedStoreId, loadStore, { immediate: true })
+/* ---------------- 被网页版唤起（只在桌面端里） ---------------- */
+// 在网页版点“打开桌面端”时，链接带着那边正在配置的门店，软件把它交到这里。
+// 换到那家门店；已经在那家门店，就把刚在网页上保存的配置重新读一遍。
+let leftPage = false
+let stopFollowingLinks = null
+const followDesktopLink = async () => {
+  let link = null
+  try { link = await desktopBridge.link.take() } catch { return }
+  if (leftPage || !link?.storeId) return
+  // 正在直播时什么都不动：换门店和重新读取都会打断播报。
+  if (runningSession.value) return
+  const target = stores.value.find(store => String(store.id) === String(link.storeId))
+  if (!target) {
+    draftError.value = '网页版里正在配置的门店，在这里登录的账号下没有找到。请确认两边登录的是同一个账号；如果是刚新建的门店，把软件关掉重新打开后再试。'
+    return
+  }
+  if (String(target.id) !== String(selectedStoreId.value)) { selectedStoreId.value = target.id; return }
+  // 正在读取的本来就是最新的；这里有没保存的修改时不去盖掉它。
+  if (loadBusy.value || apiBusy.value || draftDirty.value) return
+  await loadStore()
+}
 onMounted(() => {
   if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) {
     manualProduct.value = { points: route.query.prompt }
     manualProductOpen.value = true
     editingConfig.value = true
   }
+  // 老版本的桌面端没有这项能力。
+  if (desktopBridge?.link) {
+    followDesktopLink()
+    stopFollowingLinks = desktopBridge.link.onOpen(followDesktopLink)
+  }
 })
 
 onBeforeUnmount(() => {
+  leftPage = true
+  stopFollowingLinks?.()
   screenTicket++
   contextTicket++
 })

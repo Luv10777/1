@@ -6,6 +6,7 @@ import { DanmakuCollector } from './danmakuCollector.js'
 import { chatMessage, statusMessage } from './wire.js'
 import { normalizeRoomId, resolveRoom } from './roomLookup.js'
 import { asciiUserAgent } from './userAgent.js'
+import { linkInArguments, readLink } from './link.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const metadata = createRequire(import.meta.url)('../package.json')
@@ -14,8 +15,8 @@ const metadata = createRequire(import.meta.url)('../package.json')
 const CONSOLE_URL = process.env.YIFANGZHI_CONSOLE_URL || metadata.consoleUrl || (app.isPackaged ? 'https://yifangzhi.com' : 'http://localhost:4173')
 // 测试包和开发时留着开发者工具，方便看出了什么问题；正式包不给。
 const DIAGNOSTICS = !app.isPackaged || Boolean(metadata.consoleUrl)
-// 网页版里的“打开桌面端”是一条 yifangzhi://live 链接。安装包登记了这个协议；这里只有正式包认领它。
-// 链接里不带任何参数，也不看参数：被它唤起时软件只做一件事，把窗口拿到前面来。
+// 网页版里的“打开桌面端”是一条 yifangzhi://live?store=<门店编号> 链接。安装包登记了这个协议；这里只有正式包认领它。
+// 被它唤起时软件把窗口拿到前面来，再把链接里的门店交给页面（见 link.js），换不换门店由页面决定。
 const LINK_SCHEME = app.isPackaged && !metadata.consoleUrl ? 'yifangzhi' : ''
 // 软件名是中文，不处理的话会被写进浏览器标识，后端因此拒绝建立播报的长连接。要在打开任何窗口之前换掉。
 app.userAgentFallback = asciiUserAgent(app.userAgentFallback, app.getVersion())
@@ -25,6 +26,8 @@ const LIVE_PATH = '/digital-human'
 
 let consoleWindow = null
 let collector = null
+// 最近一次唤起软件的链接带来的信息，等页面来取；取走就清掉。
+let pendingLink = null
 
 const consoleOrigin = () => new URL(CONSOLE_URL).origin
 const sameOrigin = (url) => { try { return new URL(url).origin === consoleOrigin() } catch { return false } }
@@ -70,6 +73,12 @@ ipcMain.handle('danmaku:start', answer(async (input) => {
 }))
 
 ipcMain.handle('danmaku:stop', answer(() => stopCollector()))
+
+ipcMain.handle('link:take', answer(() => {
+  const link = pendingLink
+  pendingLink = null
+  return link
+}))
 
 function openConsole() {
   // 默认菜单是英文的一整排（File / Edit / View…），商家用不上，换成自己的。
@@ -147,11 +156,20 @@ if (!app.requestSingleInstanceLock()) {
     consoleWindow.show()
     consoleWindow.focus()
   }
-  app.on('second-instance', surface)
-  // macOS 上链接是以事件送来的。
-  app.on('open-url', (event) => { event.preventDefault(); surface() })
+  // 记下链接带来的信息，页面开着就叫它来取；页面还没打开时，它打开后自己会来取。
+  const follow = (url) => {
+    const link = readLink(url)
+    if (!link) return
+    pendingLink = link
+    if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send('link:open')
+  }
+  app.on('second-instance', (_event, argv) => { follow(linkInArguments(argv)); surface() })
+  // macOS 上链接是以事件送来的，软件没开着时也是：这个事件可能早于窗口打开。
+  app.on('open-url', (event, url) => { event.preventDefault(); follow(url); surface() })
   app.whenReady().then(() => {
     if (LINK_SCHEME) app.setAsDefaultProtocolClient(LINK_SCHEME)
+    // Windows 上软件没开着时，链接在这一次的启动参数里。
+    follow(linkInArguments(process.argv))
     openConsole()
   })
 }

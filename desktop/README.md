@@ -47,11 +47,24 @@ npm run dist:win -- --test http://192.168.x.x:4173      # 测试包：软件连�
 
 安装包出在 `dist/`（不进 git）。测试包的名字是“一方志测试版”，安装位置、数据目录都和正式包分开，可以同时装在一台电脑上；它保留了“视图 → 开发者工具”，正式包没有。测试包里的地址是打包时写死的，开发服务器所在电脑的局域网 IP 变了就要重打。
 
-安装包**没有代码签名**，Windows 会提示“未知发布者”，需要点“更多信息 → 仍要运行”。没有自动更新。
+安装包**没有代码签名**，Windows 会提示“未知发布者”，需要点“更多信息 → 仍要运行”。
+
+**没有自动更新，只有提醒。** 软件显示的是网站上的页面，所以页面上的改动发布网页后就生效，不用重装；改到软件本身（`desktop/` 下的代码）才需要新安装包。有新安装包时，软件顶上会出现一条“桌面端有新版本”的提醒，带下载按钮，点了交给系统浏览器去下载。提醒是页面给的（`src/services/desktopUpdate.js`、`src/layouts/DesktopShell.vue`）：页面从浏览器标识里看出装的是哪一版，再去看网站的 `/downloads/latest.json`，所以已经装出去的旧版本也收得到。
+
+出新版本时，除了换掉服务器上的安装包，还要把 `latest.json` 一起换掉，提醒才会出现；两个系统的版本号各写各的，没有这个文件就不提醒：
+
+```json
+{
+  "windows": { "version": "0.1.3", "url": "/downloads/yifangzhi-setup.exe" },
+  "mac": { "version": "0.1.3", "url": "/downloads/yifangzhi-mac.dmg" }
+}
+```
 
 软件名是中文，Electron 默认会把它写进浏览器标识（User-Agent），后端因此拒绝建立播报的长连接。`src/userAgent.js` 在打开任何窗口之前把它换成英文名；0.1.0 没有这一步，装上后播报会一直“重连中”。
 
-正式包会登记 `yifangzhi://` 协议：网页版“启动直播”一步里的“打开桌面端”就是一条 `yifangzhi://live` 链接，点了把已安装的软件唤到前面。测试包不登记，免得抢走正式版的链接。网页上的入口看网站的 `/downloads/` 下有哪个安装包：有 `yifangzhi-setup.exe` 就给“下载 Windows 版”，有 `yifangzhi-mac.dmg` 就给“下载 Mac 版”，都没有就整块不显示。出新版本时把服务器上的这两个文件换掉，各另留一份带版本号的。
+正式包会登记 `yifangzhi://` 协议：网页版“启动直播”一步里的“打开桌面端”就是一条 `yifangzhi://live?store=<门店编号>` 链接，点了把已安装的软件唤到前面，并换到网页上正在配置的那家门店（0.1.3 起）。`src/link.js` 只从链接里读一个纯数字的门店编号，换不换由页面决定，经过和界限见设计文档。测试包不登记，免得抢走正式版的链接。
+
+开发时可以把链接当作启动参数来试：`npm start -- "yifangzhi://live?store=4"`；软件已经开着时再运行一次，等于它又被唤起了一次。网页上的入口看网站的 `/downloads/` 下有哪个安装包：有 `yifangzhi-setup.exe` 就给“下载 Windows 版”，有 `yifangzhi-mac.dmg` 就给“下载 Mac 版”，都没有就整块不显示。出新版本时把服务器上的这两个文件换掉，各另留一份带版本号的。
 
 ### macOS
 
@@ -76,6 +89,7 @@ npm run dist:mac    # 出 dist/yifangzhi-<版本>-mac.dmg，软件连 https://yi
 | `src/danmakuCollector.js` | 在隐藏窗口里打开直播间网页，判断是否在播，旁听弹幕 |
 | `src/douyinFrames.js` | 把网页收到的二进制数据解成弹幕 |
 | `src/roomLookup.js` | 把分享链接或直播间网址换成直播间号 |
+| `src/link.js` | 读“打开桌面端”那条链接带来的门店编号 |
 | `src/wire.js` | 采集到的事件交给页面时的格式 |
 | `src/probe.js` | 可行性验证用的命令行入口（不打进安装包） |
 | `scripts/dist-win.js` | 打 Windows 安装包 |

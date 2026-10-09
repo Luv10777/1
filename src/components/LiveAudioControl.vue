@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { ArrowRight, Volume2 } from 'lucide-vue-next'
 import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from '../services/liveApi'
 import { LivePlayerSession } from '../services/livePlayerSession'
-import { inDesktop } from '../utils/desktop'
+import { desktopLink, inDesktop } from '../utils/desktop'
 import { findDesktopDownloads } from '../services/desktopDownload'
 
 const props = defineProps({
@@ -25,6 +25,20 @@ const isDevelopment = import.meta.env.DEV
 const desktopDownloads = ref({ windows: '', mac: '' })
 // 两个系统的安装包都有时，把正在用的这台电脑的那个放在显眼的位置。
 const onMac = /Macintosh|Mac OS X/.test(navigator.userAgent)
+const openingDesktop = ref(false)
+const desktopError = ref('')
+// 桌面端里看到的是服务器上保存的配置，所以先把这边还没保存的修改存下来，再带着当前门店把软件唤起来。
+const openDesktop = async () => {
+  if (openingDesktop.value) return
+  openingDesktop.value = true
+  desktopError.value = ''
+  try {
+    await props.ensureSession()
+    window.location.href = desktopLink(props.storeId)
+  } catch (reason) {
+    desktopError.value = `配置还没有保存，所以没有打开桌面端：${reason.message || '请重试'}`
+  } finally { openingDesktop.value = false }
+}
 // 读取直播间弹幕要靠桌面软件，网页版浏览器做不到：只有在桌面端里打开时才加载这一块。
 const LiveDanmakuPanel = inDesktop ? defineAsyncComponent(() => import('./LiveDanmakuPanel.vue')) : null
 const idlePlayback = () => ({ status: 'idle', connectionError: '', current: null, pending: [], paused: false, loading: false, error: '' })
@@ -219,12 +233,13 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         <div class="audio-desktop-head">
           <div><strong>让 AI 回答直播间弹幕<span>试用</span></strong><p>网页版读不到抖音直播间里的弹幕。装上桌面端、在桌面端里开播，AI 才能看到观众发的弹幕并回答。商品、话术和问答仍在这里配置，桌面端只负责开播。<template v-if="!desktopDownloads.mac">目前只有 Windows 版。</template><template v-else-if="!desktopDownloads.windows">目前只有 Mac 版。</template></p></div>
           <div class="audio-desktop-actions">
-            <a class="ls-ghost compact" href="yifangzhi://live">打开桌面端</a>
+            <a class="ls-ghost compact" :href="desktopLink(storeId)" :aria-disabled="openingDesktop" @click.prevent="openDesktop">{{ openingDesktop ? '正在保存…' : '打开桌面端' }}</a>
             <a v-if="desktopDownloads.windows" :class="onMac && desktopDownloads.mac ? 'ls-ghost compact' : 'primary-button compact'" :href="desktopDownloads.windows" download>下载 Windows 版</a>
             <a v-if="desktopDownloads.mac" :class="onMac || !desktopDownloads.windows ? 'primary-button compact' : 'ls-ghost compact'" :href="desktopDownloads.mac" download>下载 Mac 版</a>
           </div>
         </div>
-        <p class="audio-help">点“打开桌面端”没有反应，说明这台电脑还没有安装，请先下载。安装包暂时没有数字签名：<template v-if="desktopDownloads.windows">Windows 会提示“未知发布者”，点“更多信息 → 仍要运行”即可。</template><template v-if="desktopDownloads.mac">Mac 第一次打开会被系统拦下，要到“系统设置 → 隐私与安全性”里点“仍要打开”。</template>读取弹幕用的不是抖音官方接口，抖音网页改版时可能暂时失效。</p>
+        <p v-if="desktopError" class="audio-error" role="alert">{{ desktopError }}</p>
+        <p class="audio-help">点“打开桌面端”会先保存这里的配置，软件打开后看到的就是这家门店、这一场。软件要另外登录一次，请用同一个账号。点了没有反应，说明这台电脑还没有安装，请先下载。安装包暂时没有数字签名：<template v-if="desktopDownloads.windows">Windows 会提示“未知发布者”，点“更多信息 → 仍要运行”即可。</template><template v-if="desktopDownloads.mac">Mac 第一次打开会被系统拦下，要到“系统设置 → 隐私与安全性”里点“仍要打开”。</template>读取弹幕用的不是抖音官方接口，抖音网页改版时可能暂时失效。</p>
       </div>
     </template>
     <template v-else>
