@@ -72,15 +72,37 @@ ipcMain.handle('danmaku:start', answer(async (input) => {
 ipcMain.handle('danmaku:stop', answer(() => stopCollector()))
 
 function openConsole() {
-  // 默认菜单是英文的一整排（File / Edit / View…），商家用不上。只留重新加载。
-  Menu.setApplicationMenu(Menu.buildFromTemplate([{
+  // 默认菜单是英文的一整排（File / Edit / View…），商家用不上，换成自己的。
+  const view = {
     label: '视图',
     submenu: [
       { role: 'reload', label: '重新加载' },
       { role: 'togglefullscreen', label: '全屏' },
       ...(DIAGNOSTICS ? [{ role: 'toggleDevTools', label: '开发者工具' }] : []),
     ],
-  }]))
+  }
+  // macOS 上复制、粘贴这些快捷键是菜单给的：没有“编辑”菜单，Cmd+V 就粘贴不了分享链接。
+  // 第一项在 macOS 上是以软件名显示的那个菜单，退出、隐藏放在里面。Windows 不需要这两项。
+  const mac = [
+    { label: app.getName(), submenu: [
+      { role: 'about', label: `关于${app.getName()}` },
+      { type: 'separator' },
+      { role: 'hide', label: `隐藏${app.getName()}` },
+      { role: 'hideOthers', label: '隐藏其他' },
+      { type: 'separator' },
+      { role: 'quit', label: `退出${app.getName()}` },
+    ] },
+    { label: '编辑', submenu: [
+      { role: 'undo', label: '撤销' },
+      { role: 'redo', label: '重做' },
+      { type: 'separator' },
+      { role: 'cut', label: '剪切' },
+      { role: 'copy', label: '复制' },
+      { role: 'paste', label: '粘贴' },
+      { role: 'selectAll', label: '全选' },
+    ] },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(process.platform === 'darwin' ? [...mac, view] : [view]))
   consoleWindow = new BrowserWindow({
     width: 1360,
     height: 900,
