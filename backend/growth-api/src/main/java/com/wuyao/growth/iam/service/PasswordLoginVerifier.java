@@ -25,7 +25,7 @@ public class PasswordLoginVerifier {
     @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = BizException.class)
     public Long verify(String account, String password) {
         if (password.getBytes(StandardCharsets.UTF_8).length > 72) throw invalid();
-        var user = users.findByUsername(account).orElse(null);
+        var user = users.findByUsername(account).or(() -> users.findByPhone(account)).orElse(null);
         Instant now = Instant.now();
         boolean matches = ENCODER.matches(password,
                 user == null || user.getPasswordHash() == null ? DUMMY_HASH : user.getPasswordHash());
@@ -50,5 +50,9 @@ public class PasswordLoginVerifier {
 
     private BizException invalid() {
         return BizException.of(ErrorCode.PASSWORD_INVALID, "账号或密码错误，连续失败五次后请等待 15 分钟再试");
+    }
+
+    static String hashPassword(String password) {
+        return ENCODER.encode(password);
     }
 }

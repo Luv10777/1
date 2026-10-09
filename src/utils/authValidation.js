@@ -12,7 +12,8 @@ export function accountError(account) {
 }
 
 export function passwordError(password) {
-  return password.length >= 8 && password.length <= 64 ? '' : '密码长度需为 8–64 位'
+  if (password.length < 8 || password.length > 64) return '密码长度需为 8–64 位'
+  return new TextEncoder().encode(password).length <= 72 ? '' : '密码编码长度超过上限，请减少中文或表情字符'
 }
 
 export function codeError(code) {
