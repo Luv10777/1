@@ -24,6 +24,7 @@ target/
 *.jar
 *.war
 !backend/vimax-api/.mvn/wrapper/maven-wrapper.jar
+!android/gradle/wrapper/gradle-wrapper.jar
 
 # Python
 __pycache__/

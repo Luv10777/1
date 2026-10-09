@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { liveApi } from '../services/liveApi'
 import { LiveDanmakuRelay } from '../services/liveDanmakuRelay'
 import { desktopBridge } from '../utils/desktop'
+import { selectedStoreId } from '../stores/merchantContext'
 
 const props = defineProps({
   sessionId: { type: Number, default: null },
@@ -14,7 +15,11 @@ const props = defineProps({
   voiceInput: { type: Function, required: true },
 })
 const bridge = desktopBridge.danmaku
-const room = ref('')
+// 同一个抖音号的直播间号是固定的：连上过一次就记在这台设备上（按门店分开记），下次不用再粘贴。
+const roomKey = () => `yifangzhi-live-room:${selectedStoreId.value ?? ''}`
+const recallRoom = () => { try { return localStorage.getItem(roomKey()) || '' } catch { return '' } }
+const rememberRoom = (roomId) => { try { localStorage.setItem(roomKey(), roomId) } catch { /* 记不住就下次再粘贴 */ } }
+const room = ref(recallRoom())
 const state = ref(null)
 const lost = ref(0)
 // 后端按规则直接放过的：打招呼、刷屏一类不用回的，以及辱骂、引流一类不回的。
@@ -57,6 +62,7 @@ const toggle = async () => {
     const roomId = await bridge.resolveRoom(room.value)
     if (!mounted || sessionId !== props.sessionId || !onAir.value) return
     room.value = roomId
+    rememberRoom(roomId)
     relay = new LiveDanmakuRelay({ bridge, roomId, onChat: forward, onChange: value => { if (mounted) state.value = value } })
     relay.start()
   } catch (reason) {
@@ -65,6 +71,8 @@ const toggle = async () => {
 }
 // 换了场次或本场结束：上一场的弹幕不能接着送进来。
 watch(() => [props.sessionId, onAir.value], () => { if (relay) stop() })
+// 换了门店：换成那家门店记着的直播间。
+watch(selectedStoreId, () => { if (!relay) room.value = recallRoom() })
 onBeforeUnmount(() => { mounted = false; relay?.stop(); relay = null })
 </script>
 
@@ -77,7 +85,7 @@ onBeforeUnmount(() => { mounted = false; relay?.stop(); relay = null })
       </div>
       <button type="button" :class="state ? 'ls-ghost compact' : 'primary-button compact'" :disabled="resolving || (!state && !room.trim())" @click="toggle">{{ state ? '断开' : resolving ? '正在查找直播间…' : '连接直播间' }}</button>
     </div>
-    <label v-if="!state"><span>直播间分享链接</span><input v-model="room" :disabled="resolving" maxlength="500" placeholder="在抖音 App 的直播间点“分享 → 复制链接”，把复制到的内容整段粘贴到这里"></label>
+    <label v-if="!state"><span>直播间分享链接（连上过一次会记住，下次直接点“连接直播间”）</span><input v-model="room" :disabled="resolving" maxlength="500" placeholder="在抖音 App 的直播间点“分享 → 复制链接”，把复制到的内容整段粘贴到这里"></label>
     <p v-if="state?.message" class="live-danmaku-status" role="status">{{ state.message }}</p>
     <p v-if="state" class="live-danmaku-note">已读到 {{ state.received }} 条：交给 AI {{ Math.max(0, state.forwarded - lost - passed - blocked) }} 条，不用回 {{ passed }} 条（打招呼、刷屏一类），已屏蔽 {{ blocked }} 条（辱骂、引流一类），重复或刷屏过密 {{ state.skipped }} 条，未送达 {{ lost }} 条。</p>
     <p v-if="error" class="live-danmaku-error" role="alert">{{ error }}</p>

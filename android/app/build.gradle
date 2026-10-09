@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.yifangzhi.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.yifangzhi.app'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '0.0.2'
+    }
+    buildFeatures {
+        buildConfig true
+    }
+    buildTypes {
+        // 调试包连开发用的控制台：手机上的 localhost:4173 由 adb reverse 转到电脑上的开发服务器，和桌面端开发时连的是同一个地址。
+        debug {
+            buildConfigField 'String', 'CONSOLE_URL', '"http://localhost:4173"'
+            resValue 'string', 'app_name', '一方志测试版'
+        }
+        // 预览包：和调试包一样用本机的调试签名、可以从电脑上检查，但连的是线上。包名不同，能和调试包并排装在一台手机上。
+        // 只用来自己拿真实账号试，不能发给商家。
+        preview {
+            initWith debug
+            applicationIdSuffix '.preview'
+            buildConfigField 'String', 'CONSOLE_URL', '"https://yifangzhi.com"'
+            resValue 'string', 'app_name', '一方志预览版'
+            matchingFallbacks = ['debug']
+        }
+        release {
+            buildConfigField 'String', 'CONSOLE_URL', '"https://yifangzhi.com"'
+            resValue 'string', 'app_name', '一方志'
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    // 在网页自己的脚本之前放进一段脚本、只接收指定网站发来的消息，这两样要靠它。
+    implementation 'androidx.webkit:webkit:1.12.1'
+    testImplementation 'junit:junit:4.13.2'
+    // 手机上 org.json 是系统自带的；在电脑上跑单元测试时要另外带一份。
+    testImplementation 'org.json:json:20240303'
+}

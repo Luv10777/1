@@ -1,0 +1,7 @@
+# 构建产物和本机配置
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.keystore

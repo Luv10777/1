@@ -10,6 +10,7 @@
 | `docs/` | 设计文档。`adr/` 记录架构决策的来龙去脉 |
 | `deploy/` | 测试服务器部署（Docker Compose 全栈），步骤见 `deploy/README.md` |
 | `desktop/` | 桌面端（Electron），在商家电脑上读取直播间弹幕；试用阶段，说明见 `desktop/README.md` |
+| `android/` | 安卓端，目前只有验证“一台手机开播”可行性的验证版，不是给商家用的软件；说明见 `android/README.md` |
 
 ## ⛔ legacy/ 目录
 
