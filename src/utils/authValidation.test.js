@@ -21,6 +21,8 @@ test('password length boundaries preserve spaces and code requires six digits', 
   assert.equal(passwordError('12345678'), '')
   assert.equal(passwordError('a'.repeat(64)), '')
   assert.ok(passwordError('a'.repeat(65)))
+  assert.equal(passwordError('密'.repeat(24)), '')
+  assert.ok(passwordError('密'.repeat(25)))
   assert.equal(codeError('012345'), '')
   for (const value of ['12345', '1234567', '12345a', ' 123456']) assert.ok(codeError(value))
 })
