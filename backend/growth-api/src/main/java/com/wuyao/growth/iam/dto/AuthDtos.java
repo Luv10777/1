@@ -38,6 +38,18 @@ public final class AuthDtos {
             @Size(min = 8, max = 64, message = "密码长度需为 8–64 位") String password) {
     }
 
+    /** 微信回调后的一次性登录票据。手机号、验证码和密码只在首次绑定时需要。 */
+    public record WechatCompleteRequest(
+            @NotBlank(message = "微信登录票据不能为空") @Size(max = 128) String ticket,
+            @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确") String phone,
+            @Pattern(regexp = "^\\d{6}$", message = "验证码必须是 6 位数字") String code,
+            @Size(min = 8, max = 64, message = "密码长度需为 8–64 位") String password) {
+    }
+
+    public record WechatSession(boolean requiresBinding, boolean passwordRequired,
+                                String nickname, TokenPair tokenPair) {
+    }
+
     /** @param role OWNER 或 STAFF，前端据此决定显示哪些管理入口；真正的限制在服务端 */
     public record UserInfo(Long userId, Long tenantId, String phone, String name, String role) {
     }

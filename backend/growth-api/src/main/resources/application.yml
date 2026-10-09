@@ -199,6 +199,11 @@ growth:
       access-key-secret: ${ALIYUN_SMS_ACCESS_KEY_SECRET:}
       sign-name: ${ALIYUN_SMS_SIGN_NAME:}
       template-code: ${ALIYUN_SMS_TEMPLATE_CODE:}
+  wechat:
+    app-id: ${WECHAT_APP_ID:}
+    app-secret: ${WECHAT_APP_SECRET:}
+    callback-url: ${WECHAT_CALLBACK_URL:}
+    frontend-login-path: ${WECHAT_FRONTEND_LOGIN_PATH:/login}
   security:
     trusted-proxies: ${TRUSTED_PROXY_CIDRS:}
   storage:

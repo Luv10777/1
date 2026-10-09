@@ -147,6 +147,7 @@ public class AuthService {
         codeVerifier.verifyAndConsume(phone, code);
         // 校验结束后才开启账户事务，避免每个并发登录占用两条数据库连接。
         return transactions.execute(status -> {
+            smsCodeRepository.lockPhone(phone);
             User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
             if (!"ACTIVE".equals(user.getStatus())) {
                 throw BizException.of(ErrorCode.UNAUTHORIZED, "账号已停用，请联系商户管理员");
@@ -210,7 +211,7 @@ public class AuthService {
         log.info("用户登出: userId={} 作废 {} 个 refresh token", userId, revoked);
     }
 
-    private User registerNewUser(String phone) {
+    User registerNewUser(String phone) {
         Tenant tenant = new Tenant();
         tenant.setName("商家" + phone.substring(7));
         tenant = tenantRepository.save(tenant);
@@ -225,6 +226,17 @@ public class AuthService {
 
         log.info("新用户注册: userId={} tenantId={}", user.getId(), tenant.getId());
         return user;
+    }
+
+    /** 微信登录绑定后复用现有 JWT / refresh token 发行逻辑。 */
+    AuthDtos.TokenPair issueTokensForUser(Long userId, String ip, String userAgent, String deviceId) {
+        return transactions.execute(status -> {
+            User user = userRepository.findForUpdate(userId)
+                    .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                    .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+            user.setLastLoginAt(Instant.now());
+            return issueTokens(user, ip, userAgent, deviceId);
+        });
     }
 
     private AuthDtos.TokenPair issueTokens(User user, String ip, String userAgent, String deviceId) {

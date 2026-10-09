@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, ArrowUpRight, ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
 import { auth } from '../stores/auth'
@@ -24,8 +24,20 @@ const smsTab = ref(null)
 const passwordTab = ref(null)
 const pageForm = ref(null)
 const agreedInput = ref(null)
-const actionBusy = computed(() => busy.value || sending.value)
+const actionBusy = computed(() => busy.value || sending.value || wechatBusy.value || wechatVerifying.value)
 const legalUrls = { terms: import.meta.env.VITE_TERMS_URL, privacy: import.meta.env.VITE_PRIVACY_URL }
+const wechatTicket = ref('')
+const wechatBinding = ref(false)
+const wechatNickname = ref('')
+const wechatPasswordRequired = ref(false)
+const wechatPhone = ref('')
+const wechatCode = ref('')
+const wechatPassword = ref('')
+const wechatPasswordConfirm = ref('')
+const wechatBusy = ref(false)
+const wechatVerifying = ref(false)
+const wechatSending = ref(false)
+const wechatForm = ref(null)
 
 function clearMessages() {
   notice.value = ''
@@ -53,6 +65,38 @@ async function toggleRegistration() {
 }
 
 watch(isRegister, () => selectTab('sms'))
+
+onMounted(async () => {
+  const fragment = new URLSearchParams(route.hash.slice(1))
+  const ticket = fragment.get('wechat_ticket') || (typeof route.query.wechat_ticket === 'string' ? route.query.wechat_ticket : '')
+  const wechatError = typeof route.query.wechat_error === 'string' ? route.query.wechat_error : ''
+  if (wechatError) {
+    error.value = wechatError
+    await router.replace({ query: { ...route.query, wechat_error: undefined } })
+    return
+  }
+  if (!ticket) return
+  wechatVerifying.value = true
+  wechatTicket.value = ticket
+  await router.replace({ query: { ...route.query, wechat_ticket: undefined }, hash: '' })
+  try {
+    const result = await auth.completeWechat({ ticket })
+    if (result?.tokenPair) {
+      await router.replace(safeRedirect(route.query.redirect))
+      return
+    }
+    wechatNickname.value = result.nickname || '微信用户'
+    wechatPasswordRequired.value = result.passwordRequired === true
+    wechatBinding.value = true
+    wechatVerifying.value = false
+    await nextTick()
+    wechatForm.value?.querySelector('#wechat-phone')?.focus()
+  } catch (err) {
+    error.value = err.message || '微信登录失败，请重新扫码。'
+  } finally {
+    wechatVerifying.value = false
+  }
+})
 
 async function focusInvalid() {
   await nextTick()
@@ -85,6 +129,78 @@ async function sendCode() {
   } finally {
     sending.value = false
   }
+}
+
+async function sendWechatCode() {
+  if (actionBusy.value || wechatSending.value || auth.state.cooldown > 0) return
+  clearMessages()
+  const phoneMessage = phoneError(wechatPhone.value, '+86')
+  if (phoneMessage) {
+    error.value = phoneMessage
+    return
+  }
+  if (!checkAgreement()) return
+  wechatSending.value = true
+  try {
+    const result = await auth.sendCode(wechatPhone.value.trim())
+    notice.value = result.developmentMode
+      ? '当前为本地调试模式，验证码请在后端控制台查看。'
+      : '验证码短信已发送，5 分钟内有效。'
+    await nextTick()
+    wechatForm.value?.querySelector('#wechat-code')?.focus()
+  } catch (err) {
+    error.value = err.message || '验证码发送失败，请稍后重试。'
+  } finally {
+    wechatSending.value = false
+  }
+}
+
+async function completeWechatBinding() {
+  if (actionBusy.value || wechatSending.value) return
+  clearMessages()
+  const phoneMessage = wechatPasswordRequired.value ? '' : phoneError(wechatPhone.value, '+86')
+  const codeMessage = wechatPasswordRequired.value ? '' : codeError(wechatCode.value.trim())
+  const passwordMessage = wechatPasswordRequired.value ? passwordError(wechatPassword.value) : ''
+  if (phoneMessage || codeMessage || passwordMessage || (wechatPasswordRequired.value && wechatPassword.value !== wechatPasswordConfirm.value)) {
+    error.value = phoneMessage || codeMessage || passwordMessage || '两次输入的密码不一致'
+    return
+  }
+  if (!checkAgreement()) return
+  wechatBusy.value = true
+  try {
+    const result = await auth.completeWechat({
+      ticket: wechatTicket.value,
+      ...(wechatPasswordRequired.value ? { password: wechatPassword.value } : {
+        phone: wechatPhone.value.trim(),
+        code: wechatCode.value.trim(),
+      }),
+    })
+    if (result?.requiresBinding && result.passwordRequired) {
+      wechatPasswordRequired.value = true
+      wechatCode.value = ''
+      notice.value = ''
+      await nextTick()
+      wechatForm.value?.querySelector('#wechat-password')?.focus()
+      return
+    }
+    if (!result?.tokenPair) throw new Error('微信绑定未完成，请重新尝试。')
+    await router.replace(safeRedirect(route.query.redirect))
+  } catch (err) {
+    error.value = err.message || '微信绑定失败，请稍后重试。'
+  } finally {
+    wechatBusy.value = false
+  }
+}
+
+function cancelWechatBinding() {
+  wechatBinding.value = false
+  wechatTicket.value = ''
+  wechatPhone.value = ''
+  wechatCode.value = ''
+  wechatPassword.value = ''
+  wechatPasswordConfirm.value = ''
+  wechatPasswordRequired.value = false
+  clearMessages()
 }
 
 async function submit() {
@@ -124,12 +240,14 @@ function trustedLink(raw) {
 function loginWithWechat() {
   clearMessages()
   if (!checkAgreement()) return
-  const url = trustedLink(import.meta.env.VITE_WECHAT_LOGIN_URL)
+  const url = trustedLink(import.meta.env.VITE_WECHAT_LOGIN_URL || '/api/auth/wechat/start')
   if (!url) {
-    error.value = '微信登录暂未开放，请使用验证码登录。'
+    error.value = '微信扫码登录暂未开放，请使用验证码登录。'
     return
   }
-  window.location.assign(url)
+  const loginUrl = new URL(url, window.location.origin)
+  loginUrl.searchParams.set('redirect', safeRedirect(route.query.redirect))
+  window.location.assign(loginUrl.href)
 }
 
 function openDialog(kind) {
@@ -170,18 +288,34 @@ function useSmsInstead() {
         </div>
       </header>
       <div class="access-form-area">
-        <div class="access-intro">
+        <div v-if="!wechatBinding" class="access-intro">
           <p class="access-kicker">{{ isRegister ? 'YOUR NEXT CHAPTER' : 'WELCOME BACK' }}<span /></p>
           <h1 id="access-title">{{ isRegister ? '从一方烟火开始' : '欢迎回到一方志' }}</h1>
           <p>{{ isRegister ? '一个账号，记录门店的每一天。' : '记录一方水土，讲述万家故事。' }}</p>
         </div>
-        <div v-if="!isRegister" class="access-tabs" role="tablist" aria-label="登录方式" @keydown="tabKeydown">
+        <p v-if="wechatVerifying" class="access-message" role="status"><LoaderCircle class="access-spinner" :size="18" aria-hidden="true" /> 正在确认微信登录…</p>
+        <form v-else-if="wechatBinding" ref="wechatForm" class="wechat-binding" novalidate :aria-busy="wechatBusy" aria-labelledby="wechat-title" @submit.prevent="completeWechatBinding">
+          <p class="access-kicker">WECHAT VERIFIED<span /></p>
+          <h2 id="wechat-title">{{ wechatPasswordRequired ? '设置登录密码' : '绑定手机号' }}</h2>
+          <p>{{ wechatPasswordRequired ? `手机号 ${wechatPhone} 已验证。设置密码后，也可使用手机号和密码登录。` : `已确认微信账号「${wechatNickname}」。验证手机号后，将绑定已有账号或创建新账号。` }}</p>
+          <div class="access-fields">
+            <div v-if="!wechatPasswordRequired" class="access-field"><label for="wechat-phone">手机号</label><div class="access-input-shell"><input id="wechat-phone" v-model="wechatPhone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="11" placeholder="请输入手机号" :disabled="wechatBusy || wechatSending" /></div></div>
+            <div v-if="!wechatPasswordRequired" class="access-field"><label for="wechat-code">短信验证码</label><div class="access-input-shell"><input id="wechat-code" v-model="wechatCode" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="请输入 6 位验证码" :disabled="wechatBusy" /><button type="button" class="access-send" :disabled="wechatBusy || wechatSending || auth.state.cooldown > 0" @click="sendWechatCode">{{ wechatSending ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}</button></div></div>
+            <div v-if="wechatPasswordRequired" class="access-field"><label for="wechat-password">登录密码</label><div class="access-input-shell"><input id="wechat-password" v-model="wechatPassword" type="password" autocomplete="new-password" maxlength="64" placeholder="请输入 8–64 位密码" :disabled="wechatBusy" /></div></div>
+            <div v-if="wechatPasswordRequired" class="access-field"><label for="wechat-password-confirm">确认登录密码</label><div class="access-input-shell"><input id="wechat-password-confirm" v-model="wechatPasswordConfirm" type="password" autocomplete="new-password" maxlength="64" placeholder="请再次输入密码" :disabled="wechatBusy" /></div></div>
+          </div>
+          <p v-if="error" class="access-message is-error" role="alert">{{ error }}</p>
+          <p v-if="notice" class="access-message is-success" role="status">{{ notice }}</p>
+          <button class="access-submit w-full" type="submit" :disabled="wechatBusy || wechatSending"><LoaderCircle v-if="wechatBusy" class="access-spinner" :size="18" aria-hidden="true" />{{ wechatBusy ? '正在处理…' : wechatPasswordRequired ? '完成设置并登录' : '验证手机号并继续' }}<ArrowRight v-if="!wechatBusy" :size="18" aria-hidden="true" /></button>
+          <button class="wechat-back" type="button" :disabled="wechatBusy || wechatSending" @click="cancelWechatBinding">返回其他登录方式</button>
+        </form>
+        <div v-else-if="!isRegister" class="access-tabs" role="tablist" aria-label="登录方式" @keydown="tabKeydown">
           <span class="access-tab-indicator" :class="{ 'is-password': activeTab === 'password' }" aria-hidden="true" />
           <button id="sms-tab" ref="smsTab" type="button" role="tab" :aria-selected="activeTab === 'sms'" aria-controls="login-panel" :tabindex="activeTab === 'sms' ? 0 : -1" :disabled="actionBusy" @click="selectTab('sms')">验证码登录</button>
           <button id="password-tab" ref="passwordTab" type="button" role="tab" :aria-selected="activeTab === 'password'" aria-controls="login-panel" :tabindex="activeTab === 'password' ? 0 : -1" :disabled="actionBusy" @click="selectTab('password')">密码登录</button>
         </div>
         <p v-else class="access-registration-note">通过手机号验证，创建或登录你的账号。</p>
-        <form ref="pageForm" class="access-form" novalidate :aria-busy="busy" @submit.prevent="submit">
+        <form v-if="!wechatBinding && !wechatVerifying" ref="pageForm" class="access-form" novalidate :aria-busy="busy" @submit.prevent="submit">
           <div id="login-panel" :role="isRegister ? 'group' : 'tabpanel'" :aria-labelledby="isRegister ? 'access-title' : `${activeTab}-tab`">
             <Transition name="access-fields" mode="out-in">
               <div v-if="activeTab === 'sms'" key="sms" class="access-fields">
@@ -237,12 +371,12 @@ function useSmsInstead() {
             <ArrowRight v-if="!busy" :size="18" aria-hidden="true" />
           </button>
         </form>
-        <div class="access-divider"><span>其他登录方式</span></div>
-        <button type="button" class="access-wechat w-full transition-colors" :disabled="actionBusy" @click="loginWithWechat">
+        <div v-if="!wechatBinding && !wechatVerifying" class="access-divider"><span>其他登录方式</span></div>
+        <button v-if="!wechatBinding && !wechatVerifying" type="button" class="access-wechat w-full transition-colors" :disabled="actionBusy" @click="loginWithWechat">
           <svg viewBox="0 0 28 24" width="25" height="23" aria-hidden="true"><path fill="#07C160" d="M11 1C5.5 1 1 4.5 1 8.8c0 2.5 1.5 4.8 3.8 6.2l-1 3.2 3.7-1.9c1.1.3 2.3.5 3.5.5h.5a7.2 7.2 0 0 1-.6-2.8c0-4.3 4.1-7.8 9.2-7.8h.5C19.2 3.2 15.5 1 11 1Z" /><path fill="#07C160" d="M27 14c0-3.6-3.5-6.5-7.8-6.5s-7.8 2.9-7.8 6.5 3.5 6.5 7.8 6.5c.9 0 1.8-.1 2.6-.4l3.1 1.6-.8-2.7c1.8-1.2 2.9-3 2.9-5Z" /><g fill="white"><circle cx="7.5" cy="6.9" r="1.15" /><circle cx="14.2" cy="6.9" r="1.15" /><circle cx="16.5" cy="12.4" r="1" /><circle cx="22" cy="12.4" r="1" /></g></svg>
-          微信授权登录
+          微信扫码登录
         </button>
-        <div class="access-consent">
+        <div v-if="!wechatVerifying" class="access-consent">
           <div class="access-consent-row">
             <input id="login-agreed" ref="agreedInput" v-model="form.agreed" type="checkbox" :disabled="actionBusy" :aria-invalid="Boolean(errors.agreed)" :aria-describedby="errors.agreed ? 'agreement-error' : undefined" @change="errors.agreed = ''" />
             <div><label for="login-agreed">我已阅读并同意</label><button type="button" @click="openDialog('terms')">《用户协议》</button><span>和</span><button type="button" @click="openDialog('privacy')">《隐私政策》</button></div>

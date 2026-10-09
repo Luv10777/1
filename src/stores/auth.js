@@ -111,6 +111,17 @@ export const auth = {
     }
   },
 
+  async completeWechat(payload) {
+    state.loading = true
+    try {
+      const data = await authService.completeWechat(payload)
+      if (data?.tokenPair) persistSession(data.tokenPair)
+      return data
+    } finally {
+      state.loading = false
+    }
+  },
+
   /** 刷新页面后校验会话是否还有效，顺便把用户信息对齐服务端。 */
   async restore() {
     if (!state.token?.accessToken) return false

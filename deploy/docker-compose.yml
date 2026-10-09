@@ -75,6 +75,10 @@ services:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
     environment:
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_CALLBACK_URL: ${WECHAT_CALLBACK_URL:-}
+      WECHAT_FRONTEND_LOGIN_PATH: ${WECHAT_FRONTEND_LOGIN_PATH:-/login}
       APP_ARGS: >-
         --spring.datasource.url=jdbc:postgresql://postgres:5432/${DB_NAME}
         --spring.datasource.username=${DB_APP_USER}
@@ -107,6 +111,10 @@ services:
       # 等 api 把 Flyway 迁移跑完再起，避免两个进程抢着迁移
       api: { condition: service_healthy }
     environment:
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_CALLBACK_URL: ${WECHAT_CALLBACK_URL:-}
+      WECHAT_FRONTEND_LOGIN_PATH: ${WECHAT_FRONTEND_LOGIN_PATH:-/login}
       APP_ARGS: >-
         --spring.datasource.url=jdbc:postgresql://postgres:5432/${DB_NAME}
         --spring.datasource.username=${DB_APP_USER}
