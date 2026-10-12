@@ -35,7 +35,7 @@ class VideoWorkflowQaTest {
     void setUp() {
         TenantContext.set(7L);
         service = new VideoWorkflowService(workflows, mock(VideoProviderJobRepository.class), assets, mock(AssetService.class),
-                storage, tasks, new ObjectMapper(), permits, mock(HttpClient.class), probe, mock(VideoMetrics.class));
+                storage, tasks, new ObjectMapper(), permits, mock(HttpClient.class), probe, mock(VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
         workflow = new VideoWorkflow();
         workflow.setId(42L);
         workflow.setTenantId(7L);
@@ -125,7 +125,7 @@ class VideoWorkflowQaTest {
         org.springframework.test.util.ReflectionTestUtils.setField(realProbe, "ffprobePath", java.nio.file.Path.of(
                 System.getProperty("java.io.tmpdir"), "wuyao-missing-ffprobe-" + java.util.UUID.randomUUID()).toString());
         service = new VideoWorkflowService(workflows, mock(VideoProviderJobRepository.class), assets, mock(AssetService.class),
-                storage, tasks, new ObjectMapper(), permits, mock(HttpClient.class), realProbe, mock(VideoMetrics.class));
+                storage, tasks, new ObjectMapper(), permits, mock(HttpClient.class), realProbe, mock(VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
         task.setAttempts(1);
         task.setMaxAttempts(3);
         task.setPayload(java.util.Map.of("workflowId", 42L));

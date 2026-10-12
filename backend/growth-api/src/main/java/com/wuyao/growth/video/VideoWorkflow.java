@@ -56,6 +56,10 @@ public class VideoWorkflow {
     @Column(name = "output_asset_id") private Long outputAssetId;
     @Column(name = "output_storage_key", length = 500) private String outputStorageKey;
     @Column(name = "output_published_at") private Instant outputPublishedAt;
+    @Column(length=36) private String billingReservationId;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition="jsonb") private com.wuyao.growth.billing.VideoPricingService.Quote billingQuote;
+    private Long providerBillingTokens;
+    private Long billingCapturedCredits;
     @Column(name = "error_code", length = 64) private String errorCode;
     @Column(name = "error_message", columnDefinition = "text") private String errorMessage;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt = Instant.now();

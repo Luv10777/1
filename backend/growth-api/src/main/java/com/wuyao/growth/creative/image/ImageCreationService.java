@@ -7,6 +7,7 @@ import com.wuyao.growth.common.ratelimit.TenantRateLimiter;
 import com.wuyao.growth.common.storage.ObjectStorage;
 import com.wuyao.growth.common.task.*;
 import com.wuyao.growth.common.tenant.TenantContext;
+import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.web.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class ImageCreationService {
  private final ImageModelProperties config;
  private final ObjectMapper json;
  private final TenantRateLimiter rateLimiter;
+ private final BillingService billing;
 
  @Value("${growth.image.tenant-max-concurrent:20}")
  private int tenantMaxConcurrent;
@@ -51,7 +53,8 @@ public class ImageCreationService {
        "message",planner&&generator?"":"图片创作服务尚未配置，请联系管理员");
  }
  @Transactional
- public ImageDtos.View create(ImageDtos.Create request,Long userId) {return createVersion(request,userId,null,null);}
+ public ImageDtos.View create(ImageDtos.Create request,Long userId) {
+   billing.lockForGeneration();return createVersion(request,userId,null,null);}
  private ImageDtos.View createVersion(ImageDtos.Create req,Long userId,Long parent,String variation) {
    Long tenantId = TenantContext.require();
    creations.lockRequest(tenantId + ":" + req.requestKey());
@@ -73,6 +76,8 @@ public class ImageCreationService {
    acquirePermit(tenantId);
    var c=new ImageCreation(); c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(parent);c.setVariation(variation);c.setRequest(req);c.setRequestKey(req.requestKey());c.setRequestHash(hash);
+   c.setBillingReservationId(billing.reserve("image-create:"+req.requestKey(),"IMAGE",
+       Math.multiplyExact(req.count(),BillingService.IMAGE_CREDITS),"图片创作 · 预占 "+req.count()+" 张"));
    creations.saveAndFlush(c);
    var task=tasks.submit("IMAGE_PLAN","DEFAULT",Map.of("creationId",c.getId()),"image-plan-"+c.getId(),userId);
    c.setTaskId(task.getId());
@@ -90,6 +95,7 @@ public class ImageCreationService {
  }
  @Transactional
  public ImageDtos.View revise(Long id,ImageDtos.Revision revision,Long userId) {
+   billing.lockForGeneration();
    var c=find(id);var r=c.getRequest();
    String brief=r.brief()+"\n本次修改："+revision.instruction();
    if(brief.length()>2000) throw bad("修改历史过长，请新建创作");
@@ -101,6 +107,7 @@ public class ImageCreationService {
 
  @Transactional
  public ImageDtos.View cancel(Long id) {
+   billing.lockForGeneration();
    var c=creations.lock(id).orElseThrow(()->BizException.of(ErrorCode.NOT_FOUND,"创作不存在"));
    if(Set.of("SUCCEEDED","FAILED","CANCELLED").contains(c.getStatus())) return view(c);
    var children=items.findByCreationIdOrderByOrdinal(c.getId());
@@ -126,6 +133,7 @@ public class ImageCreationService {
  }
  @Transactional
  public String rename(Long id,String title) {
+   billing.lockForGeneration();
    String value=title.trim();
    if(value.isEmpty()) throw bad("作品名称不能为空");
    var root=root(find(id));
@@ -176,24 +184,43 @@ public class ImageCreationService {
  }
  @Transactional
  public ImageDtos.View retry(Long id,Long itemId,Long expectedTaskId,Long userId) {
-   var c=find(id);
+   billing.lockForGeneration();
+   var c=creations.lock(id).orElseThrow();
    if(itemId==null) {
      c=creations.lock(id).orElseThrow();
      if(Objects.equals(c.getTaskId(),expectedTaskId) && "INTERRUPTED".equals(effective(c.getStatus(),c.getTaskId()))) {
+       long needed=Math.multiplyExact(c.getRequest().count(),BillingService.IMAGE_CREDITS);
+       if(c.getBillingReservationId()==null||billing.remaining(c.getBillingReservationId())==0) reserveRetry(c,needed,"plan-"+expectedTaskId);
+       else billing.requireMembership("IMAGE");
+       if(!c.isConcurrencyPermitHeld()) { acquirePermit(TenantContext.require()); c.setConcurrencyPermitHeld(true); }
        c.setStatus("QUEUED");c.setError(null);
+       c.setBillingRound(c.getBillingRound()+1);
        c.setTaskId(tasks.submit("IMAGE_PLAN","DEFAULT",Map.of("creationId",id),
            "image-plan-retry-"+id+"-"+expectedTaskId,userId).getId());
      }
    } else {
-     var i=items.lock(itemId).orElseThrow(()->bad("图片不存在"));
+     var i=lockItem(itemId);
      if(!i.getCreationId().equals(id)) throw bad("图片不属于这次创作");
      if(!Objects.equals(i.getTaskId(),expectedTaskId)) return view(c);
      String status=effective(i.getStatus(),i.getTaskId());
       if(!Set.of("FAILED","INTERRUPTED","UPSTREAM_UNKNOWN").contains(status)) throw bad("当前图片无需重试");
+      c.setBillingRound(c.getBillingRound()+1);
+      if(!c.isConcurrencyPermitHeld()) { acquirePermit(TenantContext.require()); c.setConcurrencyPermitHeld(true); }
+      if(!i.isBillingHeld()) {
+        reserveRetry(c,BillingService.IMAGE_CREDITS,"item-"+i.getId()+"-"+expectedTaskId);
+        i.setBillingHeld(true);
+      } else billing.requireMembership("IMAGE");
       if(Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus())) {
        i.setGeneration(i.getGeneration()+1);i.setProviderJobId(null);i.setRawKey(null);i.setPollRound(0);
        i.setProviderImageUrl(null);i.setPersistedAt(null);i.setOutputKey(null);
        i.setProviderCode(null);
+     }
+     if(i.getProviderImageUrl()!=null && i.getPersistedAt()==null) {
+       var download=tasks.submit("IMAGE_DOWNLOAD","DEFAULT",Map.of("itemId",i.getId(),"imageUrl",i.getProviderImageUrl(),
+           "targetKey","t"+i.getTenantId()+"/generated/"+i.getId()+"/"+i.getGeneration()+"/background.png"),
+           "image-download-retry-"+i.getId()+"-"+expectedTaskId,userId);
+       i.setTaskId(download.getId()); i.setStatus("GENERATING"); i.setError(null); c.setStatus("GENERATING");
+       return view(c);
      }
      i.setPollRound(0);
      i.setStatus("QUEUED");i.setError(null);
@@ -204,6 +231,7 @@ public class ImageCreationService {
  }
  @Transactional
  public ImageDtos.View editText(Long id,Long itemId,ImageDtos.TextEdit edit,Long userId) {
+   billing.lockForGeneration();
    var original=find(id);
    var source=items.findById(itemId).orElseThrow(()->bad("图片不存在"));
    if(!source.getCreationId().equals(id)||!"SUCCEEDED".equals(source.getStatus())) throw bad("请先完成这张图片");
@@ -223,13 +251,16 @@ public class ImageCreationService {
    var spec=new ImageDtos.Spec(source.getSpec().role(),"参考原图修改文字，尽量保持商品、构图、色彩与风格；去除旧标题和说明，按新的文案重新设计文字。",edit.headline(),edit.caption(),source.getId());
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(edit.requestKey());c.setRequestHash(hash);c.setRequest(req);
+   c.setBillingReservationId(billing.reserve("image-create:"+edit.requestKey(),"IMAGE",BillingService.IMAGE_CREDITS,"图片文字修改 · 预占 1 张"));
    c.setPlan(new ImageDtos.Plan("参考原图修改文字，局部画面可能变化","",original.getPlan().visualDirection(),List.of(spec)));c.setStatus("GENERATING");creations.saveAndFlush(c);
    var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(c.getId());i.setSpec(spec);
+   i.setBillingHeld(true);
    items.saveAndFlush(i);enqueue(i,c,"text",0);
    return view(c);
  }
  @Transactional
  public ImageDtos.View regenerate(Long id,Long itemId,String requestKey,String variation,Long userId) {
+   billing.lockForGeneration();
    var original=find(id);
    var originals=items.findByCreationIdOrderByOrdinal(id);
    if(originals.isEmpty() || originals.stream().anyMatch(i->!"SUCCEEDED".equals(i.getStatus()))
@@ -255,10 +286,12 @@ public class ImageCreationService {
    acquirePermit(tenantId);
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(requestKey);c.setRequestHash(fingerprint);
+   c.setBillingReservationId(billing.reserve("image-create:"+requestKey,"IMAGE",BillingService.IMAGE_CREDITS,"重新生成图片 · 预占 1 张"));
    c.setRequest(original.getRequest());c.setPlan(original.getPlan());c.setStatus("GENERATING");creations.saveAndFlush(c);
    for(var source:originals) {
      var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(c.getId());
      i.setOrdinal(source.getOrdinal());i.setSpec(source.getSpec());
+     i.setBillingHeld(source.getId().equals(itemId));
      if(!source.getId().equals(itemId)) {
        i.setRawKey(source.getRawKey());i.setOutputKey(source.getOutputKey());i.setStatus("SUCCEEDED");
        i.setProviderCode(source.getProviderCode());i.setModel(source.getModel());
@@ -295,13 +328,23 @@ public class ImageCreationService {
    }
  }
  private void releasePermitIfTerminal(ImageCreation creation) {
-   if (!creation.isConcurrencyPermitHeld()) return;
    var children=items.findByCreationIdOrderByOrdinal(creation.getId());
-    boolean terminal = Set.of("FAILED","NEEDS_INPUT","CANCELLED","UPSTREAM_UNKNOWN").contains(creation.getStatus())
-        || (!children.isEmpty() && children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN").contains(effective(i.getStatus(),i.getTaskId()))));
-   if (terminal) cleanupFailedObjects(children);
-   if (terminal && creations.clearConcurrencyPermit(creation.getId()) == 1)
-     rateLimiter.releaseImageGeneration(creation.getTenantId());
+    boolean terminal = Set.of("FAILED","NEEDS_INPUT","CANCELLED","UPSTREAM_UNKNOWN","INTERRUPTED").contains(creation.getStatus())
+        || (!children.isEmpty() && children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN","INTERRUPTED").contains(effective(i.getStatus(),i.getTaskId()))));
+   if (terminal) {
+     cleanupFailedObjects(children);
+     children.forEach(i->i.setBillingHeld(false));
+     if(creation.getBillingReservationId()!=null) billing.release(creation.getBillingReservationId(),
+         "image-terminal:"+creation.getId()+":"+creation.getBillingRound(),"图片创作结束 · 退回未交付烟火");
+   }
+   if (!creation.isConcurrencyPermitHeld()) return;
+   if (terminal && creations.clearConcurrencyPermit(creation.getId()) == 1) {
+     if(TransactionSynchronizationManager.isActualTransactionActive() && TransactionSynchronizationManager.isSynchronizationActive()) {
+       TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+         @Override public void afterCommit() { rateLimiter.releaseImageGeneration(creation.getTenantId()); }
+       });
+     } else rateLimiter.releaseImageGeneration(creation.getTenantId());
+   }
  }
  private void cleanupFailedObjects(List<ImageItem> children) {
    for (var item : children) {
@@ -326,6 +369,7 @@ public class ImageCreationService {
  }
  @Transactional
  public void saveReferenceHash(Long id,Task task,String hash) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task)) return;
    var c=creations.lock(id).orElseThrow();
    if(Objects.equals(c.getTaskId(),task.getId())) c.setReferenceHash(hash);
@@ -364,6 +408,7 @@ public class ImageCreationService {
  }
  @Transactional
  public boolean beginPlan(Long id,Task task) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task)) return false;
    var c=creations.lock(id).orElseThrow();
    if(!Objects.equals(c.getTaskId(),task.getId()) || c.getPlan()!=null) return false;
@@ -371,12 +416,20 @@ public class ImageCreationService {
  }
  @Transactional
  public void savePlan(Long id,Task task,ImageDtos.Plan plan) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task)) return;
    var c=creations.lock(id).orElseThrow();
    if(!Objects.equals(c.getTaskId(),task.getId())||c.getPlan()!=null)return;
+   if(plan.question().isBlank()&&plan.items().size()!=c.getRequest().count())
+     throw BizException.of(ErrorCode.IMAGE_PLAN_INVALID,"图片计划数量与本次预占数量不一致");
    c.setPlan(plan);c.setStatus(plan.question().isBlank()?"GENERATING":"NEEDS_INPUT");
+   if(!plan.question().isBlank()) {
+     releasePermitIfTerminal(c);
+     return;
+   }
    for(int n=0;n<plan.items().size();n++) {
      var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(id);i.setOrdinal(n);
+     i.setBillingHeld(c.getBillingReservationId()!=null);
      i.setSpec(plan.items().get(n));items.saveAndFlush(i);enqueue(i,c,"initial",0);
    }
    releasePermitIfTerminal(c);
@@ -388,32 +441,37 @@ public class ImageCreationService {
  }
  @Transactional
  public boolean beginItem(Long id,Task task) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return false;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId())||Set.of("SUCCEEDED","FAILED","CANCELLED").contains(i.getStatus()))return false;
    i.setStatus(i.getRawKey()==null?"GENERATING":"SAVING");return true;
  }
  /** Persist intent before a synchronous call: OpenAI compatibility does not guarantee idempotency. */
  @Transactional
  public boolean reserveSynchronousSubmission(Long id,Task task) {
+   billing.lockForGeneration();
    return reserveProviderSubmission(id, task);
  }
  /** Record a known pre-submit failure without ending the item or consuming submission rights. */
  @Transactional
  public void recordSubmissionWaitFailure(Long id,Task task,String message) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()) || i.getProviderCode()!=null || i.getProviderJobId()!=null)return;
    i.setError(message);
  }
  @Transactional
  public boolean reserveProviderSubmission(Long id,Task task) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return false;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()))return false;
    if(i.getProviderCode()!=null) {
      if("SUBMITTING".equals(i.getProviderCode()) || "OPENAI_SUBMITTING".equals(i.getProviderCode())) {
        i.setStatus("FAILED");i.setError("上次提交状态尚未确认。请先核对中转站记录；重新生成可能产生新的费用。");
+       var c=find(i.getCreationId()); releaseImage(c,i,"image-submit-unknown:"+task.getId()); syncCreationStatus(c); releasePermitIfTerminal(c);
      }
      return false;
    }
@@ -421,11 +479,13 @@ public class ImageCreationService {
  }
  @Transactional
  public void failSynchronousSubmission(Long id,Task task,String message) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()))return;
    i.setStatus("FAILED");i.setError(message+"。请先核对中转站记录，重新生成可能产生新的费用。");
    var c=find(i.getCreationId());
+   releaseImage(c,i,"image-submit-failed:"+task.getId());
    syncCreationStatus(c);
    releasePermitIfTerminal(c);
  }
@@ -436,19 +496,22 @@ public class ImageCreationService {
    */
   @Transactional
   public void markUpstreamUnknown(Long id,Task task,String message) {
+   billing.lockForGeneration();
     if(!tasks.ownsExecution(task))return;
-    var i=items.lock(id).orElseThrow();
+    var i=lockItem(id);
     if(!Objects.equals(i.getTaskId(),task.getId()))return;
     i.setStatus("UPSTREAM_UNKNOWN");
     i.setError(message+"。请先核对中转站记录，确认未生成后再重新生成。");
     var c=find(i.getCreationId());
+    releaseImage(c,i,"image-upstream-unknown:"+task.getId());
     syncCreationStatus(c);
     releasePermitIfTerminal(c);
   }
  @Transactional
  public void saveProvider(Long id,Task task,ProviderResult result,String rawKey) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()))return;
    String status=String.valueOf(result.output().get("status"));
    if(result.providerJobId()!=null)i.setProviderJobId(result.providerJobId());
@@ -458,6 +521,7 @@ public class ImageCreationService {
    if(status.equals("FAILED")) {
      i.setStatus("FAILED");i.setError("图片模型未能完成这张图，可以重试");
      var c=find(i.getCreationId());
+     releaseImage(c,i,"image-provider-failed:"+i.getId()+":"+i.getGeneration());
      syncCreationStatus(c);
      releasePermitIfTerminal(c);
      return;
@@ -474,8 +538,9 @@ public class ImageCreationService {
 /** Record the provider URL and enqueue its durable copy. */
  @Transactional
  public void saveProviderUrl(Long id,Task task,ProviderResult result,String imageUrl,String targetKey) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()))return;
    if(imageUrl==null || imageUrl.isBlank()) throw new IllegalArgumentException("上游未返回图片 URL");
    if(result.providerJobId()!=null)i.setProviderJobId(result.providerJobId());
@@ -494,10 +559,14 @@ public class ImageCreationService {
      Map.of("itemId",id,"imageUrl",String.valueOf(result.output().getOrDefault("imageSourceUrl",imageUrl)),"targetKey",targetKey),
      "image-download-"+id+"-"+i.getGeneration(), c.getCreatedBy());
    download.setPriority(-5);
+   i.setTaskId(download.getId());
  }
  @Transactional
- public void markImagePersisted(Long itemId,String storageKey,int width,int height,String imageHash) {
-   var item=items.lock(itemId).orElseThrow(()->new IllegalStateException("图片项不存在"));
+ public void markImagePersisted(Long itemId,Task task,String storageKey,int width,int height,String imageHash) {
+   billing.lockForGeneration();
+   if(!tasks.ownsExecution(task)) throw new IllegalStateException("图片下载执行已过期");
+   var item=lockItem(itemId);
+   if(!Objects.equals(item.getTaskId(),task.getId())) throw new IllegalStateException("图片下载任务已变化");
    var creation=find(item.getCreationId());
    String expected="t"+creation.getTenantId()+"/generated/"+itemId+"/"+item.getGeneration()+"/background.png";
    if(!expected.equals(storageKey) || !Set.of("GENERATING","SAVING","SUCCEEDED").contains(item.getStatus()))
@@ -514,6 +583,7 @@ public class ImageCreationService {
          && ImageFingerprint.distance(imageHash,(String)previous[1])<=6));
    }
    item.setImageHash(imageHash);
+   captureImage(creation,item);
    item.setStatus("SUCCEEDED");
    item.setError(null);
    syncCreationStatus(creation);
@@ -521,8 +591,9 @@ public class ImageCreationService {
  }
  @Transactional
  public void complete(Long id,Task task,String outputKey,String imageHash) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()))return;
    var c=find(i.getCreationId());
    if(imageHash!=null && "POSTER".equals(c.getRequest().workflow()) && c.getReferenceHash()!=null
@@ -533,6 +604,7 @@ public class ImageCreationService {
      i.setSimilarityWarning(similar);
    }
    i.setImageHash(imageHash);
+   captureImage(c,i);
    i.setOutputKey(outputKey);i.setPersistedAt(Instant.now());i.setStatus("SUCCEEDED");i.setError(null);
    syncCreationStatus(c);
    releasePermitIfTerminal(c);
@@ -542,18 +614,66 @@ public class ImageCreationService {
    if(children.isEmpty()) return;
    boolean allSucceeded=children.stream().allMatch(i -> "SUCCEEDED".equals(i.getStatus()));
    boolean allCancelled=children.stream().allMatch(i -> "CANCELLED".equals(i.getStatus()));
-    boolean allTerminal=children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN").contains(i.getStatus()));
+    boolean allTerminal=children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN","INTERRUPTED").contains(i.getStatus()));
     boolean anyUnknown=children.stream().anyMatch(i -> "UPSTREAM_UNKNOWN".equals(i.getStatus()));
     if(allSucceeded) creation.setStatus("SUCCEEDED");
     else if(allCancelled) creation.setStatus("CANCELLED");
     else if(anyUnknown && allTerminal) creation.setStatus("UPSTREAM_UNKNOWN");
     else if(allTerminal && children.stream().anyMatch(i -> "SUCCEEDED".equals(i.getStatus()))) creation.setStatus("PARTIAL");
+    else if(allTerminal && children.stream().anyMatch(i -> "INTERRUPTED".equals(i.getStatus()))) creation.setStatus("INTERRUPTED");
     else if(allTerminal) creation.setStatus("FAILED");
+ }
+ private ImageItem lockItem(Long id) {
+   Long creationId=items.creationId(id).orElseThrow(()->bad("图片不存在"));
+   creations.lock(creationId).orElseThrow();
+   return items.lock(id).orElseThrow(()->bad("图片不存在"));
+ }
+ private void captureImage(ImageCreation c,ImageItem item) {
+   if(c.getBillingReservationId()!=null && item.isBillingHeld()) {
+     billing.capture(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,
+       "image-delivered:"+item.getId()+":"+item.getGeneration(),"图片成功交付 · 1 张");
+     item.setBillingHeld(false);
+   }
+ }
+ private void reserveRetry(ImageCreation c,long amount,String key) {
+   if(c.getBillingReservationId()==null) {
+     c.setBillingReservationId(billing.reserve("image-retry:"+c.getId()+":"+key,"IMAGE",amount,"恢复图片创作 · 预占烟火"));
+   } else billing.reserveMore(c.getBillingReservationId(),amount,"image-retry:"+c.getId()+":"+key,"恢复图片创作 · 预占烟火");
+ }
+ private void releaseImage(ImageCreation c,ImageItem i,String key) {
+   if(c.getBillingReservationId()!=null&&i.isBillingHeld()) {
+     billing.releaseAmount(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,key,"图片未交付 · 退回 3 烟火");
+     i.setBillingHeld(false);
+   }
+ }
+ @Transactional(propagation=org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+ public void taskFailed(com.wuyao.growth.common.task.TaskTerminalFailure event) {
+   billing.lockForGeneration();
+   if("IMAGE_PLAN".equals(event.type())) {
+     var c=creations.lock(((Number)event.payload().get("creationId")).longValue()).orElse(null);
+     if(c==null||!Objects.equals(c.getTaskId(),event.taskId())||c.getPlan()!=null) return;
+     c.setStatus("INTERRUPTED");
+     if(c.getError()==null||c.getError().isBlank()) c.setError("本次创作未完成，预占烟火已退回，可以重试");
+     if(c.getBillingReservationId()!=null) billing.release(c.getBillingReservationId(),"image-task-failed:"+event.taskId(),"图片计划失败 · 退回预占烟火");
+     releasePermitIfTerminal(c);
+   } else if("IMAGE_RENDER".equals(event.type())||"IMAGE_DOWNLOAD".equals(event.type())) {
+     var i=lockItem(((Number)event.payload().get("itemId")).longValue());
+     if(i==null||Set.of("SUCCEEDED","CANCELLED","INTERRUPTED").contains(i.getStatus())) return;
+     if(!Objects.equals(i.getTaskId(),event.taskId())) return;
+     if("IMAGE_DOWNLOAD".equals(event.type())&&!Objects.equals(event.payload().get("targetKey"),
+         "t"+i.getTenantId()+"/generated/"+i.getId()+"/"+i.getGeneration()+"/background.png")) return;
+     if(!Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus())) i.setStatus("INTERRUPTED");
+     if(i.getError()==null||i.getError().isBlank()) i.setError("本次图片未交付，预占烟火已退回，可以恢复原任务");
+     var c=find(i.getCreationId());
+     releaseImage(c,i,"image-task-failed:"+event.taskId());
+     syncCreationStatus(c); releasePermitIfTerminal(c);
+   }
  }
  @Transactional
  public void saveActualDimensions(Long id,Task task,int width,int height) {
+   billing.lockForGeneration();
    if(!tasks.ownsExecution(task))return;
-   var i=items.lock(id).orElseThrow();
+   var i=lockItem(id);
    if(!Objects.equals(i.getTaskId(),task.getId()))return;
    i.setActualWidth(width);i.setActualHeight(height);
  }

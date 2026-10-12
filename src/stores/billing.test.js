@@ -1,0 +1,47 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createServer } from 'vite'
+
+test('billing uses real account responses and isolates late responses after account changes', async () => {
+  const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-billing-tests',
+    server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true } })
+  const originalFetch = globalThis.fetch
+  const ok = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
+  const pending = []
+  globalThis.fetch = (url, options) => new Promise(resolve => pending.push({ url, options, resolve }))
+  const { billing, refreshBilling, loadBillingPlans } = await vite.ssrLoadModule('/src/stores/billing.js')
+  const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
+  try {
+    auth.state.user = { id: 1, tenantId: 7 }
+    auth.state.token = { accessToken: 'test-only' }
+    const old = refreshBilling()
+    refreshBilling()
+    assert.equal(pending.length, 1)
+    assert.equal(pending[0].url, '/api/billing/summary')
+    const oldPlans = loadBillingPlans()
+    auth.state.user = { id: 2, tenantId: 8 }
+    assert.equal(billing.summary, null)
+    const current = refreshBilling()
+    pending[2].resolve(ok({ available: 23, giftAvailable: 3, purchasedAvailable: 20, held: 6 }))
+    await current
+    assert.equal(billing.summary.available, 23)
+    pending[0].resolve(ok({ available: 999 }))
+    pending[1].resolve(ok([{ name: 'late old catalogue' }]))
+    assert.equal(await old, null)
+    await oldPlans
+    assert.equal(billing.summary.available, 23)
+    assert.deepEqual(billing.plans, [])
+    globalThis.fetch = async () => { throw new Error('connection lost') }
+    await refreshBilling()
+    assert.match(billing.error, /connection lost/)
+    assert.equal(billing.summary.available, 23)
+    auth.state.user = null
+    assert.equal(billing.summary, null)
+    assert.equal(await refreshBilling(), null)
+  } finally {
+    auth.state.user = null
+    auth.state.token = null
+    globalThis.fetch = originalFetch
+    await vite.close()
+  }
+})

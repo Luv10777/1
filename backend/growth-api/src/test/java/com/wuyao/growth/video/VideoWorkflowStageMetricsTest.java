@@ -41,11 +41,12 @@ class VideoWorkflowStageMetricsTest {
         var permits = mock(TenantRateLimiter.class);
         var metrics = new VideoMetrics(meters, mock(TaskRepository.class), permits, mock(VideoWorkflowObservations.class), 20, 2);
         service = new VideoWorkflowService(workflows, jobs, assets, mock(AssetService.class), storage, tasks,
-                new ObjectMapper(), permits, mock(HttpClient.class), probe, metrics);
+                new ObjectMapper(), permits, mock(HttpClient.class), probe, metrics, mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
         ReflectionTestUtils.setField(service, "maxDurationSeconds", 7200L);
         ReflectionTestUtils.setField(service, "maxPolls", 360);
         workflow = new VideoWorkflow();
         workflow.setId(42L);
+        workflow.setBillingQuote(com.wuyao.growth.billing.BillingTestFixtures.quote());
         workflow.setTenantId(7L);
         workflow.setTaskId(8L);
         workflow.setStatus("GENERATING");
@@ -168,7 +169,7 @@ class VideoWorkflowStageMetricsTest {
     void manualRecoveryClosesAnInterruptedStageAndStartsANewAgeWindow() {
         when(tasks.statusForTenant(8L)).thenReturn(TaskStatus.FAILED);
         workflow.setPollRound(12);
-        var resumed = service.retry(42L, 8L, null);
+        var resumed = service.retry(42L, 8L, null, "a".repeat(64));
         assertThat(resumed.status()).isEqualTo("GENERATING");
         assertThat(timer("poll", "interrupted").count()).isEqualTo(1);
         assertThat(meters.get("video.poll.rounds").tag("outcome", "interrupted").summary().totalAmount()).isEqualTo(12);

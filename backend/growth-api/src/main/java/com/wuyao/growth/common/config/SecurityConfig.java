@@ -35,6 +35,7 @@ public class SecurityConfig {
                                 "/api/auth/wechat/callback",
                                 "/api/auth/wechat/complete",
                                 "/api/auth/refresh",
+                                "/api/billing/wechat/notify",
                                 "/api/player/ws",
                                 "/api/player/test-audio.wav",
                                 "/api/player/audio/**",

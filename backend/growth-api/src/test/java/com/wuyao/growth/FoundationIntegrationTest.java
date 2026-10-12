@@ -1,6 +1,8 @@
 package com.wuyao.growth;
 
 import com.wuyao.growth.asset.*;
+import com.wuyao.growth.billing.*;
+import java.math.BigDecimal;
 import com.wuyao.growth.creative.image.*;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.security.JwtService;
@@ -135,6 +137,11 @@ class FoundationIntegrationTest {
     @Autowired AssetRepository assetRepository;
     @Autowired AssetProbeHandler probe;
     @Autowired VideoWorkflowService videoWorkflows;
+    @Autowired BillingService billingService;
+    @Autowired com.wuyao.growth.billing.BillingRecovery billingRecovery;
+    @Autowired BillingProperties billingConfig;
+    @Autowired VideoPricingProperties pricingConfig;
+    @Autowired VideoPricingService videoPricing;
     @Autowired VideoWorkflowRepository videoWorkflowRepository;
     @Autowired com.wuyao.growth.common.metrics.VideoMetrics videoMetrics;
     @Autowired io.micrometer.core.instrument.MeterRegistry meters;
@@ -169,6 +176,7 @@ class FoundationIntegrationTest {
         owner.execute("TRUNCATE tasks, assets, refresh_tokens, sms_codes, users, tenants RESTART IDENTITY CASCADE");
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('A') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('B') RETURNING id", Long.class);
+        setUpPaidBillingFixtures();
         when(voiceProvider.configured()).thenReturn(true);
         when(voiceProvider.code()).thenReturn("stub-voice");
         when(voiceProvider.builtInVoices()).thenReturn(List.of("voice-a"));
@@ -180,6 +188,186 @@ class FoundationIntegrationTest {
         for (var object : minio.listObjects(ListObjectsArgs.builder().bucket("test-assets").recursive(true).build())) {
             minio.removeObject(RemoveObjectArgs.builder().bucket("test-assets").object(object.get().objectName()).build());
         }
+    }
+
+
+    private void setUpPaidBillingFixtures() {
+        owner.execute("TRUNCATE billing_plans RESTART IDENTITY");
+        owner.update("INSERT INTO users(id,tenant_id,phone) VALUES (-1,?, '13999999999')", tenantA);
+        billingConfig.setOperatorUserIds(List.of(-1L));
+        billingConfig.setPaymentMethod("MANUAL");
+        billingConfig.setPaymentRecipient("test receipt fixture");
+        billingConfig.setPaymentAccount("test-only");
+        var plan=billingService.createPlan(new BillingDtos.NewPlan("TEST", "Test member", "test-only",100,30,1000000,true,true,true));
+        for(Long tenant:List.of(tenantA,tenantB)) TenantContext.runAs(tenant,()->{
+            var order=billingService.subscribe(new BillingDtos.Subscribe("test-member-"+tenant,plan.id()));
+            billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(100,"test-receipt-"+tenant),-1L);
+            return null;
+        });
+        var rates=new ArrayList<VideoPricingProperties.Rate>();
+        for(String model:List.of("SEEDANCE_2_5","SEEDANCE_2_0","SEEDANCE_2_0_MINI","SEEDANCE_2_0_FAST")) {
+            for(String resolution:List.of("480p","720p","1080p","4K")) {
+                var rate=new VideoPricingProperties.Rate();
+                rate.setProviderBaseUrl(videoProvider.baseUrl());rate.setProviderModel(videoProvider.providerModel(model));
+                rate.setResolution(resolution);rate.setVideoInput("t2v");rate.setUsdPerMillionTokens(BigDecimal.ONE);
+                rate.setCnyPerUsd(BigDecimal.ONE);rate.setSellingMultiplier(BigDecimal.ONE);
+                rate.setMaxOutputPixels(switch(resolution){case "480p"->854*480;case "720p"->1280*720;case "1080p"->1920*1080;default->3840*2160;});
+                rate.setFramesPerSecond(24);rate.setTokenAreaDivisor(1024);rate.setSourceUrl("https://test.invalid/synthetic-rate");
+                rate.setVerifiedAt(Instant.parse("2020-01-01T00:00:00Z"));rate.setValidUntil(Instant.parse("2099-01-01T00:00:00Z"));
+                rates.add(rate);
+            }
+        }
+        pricingConfig.setRates(rates);
+    }
+    private VideoDtos.View createPricedVideo(VideoDtos.Create r, Long userId) {
+        var quote=videoPricing.quote(r);
+        var approved=new VideoDtos.Create(r.requestKey(),r.prompt(),r.referenceImageAssetIds(),r.referenceVideoAssetId(),
+                r.model(),r.ratio(),r.durationSeconds(),r.resolution(),quote.quoteId());
+        return videoWorkflows.create(approved,userId);
+    }
+
+    @Test
+    void billingWithoutMembershipOrCapabilityCannotReserveAndRollsBackCleanly() {
+        owner.update("update billing_accounts set member_until=now()-interval '1 day' where tenant_id=?",tenantA);
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-member","IMAGE",3,"test")))).isEqualTo(9001);
+        assertThat(owner.queryForObject("select count(*) from billing_reservations",Long.class)).isZero();
+        owner.update("update billing_accounts set member_until=now()+interval '1 day', plan_snapshot=jsonb_set(plan_snapshot,'{videoEnabled}','false') where tenant_id=?",tenantA);
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-video","VIDEO",3,"test")))).isEqualTo(9002);
+    }
+
+    @Test
+    void billingGiftFirstPartialDeliveryReleaseAndDuplicateEventsReconstructBalances() {
+        owner.update("update billing_accounts set gift_available=5,purchased_available=10 where tenant_id=?",tenantA);
+        String reservation=TenantContext.runAs(tenantA,()->billingService.reserve("billing-partial","IMAGE",9,"3 images"));
+        TenantContext.runAs(tenantA,()->{
+            billingService.capture(reservation,3,"billing-image-1","delivered");
+            billingService.capture(reservation,3,"billing-image-1","delivered");
+            billingService.releaseAmount(reservation,3,"billing-image-2","failed");
+            billingService.releaseAmount(reservation,3,"billing-image-2","failed");
+            billingService.capture(reservation,3,"billing-image-3","delivered");
+            billingService.release(reservation,"billing-final","final");
+            var summary=billingService.summary(true,false);
+            assertThat(summary.available()).isEqualTo(9);assertThat(summary.giftAvailable()).isZero();
+            assertThat(summary.purchasedAvailable()).isEqualTo(9);assertThat(summary.held()).isZero();
+            return null;
+        });
+        assertThat(owner.queryForObject("select captured from billing_reservations where id=?",Long.class,reservation)).isEqualTo(6);
+        assertThat(owner.queryForObject("select 15+sum(gift_delta+purchased_delta) from billing_ledger where tenant_id=? and reservation_id=?",Long.class,tenantA,reservation)).isEqualTo(9);
+        assertThat(owner.queryForObject("select sum(held_delta) from billing_ledger where reservation_id=?",Long.class,reservation)).isZero();
+    }
+
+    @Test
+    void billingConcurrentReservationsCannotOverspendOrDoubleCapture() throws Exception {
+        owner.update("update billing_accounts set gift_available=3,purchased_available=0 where tenant_id=?",tenantA);
+        var successes=java.util.Collections.synchronizedList(new ArrayList<String>());
+        concurrent(()->TenantContext.runAs(tenantA,()->{
+            try { String id=billingService.reserve("concurrent-"+UUID.randomUUID(),"IMAGE",3,"test");successes.add(id);return true; }
+            catch(BizException e){assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INSUFFICIENT_YANHUO);return false;}
+        }));
+        assertThat(successes).hasSize(1);
+        concurrent(()->TenantContext.runAs(tenantA,()->{billingService.capture(successes.getFirst(),3,"concurrent-capture","test");return true;}));
+        assertThat(owner.queryForObject("select count(*) from billing_ledger where event_key='concurrent-capture'",Long.class)).isEqualTo(1);
+        assertThat(owner.queryForObject("select held from billing_accounts where tenant_id=?",Long.class,tenantA)).isZero();
+    }
+
+    @Test
+    void billingPaymentMustMatchReceiptAndFulfilOnlyOnceAcrossConcurrentConfirmations() throws Exception {
+        var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1200)));
+        assertThat(order.credits()).isEqualTo(120);
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(1300,"payment-test-receipt"),-1L)))).isEqualTo(1400);
+        concurrent(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(1200,"payment-test-receipt"),-1L)));
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).purchasedAvailable())).isEqualTo(120);
+        var same=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1200)));
+        assertThat(same.id()).isEqualTo(order.id());
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1300))))).isEqualTo(1400);
+        var other=TenantContext.runAs(tenantB,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-002",1200)));
+        assertThatThrownBy(()->TenantContext.runAs(tenantB,()->billingService.confirmPayment(other.id(),new BillingDtos.Confirmation(1200,"payment-test-receipt"),-1L))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(TenantContext.runAs(tenantB,()->billingService.summary(true,false).purchasedAvailable())).isZero();
+    }
+
+    @Test
+    void billingSamePlanRenewalAddsDurationAndGiftWhileMissingWechatConfigCannotCreateOrders() {
+        var before=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
+        var order=TenantContext.runAs(tenantA,()->billingService.subscribe(new BillingDtos.Subscribe("billing-renew-001",before.plan().id())));
+        TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(100,"renewal-test-receipt"),-1L));
+        var after=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
+        assertThat(after.memberUntil()).isEqualTo(before.memberUntil().plus(Duration.ofDays(30)));
+        assertThat(after.giftAvailable()).isEqualTo(2000000);
+        billingConfig.setPaymentMethod("WECHAT");
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-unconfigured",100))))).isEqualTo(9004);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).payment().available())).isFalse();
+    }
+
+    @Test
+    void billingRollbackRestoresFundsAndRlsProtectsOrdersReservationsAndLedger() {
+        assertThatThrownBy(()->TenantContext.runAs(tenantA,()->transactions.execute(status->{billingService.reserve("billing-rollback","IMAGE",3,"test");throw new IllegalStateException("rollback");}))).hasMessage("rollback");
+        assertThat(owner.queryForObject("select count(*) from billing_reservations where request_key='billing-rollback'",Long.class)).isZero();
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
+        String reservation=TenantContext.runAs(tenantA,()->billingService.reserve("billing-rls","IMAGE",3,"test"));
+        assertThat(code(()->TenantContext.runAs(tenantB,()->{billingService.capture(reservation,3,"rls-attempt","test");return null;}))).isEqualTo(1400);
+        assertThat(TenantContext.runAs(tenantB,()->billingService.ledger(0,20).items())).allMatch(e->!e.description().equals("test"));
+        assertThatThrownBy(()->owner.update("update billing_ledger set description='changed' where tenant_id=?",tenantA)).hasMessageContaining("immutable");
+    }
+
+    @Test
+    void billingRecoveryRefundsLostImageFailureEventsAndSubsequentFailedRetries() {
+        enableImageModels();
+        var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-lost-event","POSTER",1,List.of()),null));
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        // Simulate a worker crashing after its task failure commits and before the event is delivered.
+        owner.update("update tasks set status='FAILED' where id=?",created.taskId());
+        billingRecovery.recover();
+        billingRecovery.recover();
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
+        var retry=TenantContext.runAs(tenantA,()->imageCreations.retry(created.id(),null,created.taskId(),null));
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        owner.update("update tasks set status='FAILED' where id=?",retry.taskId());
+        billingRecovery.recover();
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).available())).isEqualTo(1000000);
+    }
+
+    @Test
+    void rolledBackImageCancellationRetainsBothReservedCreditsAndRedisPermit() {
+        enableImageModels();
+        var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-cancel-rollback","POSTER",1,List.of()),null));
+        TenantContext.runAs(tenantA,()->transactions.execute(status->{
+            imageCreations.cancel(created.id());
+            assertThat(imageRateLimiter.getActiveCount(tenantA)).isEqualTo(1);
+            status.setRollbackOnly();return null;
+        }));
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(imageRateLimiter.getActiveCount(tenantA)).isEqualTo(1);
+        TenantContext.runAs(tenantA,()->imageCreations.cancel(created.id()));
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
+        assertThat(imageRateLimiter.getActiveCount(tenantA)).isZero();
+    }
+
+    @Test
+    void videoSettlementUsesReportedTokensAndRefundsUnusedApprovedCreditsOnlyOnce() {
+        pricingConfig.getRates().forEach(r->r.setSellingMultiplier(new BigDecimal("100")));
+        var created=createVideo("billing-video-settlement");
+        long approved=created.billingQuote().credits();
+        var submit=tasks.claim("VIDEO_PROVIDER",1).getFirst();
+        TenantContext.runAs(tenantA,()->{videoWorkflows.saveSubmission(created.id(),submit,new VideoProviderGateway.SubmitResult("onlyrouter","billing-job","RUNNING"));return null;});
+        tasks.succeed(submit.getId(),submit.getAttempts(),Map.of());
+        var poll=tasks.claim("VIDEO_PROVIDER",1).getFirst();
+        TenantContext.runAs(tenantA,()->{videoWorkflows.savePoll(created.id(),poll,new VideoProviderGateway.PollResult("SUCCEEDED","https://test.invalid/output.mp4",null,1000L));return null;});
+        tasks.succeed(poll.getId(),poll.getAttempts(),Map.of());
+        var imported=tasks.claim("MEDIA_CPU",1).getFirst();
+        String key="t"+tenantA+"/generated-video/"+created.id()+"/output.mp4";
+        imageStorage.put(key,new byte[]{0,1,2,3},"video/mp4");
+        TenantContext.runAs(tenantA,()->{videoWorkflows.saveImportedVideo(created.id(),imported,key,4,"video/mp4");return null;});
+        tasks.succeed(imported.getId(),imported.getAttempts(),Map.of());
+        var qa=tasks.claim("MEDIA_CPU",1).getFirst();
+        completeVideoQa(created.id(),qa,false);
+        completeVideoQa(created.id(),qa,false);
+        var result=TenantContext.runAs(tenantA,()->videoWorkflows.get(created.id()));
+        assertThat(approved).isGreaterThan(1);
+        assertThat(result.chargedCredits()).isEqualTo(1);
+        var balance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
+        assertThat(balance.held()).isZero();assertThat(balance.available()).isEqualTo(999999);
+        assertThat(owner.queryForObject("select count(*) from billing_ledger where event_key=?",Long.class,"video-delivered:"+created.id())).isEqualTo(1);
     }
 
     @Test
@@ -200,7 +388,7 @@ class FoundationIntegrationTest {
         owner.update("update tasks set status='FAILED', lease_expires_at=NULL where id=?", current.taskId());
 
         var responses = concurrent(() -> TenantContext.runAs(tenantA,
-                () -> videoWorkflows.retry(created.id(), current.taskId(), null)));
+                () -> videoWorkflows.retry(created.id(), current.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId())));
 
         assertThat(responses).extracting(VideoDtos.View::taskId).containsOnly(responses.getFirst().taskId());
         assertThat(responses.getFirst().taskId()).isNotEqualTo(current.taskId());
@@ -251,7 +439,7 @@ class FoundationIntegrationTest {
         assertThat(failed.retryMayCharge()).isTrue();
         assertThat(failed.retryHint()).contains("可能再次计费");
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isZero();
-        TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), failed.taskId(), null));
+        TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), failed.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId()));
         var retry = tasks.claim("VIDEO_PROVIDER", 1).getFirst();
         var provider = mock(VideoProviderGateway.class);
         when(provider.buildSubmitRequest(any())).thenReturn(Map.of("prompt", "旋转"));
@@ -279,7 +467,7 @@ class FoundationIntegrationTest {
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isZero();
 
         TenantContext.runAs(tenantA, () -> transactions.execute(status -> {
-            var resumed = videoWorkflows.retry(created.id(), created.taskId(), null);
+            var resumed = videoWorkflows.retry(created.id(), created.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId());
             assertThat(resumed.status()).isEqualTo("QUEUED");
             assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isEqualTo(1);
             status.setRollbackOnly();
@@ -317,7 +505,7 @@ class FoundationIntegrationTest {
         TenantContext.runAs(tenantA, () -> { videoWorkflows.markFailed(failed.id(), "VIDEO_TIMEOUT", "unsent"); return null; });
         createVideo("video-retry-limit-active1");
         createVideo("video-retry-limit-active2");
-        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoWorkflows.retry(failed.id(), failed.taskId(), null)))
+        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoWorkflows.retry(failed.id(), failed.taskId(), null, videoWorkflows.retryQuote(failed.id()).quoteId())))
                 .isInstanceOfSatisfying(BizException.class, error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.RATE_LIMITED));
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isEqualTo(2);
         assertThat(TenantContext.runAs(tenantA, () -> videoWorkflowRepository.findById(failed.id()).orElseThrow().getRetryRound())).isZero();
@@ -335,7 +523,7 @@ class FoundationIntegrationTest {
         assertThat(tasks.reclaimExpired()).isEqualTo(1);
         var interrupted = TenantContext.runAs(tenantA, () -> videoWorkflows.get(created.id()));
         assertThat(interrupted.status()).isEqualTo("INTERRUPTED");
-        TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), interrupted.taskId(), null));
+        TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), interrupted.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId()));
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isEqualTo(1);
         assertThat(imageRateLimiter.getVideoGlobalActiveCount()).isEqualTo(1);
         assertThat(TenantContext.runAs(tenantA, () -> videoWorkflowRepository.findById(created.id()).orElseThrow().getProviderJobId())).isEqualTo("job-interrupted");
@@ -346,7 +534,7 @@ class FoundationIntegrationTest {
         var created = createVideo("video-unsent-retry");
         TenantContext.runAs(tenantA, () -> { videoWorkflows.markFailed(created.id(), "VIDEO_TIMEOUT", "unsent timeout"); return null; });
         owner.update("update tasks set status='FAILED' where id=?", created.taskId());
-        TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), created.taskId(), null));
+        TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), created.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId()));
         var task = tasks.claim("VIDEO_PROVIDER", 1).getFirst();
         var provider = mock(VideoProviderGateway.class);
         when(provider.buildSubmitRequest(any())).thenReturn(Map.of("prompt", "旋转"));
@@ -365,7 +553,7 @@ class FoundationIntegrationTest {
         String original = TenantContext.runAs(tenantA,
                 () -> videoWorkflows.prepareSubmissionRequest(created.id(), task, Map.of("prompt", "旋转")).orElseThrow());
         TenantContext.runAs(tenantA, () -> { videoWorkflows.markFailed(created.id(), task, "VIDEO_SUBMIT_FAILED", "response lost"); return null; });
-        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), created.taskId(), null)))
+        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), created.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId())))
                 .isInstanceOf(BizException.class).hasMessageContaining("避免重复计费");
         assertThat(owner.queryForObject("select provider_submit_body from video_workflows where id=?", String.class, created.id())).isEqualTo(original);
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isZero();
@@ -449,7 +637,7 @@ class FoundationIntegrationTest {
         String path = "/api/video/workflows/" + created.id() + "/retry";
         String token = jwt.issueAccessToken(user, tenantA, "13800000001");
         String otherToken = jwt.issueAccessToken(other, tenantB, "13800000002");
-        String body = "{\"taskId\":" + created.taskId() + "}";
+        String body = "{\"taskId\":" + created.taskId() + ",\"quoteId\":\"" + TenantContext.runAs(tenantA, () -> videoWorkflows.retryQuote(created.id()).quoteId()) + "\"}";
         mvc.perform(post(path).contentType("application/json").content(body)).andExpect(status().isUnauthorized());
         mvc.perform(post(path).header("Authorization", "Bearer " + otherToken).contentType("application/json").content(body))
                 .andExpect(status().isNotFound());
@@ -489,7 +677,7 @@ class FoundationIntegrationTest {
         assertThat(imageStorage.stat(key)).isEmpty();
         assertThat(TenantContext.runAs(tenantA, () -> assetRepository.findById(candidate.outputAssetId()).orElseThrow().getStatus())).isEqualTo("INVALID");
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isZero();
-        var recovered = TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), failed.taskId(), null));
+        var recovered = TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), failed.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId()));
         assertThat(recovered.status()).isEqualTo("GENERATING");
         assertThat(TenantContext.runAs(tenantA, () -> videoWorkflowRepository.findById(created.id()).orElseThrow().getProviderJobId())).isEqualTo("job-qa");
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isEqualTo(1);
@@ -576,7 +764,7 @@ class FoundationIntegrationTest {
 
         assertThat(imageStorage.stat(key)).isPresent();
         assertThat(owner.queryForObject("select output_storage_key from video_workflows where id=?", String.class, created.id())).isEqualTo(key);
-        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), qa.getId(), null)))
+        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), qa.getId(), null, videoWorkflows.retryQuote(created.id()).quoteId())))
                 .isInstanceOf(BizException.class).hasMessageContaining("已通过校验并交付");
         assertThat(imageRateLimiter.getVideoActiveCount(tenantA)).isZero();
     }
@@ -731,7 +919,7 @@ class FoundationIntegrationTest {
     }
 
     private VideoDtos.View createVideo(String requestKey) {
-        return TenantContext.runAs(tenantA, () -> videoWorkflows.create(new VideoDtos.Create(requestKey, "旋转", List.of(), null,
+        return TenantContext.runAs(tenantA, () -> createPricedVideo(new VideoDtos.Create(requestKey, "旋转", List.of(), null,
                 "SEEDANCE_2_0_MINI", "auto", 5, "480p"), null));
     }
 
@@ -764,7 +952,7 @@ class FoundationIntegrationTest {
         }
         // Only replace HTTP transport; lifecycle methods still run through the real transactional Spring service.
         var downloader = new VideoWorkflowService(videoWorkflowRepository, videoProviderJobs, assetRepository, assets, imageStorage,
-                tasks, new ObjectMapper(), imageRateLimiter, http, mock(VideoMediaProbe.class), videoMetrics);
+                tasks, new ObjectMapper(), imageRateLimiter, http, mock(VideoMediaProbe.class), videoMetrics, billingService, videoPricing);
         org.springframework.test.util.ReflectionTestUtils.setField(downloader, "maxProviderBytes", failure.equals("WRAPPED_SIZE") ? 8L : 1024L);
         var service = mock(VideoWorkflowService.class, org.mockito.AdditionalAnswers.delegatesTo(videoWorkflows));
         doAnswer(invocation -> downloader.importUrl(invocation.getArgument(0), invocation.getArgument(1)))
@@ -813,7 +1001,7 @@ class FoundationIntegrationTest {
             if (failure.equals("WRAPPED_SIZE")) assertThat(permanent.errorCode()).isEqualTo("VIDEO_IMPORT_TOO_LARGE");
             if (failure.equals("HTTP404")) {
                 assertThat(current.retryMayCharge()).isFalse();
-                var restored = TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), current.taskId(), null));
+                var restored = TenantContext.runAs(tenantA, () -> videoWorkflows.retry(created.id(), current.taskId(), null, videoWorkflows.retryQuote(created.id()).quoteId()));
                 assertThat(restored.status()).isEqualTo("GENERATING");
                 assertThat(TenantContext.runAs(tenantA, () -> videoWorkflowRepository.findById(created.id()).orElseThrow().getProviderJobId()))
                         .isEqualTo("import-job-HTTP404");
@@ -825,7 +1013,7 @@ class FoundationIntegrationTest {
 
     @Test
     void videoQaMetadataSurvivesCommitAndTheJwtScopedApiHasNoParameterWarnings() throws Exception {
-        var created = TenantContext.runAs(tenantA, () -> videoWorkflows.create(new VideoDtos.Create("qa-http-view",
+        var created = TenantContext.runAs(tenantA, () -> createPricedVideo(new VideoDtos.Create("qa-http-view",
                 "旋转", List.of(), null, "SEEDANCE_2_5", "16:9", 5, "1080p"), null));
         var importing = prepareVideoImport(created.id(), "qa-http-job");
         String key = "t" + tenantA + "/generated-video/" + created.id() + "/output.mp4";
@@ -852,9 +1040,9 @@ class FoundationIntegrationTest {
     void videoHealthOverRealHttpSeesBothTenantsAndDetectsStageAgeRatherThanCreationAge() throws Exception {
         when(imageGateway.configured(ModelAlias.IMAGE_PRIMARY)).thenReturn(true);
         var a = createVideo("health-tenant-a");
-        var b = TenantContext.runAs(tenantB, () -> videoWorkflows.create(new VideoDtos.Create(
+        var b = TenantContext.runAs(tenantB, () -> createPricedVideo(new VideoDtos.Create(
                 "health-tenant-b", "旋转", List.of(), null, "SEEDANCE_2_0_MINI", "auto", 5, "480p"), null));
-        var c = TenantContext.runAs(tenantB, () -> videoWorkflows.create(new VideoDtos.Create(
+        var c = TenantContext.runAs(tenantB, () -> createPricedVideo(new VideoDtos.Create(
                 "health-tenant-b-qa", "旋转", List.of(), null, "SEEDANCE_2_0_MINI", "auto", 5, "480p"), null));
         tasks.claim("VIDEO_PROVIDER", 1);
         TenantContext.runAs(tenantB, () -> tasks.submit("VIDEO_QA", "MEDIA_CPU", Map.of("workflowId", c.id()), "health-media", null));
@@ -990,7 +1178,7 @@ class FoundationIntegrationTest {
         if (invalid) when(mediaProbe.probe(anyString(), anyString())).thenThrow(new IllegalStateException("invalid video"));
         else when(mediaProbe.probe(anyString(), anyString())).thenReturn(new VideoMediaProbe.Metadata(640, 480, 5000, "video/mp4"));
         var qaService = new VideoWorkflowService(videoWorkflowRepository, videoProviderJobs, assetRepository, assets, imageStorage,
-                tasks, new ObjectMapper(), imageRateLimiter, mock(org.apache.hc.client5.http.classic.HttpClient.class), mediaProbe, videoMetrics);
+                tasks, new ObjectMapper(), imageRateLimiter, mock(org.apache.hc.client5.http.classic.HttpClient.class), mediaProbe, videoMetrics, billingService, videoPricing);
         TenantContext.runAs(tenantA, () -> transactions.execute(status -> { qaService.completeQa(id, task); return null; }));
     }
 
@@ -998,7 +1186,7 @@ class FoundationIntegrationTest {
     void videoDispatchMarkerCommitsBeforeHttpAndSurvivesRollbackAndLeaseReclaim() {
         var request = new VideoDtos.Create("video-durable-dispatch", "旋转", List.of(), null,
                 "SEEDANCE_2_0_MINI", "auto", 5, "480p");
-        var created = TenantContext.runAs(tenantA, () -> videoWorkflows.create(request, null));
+        var created = TenantContext.runAs(tenantA, () -> createPricedVideo(request, null));
         var task = tasks.claim("VIDEO_PROVIDER", 1).getFirst();
         assertThat(TenantContext.runAs(tenantA, () -> videoWorkflows.beginSubmit(created.id(), task))).isTrue();
         Map<String, Object> candidate = new LinkedHashMap<>();
@@ -1047,7 +1235,7 @@ class FoundationIntegrationTest {
         var reference = TenantContext.runAs(tenantA, () -> assetRepository.saveAndFlush(asset));
         var request = new VideoDtos.Create("video-refresh", "旋转", List.of(reference.getId()), null,
                 "SEEDANCE_2_0_MINI", "auto", 5, "480p");
-        var created = TenantContext.runAs(tenantA, () -> videoWorkflows.create(request, null));
+        var created = TenantContext.runAs(tenantA, () -> createPricedVideo(request, null));
         String oldUrl = "https://storage.example/reference?X-Amz-Date=20200101T000000Z&X-Amz-Expires=3600";
         Map<String, Object> expired = Map.of("content", List.of(Map.of("type", "image_url",
                 "image_url", Map.of("url", oldUrl))));
@@ -1055,7 +1243,7 @@ class FoundationIntegrationTest {
                 new ObjectMapper().writeValueAsString(expired), created.id());
         Map<String, Object> fresh = TenantContext.runAs(tenantA, () -> videoProvider.buildSubmitRequest(request));
         var provider = mock(VideoProviderGateway.class);
-        when(provider.buildSubmitRequest(request)).thenReturn(fresh);
+        when(provider.buildSubmitRequest(any())).thenReturn(fresh);
         when(provider.submit(anyString(), eq("video-" + created.id() + "-submit"))).thenAnswer(invocation -> {
             String body = invocation.getArgument(0);
             assertThat(owner.queryForObject("select provider_submit_body from video_workflows where id=?",
@@ -1215,17 +1403,11 @@ class FoundationIntegrationTest {
     void concurrentCreationRollbackDoesNotReleaseTheCommittedWorkflowsPermit() throws Exception {
         enableImageModels();
         var sequence = new java.util.concurrent.atomic.AtomicInteger();
-        var acquired = new CyclicBarrier(2);
         concurrent(() -> {
             int index = sequence.getAndIncrement();
             return TenantContext.runAs(tenantA, () -> transactions.execute(status -> {
                 var created = imageCreations.create(imageRequest("permit-concurrent-" + index,
                         "POSTER", 1, List.of()), null);
-                try {
-                    acquired.await(10, TimeUnit.SECONDS);
-                } catch (Exception e) {
-                    throw new IllegalStateException("concurrent acquisition timed out", e);
-                }
                 if (index == 0) status.setRollbackOnly();
                 return created.id();
             }));
@@ -1278,7 +1460,7 @@ class FoundationIntegrationTest {
         }
         assertThat(owner.queryForObject("SELECT attempts FROM sms_codes", Integer.class)).isEqualTo(5);
         assertThat(code(() -> login("13800000001", "123456"))).isEqualTo(2003);
-        assertThat(owner.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM users WHERE id <> -1", Integer.class)).isZero();
     }
 
     @Test
@@ -1346,7 +1528,7 @@ class FoundationIntegrationTest {
     @Test
     void unknownDisabledAndMalformedPasswordLoginsDoNotCreateAccounts() throws Exception {
         assertThat(code(() -> passwordLogin("integration-password"))).isEqualTo(2009);
-        assertThat(owner.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM users WHERE id <> -1", Integer.class)).isZero();
         Long userId = seedPasswordAccount();
         owner.update("UPDATE users SET status='DISABLED' WHERE id=?", userId);
         assertThat(code(() -> passwordLogin("integration-password"))).isEqualTo(2009);
@@ -2161,13 +2343,18 @@ class FoundationIntegrationTest {
         for (int n=0; n<3; n++) runImageTask("IMAGE", imageRenderHandler);
         var partial = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()));
         assertThat(partial.status()).isEqualTo("PARTIAL");assertThat(partial.completed()).isEqualTo(2);
+        var partialBalance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
+        assertThat(partialBalance.held()).isZero();assertThat(partialBalance.available()).isEqualTo(999994);
         var failed = partial.items().get(1);
         TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(), failed.id(), failed.taskId(), null));
         TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(), failed.id(), failed.taskId(), null));
         assertThat(owner.queryForObject("select count(*) from tasks where type='IMAGE_RENDER' and status='PENDING'", Integer.class)).isEqualTo(1);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
         clearInvocations(imageGateway);
         runImageTask("IMAGE", imageRenderHandler);
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).completed())).isEqualTo(3);
+        var completedBalance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
+        assertThat(completedBalance.held()).isZero();assertThat(completedBalance.available()).isEqualTo(999991);
         verify(imageGateway, times(1)).invokeReal(any());
     }
 

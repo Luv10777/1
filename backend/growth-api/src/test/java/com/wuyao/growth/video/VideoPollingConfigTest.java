@@ -57,6 +57,6 @@ class VideoPollingConfigTest {
                 .withBean(VideoWorkflowService.class, () -> new VideoWorkflowService(
                         mock(VideoWorkflowRepository.class), mock(VideoProviderJobRepository.class), mock(AssetRepository.class),
                         mock(AssetService.class), mock(ObjectStorage.class), mock(TaskService.class), new ObjectMapper(),
-                        mock(TenantRateLimiter.class), mock(HttpClient.class), mock(VideoMediaProbe.class), mock(VideoMetrics.class)));
+                        mock(TenantRateLimiter.class), mock(HttpClient.class), mock(VideoMediaProbe.class), mock(VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class)));
     }
 }

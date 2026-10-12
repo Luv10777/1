@@ -247,6 +247,6 @@ class VideoWorkflowServiceImportTest {
         return new VideoWorkflowService(mock(VideoWorkflowRepository.class), mock(VideoProviderJobRepository.class),
                 mock(AssetRepository.class), mock(AssetService.class), storage, mock(TaskService.class),
                 new ObjectMapper(), mock(TenantRateLimiter.class), httpClient, mock(VideoMediaProbe.class),
-                mock(com.wuyao.growth.common.metrics.VideoMetrics.class));
+                mock(com.wuyao.growth.common.metrics.VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
     }
 }

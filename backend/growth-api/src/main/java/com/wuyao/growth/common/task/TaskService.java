@@ -21,6 +21,7 @@ import java.util.Map;
 public class TaskService {
     private final TaskRepository repository;
     private final ObjectMapper objectMapper;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Value("${growth.worker.lease:30m}")
     private Duration lease;
@@ -132,6 +133,7 @@ public class TaskService {
         } else {
             task.setStatus(TaskStatus.FAILED);
             task.setFinishedAt(Instant.now());
+            events.publishEvent(TaskTerminalFailure.from(task));
         }
         return true;
     }
@@ -146,12 +148,15 @@ public class TaskService {
         task.setLeaseExpiresAt(null);
         task.setStatus(TaskStatus.FAILED);
         task.setFinishedAt(Instant.now());
+        events.publishEvent(TaskTerminalFailure.from(task));
         return true;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int reclaimExpired() {
         List<Long> ids = repository.reclaimExpired();
+        for(Long id:ids) repository.findById(id).filter(t->t.getStatus()==TaskStatus.FAILED)
+            .ifPresent(t->events.publishEvent(TaskTerminalFailure.from(t)));
         if (!ids.isEmpty()) log.warn("回收租约过期或重试耗尽的任务: {}", ids);
         return ids.size();
     }

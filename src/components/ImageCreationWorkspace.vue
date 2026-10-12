@@ -59,6 +59,7 @@ async function saveTitle(entry) {
     <div v-if="studio.pending" class="creation-message" role="status">上次提交尚未确认，可以恢复原请求。<button type="button" :disabled="studio.busy" @click="studio.generate">恢复提交</button></div>
 
     <slot v-if="studio.workspaceTab === 'inspiration'" />
+    <p v-if="studio.workspaceTab === 'result' && studio.current" class="generation-billing-note">成功交付每张 3 烟火；修改或重做会生成新版本，并按交付张数扣费。</p>
     <div v-else-if="!studio.current" class="creation-empty-result">
       <span class="material-symbols-outlined" aria-hidden="true">image</span>
       <h2>{{ studio.product ? '你的产品套图，会展示在这里。' : '你的第一张海报，会展示在这里。' }}</h2>

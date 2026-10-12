@@ -1,10 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import { get, post } from '../utils/request'
 import { assetSource, assets as platformAssets } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
+import { billing, dateTime, number, refreshBilling } from '../stores/billing'
+import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
 
 const prompt = ref('')
 const format = ref('auto')
@@ -31,6 +33,12 @@ const historyHasMore = ref(false)
 const router = useRouter()
 const route = useRoute()
 const isMorphing = ref(false)
+const quoted = ref(null)
+const quoteError = ref('')
+const quoteBusy = ref(false)
+const quoteDialog = ref(null)
+let quoteTarget = null
+const member = computed(() => billing.summary?.memberActive && billing.summary?.plan?.videoEnabled)
 let morphTimer
 const pollTimers = new Map()
 const objectUrls = new Set()
@@ -109,6 +117,7 @@ const updateWorkflow = (item, result) => {
   item.workflow = result
   item.error = ['FAILED', 'CANCELLED'].includes(result.status)
   item.notice = result.status === 'SUCCEEDED' ? videoCompletionNotice(result) : item.error ? (result.error || '视频生成失败，请稍后重试。') : ''
+  refreshBilling()
 }
 const selectConversation = async (item) => {
   saveActiveConversation()
@@ -276,16 +285,58 @@ const generate = async () => {
     }
     const signature = JSON.stringify(payload)
     if (item.payloadSignature !== signature) { item.requestKey = `video-${crypto.randomUUID()}`; item.payloadSignature = signature }
-    const result = await post('/api/video/workflows', { requestKey: item.requestKey, ...payload })
-    updateWorkflow(item, result)
-    if (activeConversationId.value === item.id) applyForm(item)
-    if (isVideoInProgress(result)) schedulePoll(item)
+    const request = { requestKey: item.requestKey, ...payload }
+    const quote = await getVideoQuote(request)
+    quoted.value = { quote, request }
+    quoteTarget = item
+    quoteError.value = ''
+    await refreshBilling()
+    await nextTick()
+    quoteDialog.value?.showModal()
+    item.notice = quote.available ? '费用预估已完成，请确认后开始生成。' : quote.message
   } catch (error) {
     item.error = true
     item.notice = error.message || '视频任务提交失败，请稍后重试。'
   } finally {
     item.submitting = false
   }
+}
+const closeQuote = () => { if (!quoteBusy.value) { quoteDialog.value?.close(); quoted.value = null; quoteTarget = null } }
+const confirmQuote = async () => {
+  if (!quoted.value?.quote.available || quoteBusy.value || !quoteTarget) return
+  const { request, quote } = quoted.value
+  const item = quoteTarget
+  quoteBusy.value = true; item.submitting = true; quoteError.value = ''
+  try {
+    const result = quoted.value.retryId
+      ? await post('/api/video/workflows/' + quoted.value.retryId + '/retry', { taskId: quoted.value.taskId, quoteId: quote.quoteId })
+      : await submitVideoQuote(request, quote.quoteId)
+    updateWorkflow(item, result)
+    if (activeConversationId.value === item.id) applyForm(item)
+    if (isVideoInProgress(result)) schedulePoll(item)
+    quoteBusy.value = false
+    closeQuote()
+  } catch (e) { quoteError.value = e.message || '视频提交失败，请重试'; item.notice = quoteError.value; item.error = true }
+  finally { quoteBusy.value = false; item.submitting = false; refreshBilling() }
+}
+const retryVideo = async () => {
+  const item = activeConversation.value
+  if (!item?.workflow?.retryable || item.submitting) return
+  item.submitting = true
+  try {
+    const quote = await get('/api/video/workflows/' + item.workflow.id + '/retry-quote')
+    quoted.value = { quote, retryId: item.workflow.id, taskId: item.workflow.taskId, request: { model: item.workflow.model, resolution: item.workflow.resolution, durationSeconds: item.workflow.durationSeconds } }
+    quoteTarget = item; quoteError.value = ''; await refreshBilling(); await nextTick(); quoteDialog.value?.showModal()
+  } catch (e) { item.notice = e.message || '恢复费用暂时无法预估'; item.error = true }
+  finally { item.submitting = false }
+}
+const cancelVideo = async () => {
+  const item = activeConversation.value
+  if (!item?.workflow?.id || item.submitting) return
+  item.submitting = true
+  try { updateWorkflow(item, await post('/api/video/workflows/' + item.workflow.id + '/cancel', {})) }
+  catch (e) { item.notice = e.message || '取消失败，请刷新任务后重试' }
+  finally { item.submitting = false; refreshBilling() }
 }
 const switchWorkspace = (path) => {
   if (path === router.currentRoute.value.path) return
@@ -430,11 +481,16 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       </fieldset>
 
       <div class="video-workbench-action p-6 border-t border-gray-100">
+        <p class="generation-billing-note">视频按模型、分辨率与时长预估费用，确认后预占烟火。</p>
+        <RouterLink v-if="billing.summary && !member" to="/billing" class="generation-billing-link">{{ billing.summary.memberActive ? '当前套餐未开放视频创作' : '请先开通会员' }} →</RouterLink>
         <button class="video-generate-button w-full py-3.5 bg-[#18181B] hover:bg-black text-white text-sm font-medium rounded-xl shadow-lg shadow-black/20 ring-1 ring-inset ring-white/10 transition-all flex justify-center items-center gap-2" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">
-          <span>{{ isGenerating ? '正在生成视频…' : workflow ? '以此配置再生成' : '开始生成视频' }}</span>
+          <span>{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</span>
           <span>→</span>
         </button>
         <p v-if="notice" class="video-generate-notice" :class="{ 'is-error': activeConversation?.error }" role="status">{{ notice }}</p>
+        <p v-if="workflow?.chargedCredits != null" class="generation-billing-note">本次交付消耗 {{ number(workflow.chargedCredits) }} 烟火。</p>
+        <button v-if="workflow?.retryable" class="generation-billing-link" type="button" :disabled="activeConversation?.submitting" @click="retryVideo">预估恢复费用</button>
+        <button v-if="isGenerating && workflow?.id" class="generation-billing-link" type="button" :disabled="activeConversation?.submitting" @click="cancelVideo">取消生成，退回未消耗烟火</button>
       </div>
     </div>
 
@@ -451,6 +507,9 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       :stage-label="stageLabel"
       @switch-workspace="switchWorkspace"
     />
+    <dialog ref="quoteDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="video-price-title" @cancel.prevent="closeQuote">
+      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount">{{ number(quoted.quote.credits) }}<small> 烟火</small></p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !member || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="!member || (billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值 →</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
+    </dialog>
     <Transition name="video-library-fade">
       <div v-if="libraryOpen" class="video-library-modal" role="dialog" aria-modal="true" aria-label="选择平台素材" @click.self="libraryOpen = false">
         <section class="video-library-card">

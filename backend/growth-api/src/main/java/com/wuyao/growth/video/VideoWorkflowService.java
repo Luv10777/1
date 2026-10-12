@@ -7,6 +7,8 @@ import com.wuyao.growth.asset.Asset;
 import com.wuyao.growth.asset.AssetRepository;
 import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.asset.VideoMediaProbe;
+import com.wuyao.growth.billing.BillingService;
+import com.wuyao.growth.billing.VideoPricingService;
 import com.wuyao.growth.common.ratelimit.TenantRateLimiter;
 import com.wuyao.growth.common.metrics.VideoMetrics;
 import com.wuyao.growth.common.storage.ObjectStorage;
@@ -78,6 +80,8 @@ public class VideoWorkflowService {
     private final HttpClient httpClient;
     private final VideoMediaProbe videoProbe;
     private final VideoMetrics metrics;
+    private final BillingService billing;
+    private final VideoPricingService pricing;
 
     @Value("${growth.video.poll-seconds:15}") private int pollSeconds;
     @Value("${growth.video.max-polls:360}") private int maxPolls;
@@ -91,6 +95,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public VideoDtos.View create(VideoDtos.Create request, Long userId) {
+   billing.lockForGeneration();
         try {
             VideoCapabilities.validate(request);
         } catch (IllegalArgumentException e) {
@@ -111,6 +116,8 @@ public class VideoWorkflowService {
             return view(existing.get());
         }
 
+        var quote = pricing.requireApproved(request, request.quoteId());
+        String reservation = billing.reserve("video-create:" + request.requestKey(), "VIDEO", quote.credits(), "视频创作 · 预占烟火");
         acquirePermit(tenantId);
         VideoWorkflow workflow = new VideoWorkflow();
         workflow.setTenantId(tenantId);
@@ -118,6 +125,8 @@ public class VideoWorkflowService {
         workflow.setRequestKey(request.requestKey());
         workflow.setRequestHash(hash);
         workflow.setRequest(request);
+        workflow.setBillingQuote(quote);
+        workflow.setBillingReservationId(reservation);
         workflow.setModel(request.model());
         workflow.setRatio(request.ratio());
         workflow.setDurationSeconds(request.durationSeconds());
@@ -135,13 +144,25 @@ public class VideoWorkflowService {
     public VideoDtos.View get(Long id) { return view(find(id)); }
 
     @Transactional
-    public VideoDtos.View retry(Long id, Long expectedTaskId, Long userId) {
+    public VideoDtos.View retry(Long id, Long expectedTaskId, Long userId, String approvedQuoteId) {
+   billing.lockForGeneration();
         if (expectedTaskId == null) throw BizException.of(ErrorCode.BAD_REQUEST, "请提供当前视频任务标识");
         VideoWorkflow workflow = lock(id);
         // The row lock serializes two clients; the loser observes the newly assigned task.
         if (!Objects.equals(workflow.getTaskId(), expectedTaskId)) return view(workflow);
         RetryPlan plan = retryPlan(workflow, effectiveStatus(workflow));
         if (plan.stage() == null) throw BizException.of(ErrorCode.BAD_REQUEST, plan.hint());
+        var quote = "SUBMIT".equals(plan.stage()) || workflow.getBillingQuote() == null
+                ? pricing.requireApproved(workflow.getRequest(), approvedQuoteId) : workflow.getBillingQuote();
+        if (quote == null || !Objects.equals(quote.quoteId(), approvedQuoteId))
+            throw BizException.of(ErrorCode.BILLING_QUOTE_EXPIRED, "请先确认本次视频恢复的预占费用");
+        billing.requireMembership("VIDEO");
+        if (workflow.getBillingReservationId() == null) {
+            workflow.setBillingReservationId(billing.reserve("video-retry:" + id + ":" + expectedTaskId, "VIDEO", quote.credits(), "恢复视频 · 预占烟火"));
+        } else if (billing.remaining(workflow.getBillingReservationId()) == 0) {
+            billing.reserveMore(workflow.getBillingReservationId(), quote.credits(), "video-retry:" + id + ":" + expectedTaskId, "恢复视频 · 预占烟火");
+        }
+        workflow.setBillingQuote(quote);
         if ("SUBMIT".equals(plan.stage())) {
             VideoDtos.Create request = workflow.getRequest();
             try { VideoCapabilities.validate(request); }
@@ -159,6 +180,7 @@ public class VideoWorkflowService {
             workflow.setProviderJobId(null);
             workflow.setProviderStatus(null);
             workflow.setProviderResultUrl(null);
+            workflow.setProviderBillingTokens(null);
         }
         if ("SUBMIT".equals(plan.stage())) {
             // Only a definitely unsent request or a confirmed failed provider job reaches here.
@@ -202,7 +224,22 @@ public class VideoWorkflowService {
         return view(workflow);
     }
 
+    /** Compatibility for internal callers; interactive clients must submit the approved quote id. */
+    @Transactional
+    public VideoDtos.View retry(Long id, Long expectedTaskId, Long userId) {
+   billing.lockForGeneration();
+        return retry(id, expectedTaskId, userId, null);
+    }
+
     private record RetryPlan(String stage, boolean newSubmission, String hint) {}
+
+    @Transactional(readOnly = true)
+    public VideoPricingService.Quote retryQuote(Long id) {
+        var w = find(id);
+        var plan = retryPlan(w, effectiveStatus(w));
+        if (plan.stage() == null) throw BizException.of(ErrorCode.BAD_REQUEST, plan.hint());
+        return "SUBMIT".equals(plan.stage()) || w.getBillingQuote() == null ? pricing.quote(w.getRequest()) : w.getBillingQuote();
+    }
 
     private RetryPlan retryPlan(VideoWorkflow workflow, String status) {
         if (published(workflow)) return new RetryPlan(null, false, "视频已通过校验并交付，不允许重试或清理");
@@ -282,6 +319,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public boolean beginSubmit(Long workflowId, Task task) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return false;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId()) || Set.of("SUCCEEDED", "FAILED", "CANCELLED").contains(workflow.getStatus())) return false;
@@ -302,6 +340,7 @@ public class VideoWorkflowService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<String> prepareSubmissionRequest(Long workflowId, Task task, Map<String, Object> candidate) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return Optional.empty();
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId())
@@ -315,6 +354,7 @@ public class VideoWorkflowService {
         boolean dispatched = workflow.getProviderSubmitStartedAt() != null;
         String body = workflow.getProviderSubmitBody();
         if (!dispatched) {
+            if (workflow.getBillingReservationId() != null) pricing.validateDispatch(workflow.getRequest(), workflow.getBillingQuote());
             if (candidate == null || candidate.isEmpty()) {
                 throw new SubmissionRequestException("VIDEO_SUBMIT_REQUEST_INVALID", "视频提交请求为空，尚未向供应商提交，请重新创建视频");
             }
@@ -387,6 +427,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public void saveSubmission(Long workflowId, Task task, VideoProviderGateway.SubmitResult result) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId())
@@ -413,6 +454,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public boolean beginPoll(Long workflowId, Task task) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return false;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId()) || workflow.getProviderJobId() == null
@@ -428,6 +470,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public void savePoll(Long workflowId, Task task, VideoProviderGateway.PollResult result) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId())
@@ -437,6 +480,7 @@ public class VideoWorkflowService {
             return;
         }
         workflow.setProviderStatus(result.status());
+        if (result.billingTokens() != null && result.billingTokens() > 0) workflow.setProviderBillingTokens(result.billingTokens());
         workflow.setPollRound(workflow.getPollRound() + 1);
         VideoProviderJob job = providerJobs.findByWorkflowIdAndProviderJobId(workflowId, workflow.getProviderJobId()).orElseThrow();
         job.setStatus(result.status());
@@ -464,6 +508,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public boolean beginImport(Long workflowId, Task task) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return false;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId())
@@ -480,6 +525,7 @@ public class VideoWorkflowService {
     /** Commit an independently named candidate before any streaming PUT can leave an orphan. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<String> reserveImportKey(Long workflowId, Task task) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return Optional.empty();
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId()) || !"IMPORTING".equals(workflow.getStatus()) || published(workflow)) {
@@ -494,11 +540,13 @@ public class VideoWorkflowService {
 
     @Transactional
     public void cleanupImportObject(Long workflowId, String key) {
+   billing.lockForGeneration();
         discardStaleImport(lock(workflowId), key);
     }
 
     @Transactional
     public void saveImportedVideo(Long workflowId, Task task, String storageKey, long sizeBytes, String contentType) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) {
             discardStaleImport(lock(workflowId), storageKey);
             return;
@@ -536,6 +584,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public void completeQa(Long workflowId, Task task) {
+   billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return;
         VideoWorkflow workflow = lock(workflowId);
         if (!Objects.equals(workflow.getTaskId(), task.getId())
@@ -570,6 +619,12 @@ public class VideoWorkflowService {
             markFailed(workflow, "VIDEO_ASSET_INVALID", "生成的视频文件无法通过媒体校验");
             return;
         }
+        if (workflow.getBillingReservationId() != null) {
+            long charge = pricing.actualCredits(workflow.getBillingQuote(), workflow.getProviderBillingTokens(),
+                    output.getWidth(), output.getHeight(), output.getDurationMs());
+            billing.capture(workflow.getBillingReservationId(), charge, "video-delivered:" + workflow.getId(), "视频交付 · 消耗 " + charge + " 烟火");
+            workflow.setBillingCapturedCredits(charge);
+        }
         workflow.setStatus("SUCCEEDED");
         workflow.setOutputPublishedAt(Instant.now());
         advanceStage(workflow, "DONE");
@@ -581,12 +636,14 @@ public class VideoWorkflowService {
 
     @Transactional
     public void markFailed(Long workflowId, String code, String message) {
+   billing.lockForGeneration();
         VideoWorkflow workflow = lock(workflowId);
         markFailed(workflow, code, message);
     }
 
     @Transactional
     public void markFailed(Long workflowId, Task task, String code, String message) {
+   billing.lockForGeneration();
         // An old HTTP/download may fail after a client has already resumed or canceled the workflow.
         if (!tasks.ownsExecution(task)) return;
         VideoWorkflow workflow = lock(workflowId);
@@ -726,8 +783,10 @@ public class VideoWorkflowService {
     }
 
     private void releasePermitIfTerminal(VideoWorkflow workflow) {
-        if (!workflow.isVideoConcurrencyPermitHeld()
-                || !Set.of("SUCCEEDED", "FAILED", "CANCELLED").contains(workflow.getStatus())) return;
+        if (!Set.of("SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED").contains(workflow.getStatus())) return;
+        if (workflow.getBillingReservationId() != null) billing.release(workflow.getBillingReservationId(),
+                "video-release:" + workflow.getId() + ":" + workflow.getRetryRound(), "视频结算 · 退回未消耗烟火");
+        if (!workflow.isVideoConcurrencyPermitHeld()) return;
         workflow.setVideoConcurrencyPermitHeld(false);
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -741,6 +800,7 @@ public class VideoWorkflowService {
 
     @Transactional
     public VideoDtos.View cancel(Long id) {
+   billing.lockForGeneration();
         VideoWorkflow workflow = lock(id);
         if (published(workflow)) return view(workflow);
         if (Set.of("FAILED", "CANCELLED").contains(workflow.getStatus())) {
@@ -758,6 +818,20 @@ public class VideoWorkflowService {
         cleanupUnpublishedOutput(workflow);
         releasePermitIfTerminal(workflow);
         return view(workflow);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void taskFailed(com.wuyao.growth.common.task.TaskTerminalFailure event) {
+   billing.lockForGeneration();
+        if (!(event.payload().get("workflowId") instanceof Number n)) return;
+        var w = lock(n.longValue());
+        if (!Objects.equals(w.getTaskId(), event.taskId()) || published(w)) return;
+        if (!Set.of("FAILED", "CANCELLED", "INTERRUPTED").contains(w.getStatus())) {
+            w.setStatus("INTERRUPTED");
+            w.setErrorCode("VIDEO_TASK_INTERRUPTED");
+            w.setErrorMessage("任务未完成，预占烟火已退回；恢复时会重新预占，交付后结算。");
+        }
+        releasePermitIfTerminal(w);
     }
 
     private VideoWorkflow find(Long id) {
@@ -785,7 +859,7 @@ public class VideoWorkflowService {
                 request.referenceImageAssetIds().stream().map(this::referenceView).toList(),
                 request.referenceVideoAssetId() == null ? null : referenceView(request.referenceVideoAssetId()),
                 workflow.getErrorCode(), plan.stage() != null, plan.stage(), "SUBMIT".equals(plan.stage()), plan.hint(),
-                actualWidth, actualHeight, actualDurationMs);
+                actualWidth, actualHeight, actualDurationMs, workflow.getBillingQuote(), workflow.getBillingCapturedCredits());
     }
 
     private VideoDtos.Reference referenceView(Long id) {
