@@ -2,12 +2,16 @@ package com.yifangzhi.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -33,6 +37,16 @@ public final class ConsoleActivity extends Activity {
     private boolean visible;
     private View gate;
     private boolean foregroundOnly;
+    private LinearLayout volumeHint;
+    private TextView volumeWords;
+    private boolean volumeHintClosed;
+    /** 用音量键调音量时系统会发这条广播；据此让提醒跟着出现或消失。 */
+    private final BroadcastReceiver volumeChanged = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            checkVolume();
+        }
+    };
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
@@ -87,6 +101,83 @@ public final class ConsoleActivity extends Activity {
         super.onResume();
         // 可能是刚从系统的授权页回来。
         checkBackgroundAllowed();
+        checkVolume();
+        IntentFilter volume = new IntentFilter("android.media.VOLUME_CHANGED_ACTION");
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(volumeChanged, volume, Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(volumeChanged, volume);
+    }
+
+    @Override
+    protected void onPause() {
+        unregisterReceiver(volumeChanged);
+        super.onPause();
+    }
+
+    /**
+     * 媒体音量太小时提醒一句。
+     * AI 的声音是从手机喇叭放出来、再被抖音收进直播间的。音量小的时候，每段讲解停顿之后重新出声的头几个字
+     * 会被抖音的降噪当成杂音压掉：荣耀 X50 上实测，音量 5/16 时直播间里听得出来，调大之后好一些。手机喇叭本身听不出这个问题，
+     * 所以主播自己发现不了，要软件来说。
+     */
+    private void checkVolume() {
+        AudioManager audio = getSystemService(AudioManager.class);
+        int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int now = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+        boolean quiet = max > 0 && now * 10 < max * 6;
+        if (!quiet || volumeHintClosed || gate != null) {
+            if (volumeHint != null) frame.removeView(volumeHint);
+            volumeHint = null;
+            return;
+        }
+        String words = "媒体音量偏小（现在 " + now + " 格，满格 " + max + "）。音量小的时候，直播间里每段讲解开头的几个字容易被抖音的降噪压掉。";
+        if (volumeHint != null) {
+            volumeWords.setText(words);
+            return;
+        }
+        float dp = getResources().getDisplayMetrics().density;
+        int pad = Math.round(12 * dp);
+        LinearLayout strip = new LinearLayout(this);
+        strip.setOrientation(LinearLayout.VERTICAL);
+        strip.setPadding(pad + pad / 2, pad, pad + pad / 2, pad / 2);
+        strip.setBackgroundColor(0xFFFFF1DC);
+        strip.setClickable(true);
+        volumeWords = words(words, 13, false, 0xFF5A4520);
+        volumeWords.setPadding(0, 0, 0, 0);
+        strip.addView(volumeWords);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.END);
+        Button raise = new Button(this);
+        raise.setText("调到合适音量");
+        raise.setAllCaps(false);
+        raise.setTextSize(13);
+        raise.setOnClickListener(view -> raiseVolume());
+        Button close = new Button(this);
+        close.setText("知道了");
+        close.setAllCaps(false);
+        close.setTextSize(13);
+        close.setOnClickListener(view -> {
+            volumeHintClosed = true;
+            checkVolume();
+        });
+        row.addView(close);
+        row.addView(raise);
+        strip.addView(row);
+        volumeHint = strip;
+        frame.addView(strip, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
+    }
+
+    /** 调到满格的四分之三，并让系统显示音量条，用户看得到改成了多少、可以接着自己调。 */
+    private void raiseVolume() {
+        AudioManager audio = getSystemService(AudioManager.class);
+        int target = Math.round(audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) * 0.75f);
+        try {
+            audio.setStreamVolume(AudioManager.STREAM_MUSIC, target, AudioManager.FLAG_SHOW_UI);
+        } catch (RuntimeException refused) {
+            // 勿扰模式下系统可能不让软件改音量：那就只把音量条叫出来，由用户自己调。
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_SAME, AudioManager.FLAG_SHOW_UI);
+        }
+        checkVolume();
     }
 
     /**
@@ -101,6 +192,8 @@ public final class ConsoleActivity extends Activity {
             gate = null;
             return;
         }
+        if (volumeHint != null) frame.removeView(volumeHint);
+        volumeHint = null;
         if (gate != null) return;
         float dp = getResources().getDisplayMetrics().density;
         int pad = Math.round(24 * dp);
@@ -127,6 +220,7 @@ public final class ConsoleActivity extends Activity {
         skip.setOnClickListener(view -> {
             foregroundOnly = true;
             checkBackgroundAllowed();
+            checkVolume();
         });
         card.addView(skip);
 

@@ -34,7 +34,10 @@ export class BrowserAudioPlayer {
     if (!this.context) {
       const Context = window.AudioContext || window.webkitAudioContext
       if (!Context) throw new Error('当前浏览器不支持 Web Audio，请更换浏览器。')
-      this.context = new Context()
+      // 要的是播得稳，不是延迟低。默认的“低延迟”输出缓冲只有几毫秒，设备一忙就断续：
+      // 安卓手机上抖音一开播，这边的声音就一卡一卡的（系统里看到用的是 8 毫秒缓冲的快通道）。
+      // 讲解晚出声一两百毫秒没有人听得出来；插播的时机按音频时钟算，不受影响。
+      this.context = new Context({ latencyHint: 'playback' })
       this.gain = this.context.createGain()
       this.gain.gain.value = this.volume
       this.gain.connect(this.context.destination)
