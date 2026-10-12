@@ -114,6 +114,8 @@ final class ConsoleWeb {
         }
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
+        // 这张网页自己不下载文件：新版安装包之类的下载交给系统浏览器，那边有下载进度，下完能直接点安装。
+        web.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> openOutside(Uri.parse(url)));
         web.loadUrl(origin + LIVE_PATH);
     }
 
@@ -240,6 +242,14 @@ final class ConsoleWeb {
         }
     }
 
+    private void openOutside(Uri url) {
+        try {
+            context.startActivity(new Intent(Intent.ACTION_VIEW, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (RuntimeException noBrowser) {
+            host.note("没有能打开这个链接的软件：" + url.getHost());
+        }
+    }
+
     private boolean isConsole(Uri url) {
         return origin.equals(url.getScheme() + "://" + url.getAuthority());
     }
@@ -248,15 +258,10 @@ final class ConsoleWeb {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             Uri url = request.getUrl();
-            if (isConsole(url)) return false;
-            // 控制台以外的链接交给系统浏览器，这张网页本身不离开控制台。
-            if (request.isForMainFrame() && ("https".equals(url.getScheme()) || "http".equals(url.getScheme()))) {
-                try {
-                    context.startActivity(new Intent(Intent.ACTION_VIEW, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                } catch (RuntimeException noBrowser) {
-                    host.note("没有能打开这个链接的软件：" + url.getHost());
-                }
-            }
+            boolean download = url.getPath() != null && url.getPath().startsWith("/downloads/");
+            if (isConsole(url) && !download) return false;
+            // 控制台以外的链接、以及安装包的下载，交给系统浏览器；这张网页本身不离开控制台。
+            if (request.isForMainFrame() && ("https".equals(url.getScheme()) || "http".equals(url.getScheme()))) openOutside(url);
             return true;
         }
 

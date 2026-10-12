@@ -3,7 +3,7 @@
 目标是让商家**只用一台手机**开播：抖音 App 在前台直播，一方志在后台读弹幕、让 AI 用声音回答。
 能在一台手机上跑通，放到第二台手机上在前台用自然也行。
 
-**现在还不是能给商家用的软件。** 只有调试包，连的是开发用的控制台，在一台手机（荣耀 X50）上试过。里面有两部分：
+**试用阶段。** 0.1.0 起有正式签名的安装包，网站的 `/app` 页面提供下载；但只在一台手机（荣耀 X50）上完整地播过，还没有扫码登录。里面有两部分：
 
 - **直播工作台**（打开软件看到的）：一整屏的一方志直播页，和桌面端里显示的是同一个网页。页面通过一座和桌面端一样的桥
   （`window.yifangzhiDesktop`）让软件去读直播间弹幕，所以页面不用区分自己开在电脑软件还是手机软件里。
@@ -125,6 +125,38 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 还有一种**预览包**（`./gradlew :app:assemblePreview`，出 `app/build/outputs/apk/preview/app-preview.apk`）：和调试包一样用调试签名，
 但连的是线上 `https://yifangzhi.com`，不需要 `adb reverse`。它的包名多一个 `.preview`，可以和调试包并排装在一台手机上，
 桌面上叫“一方志预览版”。用来拿真实账号自己试，同样不能发给商家。
+
+## 三种安装包
+
+| | 包名 | 连哪里 | 签名 | 桌面上叫 |
+|---|---|---|---|---|
+| 调试包 `assembleDebug` | `com.yifangzhi.app.dev` | 本机开发服务器（需要 `adb reverse`） | 本机调试签名 | 一方志测试版 |
+| 预览包 `assemblePreview` | `com.yifangzhi.app.preview` | 线上 | 本机调试签名，能从电脑上检查网页 | 一方志预览版 |
+| 正式包 `assembleRelease` | `com.yifangzhi.app` | 线上 | 正式签名，不能调试 | 一方志 |
+
+三种可以并排装在一台手机上。每种的授权（后台运行、悬浮窗、通知）要各给各的。只有正式包可以发给商家。
+
+## 正式签名和发版
+
+正式签名的钥匙和密码**不在代码库里**。打包时默认从 `~/.yifangzhi/android-release.properties` 读四行（`storeFile`、`storePassword`、`keyAlias`、`keyPassword`），
+钥匙文件是 `~/.yifangzhi/android-release.jks`（2026-10-12 生成）。没有这个文件时正式包打出来是没签名的，装不了。
+
+**这两个文件要另外备份。** 安卓只认签名：钥匙丢了，已经装出去的软件就没法再更新，用户只能卸载重装；钥匙泄露了，别人就能做出能覆盖安装的假包。
+证书指纹（公开信息，用来核对安装包是不是我们签的）：SHA-256 `67:72:50:74:15:87:AF:AC:F5:FD:ED:14:9A:D0:62:F7:4E:E3:49:AF:31:96:5A:D3:0A:4C:64:57:B2:1D:08:9E`。
+
+发一个新版本：
+
+1. 改 `app/build.gradle` 里的 `versionName`，`versionCode` 加一（安卓按它判断新旧，只能增不能减）。
+2. `./gradlew :app:testDebugUnitTest :app:assembleRelease`，出 `app/build/outputs/apk/release/app-release.apk`。
+3. 核对签名：`$ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs <apk>`，指纹要和上面一致。
+4. 先装到自己的手机上播一场。
+5. 传到服务器的 `/var/www/wuyao/downloads/`：一份叫 `yifangzhi-android.apk`（网页认这个名字），另留一份带版本号的；再把 `latest.json` 里 `android` 那一项的版本号改掉，旧版软件打开时才会提醒更新。
+
+下载入口在网站的 `/app`（`src/views/AppDownloadView.vue`，不用登录）：电脑上显示二维码，安卓浏览器里显示下载按钮，微信里提示先在浏览器打开，苹果手机上说明只有安卓版。
+软件里的新版本提醒和桌面端是同一套（`src/services/desktopUpdate.js`），点了交给系统浏览器去下载。
+
+0.1.0 发出前验证过：签名核对通过，不是调试包，连的是线上；装到荣耀 X50 上能启动、没有闪退、能打开线上的页面。**没有验证**：用正式包完整播一场（播过的都是预览包，代码相同、签名和包名不同）；
+从网页下载、安装的整个过程；微信里打开下载页的样子；软件里的新版本提醒（要等有下一个版本才看得到）。
 
 ## 在一台新手机上先做验证
 

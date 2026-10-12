@@ -2,6 +2,13 @@ plugins {
     id 'com.android.application'
 }
 
+// 正式签名的钥匙和密码不进代码库。默认从 ~/.yifangzhi/android-release.properties 读（storeFile、storePassword、keyAlias、keyPassword 四行），
+// 也可以用 -Pyifangzhi.signing=<文件> 指到别处。没有这个文件时正式包打出来是没签名的（装不了），调试包和预览包不受影响。
+// 这把钥匙丢了，已经装出去的软件就没法再更新，只能卸载重装。
+def signingFile = file(project.findProperty('yifangzhi.signing') ?: "${System.getProperty('user.home')}/.yifangzhi/android-release.properties")
+def signing = new Properties()
+if (signingFile.isFile()) signingFile.withInputStream { signing.load(it) }
+
 android {
     namespace 'com.yifangzhi.app'
     compileSdk 35
@@ -10,15 +17,27 @@ android {
         applicationId 'com.yifangzhi.app'
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName '0.0.4'
+        versionCode 10
+        versionName '0.1.0'
     }
     buildFeatures {
         buildConfig true
     }
+    signingConfigs {
+        release {
+            if (signing['storeFile']) {
+                storeFile file(signing['storeFile'])
+                storePassword signing['storePassword']
+                keyAlias signing['keyAlias']
+                keyPassword signing['keyPassword']
+            }
+        }
+    }
     buildTypes {
         // 调试包连开发用的控制台：手机上的 localhost:4173 由 adb reverse 转到电脑上的开发服务器，和桌面端开发时连的是同一个地址。
         debug {
+            // 包名多一个 .dev：调试包用的是本机的调试签名，和正式包签名不同，同一个包名装不到一台手机上。
+            applicationIdSuffix '.dev'
             buildConfigField 'String', 'CONSOLE_URL', '"http://localhost:4173"'
             resValue 'string', 'app_name', '一方志测试版'
         }
@@ -35,6 +54,7 @@ android {
             buildConfigField 'String', 'CONSOLE_URL', '"https://yifangzhi.com"'
             resValue 'string', 'app_name', '一方志'
             minifyEnabled false
+            signingConfig signing['storeFile'] ? signingConfigs.release : null
         }
     }
     compileOptions {

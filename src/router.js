@@ -24,6 +24,7 @@ import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
 import PlayerView from './views/PlayerView.vue'
+const AppDownloadView = () => import('./views/AppDownloadView.vue')
 import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
@@ -38,6 +39,7 @@ const routes = [
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
+  { path: '/app', name: 'app-download', component: AppDownloadView, meta: { public: true, title: '一方志 App' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
   { path: '/ecosystem', name: 'ecosystem', component: EcosystemView, meta: { title: '生态与治理', eyebrow: 'OPEN ECOSYSTEM' }, },
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '经营总览', eyebrow: 'TODAY / OPERATIONS' } },
