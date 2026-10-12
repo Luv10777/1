@@ -37,7 +37,8 @@ onBeforeUnmount(() => clearInterval(updateTimer))
         </div>
       </div></header>
       <div v-if="update && !updateLater" class="desk-update" role="status">
-        <p>桌面端有新版本 {{ update.version }}，现在用的是 {{ update.current }}。下载后退出软件再安装，登录和设置都会保留。<template v-if="update.platform === 'mac'">装好后第一次打开，还要到“系统设置 → 隐私与安全性”里点“仍要打开”。</template></p>
+        <p v-if="update.platform === 'android'">一方志 App 有新版本 {{ update.version }}，现在用的是 {{ update.current }}。下载后点安装即可，登录和设置都会保留。</p>
+        <p v-else>桌面端有新版本 {{ update.version }}，现在用的是 {{ update.current }}。下载后退出软件再安装，登录和设置都会保留。<template v-if="update.platform === 'mac'">装好后第一次打开，还要到“系统设置 → 隐私与安全性”里点“仍要打开”。</template></p>
         <a class="primary-button compact" :href="updateUrl" target="_blank" rel="noopener">下载新版本</a>
         <button type="button" class="secondary-button compact" @click="updateLater = true">稍后再说</button>
       </div>
@@ -55,8 +56,8 @@ onBeforeUnmount(() => clearInterval(updateTimer))
 
 <style scoped>
 .desk-store, .desk-user { color: var(--ink-muted); font-size: 12px; white-space: nowrap; }
-.desk-update { display: flex; align-items: center; gap: 12px; padding: 10px 32px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
-.desk-update p { flex: 1; min-width: 0; margin: 0; color: var(--ink); font-size: 12px; line-height: 1.6; }
+.desk-update { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 32px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+.desk-update p { flex: 1 1 240px; min-width: 0; margin: 0; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .desk-update a { display: inline-flex; align-items: center; flex-shrink: 0; text-decoration: none; white-space: nowrap; }
 .desk-update button { flex-shrink: 0; margin: 0; }
 .desk-state { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 36px; text-align: center; }

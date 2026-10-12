@@ -22,7 +22,7 @@ const props = defineProps({
 const emit = defineEmits(['open-workspace', 'start-session', 'edit-step'])
 const isDevelopment = import.meta.env.DEV
 // 网页版读不到直播间弹幕，要靠桌面端。找得到安装包才给入口；已经在桌面端里就不用再提。
-const desktopDownloads = ref({ windows: '', mac: '' })
+const desktopDownloads = ref({ windows: '', mac: '', android: '' })
 // 两个系统的安装包都有时，把正在用的这台电脑的那个放在显眼的位置。
 const onMac = /Macintosh|Mac OS X/.test(navigator.userAgent)
 const openingDesktop = ref(false)
@@ -228,6 +228,13 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         <p>{{ sessionStatus === 'DRAFT' ? '开始后配置会锁定，并进入直播工作台。' : sessionStatus === 'ENDED' ? '这一场已结束。' : '本场已开始，可在工作台管理播报。' }}</p>
         <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="!storeId || blockers.length > 0" @click="emit('start-session')">开始本场<ArrowRight :size="15" /></button>
         <button v-else-if="sessionStatus !== 'ENDED'" type="button" class="primary-button compact" :disabled="!storeId" @click="emit('open-workspace')">前往直播工作台<ArrowRight :size="15" /></button>
+      </div>
+      <div v-if="desktopDownloads.android" class="audio-desktop">
+        <div class="audio-desktop-head">
+          <div><strong>只用一台安卓手机开播<span>试用</span></strong><p>不用电脑：抖音在前台直播，一方志 App 在后台读弹幕、让 AI 用声音回答。商品、话术和问答仍在这里配置，App 只负责开播。目前只有安卓版，苹果手机装不了。</p></div>
+          <div class="audio-desktop-actions"><a class="primary-button compact" href="/app" target="_blank" rel="noopener">安卓版下载页</a></div>
+        </div>
+        <p class="audio-help">电脑上打开下载页会看到二维码，用手机扫；手机上打开就是下载按钮。只在少数手机上试过，读取弹幕用的不是抖音官方接口。</p>
       </div>
       <div v-if="desktopDownloads.windows || desktopDownloads.mac" class="audio-desktop">
         <div class="audio-desktop-head">

@@ -1,15 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { compareVersions, findDesktopUpdate, installedDesktop } from './desktopUpdate.js'
+import { compareVersions, findDesktopUpdate, installedDesktop, readLatestVersions } from './desktopUpdate.js'
 
 // The identification the desktop app sends, as seen on the live site.
 const agent = (system, version) => `Mozilla/5.0 (${system}) AppleWebKit/537.36 (KHTML, like Gecko) YifangzhiDesktop/${version} Chrome/152.0.7977.130 Electron/44.7.0 Safari/537.36`
 const WINDOWS = 'Windows NT 10.0; Win64; x64'
 const MAC = 'Macintosh; Intel Mac OS X 10_15_7'
+// The phone app adds its own name to the phone browser engine's identification.
+const PHONE = version => `Mozilla/5.0 (Linux; Android 15; ALI-AN00 Build/HONORALI-AN00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.6723.58 Mobile Safari/537.36 YifangzhiAndroid/${version}`
 const BROWSER = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36'
 const LATEST = {
   windows: { version: '0.1.3', url: '/downloads/yifangzhi-setup.exe' },
   mac: { version: '0.1.3', url: '/downloads/yifangzhi-mac.dmg' },
+  android: { version: '0.1.0', url: '/downloads/yifangzhi-android.apk' },
 }
 const site = (body, { ok = true, calls = [] } = {}) => async (url, options) => {
   calls.push({ url, cache: options?.cache })
@@ -19,6 +22,7 @@ const site = (body, { ok = true, calls = [] } = {}) => async (url, options) => {
 test('the installed version and system are read from the identification the app sends', () => {
   assert.deepEqual(installedDesktop(agent(WINDOWS, '0.1.1')), { version: '0.1.1', platform: 'windows' })
   assert.deepEqual(installedDesktop(agent(MAC, '0.1.2')), { version: '0.1.2', platform: 'mac' })
+  assert.deepEqual(installedDesktop(PHONE('0.0.4')), { version: '0.0.4', platform: 'android' })
   assert.equal(installedDesktop(BROWSER), null)
   assert.equal(installedDesktop(agent('X11; Linux x86_64', '0.1.2')), null)
   assert.equal(installedDesktop(''), null)
@@ -38,11 +42,15 @@ test('an older install is told about the newer version for its own system', asyn
   assert.deepEqual(await findDesktopUpdate({ userAgent: agent(WINDOWS, '0.1.1'), fetch: site(LATEST, { calls }) }), { version: '0.1.3', current: '0.1.1', platform: 'windows', url: '/downloads/yifangzhi-setup.exe' })
   assert.deepEqual(calls, [{ url: '/downloads/latest.json', cache: 'no-store' }])
   assert.deepEqual(await findDesktopUpdate({ userAgent: agent(MAC, '0.1.2'), fetch: site(LATEST) }), { version: '0.1.3', current: '0.1.2', platform: 'mac', url: '/downloads/yifangzhi-mac.dmg' })
+  assert.deepEqual(await findDesktopUpdate({ userAgent: PHONE('0.0.4'), fetch: site(LATEST) }), { version: '0.1.0', current: '0.0.4', platform: 'android', url: '/downloads/yifangzhi-android.apk' })
 })
 
 test('an install that is current, or ahead of what is published, is left alone', async () => {
   assert.equal(await findDesktopUpdate({ userAgent: agent(MAC, '0.1.3'), fetch: site(LATEST) }), null)
   assert.equal(await findDesktopUpdate({ userAgent: agent(MAC, '0.2.0'), fetch: site(LATEST) }), null)
+  assert.equal(await findDesktopUpdate({ userAgent: PHONE('0.1.0'), fetch: site(LATEST) }), null)
+  // The phone app is not told about desktop versions.
+  assert.equal(await findDesktopUpdate({ userAgent: PHONE('0.1.0'), fetch: site({ windows: LATEST.windows, mac: LATEST.mac }) }), null)
   // Each system has its own version: a newer Mac build says nothing about Windows.
   assert.equal(await findDesktopUpdate({ userAgent: agent(WINDOWS, '0.1.3'), fetch: site({ ...LATEST, mac: { version: '0.1.4', url: '/downloads/yifangzhi-mac.dmg' } }) }), null)
 })
@@ -70,4 +78,11 @@ test('the download must be a file in the site\'s own downloads folder', async ()
   for (const url of ['https://evil.example.com/setup.exe', '//evil.example.com/setup.exe', '/downloads/../api/x', '/downloads/a/b.exe', 'javascript:alert(1)', '/other/yifangzhi-setup.exe']) {
     assert.equal(await findDesktopUpdate({ ...from, fetch: site({ windows: { version: '0.1.3', url } }) }), null, url)
   }
+})
+
+test('the published versions can be read on their own, and a badly written entry does not hide the others', async () => {
+  assert.deepEqual(await readLatestVersions({ fetch: site(LATEST) }), LATEST)
+  assert.deepEqual(await readLatestVersions({ fetch: site({ ...LATEST, mac: { version: 'next', url: '/downloads/yifangzhi-mac.dmg' }, android: { version: '0.1.0', url: 'https://evil.example.com/a.apk' }, ios: { version: '1.0', url: '/downloads/x.ipa' } }) }), { windows: LATEST.windows })
+  assert.deepEqual(await readLatestVersions({ fetch: site(LATEST, { ok: false }) }), {})
+  assert.deepEqual(await readLatestVersions({ fetch: async () => { throw new Error('offline') } }), {})
 })
