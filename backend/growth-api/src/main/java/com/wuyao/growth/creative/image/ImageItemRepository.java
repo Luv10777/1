@@ -5,6 +5,8 @@ import jakarta.persistence.LockModeType;
 import java.util.*;
 
 public interface ImageItemRepository extends JpaRepository<ImageItem,Long> {
+ @Query("select i.creationId from ImageItem i where i.id=:id")
+ Optional<Long> creationId(Long id);
  List<ImageItem> findByCreationIdOrderByOrdinal(Long id);
  Page<ImageItem> findByStatusAndOutputKeyIsNotNullOrderByIdDesc(String status, Pageable page);
  @Query(value="select c.reference_hash, i.image_hash from image_items i "

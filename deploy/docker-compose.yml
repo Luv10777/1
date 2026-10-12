@@ -79,6 +79,16 @@ services:
       WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
       WECHAT_CALLBACK_URL: ${WECHAT_CALLBACK_URL:-}
       WECHAT_FRONTEND_LOGIN_PATH: ${WECHAT_FRONTEND_LOGIN_PATH:-/login}
+      BILLING_OPERATOR_USER_IDS: ${BILLING_OPERATOR_USER_IDS:-}
+      WECHAT_PAY_APP_ID: ${WECHAT_PAY_APP_ID:-}
+      WECHAT_PAY_MERCHANT_ID: ${WECHAT_PAY_MERCHANT_ID:-}
+      WECHAT_PAY_MERCHANT_SERIAL: ${WECHAT_PAY_MERCHANT_SERIAL:-}
+      WECHAT_PAY_PRIVATE_KEY_PATH: ${WECHAT_PAY_PRIVATE_KEY_PATH:-}
+      WECHAT_PAY_API_V3_KEY: ${WECHAT_PAY_API_V3_KEY:-}
+      WECHAT_PAY_PLATFORM_KEY_ID: ${WECHAT_PAY_PLATFORM_KEY_ID:-}
+      WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH: ${WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH:-}
+      WECHAT_PAY_NOTIFY_URL: ${WECHAT_PAY_NOTIFY_URL:-}
+      SPRING_CONFIG_ADDITIONAL_LOCATION: ${SPRING_CONFIG_ADDITIONAL_LOCATION:-}
       APP_ARGS: >-
         --spring.datasource.url=jdbc:postgresql://postgres:5432/${DB_NAME}
         --spring.datasource.username=${DB_APP_USER}
@@ -95,6 +105,8 @@ services:
         --growth.storage.bucket=${MINIO_BUCKET}
         --growth.cors.allowed-origins=${CORS_ORIGINS}
         --growth.worker.enabled=false
+    volumes:
+      - ${BILLING_CONFIG_DIR:-./billing-config}:/etc/wuyao:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
@@ -115,6 +127,16 @@ services:
       WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
       WECHAT_CALLBACK_URL: ${WECHAT_CALLBACK_URL:-}
       WECHAT_FRONTEND_LOGIN_PATH: ${WECHAT_FRONTEND_LOGIN_PATH:-/login}
+      BILLING_OPERATOR_USER_IDS: ${BILLING_OPERATOR_USER_IDS:-}
+      WECHAT_PAY_APP_ID: ${WECHAT_PAY_APP_ID:-}
+      WECHAT_PAY_MERCHANT_ID: ${WECHAT_PAY_MERCHANT_ID:-}
+      WECHAT_PAY_MERCHANT_SERIAL: ${WECHAT_PAY_MERCHANT_SERIAL:-}
+      WECHAT_PAY_PRIVATE_KEY_PATH: ${WECHAT_PAY_PRIVATE_KEY_PATH:-}
+      WECHAT_PAY_API_V3_KEY: ${WECHAT_PAY_API_V3_KEY:-}
+      WECHAT_PAY_PLATFORM_KEY_ID: ${WECHAT_PAY_PLATFORM_KEY_ID:-}
+      WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH: ${WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH:-}
+      WECHAT_PAY_NOTIFY_URL: ${WECHAT_PAY_NOTIFY_URL:-}
+      SPRING_CONFIG_ADDITIONAL_LOCATION: ${SPRING_CONFIG_ADDITIONAL_LOCATION:-}
       APP_ARGS: >-
         --spring.datasource.url=jdbc:postgresql://postgres:5432/${DB_NAME}
         --spring.datasource.username=${DB_APP_USER}
@@ -130,6 +152,8 @@ services:
         --growth.worker.enabled=true
         --growth.worker.queues=DEFAULT,IMAGE,VIDEO,LIVE
         --server.port=8090
+    volumes:
+      - ${BILLING_CONFIG_DIR:-./billing-config}:/etc/wuyao:ro
 
   web:
     build:

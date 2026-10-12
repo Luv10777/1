@@ -1,4 +1,6 @@
 import { get, post } from '../utils/request'
+export const getVideoQuote = data => post('/api/video/quote', data)
+export const submitVideoQuote = (data, quoteId) => post('/api/video/workflows', { ...data, quoteId })
 
 export const videoApi = {
   create: data => post('/api/video/workflows', data),

@@ -8,6 +8,7 @@ import java.time.Instant;
 
 @Entity @Table(name="image_creations") @Getter @Setter
 public class ImageCreation {
+ private int billingRound;
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @Column(nullable=false) private Long tenantId;
  @Column(nullable=false,length=80) private String requestKey;
@@ -23,5 +24,6 @@ public class ImageCreation {
  @Column(nullable=false) private boolean concurrencyPermitHeld;
  @Column(columnDefinition="text") private String error;
  private Long taskId;
+ @Column(length=36) private String billingReservationId;
  @Column(nullable=false) private Instant createdAt=Instant.now();
 }

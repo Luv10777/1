@@ -22,7 +22,13 @@ public final class VideoDtos {
             @NotBlank @Pattern(regexp = "SEEDANCE_2_5|SEEDANCE_2_0|SEEDANCE_2_0_MINI|SEEDANCE_2_0_FAST") String model,
             @NotBlank @Pattern(regexp = "auto|16:9|4:3|1:1|3:4|9:16|21:9") String ratio,
             @Min(5) @Max(30) int durationSeconds,
-            @NotBlank @Pattern(regexp = "480p|720p|1080p|4K") String resolution) {}
+            @NotBlank @Pattern(regexp = "480p|720p|1080p|4K") String resolution,
+            @Pattern(regexp = "[a-f0-9]{64}") String quoteId) {
+        public Create(String requestKey, String prompt, List<Long> references, Long videoReference,
+                      String model, String ratio, int seconds, String resolution) {
+            this(requestKey, prompt, references, videoReference, model, ratio, seconds, resolution, null);
+        }
+    }
 
     public record Capability(
             String id,
@@ -35,7 +41,7 @@ public final class VideoDtos {
 
     public record Reference(Long assetId, String name, String url) {}
 
-    public record Retry(@NotNull @Positive Long taskId) {}
+    public record Retry(@NotNull @Positive Long taskId, @Pattern(regexp = "[a-f0-9]{64}") String quoteId) {}
 
     public record View(
             Long id,
@@ -65,5 +71,7 @@ public final class VideoDtos {
             String retryHint,
             Integer actualWidth,
             Integer actualHeight,
-            Integer actualDurationMs) {}
+            Integer actualDurationMs,
+            com.wuyao.growth.billing.VideoPricingService.Quote billingQuote,
+            Long chargedCredits) {}
 }

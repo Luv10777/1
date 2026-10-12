@@ -30,6 +30,7 @@ class VideoWorkflowRetryTest {
     private final ObjectStorage storage = mock(ObjectStorage.class);
     private final TaskService tasks = mock(TaskService.class);
     private final TenantRateLimiter limiter = mock(TenantRateLimiter.class);
+    private final com.wuyao.growth.billing.VideoPricingService pricing = mock(com.wuyao.growth.billing.VideoPricingService.class);
     private VideoWorkflowService service;
     private VideoWorkflow workflow;
     private VideoProviderJob job;
@@ -41,13 +42,15 @@ class VideoWorkflowRetryTest {
         TenantContext.set(7L);
         service = new VideoWorkflowService(workflows, jobs, assets, mock(AssetService.class), storage, tasks,
                 new ObjectMapper(), limiter, mock(HttpClient.class), mock(VideoMediaProbe.class),
-                mock(com.wuyao.growth.common.metrics.VideoMetrics.class));
+                mock(com.wuyao.growth.common.metrics.VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), pricing);
+        when(pricing.requireApproved(any(),any())).thenReturn(com.wuyao.growth.billing.BillingTestFixtures.quote());
         ReflectionTestUtils.setField(service, "maxDurationSeconds", 7200L);
         ReflectionTestUtils.setField(service, "tenantMaxConcurrent", 2);
         ReflectionTestUtils.setField(service, "globalMaxConcurrent", 20);
         ReflectionTestUtils.setField(service, "concurrencyPermitTtlSeconds", 21600L);
         workflow = new VideoWorkflow();
         workflow.setId(42L);
+        workflow.setBillingQuote(com.wuyao.growth.billing.BillingTestFixtures.quote());
         workflow.setTenantId(7L);
         workflow.setTaskId(8L);
         workflow.setRequest(new VideoDtos.Create("retry-video-42", "旋转", List.of(), null,
@@ -95,7 +98,7 @@ class VideoWorkflowRetryTest {
         workflow.setProviderResultUrl("https://expired.example/video");
         assertThat(service.get(42L).retryMayCharge()).isFalse();
 
-        var result = service.retry(42L, 8L, 9L);
+        var result = service.retry(42L, 8L, 9L, "a".repeat(64));
 
         assertThat(result.status()).isEqualTo("GENERATING");
         assertThat(result.taskId()).isEqualTo(100L);
@@ -117,7 +120,7 @@ class VideoWorkflowRetryTest {
     @ValueSource(strings = {"SUCCEEDED", "CANCELLED", "QUEUED", "SUBMITTING", "GENERATING", "IMPORTING", "QA"})
     void successfulCanceledAndActiveWorkflowsCannotBeRetried(String status) {
         workflow.setStatus(status);
-        assertThatThrownBy(() -> service.retry(42L, 8L, 9L)).isInstanceOf(BizException.class).hasMessageContaining("不允许重试");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 9L, "a".repeat(64))).isInstanceOf(BizException.class).hasMessageContaining("不允许重试");
         verifyNoInteractions(limiter);
         verify(tasks, never()).submit(anyString(), anyString(), anyMap(), anyString(), any());
     }
@@ -128,7 +131,7 @@ class VideoWorkflowRetryTest {
     void permanentAndUnclassifiedFailuresCannotSpendMoreProviderQuota(String code) {
         workflow.setErrorCode(code);
         assertThat(service.get(42L).retryable()).isFalse();
-        assertThatThrownBy(() -> service.retry(42L, 8L, 9L)).isInstanceOf(BizException.class);
+        assertThatThrownBy(() -> service.retry(42L, 8L, 9L, "a".repeat(64))).isInstanceOf(BizException.class);
         verifyNoInteractions(limiter);
         verify(tasks, never()).submit(anyString(), anyString(), anyMap(), anyString(), any());
     }
@@ -146,7 +149,7 @@ class VideoWorkflowRetryTest {
         assertThat(before.retryMayCharge()).isTrue();
         assertThat(before.retryHint()).contains("可能再次计费");
 
-        var result = service.retry(42L, 8L, 9L);
+        var result = service.retry(42L, 8L, 9L, "a".repeat(64));
 
         assertThat(result.status()).isEqualTo("QUEUED");
         assertThat(workflow.getSubmissionGeneration()).isEqualTo(1);
@@ -163,7 +166,7 @@ class VideoWorkflowRetryTest {
         workflow.setErrorCode("VIDEO_PROVIDER_FAILED");
         workflow.setProviderStatus("FAILED");
         when(jobs.findByWorkflowIdAndProviderJobId(42L, "job-42")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.retry(42L, 8L, 9L)).isInstanceOf(BizException.class).hasMessageContaining("核对原任务");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 9L, "a".repeat(64))).isInstanceOf(BizException.class).hasMessageContaining("核对原任务");
         verifyNoInteractions(limiter);
     }
 
@@ -174,7 +177,7 @@ class VideoWorkflowRetryTest {
         workflow.setProviderSubmitStartedAt(Instant.now());
         workflow.setProviderSubmitBody("exact original bytes");
         assertThat(service.get(42L).retryHint()).contains("避免重复计费");
-        assertThatThrownBy(() -> service.retry(42L, 8L, 9L)).isInstanceOf(BizException.class).hasMessageContaining("提交结果尚未确认");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 9L, "a".repeat(64))).isInstanceOf(BizException.class).hasMessageContaining("提交结果尚未确认");
         assertThat(workflow.getProviderSubmitBody()).isEqualTo("exact original bytes");
         verifyNoInteractions(limiter);
         verify(tasks, never()).submit(anyString(), anyString(), anyMap(), anyString(), any());
@@ -185,7 +188,7 @@ class VideoWorkflowRetryTest {
         workflow.setProviderJobId(null);
         workflow.setErrorCode("VIDEO_TIMEOUT");
         workflow.setProviderSubmitRequest(Map.of("prompt", "old candidate"));
-        service.retry(42L, 8L, 9L);
+        service.retry(42L, 8L, 9L, "a".repeat(64));
         assertThat(workflow.getProviderSubmitRequest()).isNull();
         assertThat(workflow.getSubmissionGeneration()).isZero();
         assertThat(VideoWorkflowService.submissionKey(workflow)).isEqualTo("video-42-submit");
@@ -203,7 +206,7 @@ class VideoWorkflowRetryTest {
         assertThat(service.get(42L).status()).isEqualTo("INTERRUPTED");
         assertThat(service.get(42L).outputUrl()).isNull();
 
-        var result = service.retry(42L, 8L, 9L);
+        var result = service.retry(42L, 8L, 9L, "a".repeat(64));
 
         assertThat(result.status()).isEqualTo("QA");
         assertThat(workflow.getOutputStorageKey()).isEqualTo("t7/generated-video/42/output.mp4");
@@ -214,7 +217,7 @@ class VideoWorkflowRetryTest {
 
     @Test
     void aStaleTaskIdDoesNotMutateStateAcquireOrEnqueue() {
-        assertThat(service.retry(42L, 1L, 9L).taskId()).isEqualTo(8L);
+        assertThat(service.retry(42L, 1L, 9L, "a".repeat(64)).taskId()).isEqualTo(8L);
         assertThat(workflow.getRetryRound()).isZero();
         verifyNoInteractions(limiter);
         verify(tasks, never()).submit(anyString(), anyString(), anyMap(), anyString(), any());
@@ -223,7 +226,7 @@ class VideoWorkflowRetryTest {
     @Test
     void enqueueFailureReleasesTheNewPermitOnRollback() {
         when(tasks.submit(anyString(), anyString(), anyMap(), anyString(), any())).thenThrow(new IllegalStateException("enqueue failed"));
-        assertThatThrownBy(() -> service.retry(42L, 8L, 9L)).hasMessage("enqueue failed");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 9L, "a".repeat(64))).hasMessage("enqueue failed");
         verify(limiter, never()).releaseVideoGeneration(anyLong());
         complete(TransactionSynchronization.STATUS_ROLLED_BACK);
         verify(limiter).releaseVideoGeneration(7L);
@@ -232,7 +235,7 @@ class VideoWorkflowRetryTest {
     @Test
     void retryRefusesToAcquireAPermitOutsideATransaction() {
         TransactionSynchronizationManager.setActualTransactionActive(false);
-        assertThatThrownBy(() -> service.retry(42L, 8L, 9L)).hasMessage("视频并发许可必须在事务中申请");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 9L, "a".repeat(64))).hasMessage("视频并发许可必须在事务中申请");
         verifyNoInteractions(limiter);
     }
 
@@ -245,7 +248,7 @@ class VideoWorkflowRetryTest {
         when(assets.findById(99L)).thenReturn(Optional.of(output));
         doThrow(new IllegalStateException("storage offline")).when(storage).delete(anyString());
 
-        service.retry(42L, 8L, 9L);
+        service.retry(42L, 8L, 9L, "a".repeat(64));
 
         assertThat(output.getStatus()).isEqualTo("INVALID");
         assertThat(workflow.getOutputAssetId()).isNull();
@@ -256,7 +259,7 @@ class VideoWorkflowRetryTest {
 
     @Test
     void anOldAttemptCannotFailAResumedWorkflowOrReleaseItsPermit() {
-        service.retry(42L, 8L, 9L);
+        service.retry(42L, 8L, 9L, "a".repeat(64));
         Task old = new Task();
         old.setId(8L);
         when(tasks.ownsExecution(old)).thenReturn(true);
@@ -291,7 +294,7 @@ class VideoWorkflowRetryTest {
 
     @Test
     void aStaleImportDeletesOnlyItsUnpublishedObject() {
-        service.retry(42L, 8L, 9L);
+        service.retry(42L, 8L, 9L, "a".repeat(64));
         Task old = new Task();
         old.setId(8L);
         when(tasks.ownsExecution(old)).thenReturn(false);

@@ -172,6 +172,21 @@ growth:
       seedance-2-0-mini: ${VIDEO_MODEL_SEEDANCE_2_0_MINI:doubao-seedance-2-0-mini-260615}
       seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:doubao-seedance-2-0-fast-260128}
     poll-seconds: ${VIDEO_POLL_SECONDS:15}
+  billing:
+    payment-method: WECHAT
+    operator-user-ids: ${BILLING_OPERATOR_USER_IDS:}
+    wechat:
+      app-id: ${WECHAT_PAY_APP_ID:}
+      merchant-id: ${WECHAT_PAY_MERCHANT_ID:}
+      merchant-serial: ${WECHAT_PAY_MERCHANT_SERIAL:}
+      private-key-path: ${WECHAT_PAY_PRIVATE_KEY_PATH:}
+      api-v3-key: ${WECHAT_PAY_API_V3_KEY:}
+      platform-key-id: ${WECHAT_PAY_PLATFORM_KEY_ID:}
+      platform-public-key-path: ${WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH:}
+      notify-url: ${WECHAT_PAY_NOTIFY_URL:}
+    video:
+      # Supply verified rates through an external Spring YAML file. No default commercial rate.
+      rates: []
   http:
     server-protocol: ${SERVER_PROTOCOL:}
     max-total: ${HTTP_MAX_TOTAL:200}

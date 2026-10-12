@@ -163,7 +163,7 @@ class ImageDownloadHandlerTest {
             assertThat(handler.handle(task)).containsEntry("status", "DOWNLOADED");
             assertThat(request.get(5, TimeUnit.SECONDS)).startsWith("GET /result.png ").doesNotContain("Authorization");
             verify(storage).put(eq("t2/generated/8/0/background.png"), any(byte[].class), eq("image/png"));
-            verify(service).markImagePersisted(8L, "t2/generated/8/0/background.png", 48, 32, null);
+            verify(service).markImagePersisted(8L, task, "t2/generated/8/0/background.png", 48, 32, null);
         }
     }
 }

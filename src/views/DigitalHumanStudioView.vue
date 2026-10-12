@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import { useDigitalHumanVideo } from '../composables/useDigitalHumanVideo'
@@ -7,6 +7,7 @@ import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
 import { get } from '../utils/request'
 import { assets as platformAssets, assetSource } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel } from '../services/videoConversations'
+import { billing, number, refreshBilling } from '../stores/billing'
 
 const avatarInput = ref(null)
 const assetsInput = ref(null)
@@ -31,7 +32,9 @@ const duration = ref(10)
 const ratio = ref('auto')
 const selectedModel = ref('SEEDANCE_2_5')
 const resolution = ref('720p')
-const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, start } = useDigitalHumanVideo()
+const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, quoted, quoting, estimate, confirmQuote, closeQuote } = useDigitalHumanVideo()
+const priceDialog = ref(null)
+watch(quoted, async value => { await nextTick(); if (value) priceDialog.value?.showModal(); else priceDialog.value?.close() })
 const notice = ref('')
 const showAllAvatars = ref(false)
 const router = useRouter()
@@ -208,7 +211,8 @@ const generate = () => {
       images: [productFile.value, packageFile.value, ...extraImages.value].filter(Boolean),
       videos: referenceVideos.value, voices: [voiceFile.value, ...extraVoices.value].filter(Boolean),
       model: selectedModel.value, ratio: ratio.value, durationSeconds: duration.value, resolution: resolution.value })
-    start(input)
+    estimate(input)
+    refreshBilling()
   } catch (error) {
     notice.value = error.message
   }
@@ -242,7 +246,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           <section class="dh-form-section dh-copy-section"><div class="dh-section-heading"><div><h2>描述内容</h2></div><span class="dh-counter">{{ script.length }}/500</span></div><div class="dh-textarea-shell"><textarea v-model="script" maxlength="500" placeholder="输入视频文案或商品描述，例如：今天给大家分享一款适合敏感肌的春日精华，轻薄好吸收，换季也能保持水润光泽。" /></div></section>
           <section class="dh-form-section dh-setting-section"><div class="dh-section-heading"><div><h2>模型与输出</h2></div><span class="dh-section-note">{{ currentModel.label }} · {{ materialLimitLabel }}</span></div><div class="video-model-grid dh-model-grid"><button v-for="model in videoModels" :key="model.id" type="button" :class="{ selected: selectedModel === model.id }" @click="selectModel(model.id)"><strong>{{ model.label }}</strong></button></div><label class="video-ratio-select dh-ratio-select"><span class="video-setting-label">画面比例</span><select v-model="ratio" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select></label><div class="dh-setting-row dh-duration-setting"><span>视频时长</span><strong>{{ duration }} 秒</strong></div><input v-model.number="duration" class="video-duration-range" type="range" min="5" :max="currentModel.maxDurationSeconds" step="1"><div class="video-range-meta flex justify-between"><span>5s</span><span>{{ currentModel.maxDurationSeconds }}s</span></div><div class="dh-setting-row dh-resolution-setting"><span>分辨率</span><div class="video-resolution-grid"><button v-for="item in availableResolutions" :key="item" type="button" :class="{ selected: resolution === item }" @click="resolution = item">{{ item }}</button></div></div></section>
         </fieldset>
-        <div class="dh-form-footer"><button class="dh-generate-button" type="button" :disabled="isGenerating" @click="generate"><span>{{ isGenerating ? '正在生成…' : previewStarted ? '再次生成' : '立即生成' }}</span><span class="material-symbols-outlined">arrow_forward</span></button><p v-if="notice || videoNotice" class="dh-notice" :class="{ 'is-error': videoError }" role="status">{{ notice || videoNotice }}</p><small>预计消耗 12 算力 · 约 1–2 分钟完成</small></div>
+        <div class="dh-form-footer"><button class="dh-generate-button" type="button" :disabled="isGenerating || quoting" @click="generate"><span>{{ isGenerating ? '正在生成…' : quoting ? '正在预估费用…' : '预估费用并生成' }}</span><span class="material-symbols-outlined">arrow_forward</span></button><p v-if="notice || videoNotice" class="dh-notice" :class="{ 'is-error': videoError }" role="status">{{ notice || videoNotice }}</p><small>按所选模型、分辨率与时长预估烟火，确认后开始生成。</small></div>
       </aside>
 
       <VideoPreviewPanel
@@ -269,6 +273,9 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         </div>
         <div class="dh-preview-intro"><h2>上传模特与商品素材，<br><em>智能生成口播带货视频</em></h2><p>快去左侧创建你的灵感吧～</p></div><div class="dh-banner" :class="ratio === '9:16' ? 'banner-portrait' : 'banner-landscape'"><div class="dh-banner-image dh-banner-person"><img :src="avatarFile?.url || digitalHumanAvatars[0].image" alt="数字人示例"><span class="dh-banner-tag">数字人出镜</span></div><div class="dh-banner-image dh-banner-product"><img :src="packageFile?.url || productFile?.url || mockProduct" alt="商品示例"><span class="dh-banner-tag">商品卖点</span></div><div class="dh-banner-glow" /></div><div class="dh-inspiration"><div class="dh-inspiration-heading"><div><h3>没有灵感？试试方志原创数字人形象</h3></div><button type="button" @click="showAllAvatars = true">查看全部 <span class="material-symbols-outlined">arrow_forward</span></button></div><div class="dh-inspiration-grid"><button v-for="item in digitalHumanAvatars.slice(0, 4)" :key="item.id" class="dh-inspiration-card" type="button" @click="selectLibraryAsset('avatar', item)"><span class="dh-inspiration-thumb"><img :src="item.image" :alt="item.label"></span><span><strong>{{ item.label }}</strong><small>{{ item.name }}</small></span></button></div></div></section>
     </main>
+    <dialog ref="priceDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="dh-price-title" @cancel.prevent="closeQuote">
+      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" width="32" height="32" alt=""><h2 id="dh-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="isGenerating" @click="closeQuote">×</button></header><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount">{{ number(quoted.quote.credits) }}<small> 烟火</small></p><p class="yanhuo-note">{{ quoted.quote.message }}</p><p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p><p class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</p><button class="yanhuo-primary" type="button" :disabled="isGenerating || !billing.summary?.memberActive || !billing.summary?.plan?.videoEnabled || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink><p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p></template>
+    </dialog>
     <Transition name="dh-avatar-modal" appear>
       <div v-if="showAllAvatars" class="dh-avatar-modal" role="dialog" aria-modal="true" aria-label="全部数字人形象" @click.self="showAllAvatars = false">
         <Transition name="dh-avatar-modal-card" appear>

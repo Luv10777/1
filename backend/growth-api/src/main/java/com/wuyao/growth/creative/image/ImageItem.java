@@ -9,6 +9,7 @@ import java.util.Map;
 
 @Entity @Table(name="image_items") @Getter @Setter
 public class ImageItem {
+ @Column(nullable=false) private boolean billingHeld;
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @Column(nullable=false) private Long tenantId;
  @Column(nullable=false) private Long creationId;

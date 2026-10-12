@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { isVideoInProgress, videoCompletionNotice } from '../services/videoConversations'
-import { videoApi, uploadVideoReference } from '../services/videoWorkflow'
+import { getVideoQuote, videoApi, uploadVideoReference } from '../services/videoWorkflow'
+import { refreshBilling } from '../stores/billing'
 
 export function useDigitalHumanVideo() {
   const workflow = ref(null)
@@ -8,6 +9,9 @@ export function useDigitalHumanVideo() {
   const previewStarted = ref(false)
   const submittedForm = ref(null)
   const error = ref('')
+  const quoted = ref(null)
+  const quoting = ref(false)
+  let quotedInput = null
   const isGenerating = computed(() => submitting.value || isVideoInProgress(workflow.value))
   const outputUrl = computed(() => workflow.value?.outputUrl || '')
   const stageLabel = computed(() => submitting.value ? '正在提交创作' : ({ SUBMIT: '正在提交创作', POLL: '画面渲染中', IMPORT: '正在保存成片', QA: '正在检查成片' }[workflow.value?.stage] || '画面渲染中'))
@@ -19,6 +23,7 @@ export function useDigitalHumanVideo() {
 
   const updateWorkflow = result => {
     workflow.value = result
+    refreshBilling()
     error.value = ['FAILED', 'CANCELLED'].includes(result.status) ? result.error || '视频生成失败，请稍后重试。' : ''
   }
   const schedulePoll = () => {
@@ -36,9 +41,26 @@ export function useDigitalHumanVideo() {
     }
     if (isVideoInProgress(workflow.value)) schedulePoll()
   }
-  const start = async input => {
+  const estimate = async input => {
+    if (isGenerating.value || quoting.value || disposed) return
+    quoting.value = true; error.value = ''; quoted.value = null
+    try {
+      const imageIds = await Promise.all(input.images.map(entry => uploadVideoReference(entry, 'IMAGE')))
+      const videoId = input.video ? await uploadVideoReference(input.video, 'VIDEO') : null
+      const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetId: videoId,
+        model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution }
+      const signature = JSON.stringify(payload)
+      if (!requestKey || payloadSignature !== signature || workflow.value) requestKey = `video-${crypto.randomUUID()}`
+      payloadSignature = signature
+      const result = await getVideoQuote({ requestKey, ...payload })
+      if (!disposed) { quoted.value = { quote: result, requestKey, signature }; quotedInput = input }
+      return result
+    } catch (failure) { if (!disposed) error.value = failure.message || '费用暂时无法预估' }
+    finally { quoting.value = false }
+  }
+  const start = async (input, approval) => {
     if (isGenerating.value || disposed) return
-    const previousWorkflow = workflow.value
+    if (!approval?.quote.available || !approval.quote.quoteId) { error.value = '请先预估并确认视频费用'; return }
     window.clearTimeout(timer)
     submitting.value = true
     previewStarted.value = true
@@ -52,10 +74,11 @@ export function useDigitalHumanVideo() {
       const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetId: videoId,
         model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution }
       const signature = JSON.stringify(payload)
-      // Reuse the key after an uncertain submission; a known completed task starts a new generation.
-      if (!requestKey || payloadSignature !== signature || previousWorkflow) requestKey = `video-${crypto.randomUUID()}`
+      // The approved key is also reused after an uncertain submission.
+      if (approval.signature !== signature) throw new Error('配置已变化，请重新预估费用')
+      requestKey = approval.requestKey
       payloadSignature = signature
-      const result = await videoApi.create({ requestKey, ...payload })
+      const result = await videoApi.create({ requestKey, ...payload, quoteId: approval.quote.quoteId })
       if (disposed) return
       updateWorkflow(result)
       if (isVideoInProgress(result)) schedulePoll()
@@ -65,6 +88,12 @@ export function useDigitalHumanVideo() {
       submitting.value = false
     }
   }
+  const confirmQuote = async () => {
+    if (!quoted.value?.quote.available || !quotedInput) return
+    await start(quotedInput, quoted.value)
+    if (workflow.value) quoted.value = null
+  }
+  const closeQuote = () => { if (!submitting.value) { quoted.value = null; quotedInput = null } }
   onBeforeUnmount(() => { disposed = true; window.clearTimeout(timer) })
-  return { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice, error, start }
+  return { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice, error, start, quoted, quoting, estimate, confirmQuote, closeQuote }
 }

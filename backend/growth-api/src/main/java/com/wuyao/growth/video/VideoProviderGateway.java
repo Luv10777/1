@@ -117,7 +117,11 @@ public class VideoProviderGateway {
         JsonNode response = send("GET", pollPath.replace("{jobId}", jobId), null, idempotencyKey);
         String status = normalizeStatus(firstText(response, "status", "state"));
         String url = "SUCCEEDED".equals(status) ? resolveContentUrl(jobId) : null;
-        return new PollResult(status, url, errorMessage(response));
+        JsonNode usage=response.path("usage");
+        if(usage.isMissingNode()) usage=response.path("data").path("usage");
+        Long tokens=usage.path("completion_tokens").asLong(0)>0?usage.path("completion_tokens").asLong():null;
+        if(tokens==null && usage.path("total_tokens").asLong(0)>0) tokens=usage.path("total_tokens").asLong();
+        return new PollResult(status, url, errorMessage(response),tokens);
     }
 
     public String providerName() { return providerName; }
@@ -276,7 +280,8 @@ public class VideoProviderGateway {
         return null;
     }
 
-    private String providerModel(String model) {
+    public String baseUrl() { return baseUrl; }
+    public String providerModel(String model) {
         return switch (model) {
             case "SEEDANCE_2_5" -> seedance25;
             case "SEEDANCE_2_0" -> seedance20;
@@ -299,5 +304,7 @@ public class VideoProviderGateway {
     private record RedirectResponse(int status, String location) {}
 
     public record SubmitResult(String provider, String providerJobId, String status) {}
-    public record PollResult(String status, String resultUrl, String error) {}
+    public record PollResult(String status, String resultUrl, String error, Long billingTokens) {
+        public PollResult(String status,String resultUrl,String error) { this(status,resultUrl,error,null); }
+    }
 }

@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, uploadLibraryImageReference, saveGeneratedImageToLibrary, downloadImage } from '../services/imageCreation'
 import { IMAGE_QUALITIES, POSTER_PURPOSE_GROUPS, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
+import { billing, refreshBilling } from '../stores/billing'
 
 export function useImageCreation(workflow) {
   const route = useRoute()
@@ -44,6 +45,7 @@ export function useImageCreation(workflow) {
   const owner = readUser()
   const pendingKey = 'image-pending:' + (owner?.userId || owner?.id || 'session') + ':' + workflow
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
+  const estimatedCredits = computed(() => (product.value ? Number(count.value) : 1) * 3)
   const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
   const supportsRatio = value => {
     const ratios = capabilities.value?.qualityRatios
@@ -96,6 +98,7 @@ export function useImageCreation(workflow) {
       if (current.value?.id !== result.id) workspaceTab.value = 'result'
       thread.value = versions
       current.value = result
+      refreshBilling()
       if (pollError) { error.value = ''; pollError = false }
       const waitingForStorage = versions.some(turn => turn.items?.some(item => item.providerImageUrl && !item.persisted && !item.downloadFailed))
       if (isImageActive(result.status) || waitingForStorage) pollTimer = setTimeout(() => load(id), waitingForStorage ? 5000 : 3000)
@@ -175,8 +178,8 @@ export function useImageCreation(workflow) {
     catch (e) {
       error.value = e.message
       // Business rejection is definitive; a network/server failure may have accepted the request.
-      if (typeof e.code === 'number' && e.code < 5000) persistPending(null)
-    } finally { busy.value = false }
+      if (typeof e.code === 'number' && (e.code < 5000 || (e.code >= 9001 && e.code <= 9006))) persistPending(null)
+    } finally { busy.value = false; refreshBilling() }
   }
   function generate() {
     if (active.value || (!configured.value && !pending.value)) return
@@ -334,6 +337,6 @@ export function useImageCreation(workflow) {
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
-    supportsQuality, loadCapabilities,
+    supportsQuality, loadCapabilities, billing, estimatedCredits,
   })
 }

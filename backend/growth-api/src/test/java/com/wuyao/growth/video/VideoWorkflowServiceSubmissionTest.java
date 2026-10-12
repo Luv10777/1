@@ -41,7 +41,7 @@ class VideoWorkflowServiceSubmissionTest {
         service = new VideoWorkflowService(workflows, mock(VideoProviderJobRepository.class),
                 mock(AssetRepository.class), mock(AssetService.class), mock(ObjectStorage.class), tasks,
                 json, mock(TenantRateLimiter.class), mock(HttpClient.class), mock(VideoMediaProbe.class),
-                mock(com.wuyao.growth.common.metrics.VideoMetrics.class));
+                mock(com.wuyao.growth.common.metrics.VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
         ReflectionTestUtils.setField(service, "maxDurationSeconds", 7200L);
         workflow = new VideoWorkflow();
         workflow.setId(42L);

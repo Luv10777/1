@@ -4,9 +4,16 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
+import { Wallet, ArrowUpRight } from 'lucide-vue-next'
+import { billing, number, refreshBilling } from '../stores/billing'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
 const route = useRoute()
+let billingTimer
+const reloadBalance = () => { if (document.visibilityState === 'visible') refreshBilling() }
+watch(() => [auth.user?.id, auth.tenantId], () => refreshBilling(), { immediate: true })
+onMounted(() => { billingTimer = setInterval(reloadBalance, 30000); window.addEventListener('focus', reloadBalance) })
+onBeforeUnmount(() => { clearInterval(billingTimer); window.removeEventListener('focus', reloadBalance) })
 const router = useRouter()
 const menuOpen = ref(false)
 const collapsed = ref(false)
@@ -32,7 +39,7 @@ const keyboard = (event) => {
 }
 onMounted(() => window.addEventListener('keydown', keyboard))
 onBeforeUnmount(() => window.removeEventListener('keydown', keyboard))
-watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll.value?.scrollTo({ top: 0 }) })
+watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll.value?.scrollTo({ top: 0 }); refreshBilling() })
 
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
 const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'auto_awesome', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
@@ -274,7 +281,13 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         </div>
       </nav>
 
-      <div class="sidebar-footer paper-sidebar-footer"><RouterLink to="/creative" class="sidebar-create-button" @click="closeMenu"><span>＋</span><span>新建创作任务</span></RouterLink><div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ userInitial }}</span><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div></div>
+      <div class="sidebar-footer paper-sidebar-footer">
+        <RouterLink :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
+          <Wallet :size="18" class="sidebar-yanhuo-icon" />
+          <div class="sidebar-yanhuo-copy"><div><span>可用烟火</span><ArrowUpRight :size="14" /></div><strong>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong><p>{{ billing.error ? '账户暂不可读' : billing.summary?.memberActive ? billing.summary.plan?.name : billing.summary?.plan ? '会员已到期' : '尚未开通会员' }}<span v-if="billing.summary?.held"> · 预占 {{ number(billing.summary.held) }}</span></p><span class="sidebar-yanhuo-action">套餐与充值</span></div>
+        </RouterLink>
+        <div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ userInitial }}</span><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+      </div>
     </aside>
     <main class="main-area paper-main">
       <header class="topbar paper-topbar"><div class="topbar-inner"><button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button><button class="icon-button desktop-collapse" :aria-label="collapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed">☰</button><RouterLink to="/dashboard" class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink><div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '工作台' }}</strong></div><div class="topbar-actions"><select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select><button class="topbar-search paper-search" type="button" aria-label="搜索页面" @click="searchOpen = true"><span>⌕</span><span class="topbar-search-label">搜索方志内容</span><kbd>⌘ K</kbd></button><ThemeToggle /><button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button><button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button><button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ userInitial }}</span><span class="top-account-name">{{ userName }}</span></button></div></div></header>

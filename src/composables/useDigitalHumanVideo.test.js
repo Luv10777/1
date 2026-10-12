@@ -6,10 +6,13 @@ import { createServer } from 'vite'
 const input = () => ({ prompt: '生成数字人口播视频', images: [{ assetId: 11 }], video: null,
   model: 'SEEDANCE_2_5', ratio: '9:16', durationSeconds: 10, resolution: '720p' })
 const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
+const approved = () => ({ quote: { available: true, quoteId: 'server-test-quote', credits: 17 }, requestKey: `video-${crypto.randomUUID()}`,
+  signature: JSON.stringify({ prompt: input().prompt, referenceImageAssetIds: [11], referenceVideoAssetId: null,
+    model: input().model, ratio: input().ratio, durationSeconds: input().durationSeconds, resolution: input().resolution }) })
 
 test('digital human task lifecycle follows the real video API', async t => {
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-dh-tests',
-    server: { middlewareMode: true, hmr: false }, appType: 'custom' })
+    server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true } })
   const originalFetch = globalThis.fetch
   const originalWindow = globalThis.window
   const timers = new Map()
@@ -38,10 +41,10 @@ test('digital human task lifecycle follows the real video API', async t => {
       }
       const { app, studio } = mount()
       try {
-        const pending = studio.start(input())
+        const pending = studio.start(input(), approved())
         assert.equal(studio.previewStarted.value, true)
         assert.equal(studio.isGenerating.value, true)
-        await studio.start(input())
+        await studio.start(input(), approved())
         await new Promise(resolve => setImmediate(resolve))
         assert.equal(posts.length, 1)
         assert.deepEqual(posts[0].referenceImageAssetIds, [11])
@@ -67,7 +70,7 @@ test('digital human task lifecycle follows the real video API', async t => {
       }
       const { app, studio } = mount()
       try {
-        await studio.start(input())
+        await studio.start(input(), approved())
         assert.equal(studio.isGenerating.value, false)
         assert.equal(studio.outputUrl.value, '/test/finished.mp4')
         assert.equal(studio.workflow.value.actualWidth, 720)
@@ -88,7 +91,7 @@ test('digital human task lifecycle follows the real video API', async t => {
       }
       const { app, studio } = mount()
       try {
-        await studio.start(input())
+        await studio.start(input(), approved())
         assert.equal(studio.isGenerating.value, true)
         const [id, callback] = timers.entries().next().value
         timers.delete(id)
@@ -109,15 +112,16 @@ test('digital human task lifecycle follows the real video API', async t => {
         return response({ id: 72, status: 'FAILED', error: '供应商拒绝任务' })
       }
       const { app, studio } = mount()
+      const approval = approved()
       try {
-        await studio.start(input())
+        await studio.start(input(), approval)
         assert.equal(studio.isGenerating.value, false)
         assert.match(studio.error.value, /网络中断/)
-        await studio.start(input())
+        await studio.start(input(), approval)
         assert.equal(posts[0].requestKey, posts[1].requestKey)
         assert.equal(studio.isGenerating.value, false)
         assert.equal(studio.error.value, '供应商拒绝任务')
-        await studio.start(input())
+        await studio.start(input(), approved())
         assert.notEqual(posts[1].requestKey, posts[2].requestKey)
       } finally { app.unmount() }
     })
@@ -128,7 +132,7 @@ test('digital human task lifecycle follows the real video API', async t => {
       }
       const { app, studio } = mount()
       try {
-        await studio.start(input())
+        await studio.start(input(), approved())
         assert.equal(studio.stageLabel.value, '正在保存成片')
         const [id, callback] = timers.entries().next().value
         timers.delete(id)
@@ -138,6 +142,50 @@ test('digital human task lifecycle follows the real video API', async t => {
         assert.equal(timers.size, 1)
       } finally { app.unmount() }
       assert.equal(timers.size, 0)
+    })
+    await t.test('requests a server quote before generation and submits exactly the approved quote', async () => {
+      const calls = []
+      globalThis.fetch = async (url, options) => {
+        const body = JSON.parse(options.body)
+        calls.push({ url, body })
+        if (url === '/api/video/quote') return response({ available: true, quoteId: 'verified-server-quote', credits: 29 })
+        return response({ id: 79, status: 'SUCCEEDED', chargedCredits: 27 })
+      }
+      const { app, studio } = mount()
+      try {
+        await studio.start(input())
+        assert.equal(calls.length, 0)
+        assert.match(studio.error.value, /先预估/)
+        await studio.estimate(input())
+        assert.equal(calls.length, 1)
+        assert.equal(calls[0].url, '/api/video/quote')
+        assert.equal(studio.previewStarted.value, false)
+        assert.equal(studio.quoted.value.quote.credits, 29)
+        await studio.confirmQuote()
+        assert.equal(calls.length, 2)
+        assert.equal(calls[1].url, '/api/video/workflows')
+        assert.equal(calls[1].body.quoteId, 'verified-server-quote')
+        assert.equal(calls[1].body.requestKey, calls[0].body.requestKey)
+        assert.equal(studio.workflow.value.chargedCredits, 27)
+        assert.equal(studio.quoted.value, null)
+      } finally { app.unmount() }
+    })
+    await t.test('unverified pricing and changed inputs cannot create a video', async () => {
+      const calls = []
+      globalThis.fetch = async url => {
+        calls.push(url)
+        return response({ available: false, message: '计价尚未核验' })
+      }
+      const { app, studio } = mount()
+      try {
+        await studio.estimate(input())
+        await studio.confirmQuote()
+        assert.deepEqual(calls, ['/api/video/quote'])
+        assert.equal(studio.workflow.value, null)
+        await studio.start({ ...input(), resolution: '1080p' }, approved())
+        assert.match(studio.error.value, /配置已变化/)
+        assert.deepEqual(calls, ['/api/video/quote'])
+      } finally { app.unmount() }
     })
   } finally {
     globalThis.fetch = originalFetch

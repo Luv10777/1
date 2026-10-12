@@ -60,7 +60,7 @@ public class ImageDownloadHandler implements TaskHandler {
             String imageHash = "POSTER".equals(creation.getRequest().workflow())
                 && (creation.getParentId() == null || creation.getVariation() != null)
                 ? ImageFingerprint.of(image) : null;
-            service.markImagePersisted(itemId, targetKey, image.getWidth(), image.getHeight(), imageHash);
+            service.markImagePersisted(itemId, task, targetKey, image.getWidth(), image.getHeight(), imageHash);
             log.info("图片下载完成: itemId={} key={} sizeBytes={}", itemId, targetKey, bytes.length);
             metrics.recordDownload((System.nanoTime() - started) / 1_000_000, "succeeded");
             return Map.of("status", "DOWNLOADED", "key", targetKey, "sizeBytes", bytes.length);

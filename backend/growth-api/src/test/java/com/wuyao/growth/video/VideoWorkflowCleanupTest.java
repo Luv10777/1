@@ -38,7 +38,7 @@ class VideoWorkflowCleanupTest {
         TenantContext.set(7L);
         service = new VideoWorkflowService(workflows, mock(VideoProviderJobRepository.class), assets, mock(AssetService.class),
                 storage, tasks, new ObjectMapper(), limiter, mock(HttpClient.class), probe,
-                mock(com.wuyao.growth.common.metrics.VideoMetrics.class));
+                mock(com.wuyao.growth.common.metrics.VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
         workflow = new VideoWorkflow();
         workflow.setId(42L);
         workflow.setTenantId(7L);
@@ -154,7 +154,7 @@ class VideoWorkflowCleanupTest {
         assertThat(asset.getStatus()).isEqualTo("READY");
         verify(storage, never()).delete(anyString());
         verify(assets, never()).saveAndFlush(any());
-        assertThatThrownBy(() -> service.retry(42L, 8L, 1L)).hasMessageContaining("已通过校验并交付");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 1L, null)).hasMessageContaining("已通过校验并交付");
     }
 
     @Test
@@ -188,7 +188,7 @@ class VideoWorkflowCleanupTest {
         service.markFailed(42L, "VIDEO_IMPORT_FAILED", "late failure");
         service.cleanupImportObject(42L, KEY);
         assertThat(workflow.getOutputStorageKey()).isEqualTo(KEY);
-        assertThatThrownBy(() -> service.retry(42L, 8L, 1L)).hasMessageContaining("已通过校验并交付");
+        assertThatThrownBy(() -> service.retry(42L, 8L, 1L, null)).hasMessageContaining("已通过校验并交付");
         verify(storage, never()).delete(anyString());
     }
 

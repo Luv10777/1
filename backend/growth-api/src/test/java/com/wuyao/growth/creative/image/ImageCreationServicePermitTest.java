@@ -74,6 +74,9 @@ class ImageCreationServicePermitTest {
             item.setId(100L + savedItems.size());
             savedItems.add(item);
             when(items.lock(item.getId())).thenReturn(Optional.of(item));
+            when(items.creationId(item.getId())).thenReturn(Optional.of(item.getCreationId()));
+            var creation=creations.findById(item.getCreationId());
+            when(creations.lock(item.getCreationId())).thenReturn(creation);
             return item;
         });
         when(items.findByCreationIdOrderByOrdinal(CREATION_ID)).thenReturn(savedItems);
@@ -95,7 +98,8 @@ class ImageCreationServicePermitTest {
         var gateway = mock(AiGateway.class);
         when(gateway.configured(any())).thenReturn(true);
         service = new ImageCreationService(creations, items, mock(AssetService.class), tasks,
-                mock(ObjectStorage.class), gateway, new ImageModelProperties(), new ObjectMapper(), limiter);
+                mock(ObjectStorage.class), gateway, new ImageModelProperties(), new ObjectMapper(), limiter,
+                mock(com.wuyao.growth.billing.BillingService.class));
         ReflectionTestUtils.setField(service, "tenantMaxConcurrent", 20);
         ReflectionTestUtils.setField(service, "globalMaxConcurrent", 200);
         TenantContext.set(TENANT_ID);
@@ -266,10 +270,12 @@ class ImageCreationServicePermitTest {
         when(creations.clearConcurrencyPermit(CREATION_ID)).thenReturn(1, 0);
         var item = savedItems.getFirst();
         item.setStatus("GENERATING");
+        var execution = new Task(); execution.setId(item.getTaskId());
+        when(tasks.ownsExecution(execution)).thenReturn(true);
         var key = "t41/generated/" + item.getId() + "/0/background.png";
 
         for (int attempt = 0; attempt < 2; attempt++) {
-            transactions.executeWithoutResult(status -> service.markImagePersisted(item.getId(), key, 1024, 1024, null));
+            transactions.executeWithoutResult(status -> service.markImagePersisted(item.getId(), execution, key, 1024, 1024, null));
         }
 
         assertReleased(1);

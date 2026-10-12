@@ -63,7 +63,7 @@ class VideoImportHandlerTest {
             }).when(storage).put(anyString(), any(java.io.InputStream.class), anyLong(), anyString());
         }
         var service = new VideoWorkflowService(workflows, mock(VideoProviderJobRepository.class), mock(AssetRepository.class),
-                mock(AssetService.class), storage, tasks, new ObjectMapper(), permits, http, mock(VideoMediaProbe.class), mock(VideoMetrics.class));
+                mock(AssetService.class), storage, tasks, new ObjectMapper(), permits, http, mock(VideoMediaProbe.class), mock(VideoMetrics.class), mock(com.wuyao.growth.billing.BillingService.class), mock(com.wuyao.growth.billing.VideoPricingService.class));
         ReflectionTestUtils.setField(service, "maxDurationSeconds", 7200L);
         ReflectionTestUtils.setField(service, "maxProviderBytes", 1024L);
         var handler = new VideoImportHandler(service, workflows);

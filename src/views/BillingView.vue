@@ -1,53 +1,213 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { billing } from '../stores/billing.js'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { ArrowDownLeft, ArrowUpRight, Check, CircleHelp, RefreshCw, Wallet, X } from 'lucide-vue-next'
+import QRCode from 'qrcode'
+import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
+import BillingPlanManager from '../components/BillingPlanManager.vue'
 
-const formatMoney = (minor) => minor === 0 ? '免费' : `¥${(minor / 100).toLocaleString('zh-CN')}/月`
-const planCards = computed(() => billing.plans.map((plan) => ({ ...plan, current: plan.id === billing.currentPlan.id })))
-const livePlans = [
-  { id: 'hourly', name: '按小时充值', price: '¥12', unit: '/ 小时', hours: '10 小时起充', desc: '偶尔开播、先试水的商家', perks: ['随充随用，永久有效', '标准话术引擎', '弹幕自动回复'] },
-  { id: 'month', name: '月卡', price: '¥399', unit: '/ 月', hours: '含 60 小时', desc: '每天固定时段开播', perks: ['单价低至 ¥6.6/小时', '多音色轮换', '知识库 500 条', '优先算力队列'] },
-  { id: 'quarter', name: '季卡', price: '¥1,059', unit: '/ 季', hours: '含 210 小时', desc: '多门店、长时段无人播', perks: ['单价低至 ¥5.0/小时', '全部月卡权益', '知识库不限条数', '专属运营顾问'] },
-]
-const comparedLivePlan = ref(null)
-const plannedDailyHours = ref(6)
-const estimatedMonthlyHours = computed(() => plannedDailyHours.value * 30)
-const meters = [
-  { code: 'AI_IMAGE', label: '图片生成', unit: '张', color: 'cinnabar' },
-  { code: 'AI_VIDEO', label: '视频任务', unit: '条', color: 'cyan' },
-  { code: 'STORES', label: '门店数', unit: '家', color: 'amber' },
-  { code: 'AUTOMATION', label: '自动化流程', unit: '条', color: 'green' },
-]
+const route = useRoute()
+const account = computed(() => billing.summary)
+const amount = ref(50)
+const preset = [10, 50, 100, 300]
+const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= 1 && amount.value <= 100000)
+const topupCredits = computed(() => validAmount.value ? amount.value * (account.value?.creditsPerYuan || 10) : 0)
+const busy = ref(false)
+const error = ref('')
+const plansError = ref('')
+const recordsError = ref('')
+const tab = ref('ledger')
+const ledger = ref([])
+const orders = ref([])
+const pages = ref({ ledger: 0, orders: 0 })
+const hasMore = ref({ ledger: false, orders: false })
+const recordsLoading = ref(false)
+const payment = ref(null)
+const qr = ref('')
+const paymentError = ref('')
+const paymentLoading = ref(false)
+const paymentDialog = ref(null)
+const topupInput = ref(null)
+const refreshButton = ref(null)
+let paymentTimer
+let balanceTimer
+let disposed = false
+let qrVersion = 0
+const keys = new Map()
+const labels = { PENDING_PAYMENT: '待支付', PAID: '已到账', CANCELLED: '已取消', EXPIRED: '已过期' }
+const entryLabels = { RESERVE: '预占', CAPTURE: '消耗', RELEASE: '退回', GRANT: '赠送', PURCHASE: '充值' }
+const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期' : '尚未开通会员')
+const canPay = computed(() => account.value?.canManage && account.value?.payment.available && !billing.error && !busy.value)
+const keyFor = (key) => {
+  if (!keys.has(key)) keys.set(key, 'billing-' + crypto.randomUUID())
+  return keys.get(key)
+}
+const reloadPlans = async () => {
+  try { await loadBillingPlans(); plansError.value = '' }
+  catch (e) { plansError.value = e.message || '套餐暂时无法读取' }
+}
+const loadRecords = async (more = false) => {
+  if (recordsLoading.value) return
+  const kind = tab.value
+  recordsLoading.value = true
+  recordsError.value = ''
+  const page = more ? pages.value[kind] + 1 : 0
+  try {
+    const result = await billingApi[kind](page)
+    if (disposed) return
+    const list = kind === 'ledger' ? ledger : orders
+    list.value = more ? [...list.value, ...result.items] : result.items
+    pages.value[kind] = page
+    hasMore.value[kind] = result.hasMore
+  } catch (e) { recordsError.value = e.message || '账务记录暂时无法读取' }
+  finally { recordsLoading.value = false }
+}
+const selectTab = (value) => { tab.value = value; loadRecords() }
+const refresh = async () => { await refreshBilling(); await reloadPlans(); await loadRecords() }
+const closePayment = () => { clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus() }
+const applyPayment = async (order) => {
+  if (disposed || !payment.value) return
+  payment.value = order
+  if (['PAID', 'CANCELLED', 'EXPIRED'].includes(order.state)) keys.delete(order.kind === 'TOPUP' ? 'topup:' + order.amountMinor / 100 : 'plan:' + order.plan?.id)
+  if (order.state === 'PAID') {
+    keys.clear()
+    qr.value = ''
+    await refreshBilling()
+    await loadRecords()
+  } else if (order.paymentCodeUrl) {
+    const version = ++qrVersion
+    const image = await QRCode.toDataURL(order.paymentCodeUrl, { width: 280, margin: 2, color: { dark: '#20282b', light: '#ffffff' } })
+    if (version === qrVersion) qr.value = image
+  }
+}
+const pollPayment = async () => {
+  if (disposed || !payment.value || paymentLoading.value) return
+  paymentLoading.value = true
+  try {
+    const id = payment.value.id
+    const result = await billingApi.order(id)
+    if (payment.value?.id === id) { await applyPayment(result); paymentError.value = '' }
+  } catch (e) { paymentError.value = e.message || '支付状态暂时无法读取' }
+  finally {
+    paymentLoading.value = false
+    clearTimeout(paymentTimer)
+    if (!disposed && payment.value?.state === 'PENDING_PAYMENT') paymentTimer = setTimeout(pollPayment, 4000)
+  }
+}
+const openPayment = async (order) => {
+  payment.value = order
+  paymentError.value = ''
+  qr.value = ''
+  await nextTick()
+  paymentDialog.value?.showModal()
+  await applyPayment(order)
+  if (order.state === 'PENDING_PAYMENT') paymentTimer = setTimeout(pollPayment, 4000)
+}
+const topUp = async () => {
+  if (!validAmount.value || !canPay.value) return
+  busy.value = true; error.value = ''
+  try { await openPayment(await billingApi.topUp({ requestKey: keyFor('topup:' + amount.value), amountMinor: amount.value * 100 })); await loadRecords() }
+  catch (e) { error.value = e.message || '充值订单创建失败'; await loadRecords() }
+  finally { busy.value = false }
+}
+const subscribe = async (plan) => {
+  if (!canPay.value) return
+  busy.value = true; error.value = ''
+  try { await openPayment(await billingApi.subscribe({ requestKey: keyFor('plan:' + plan.id), planId: plan.id })); await loadRecords() }
+  catch (e) { error.value = e.message || '订阅订单创建失败'; await loadRecords() }
+  finally { busy.value = false }
+}
+const resumeOrder = async (order) => {
+  error.value = ''; busy.value = true
+  try { await openPayment(await billingApi.order(order.id)) }
+  catch (e) { error.value = e.message || '支付订单暂时无法读取' }
+  finally { busy.value = false }
+}
+const cancelPayment = async () => {
+  if (!payment.value || paymentLoading.value) return
+  paymentLoading.value = true
+  try { await applyPayment(await billingApi.cancel(payment.value.id)); await loadRecords(); paymentError.value = '' }
+  catch (e) { paymentError.value = e.message || '订单取消失败，请刷新支付状态' }
+  finally { paymentLoading.value = false }
+}
+const entryAmount = (entry) => entry.type === 'CAPTURE' ? entry.heldDelta : entry.availableDelta
+onMounted(async () => {
+  await refresh()
+  if (route.query.topup) topupInput.value?.focus()
+  balanceTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBilling() }, 30000)
+})
+onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterval(balanceTimer); qrVersion += 1 })
 </script>
 
 <template>
-  <div class="billing-page">
-    <div class="page-heading billing-heading"><div><p class="eyebrow">SAAS COMMERCIAL / ENTITLEMENTS</p><h1>套餐与权益，先把边界看清楚。</h1><p class="page-intro">这里展示的是商家 SaaS 账务域：订阅版本、权益快照、点数水位和下一步动作。消费者订单、支付和退款不在此处混用。</p></div><span class="billing-boundary"><span class="status-pulse" /> SaaS BILLING / MOCK</span></div>
-
-    <section class="billing-hero panel-dark"><div><p class="eyebrow accent">CURRENT SUBSCRIPTION</p><h2>{{ billing.currentPlan.displayName }} <span>· {{ billing.currentPlan.version }}</span></h2><p>本周期至 2026 年 9 月 25 日。升级将创建待确认咨询，不会在浏览器端直接扣款。</p><div class="billing-hero-actions"><button class="primary-button compact" type="button" @click="billing.message = '续费提醒草稿已创建，等待服务端 SaaS 订单能力接入。'">查看续费选项 <span>→</span></button><span class="billing-state">ACTIVE / <i>按月</i></span></div></div><div class="credit-orbit"><div><strong>{{ billing.balance }}</strong><span>PLATFORM CREDITS</span></div><i class="credit-ring ring-a" /><i class="credit-ring ring-b" /></div></section>
-
-    <section class="billing-meter-grid"><article v-for="meter in meters" :key="meter.code" class="billing-meter panel" :class="`meter-${meter.color}`"><div class="meter-top"><div><p class="eyebrow">{{ meter.code }}</p><h3>{{ meter.label }}</h3></div><button type="button" aria-label="记录一次用量" @click="billing.simulateUsage(meter.code)">＋</button></div><div class="meter-number"><strong>{{ billing.getEntitlement(meter.code).used }}</strong><span>/ {{ billing.getEntitlement(meter.code).limit }} {{ meter.unit }}</span></div><div class="meter-track"><span :style="{ width: `${Math.min(100, (billing.getEntitlement(meter.code).used / billing.getEntitlement(meter.code).limit) * 100)}%` }" /></div><p class="meter-foot">剩余 {{ billing.getEntitlement(meter.code).remaining }} {{ meter.unit }} <span>来源 · {{ billing.getEntitlement(meter.code).source }}</span></p></article></section>
-
-    <section class="billing-grid"><article class="panel plan-panel"><div class="panel-heading"><div><p class="eyebrow">VERSIONED PLAN CATALOG</p><h3>选择下一段增长容量</h3></div><span class="mono muted-text">历史版本不可变</span></div><div class="plan-list"><div v-for="plan in planCards" :key="plan.id" class="plan-row" :class="{ selected: plan.current }"><div class="plan-mark">{{ plan.planCode === 'TRIAL' ? 'T' : plan.planCode === 'GROWTH' ? 'G' : 'E' }}</div><div class="plan-copy"><strong>{{ plan.displayName }}</strong><span>{{ plan.version }} · {{ plan.entitlements.STORES.limit }} 家门店 · {{ plan.entitlements.AI_IMAGE.limit }} 张图片</span></div><b>{{ formatMoney(plan.prices[0].amountMinor) }}</b><button v-if="!plan.current" type="button" @click="billing.requestUpgrade(plan)">咨询升级 <span>→</span></button><em v-else>当前使用</em></div></div></article><article class="panel ledger-panel"><div class="panel-heading"><div><p class="eyebrow">CREDIT LEDGER</p><h3>最近点数流水</h3></div><span class="ledger-domain">不可变 / 可重建</span></div><div class="ledger-list"><div v-for="entry in billing.ledgerEntries" :key="entry.id" class="ledger-row"><span class="ledger-glyph" :class="entry.amount < 0 ? 'out' : 'in'">{{ entry.amount < 0 ? '−' : '+' }}</span><div><strong>{{ entry.reason || entry.type }}</strong><small>{{ entry.type }} · {{ entry.createdAt?.slice(0, 10) || '本地演示' }}</small></div><b :class="entry.amount < 0 ? 'out' : 'in'">{{ entry.amount > 0 ? '+' : '' }}{{ entry.amount }}</b></div></div></article></section>
-    <section class="billing-live-plans" aria-labelledby="billing-live-title">
-      <div class="panel-heading"><div><p class="eyebrow">LIVE COMPUTE / PREVIEW</p><h3 id="billing-live-title">直播云算力套餐 <small>（预览）</small></h3></div></div>
-      <div class="billing-live-overview">
-        <div><span class="eyebrow">计费状态</span><strong>尚未接入</strong></div>
-        <label>每天计划开播<select v-model.number="plannedDailyHours"><option v-for="hours in [2, 4, 6, 8, 12]" :key="hours" :value="hours">{{ hours }} 小时</option></select></label>
-        <p>按 30 天估算每月约 {{ estimatedMonthlyHours }} 小时。仅供对比方案；购买、余额和实际扣费尚未接入。</p>
-      </div>
-      <div class="billing-live-grid">
-        <article v-for="plan in livePlans" :key="plan.id" class="billing-live-card" :class="{ selected: comparedLivePlan === plan.id }">
-          <h4>{{ plan.name }}</h4>
-          <p class="billing-live-price"><strong>{{ plan.price }}</strong><small>{{ plan.unit }}</small></p>
-          <p class="billing-live-hours">{{ plan.hours }}</p>
-          <p class="billing-live-desc">{{ plan.desc }}</p>
-          <ul><li v-for="perk in plan.perks" :key="perk">{{ perk }}</li></ul>
-          <button type="button" :aria-pressed="comparedLivePlan === plan.id" @click="comparedLivePlan = plan.id">{{ comparedLivePlan === plan.id ? '正在对比' : '对比方案' }}</button>
-        </article>
-      </div>
-    </section>
-    <p v-if="billing.message" class="billing-message" role="status">{{ billing.message }}</p>
-    <footer class="billing-footer"><span>账务域隔离：SaaS Billing ≠ Consumer Commerce</span><span>价格、权益、点数和支付均为版本化服务端待接入契约</span></footer>
+  <div class="yanhuo-page">
+    <header class="yanhuo-heading">
+      <div><p class="eyebrow">一方志 · 我的账户</p><h1>套餐与权益</h1></div>
+      <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
+    </header>
+    <div v-if="billing.error" class="yanhuo-alert" role="alert">{{ billing.error }}<button type="button" @click="refresh">重新读取</button></div>
+    <div v-else-if="!account" class="yanhuo-empty" role="status">正在读取烟火账户...</div>
+    <template v-if="account">
+      <section class="yanhuo-account" aria-label="烟火与会员">
+        <div class="yanhuo-balance">
+          <div class="yanhuo-caption"><Wallet :size="17" /><span>可用烟火</span></div>
+          <p class="yanhuo-number">{{ billing.error ? '--' : number(account.available) }}<small>烟火</small></p>
+          <dl class="yanhuo-sources"><div><dt>会员赠送</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
+        </div>
+        <div class="yanhuo-membership">
+          <span class="yanhuo-status" :class="{ active: account.memberActive }"><span />{{ membershipLabel }}</span>
+          <h2>{{ account.plan?.name || '会员套餐待订阅' }}</h2>
+          <p v-if="account.memberUntil">有效期至 {{ dateTime(account.memberUntil) }}</p>
+          <p v-else>开通会员后即可使用套餐内的创作权益。</p>
+          <div class="yanhuo-entitlements"><span :class="{ enabled: account.memberActive && account.plan?.imageEnabled }"><Check :size="14" />图片创作</span><span :class="{ enabled: account.memberActive && account.plan?.videoEnabled }"><Check :size="14" />视频创作</span></div>
+        </div>
+        <div class="yanhuo-rules">
+          <h3>烟火计费</h3>
+          <p><strong>1 元 = {{ account.creditsPerYuan }} 烟火</strong><br>每张图片 {{ account.imageCredits }} 烟火，优先使用会员赠送余额。</p>
+          <p>视频以生成前确认的报价预占烟火，交付后结算。未交付部分退回。</p>
+          <span><CircleHelp :size="14" />充值烟火可保留，创作需有效会员。</span>
+        </div>
+      </section>
+      <section id="topup" class="yanhuo-topup">
+        <div class="yanhuo-section-title"><h2>添一份烟火</h2><p>充值烟火</p></div>
+        <form @submit.prevent="topUp">
+          <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small>{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
+          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '微信支付' }}</button></div>
+          <p v-if="!account.canManage" class="yanhuo-note">充值与订阅由账户管理员办理。</p><p v-else-if="!account.payment.available" class="yanhuo-note">微信收款暂未开放。</p>
+        </form>
+      </section>
+      <section class="yanhuo-catalog">
+        <div class="yanhuo-section-title"><h2>会员套餐</h2><p>订阅与续期</p></div>
+        <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
+        <div v-else-if="!billing.plans.length" class="yanhuo-empty"><img src="/images/brand/yifangzhi-mark.png" alt="" width="36" height="36"><h3>套餐尚未开放</h3><p>正式套餐公布后，可在这里订阅。</p></div>
+        <div v-else class="yanhuo-plan-grid"><article v-for="plan in billing.plans" :key="plan.id" class="yanhuo-plan"><div class="yanhuo-plan-top"><h3>{{ plan.name }}</h3><span v-if="account.plan?.code === plan.code && account.memberActive" class="yanhuo-current">当前套餐</span></div><p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p><p class="yanhuo-plan-description">{{ plan.description }}</p><ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li></ul><button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="subscribe(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button></article></div>
+      </section>
+      <p v-if="error" class="yanhuo-alert" role="alert">{{ error }}</p>
+      <section class="yanhuo-records">
+        <div class="yanhuo-records-head"><h2>账户记录</h2><div class="yanhuo-tabs" role="tablist" aria-label="账务记录"><button id="ledger-tab" type="button" role="tab" :aria-selected="tab === 'ledger'" aria-controls="billing-records" @click="selectTab('ledger')">烟火明细</button><button v-if="account.canManage" id="orders-tab" type="button" role="tab" :aria-selected="tab === 'orders'" aria-controls="billing-records" @click="selectTab('orders')">支付订单</button></div></div>
+        <div v-if="recordsError" class="yanhuo-alert" role="alert">{{ recordsError }}<button type="button" @click="loadRecords()">重新读取</button></div>
+        <div id="billing-records" role="tabpanel" :aria-labelledby="tab + '-tab'" class="yanhuo-table-wrap">
+          <table v-if="tab === 'ledger' && ledger.length" class="yanhuo-table"><thead><tr><th>时间</th><th>内容</th><th>类型</th><th class="numeric">烟火变动</th><th class="numeric">可用余额</th></tr></thead><tbody><tr v-for="entry in ledger" :key="entry.id"><td class="time">{{ dateTime(entry.createdAt) }}</td><td>{{ entry.description }}</td><td><span class="yanhuo-entry-type">{{ entryLabels[entry.type] || entry.type }}</span></td><td class="numeric" :class="{ positive: entryAmount(entry) > 0 }">{{ entryAmount(entry) > 0 ? '+' : '' }}{{ number(entryAmount(entry)) }}</td><td class="numeric">{{ number(entry.availableAfter) }}</td></tr></tbody></table>
+          <table v-else-if="tab === 'orders' && orders.length" class="yanhuo-table"><thead><tr><th>时间 / 订单</th><th>内容</th><th class="numeric">金额</th><th>状态</th><th><span class="sr-only">订单操作</span></th></tr></thead><tbody><tr v-for="order in orders" :key="order.id"><td class="time">{{ dateTime(order.createdAt) }}<small class="yanhuo-order-id">{{ order.id }}</small></td><td>{{ order.kind === 'TOPUP' ? '充值 ' + number(order.credits) + ' 烟火' : order.plan?.name }}</td><td class="numeric">{{ yuan(order.amountMinor) }}</td><td><span :class="{ positive: order.state === 'PAID' }">{{ labels[order.state] || order.state }}</span></td><td><button v-if="order.state === 'PENDING_PAYMENT'" class="yanhuo-link" type="button" :disabled="busy" @click="resumeOrder(order)">继续支付<ArrowUpRight :size="14" /></button><button v-else class="yanhuo-link" type="button" :disabled="busy" @click="resumeOrder(order)">详情<ArrowUpRight :size="14" /></button></td></tr></tbody></table>
+          <div v-else class="yanhuo-empty small" role="status">{{ recordsLoading ? '正在读取记录...' : tab === 'ledger' ? '暂无烟火明细' : '暂无支付订单' }}</div>
+        </div>
+        <button v-if="hasMore[tab]" class="yanhuo-more" type="button" :disabled="recordsLoading" @click="loadRecords(true)">{{ recordsLoading ? '正在读取...' : '查看更多' }}<ArrowDownLeft :size="14" /></button>
+      </section>
+      <BillingPlanManager v-if="account.operator" @updated="reloadPlans" />
+    </template>
+    <dialog ref="paymentDialog" class="yanhuo-payment" aria-labelledby="payment-title" @cancel.prevent="closePayment" @click="event => { if (event.target === paymentDialog) closePayment() }">
+      <template v-if="payment">
+        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="payment-title">{{ payment.state === 'PAID' ? '烟火已到账' : payment.kind === 'TOPUP' ? '充值烟火' : '订阅会员' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭支付窗口" title="关闭" @click="closePayment"><X :size="20" /></button></header>
+        <p class="yanhuo-payment-amount">{{ yuan(payment.amountMinor) }}</p>
+        <p class="yanhuo-payment-item">{{ payment.kind === 'TOPUP' ? number(payment.credits) + ' 烟火' : payment.plan?.name + ' · 赠送 ' + number(payment.credits) + ' 烟火' }}</p>
+        <div v-if="payment.state === 'PAID'" class="yanhuo-payment-result positive"><Check :size="36" /><strong>支付成功</strong><span>{{ dateTime(payment.paidAt) }}</span></div>
+        <template v-else-if="payment.state === 'PENDING_PAYMENT'">
+          <div class="yanhuo-qr"><img v-if="qr" :src="qr" width="240" height="240" alt="微信支付二维码"><span v-else>正在读取收款码...</span></div><p class="yanhuo-payment-caption">微信扫码支付</p><p class="yanhuo-note">有效至 {{ dateTime(payment.expiresAt) }}</p>
+          <div class="yanhuo-payment-actions"><button class="yanhuo-link" type="button" :disabled="paymentLoading" @click="pollPayment"><RefreshCw :size="14" />刷新支付状态</button><button class="yanhuo-link" type="button" :disabled="paymentLoading" @click="cancelPayment">取消订单</button></div>
+        </template>
+        <div v-else class="yanhuo-payment-result"><strong>{{ labels[payment.state] }}</strong></div>
+        <p v-if="paymentError" class="yanhuo-alert" role="alert">{{ paymentError }}</p><p class="yanhuo-order-id">{{ payment.id }}</p>
+      </template>
+    </dialog>
   </div>
 </template>
