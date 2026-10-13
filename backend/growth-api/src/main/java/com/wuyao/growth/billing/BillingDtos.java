@@ -11,7 +11,7 @@ public final class BillingDtos {
     public record Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits, long available,
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
                           Instant memberUntil, PlanSnapshot plan, boolean canManage, boolean operator,
-                          PaymentInstructions payment) {}
+                          PaymentInstructions payment, String paymentMethod) {}
     public record PaymentInstructions(boolean available, String recipient, String account, String bank,
                                       String instructions, String qrCodeUrl) {}
     public record TopUp(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
@@ -28,9 +28,10 @@ public final class BillingDtos {
     public record Confirmation(@Min(1) long receivedAmountMinor,
                                @NotBlank @Size(min=6,max=150) String receiptReference) {}
     public record LedgerView(Long id, String type, String description, long availableDelta, long heldDelta,
-                             long availableAfter, long heldAfter, Instant createdAt) {}
+                             long availableAfter, long heldAfter, Instant createdAt, Long actorUserId) {}
     public record OrderView(String id, String kind, long amountMinor, long credits, String state,
                             PlanSnapshot plan, Instant createdAt, Instant expiresAt, Instant paidAt,
-                            PaymentInstructions payment, String paymentMethod, String paymentCodeUrl) {}
+                            PaymentInstructions payment, String paymentMethod, String paymentCodeUrl,
+                            Long createdBy, Long confirmedBy) {}
     public record History<T>(List<T> items, boolean hasMore) {}
 }

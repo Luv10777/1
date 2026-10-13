@@ -8,6 +8,7 @@ import java.util.UUID;
 
 @Entity @Table(name="billing_reservations") @Getter @Setter
 public class BillingReservation {
+    private Long createdBy;
     @Id @Column(length=36) private String id = UUID.randomUUID().toString();
     private Long tenantId;
     @Column(length=120) private String requestKey;

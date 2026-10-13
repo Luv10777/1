@@ -88,6 +88,13 @@
 .yanhuo-table th:last-child, .yanhuo-table td:last-child { padding-right: 0; }
 .yanhuo-page .positive { color: var(--green); }
 .yanhuo-entry-type { font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+.yanhuo-held-change { display: block; font-size: 11px; font-weight: 400; color: var(--ink-muted); }
+.yanhuo-topup-warning { display: block; }
+.yanhuo-topup-warning .yanhuo-link { display: inline; }
+.yanhuo-manual-details { margin: 20px 0; font-size: 13px; }
+.yanhuo-manual-details div { margin: 12px 0; }
+.yanhuo-manual-details dt { color: var(--ink-muted); font-size: 11px; }
+.yanhuo-manual-details dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .yanhuo-order-id { display: block; font-size: 10px; font-family: var(--font-mono); color: var(--ink-muted); margin: 4px 0 0; overflow-wrap: anywhere; }
 .yanhuo-link { display: inline-flex; align-items: center; gap: 5px; padding: 6px 0; border: 0; color: var(--color-accent-text); background: none; font-size: 12px; white-space: nowrap; }
 .yanhuo-more { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 12px; color: var(--ink-muted); font-size: 12px; margin: 12px auto 0; }

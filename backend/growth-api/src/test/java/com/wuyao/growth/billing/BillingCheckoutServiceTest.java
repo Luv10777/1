@@ -18,12 +18,13 @@ class BillingCheckoutServiceTest {
     @AfterEach void clearTenant() { TenantContext.clear(); }
     private BillingDtos.OrderView order(String state) {
         return new BillingDtos.OrderView(UUID.randomUUID().toString(),"TOPUP",100,10,state,null,
-            Instant.now(),Instant.now().plusSeconds(600),null,null,"WECHAT",null);
+            Instant.now(),Instant.now().plusSeconds(600),null,null,"WECHAT",null,null,null);
     }
     @Test void aTimedOutRemoteCreateCanBeRecoveredUsingTheSameOrder() {
         TenantContext.set(7L);
         var order=order("PENDING_PAYMENT");
         when(billing.order(order.id())).thenReturn(order);
+        when(billing.claimReconciliation(order.id())).thenReturn(true);
         when(wechat.query(order.id())).thenReturn(json.createObjectNode().put("code","ORDER_NOT_EXIST"));
         when(wechat.create(order,7L)).thenReturn("weixin://wxpay/test");
         when(billing.savePaymentCode(order.id(),"weixin://wxpay/test")).thenReturn(order);
@@ -35,6 +36,7 @@ class BillingCheckoutServiceTest {
     @Test void missingExpiredOrderIsClosedLocallyWithoutCreatingAnotherRemoteOrder() {
         var order=order("EXPIRED");
         when(billing.order(order.id())).thenReturn(order);
+        when(billing.claimReconciliation(order.id())).thenReturn(true);
         when(wechat.query(order.id())).thenReturn(json.createObjectNode().put("code","ORDER_NOT_EXIST"));
         when(billing.cancelOrder(order.id())).thenReturn(order);
         checkout.refresh(order.id());
@@ -56,10 +58,18 @@ class BillingCheckoutServiceTest {
     @Test void unverifiedNetworkErrorsCannotCancelOrRecreateAnOrder() {
         var order=order("PENDING_PAYMENT");
         when(billing.order(order.id())).thenReturn(order);
+        when(billing.claimReconciliation(order.id())).thenReturn(true);
         when(wechat.query(order.id())).thenThrow(new IllegalStateException("network"));
         assertThatThrownBy(()->checkout.refresh(order.id())).hasMessage("network");
         assertThatThrownBy(()->checkout.cancel(order.id())).hasMessage("network");
         verify(billing,never()).cancelOrder(anyString());
         verify(wechat,never()).create(any(),anyLong());
+    }
+    @Test void aConcurrentRefreshReadsLocalStateWithoutAnotherWechatCall() {
+        var order=order("PENDING_PAYMENT");
+        when(billing.order(order.id())).thenReturn(order);
+        when(billing.claimReconciliation(order.id())).thenReturn(false);
+        assertThat(checkout.refresh(order.id())).isSameAs(order);
+        verifyNoInteractions(wechat);
     }
 }

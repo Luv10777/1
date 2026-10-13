@@ -5,6 +5,8 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface ImageCreationRepository extends JpaRepository<ImageCreation,Long> {
+ @Query("select c.taskId from ImageCreation c where c.billingReservationId in :reservations and c.plan is null and c.taskId is not null")
+ java.util.List<Long> billingRecoveryTaskIds(java.util.List<String> reservations);
  Optional<ImageCreation> findByRequestKey(String key);
  @Query(value="select * from image_creations where request->>'workflow' = :workflow order by id desc",
         countQuery="select count(*) from image_creations where request->>'workflow' = :workflow",nativeQuery=true)

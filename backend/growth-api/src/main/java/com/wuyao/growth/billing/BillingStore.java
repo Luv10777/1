@@ -23,6 +23,23 @@ public class BillingStore {
         return em.createQuery("from BillingPlan p where :all = true or p.published = true order by p.priceMinor,p.id",BillingPlan.class)
             .setParameter("all",includeUnpublished).getResultList();
     }
+    public void lockPlanCode(String code) {
+        em.createNativeQuery("SELECT true FROM pg_advisory_xact_lock(hashtextextended(:key,0))")
+            .setParameter("key","billing-plan:"+code).getSingleResult();
+    }
+    public boolean publishedPlanExists(String code,Long exceptId) {
+        return em.createQuery("select count(p) from BillingPlan p where p.code=:code and p.published=true and (:id is null or p.id<>:id)",Long.class)
+            .setParameter("code",code).setParameter("id",exceptId).getSingleResult()>0;
+    }
+    public boolean claimRecovery(long intervalMs) {
+        return em.createNativeQuery("UPDATE billing_accounts SET recovery_after=now()+(:delay * interval '1 millisecond') "
+                +"WHERE tenant_id=:tenant AND (recovery_after IS NULL OR recovery_after<=now())")
+            .setParameter("tenant",TenantContext.require()).setParameter("delay",intervalMs).executeUpdate()==1;
+    }
+    public List<String> unsettledReservations(String after) {
+        return em.createQuery("select r.id from BillingReservation r where r.tenantId=:tenant and r.id>:after and r.giftHeld+r.purchasedHeld>0 order by r.id",String.class)
+            .setParameter("tenant",TenantContext.require()).setParameter("after",after).setMaxResults(100).getResultList();
+    }
     public Optional<BillingOrder> orderByKey(String key) {
         return em.createQuery("from BillingOrder o where o.tenantId = :tenant and o.requestKey = :key",BillingOrder.class)
             .setParameter("tenant",TenantContext.require()).setParameter("key",key).getResultStream().findFirst();

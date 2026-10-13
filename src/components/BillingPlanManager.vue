@@ -46,7 +46,7 @@ onMounted(load)
         <label>赠送烟火<input v-model="form.giftCredits" type="number" min="0" max="100000000" step="1" required></label>
         <label class="full">套餐说明<textarea v-model="form.description" maxlength="600" rows="2" /></label>
         <fieldset class="full yanhuo-plan-permissions"><legend>创作权益</legend><label><input v-model="form.imageEnabled" type="checkbox">图片创作</label><label><input v-model="form.videoEnabled" type="checkbox">视频创作</label><label><input v-model="form.published" type="checkbox">保存后上架</label></fieldset>
-        <p class="yanhuo-note full">已有订阅保留购买时的价格与权益，调整套餐请新增版本。</p>
+        <p class="yanhuo-note full">调整套餐请新增版本，并先下架同标识的旧版本。目录修改不影响现有会员；续订新版本后，当前权益立即按新版本更新。</p>
         <button class="yanhuo-primary" type="submit" :disabled="busy"><Plus :size="16" />{{ busy ? '正在保存...' : '保存套餐' }}</button>
       </form>
     </div>

@@ -22,6 +22,8 @@ public class BillingOrder {
     @Column(columnDefinition="text") private String paymentCodeUrl;
     @Column(length=160) private String receiptReference;
     private Long confirmedBy;
+    private Long createdBy;
+    private Instant reconciliationAfter;
     private Instant paidAt;
     private Instant expiresAt;
     private Instant createdAt = Instant.now();

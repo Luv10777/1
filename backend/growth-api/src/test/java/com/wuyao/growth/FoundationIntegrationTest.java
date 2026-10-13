@@ -277,6 +277,8 @@ class FoundationIntegrationTest {
                     new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-recovery-" + status, "ai", ""), -1L));
             var task = tasks.claim("MEDIA_CPU", 1).getFirst();
             owner.update("UPDATE tasks SET status=?,lease_expires_at=NULL WHERE id=?", status, task.getId());
+            // Advance the shared recovery schedule; a duplicate call in the same interval stays harmless.
+            owner.update("UPDATE billing_accounts SET recovery_after=now()-interval '1 second' WHERE tenant_id=?",tenantA);
             billingRecovery.recover(); billingRecovery.recover();
             assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.get(analysis.id()).status())).isEqualTo("FAILED");
         }
@@ -428,6 +430,58 @@ class FoundationIntegrationTest {
     }
 
     @Test
+    void billingReconciliationAndRecoveryClaimsAreSharedAcrossConcurrentCallers() throws Exception {
+        var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-query-claim",100)));
+        owner.update("update billing_orders set payment_method='WECHAT' where id=?",order.id());
+        var queries=concurrent(()->TenantContext.runAs(tenantA,()->billingService.claimReconciliation(order.id())));
+        assertThat(queries.stream().filter(Boolean.TRUE::equals).count()).isEqualTo(1);
+        owner.update("update billing_orders set reconciliation_after=now()-interval '1 second' where id=?",order.id());
+        assertThat(TenantContext.runAs(tenantA,()->billingService.claimReconciliation(order.id()))).isTrue();
+        var recoveries=concurrent(()->TenantContext.runAs(tenantA,()->billingService.claimRecovery()));
+        assertThat(recoveries.stream().filter(Boolean.TRUE::equals).count()).isEqualTo(1);
+        assertThat(TenantContext.runAs(tenantB,()->billingService.claimRecovery())).isTrue();
+    }
+
+    @Test
+    void billingHistoricalPlanVersionsMayShareACodeButOnlyOneMayBePublished() {
+        var original=TenantContext.runAs(tenantA,()->billingService.summary(true,false).plan());
+        var draft=billingService.createPlan(new BillingDtos.NewPlan("TEST","New version","test-only",200,30,50,true,false,false));
+        assertThat(code(()->billingService.createPlan(new BillingDtos.NewPlan("TEST","Duplicate offer","test-only",200,30,50,true,false,true)))).isEqualTo(1400);
+        assertThat(code(()->{billingService.publish(draft.id(),true);return null;})).isEqualTo(1400);
+        billingService.publish(original.id(),false);
+        billingService.publish(draft.id(),true);
+        assertThat(billingService.plans()).extracting(BillingDtos.PlanSnapshot::id).containsExactly(draft.id());
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).plan())).isEqualTo(original);
+        assertThatThrownBy(()->owner.update("update billing_plans set published=true where id=?",original.id()))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void billingRecordsAuthenticatedCreatorsAndManualOperatorsWithoutInventingWorkerActors() {
+        Long user=seedPasswordAccount();
+        var principal=new com.wuyao.growth.common.security.AuthPrincipal(user,tenantA,"",0);
+        var security=org.springframework.security.core.context.SecurityContextHolder.getContext();
+        security.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal,null,List.of()));
+        String orderId,reservationId;
+        try {
+            var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-audit-order",100)));
+            orderId=order.id();
+            assertThat(order.createdBy()).isEqualTo(user);
+            reservationId=TenantContext.runAs(tenantA,()->billingService.reserve("billing-audit-reserve","IMAGE",3,"test audit"));
+        } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+        assertThat(owner.queryForObject("select created_by from billing_reservations where id=?",Long.class,reservationId)).isEqualTo(user);
+        assertThat(owner.queryForObject("select actor_user_id from billing_ledger where event_key='reserve:billing-audit-reserve'",Long.class)).isEqualTo(user);
+        TenantContext.runAs(tenantA,()->{
+            billingService.capture(reservationId,3,"billing-audit-worker","delivered by worker");
+            billingService.confirmPayment(orderId,new BillingDtos.Confirmation(100,"billing-audit-receipt"),-1L);
+            return null;
+        });
+        assertThat(owner.queryForObject("select actor_user_id from billing_ledger where event_key='billing-audit-worker'",Long.class)).isNull();
+        assertThat(owner.queryForObject("select actor_user_id from billing_ledger where event_key=?",Long.class,"order:"+orderId)).isEqualTo(-1L);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.order(orderId).confirmedBy())).isEqualTo(-1L);
+    }
+
+    @Test
     void billingRecoveryRefundsLostImageFailureEventsAndSubsequentFailedRetries() {
         enableImageModels();
         var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-lost-event","POSTER",1,List.of()),null));
@@ -440,6 +494,7 @@ class FoundationIntegrationTest {
         var retry=TenantContext.runAs(tenantA,()->imageCreations.retry(created.id(),null,created.taskId(),null));
         assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
         owner.update("update tasks set status='FAILED' where id=?",retry.taskId());
+        owner.update("update billing_accounts set recovery_after=now()-interval '1 second' where tenant_id=?",tenantA);
         billingRecovery.recover();
         assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
         assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).available())).isEqualTo(1000000);

@@ -38,9 +38,10 @@ let disposed = false
 let qrVersion = 0
 const keys = new Map()
 const labels = { PENDING_PAYMENT: '待支付', PAID: '已到账', CANCELLED: '已取消', EXPIRED: '已过期' }
-const entryLabels = { RESERVE: '预占', CAPTURE: '消耗', RELEASE: '退回', GRANT: '赠送', PURCHASE: '充值' }
+const entryLabels = { RESERVE: '预占（未扣费）', CAPTURE: '消耗', RELEASE: '释放预占', GRANT: '赠送', PURCHASE: '充值' }
 const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期' : '尚未开通会员')
 const canPay = computed(() => account.value?.canManage && account.value?.payment.available && !billing.error && !busy.value)
+const paymentLabel = computed(() => account.value?.paymentMethod === 'MANUAL' ? '查看付款信息' : '微信支付')
 const keyFor = (key) => {
   if (!keys.has(key)) keys.set(key, 'billing-' + crypto.randomUUID())
   return keys.get(key)
@@ -83,12 +84,12 @@ const applyPayment = async (order) => {
     if (version === qrVersion) qr.value = image
   }
 }
-const pollPayment = async () => {
+const pollPayment = async (remote = false) => {
   if (disposed || !payment.value || paymentLoading.value) return
   paymentLoading.value = true
   try {
     const id = payment.value.id
-    const result = await billingApi.order(id)
+    const result = await (remote ? billingApi.refresh(id) : billingApi.order(id))
     if (payment.value?.id === id) { await applyPayment(result); paymentError.value = '' }
   } catch (e) { paymentError.value = e.message || '支付状态暂时无法读取' }
   finally {
@@ -122,7 +123,7 @@ const subscribe = async (plan) => {
 }
 const resumeOrder = async (order) => {
   error.value = ''; busy.value = true
-  try { await openPayment(await billingApi.order(order.id)) }
+  try { await openPayment(await billingApi.refresh(order.id)) }
   catch (e) { error.value = e.message || '支付订单暂时无法读取' }
   finally { busy.value = false }
 }
@@ -133,7 +134,7 @@ const cancelPayment = async () => {
   catch (e) { paymentError.value = e.message || '订单取消失败，请刷新支付状态' }
   finally { paymentLoading.value = false }
 }
-const entryAmount = (entry) => entry.type === 'CAPTURE' ? entry.heldDelta : entry.availableDelta
+const entryAmount = (entry) => entry.availableDelta + entry.heldDelta
 onMounted(async () => {
   await refresh()
   if (route.query.topup) topupInput.value?.focus()
@@ -176,13 +177,14 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
       <section id="topup" class="yanhuo-topup">
         <div class="yanhuo-section-title"><h2>添一份烟火</h2><p>充值烟火</p></div>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用平台功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
         <form @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small>{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
-          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '微信支付' }}</button></div>
+          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : paymentLabel }}</button></div>
           <p v-if="!account.canManage" class="yanhuo-note">充值与订阅由账户管理员办理。</p><p v-else-if="!account.payment.available" class="yanhuo-note">微信收款暂未开放。</p>
         </form>
       </section>
-      <section class="yanhuo-catalog">
+      <section id="member-plans" class="yanhuo-catalog">
         <div class="yanhuo-section-title"><h2>会员套餐</h2><p>订阅与续期</p></div>
         <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
         <div v-else-if="!billing.plans.length" class="yanhuo-empty"><img src="/images/brand/yifangzhi-mark.png" alt="" width="36" height="36"><h3>套餐尚未开放</h3><p>正式套餐公布后，可在这里订阅。</p></div>
@@ -193,10 +195,11 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <div class="yanhuo-records-head"><h2>账户记录</h2><div class="yanhuo-tabs" role="tablist" aria-label="账务记录"><button id="ledger-tab" type="button" role="tab" :aria-selected="tab === 'ledger'" aria-controls="billing-records" @click="selectTab('ledger')">烟火明细</button><button v-if="account.canManage" id="orders-tab" type="button" role="tab" :aria-selected="tab === 'orders'" aria-controls="billing-records" @click="selectTab('orders')">支付订单</button></div></div>
         <div v-if="recordsError" class="yanhuo-alert" role="alert">{{ recordsError }}<button type="button" @click="loadRecords()">重新读取</button></div>
         <div id="billing-records" role="tabpanel" :aria-labelledby="tab + '-tab'" class="yanhuo-table-wrap">
-          <table v-if="tab === 'ledger' && ledger.length" class="yanhuo-table"><thead><tr><th>时间</th><th>内容</th><th>类型</th><th class="numeric">烟火变动</th><th class="numeric">可用余额</th></tr></thead><tbody><tr v-for="entry in ledger" :key="entry.id"><td class="time">{{ dateTime(entry.createdAt) }}</td><td>{{ entry.description }}</td><td><span class="yanhuo-entry-type">{{ entryLabels[entry.type] || entry.type }}</span></td><td class="numeric" :class="{ positive: entryAmount(entry) > 0 }">{{ entryAmount(entry) > 0 ? '+' : '' }}{{ number(entryAmount(entry)) }}</td><td class="numeric">{{ number(entry.availableAfter) }}</td></tr></tbody></table>
+          <table v-if="tab === 'ledger' && ledger.length" class="yanhuo-table"><thead><tr><th>时间</th><th>内容</th><th>类型</th><th class="numeric">烟火收支</th><th class="numeric">可用余额</th></tr></thead><tbody><tr v-for="entry in ledger" :key="entry.id"><td class="time">{{ dateTime(entry.createdAt) }}</td><td>{{ entry.description }}</td><td><span class="yanhuo-entry-type">{{ entryLabels[entry.type] || entry.type }}</span></td><td class="numeric" :class="{ positive: entryAmount(entry) > 0 }">{{ entryAmount(entry) > 0 ? '+' : '' }}{{ number(entryAmount(entry)) }}<small v-if="entry.heldDelta" class="yanhuo-held-change">预占 {{ entry.heldDelta > 0 ? '+' : '' }}{{ number(entry.heldDelta) }}</small></td><td class="numeric">{{ number(entry.availableAfter) }}</td></tr></tbody></table>
           <table v-else-if="tab === 'orders' && orders.length" class="yanhuo-table"><thead><tr><th>时间 / 订单</th><th>内容</th><th class="numeric">金额</th><th>状态</th><th><span class="sr-only">订单操作</span></th></tr></thead><tbody><tr v-for="order in orders" :key="order.id"><td class="time">{{ dateTime(order.createdAt) }}<small class="yanhuo-order-id">{{ order.id }}</small></td><td>{{ order.kind === 'TOPUP' ? '充值 ' + number(order.credits) + ' 烟火' : order.plan?.name }}</td><td class="numeric">{{ yuan(order.amountMinor) }}</td><td><span :class="{ positive: order.state === 'PAID' }">{{ labels[order.state] || order.state }}</span></td><td><button v-if="order.state === 'PENDING_PAYMENT'" class="yanhuo-link" type="button" :disabled="busy" @click="resumeOrder(order)">继续支付<ArrowUpRight :size="14" /></button><button v-else class="yanhuo-link" type="button" :disabled="busy" @click="resumeOrder(order)">详情<ArrowUpRight :size="14" /></button></td></tr></tbody></table>
           <div v-else class="yanhuo-empty small" role="status">{{ recordsLoading ? '正在读取记录...' : tab === 'ledger' ? '暂无烟火明细' : '暂无支付订单' }}</div>
         </div>
+        <p v-if="tab === 'ledger' && ledger.length" class="yanhuo-note">预占与释放只在可用余额和预占余额之间转移，烟火收支为 0；成功交付后才记录消耗。</p>
         <button v-if="hasMore[tab]" class="yanhuo-more" type="button" :disabled="recordsLoading" @click="loadRecords(true)">{{ recordsLoading ? '正在读取...' : '查看更多' }}<ArrowDownLeft :size="14" /></button>
       </section>
       <BillingPlanManager v-if="account.operator" @updated="reloadPlans" />
@@ -208,8 +211,16 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <p class="yanhuo-payment-item">{{ payment.kind === 'TOPUP' ? number(payment.credits) + ' 烟火' : payment.plan?.name + ' · 赠送 ' + number(payment.credits) + ' 烟火' }}</p>
         <div v-if="payment.state === 'PAID'" class="yanhuo-payment-result positive"><Check :size="36" /><strong>支付成功</strong><span>{{ dateTime(payment.paidAt) }}</span></div>
         <template v-else-if="payment.state === 'PENDING_PAYMENT'">
-          <div class="yanhuo-qr"><img v-if="qr" :src="qr" width="240" height="240" alt="微信支付二维码"><span v-else>正在读取收款码...</span></div><p class="yanhuo-payment-caption">微信扫码支付</p><p class="yanhuo-note">有效至 {{ dateTime(payment.expiresAt) }}</p>
-          <div class="yanhuo-payment-actions"><button class="yanhuo-link" type="button" :disabled="paymentLoading" @click="pollPayment"><RefreshCw :size="14" />刷新支付状态</button><button class="yanhuo-link" type="button" :disabled="paymentLoading" @click="cancelPayment">取消订单</button></div>
+          <template v-if="payment.paymentMethod === 'WECHAT'">
+            <div class="yanhuo-qr"><img v-if="qr" :src="qr" width="240" height="240" alt="微信支付二维码"><span v-else>正在读取收款码...</span></div><p class="yanhuo-payment-caption">微信扫码支付</p>
+          </template>
+          <template v-else>
+            <dl class="yanhuo-manual-details"><div><dt>收款方</dt><dd>{{ payment.payment.recipient }}</dd></div><div v-if="payment.payment.account"><dt>收款账号</dt><dd>{{ payment.payment.account }}</dd></div><div v-if="payment.payment.bank"><dt>开户行</dt><dd>{{ payment.payment.bank }}</dd></div></dl>
+            <div v-if="payment.payment.qrCodeUrl" class="yanhuo-qr"><img :src="payment.payment.qrCodeUrl" width="240" height="240" alt="收款方提供的付款二维码"></div>
+            <p class="yanhuo-note">{{ payment.payment.instructions || '请按收款信息付款，并向客服提供订单号与付款回单。核实实际收款后到账。' }}</p>
+          </template>
+          <p class="yanhuo-note">有效至 {{ dateTime(payment.expiresAt) }}</p>
+          <div class="yanhuo-payment-actions"><button class="yanhuo-link" type="button" :disabled="paymentLoading" @click="pollPayment(true)"><RefreshCw :size="14" />刷新支付状态</button><button class="yanhuo-link" type="button" :disabled="paymentLoading" @click="cancelPayment">取消订单</button></div>
         </template>
         <div v-else class="yanhuo-payment-result"><strong>{{ labels[payment.state] }}</strong></div>
         <p v-if="paymentError" class="yanhuo-alert" role="alert">{{ paymentError }}</p><p class="yanhuo-order-id">{{ payment.id }}</p>

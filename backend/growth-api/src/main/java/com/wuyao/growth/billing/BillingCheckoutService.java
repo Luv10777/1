@@ -25,6 +25,7 @@ public class BillingCheckoutService {
     public BillingDtos.OrderView refresh(String id) {
         var o=billing.order(id);
         if(!"WECHAT".equals(o.paymentMethod())||"PAID".equals(o.state())||"CANCELLED".equals(o.state())) return o;
+        if(!billing.claimReconciliation(id)) return billing.order(id);
         JsonNode proof=wechat.query(id);
         if("SUCCESS".equals(proof.path("trade_state").asText())) return billing.confirmWechat(id,proof);
         if("CLOSED".equals(proof.path("trade_state").asText())) return billing.cancelOrder(id);

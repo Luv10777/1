@@ -12,6 +12,13 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.*;
 
 class BillingConfigurationTest {
+    @Test void onlyWorkersRegisterTheRecoveryScheduler() {
+        var context=new org.springframework.boot.test.context.runner.ApplicationContextRunner()
+            .withBean(BillingRecovery.class,()->org.mockito.Mockito.mock(BillingRecovery.class))
+            .withUserConfiguration(BillingRecoveryScheduler.class);
+        context.withPropertyValues("growth.worker.enabled=false").run(c->assertThat(c).doesNotHaveBean(BillingRecoveryScheduler.class));
+        context.withPropertyValues("growth.worker.enabled=true").run(c->assertThat(c).hasSingleBean(BillingRecoveryScheduler.class));
+    }
     @TempDir Path folder;
     @Configuration(proxyBeanMethods=false)
     @EnableConfigurationProperties({BillingProperties.class,VideoPricingProperties.class})

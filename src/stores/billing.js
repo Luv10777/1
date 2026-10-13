@@ -49,6 +49,7 @@ export const billingApi = {
   topUp: data => post('/api/billing/orders/topup', data),
   subscribe: data => post('/api/billing/orders/subscription', data),
   order: id => get('/api/billing/orders/' + id),
+  refresh: id => post('/api/billing/orders/' + id + '/refresh', {}),
   cancel: id => post('/api/billing/orders/' + id + '/cancel', {}),
   orders: (page = 0) => get('/api/billing/orders', { page, size: 20 }),
   ledger: (page = 0) => get('/api/billing/ledger', { page, size: 20 }),

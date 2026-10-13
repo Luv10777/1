@@ -10,6 +10,7 @@ import java.time.Instant;
 public class BillingLedger {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     private Long tenantId;
+    private Long actorUserId;
     @Column(length=160) private String eventKey;
     @Column(length=24) private String type;
     @Column(length=240) private String description;
