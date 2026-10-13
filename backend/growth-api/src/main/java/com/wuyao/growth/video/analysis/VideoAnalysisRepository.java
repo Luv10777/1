@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface VideoAnalysisRepository extends JpaRepository<VideoAnalysis, Long> {
+    @Query("select a.taskId from VideoAnalysis a where a.billingReservationId in :reservations and a.status<>'SUCCEEDED' and a.taskId is not null")
+    java.util.List<Long> billingRecoveryTaskIds(java.util.List<String> reservations);
     Optional<VideoAnalysis> findByRequestKey(String requestKey);
     Page<VideoAnalysis> findAllByOrderByIdDesc(Pageable pageable);
     @Lock(LockModeType.PESSIMISTIC_WRITE)

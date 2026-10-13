@@ -1,10 +1,12 @@
 package com.wuyao.growth.billing;
 
 import com.wuyao.growth.common.tenant.TenantContext;
+import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,7 +31,7 @@ public class BillingService {
         return new BillingDtos.Summary("烟火",CREDITS_PER_YUAN,IMAGE_CREDITS,VIDEO_ANALYSIS_CREDITS,
             a==null?0:a.available(),a==null?0:a.getGiftAvailable(),a==null?0:a.getPurchasedAvailable(),
             a==null?0:a.getHeld(),a!=null&&a.active(Instant.now()),a==null?null:a.getMemberUntil(),
-            a==null?null:a.getPlanSnapshot(),canManage,operator,payment());
+            a==null?null:a.getPlanSnapshot(),canManage,operator,payment(),config.getPaymentMethod());
     }
     @Transactional(readOnly=true)
     public List<BillingDtos.PlanSnapshot> plans() { return store.plans(false).stream().map(BillingPlan::snapshot).toList(); }
@@ -51,6 +53,7 @@ public class BillingService {
         }
         requirePayment();
         var o=new BillingOrder(); o.setTenantId(TenantContext.require()); o.setRequestKey(input.requestKey());
+        o.setCreatedBy(currentUserId());
         o.setKind("TOPUP"); o.setAmountMinor(input.amountMinor()); o.setCredits(input.amountMinor()/10);
         o.setPaymentMethod(config.getPaymentMethod());
         o.setExpiresAt(Instant.now().plus("WECHAT".equals(o.getPaymentMethod())?Duration.ofMinutes(30):Duration.ofDays(7))); store.save(o);
@@ -71,6 +74,7 @@ public class BillingService {
         checkRenewal(a,p.snapshot());
         if(store.pendingMembership()) throw bad("已有待支付的会员订单，请先完成或取消该订单");
         var o=new BillingOrder(); o.setTenantId(TenantContext.require()); o.setRequestKey(input.requestKey());
+        o.setCreatedBy(currentUserId());
         o.setKind("MEMBERSHIP"); o.setAmountMinor(p.getPriceMinor()); o.setCredits(p.getGiftCredits());
         o.setPlanSnapshot(p.snapshot()); o.setPaymentMethod(config.getPaymentMethod());
         o.setExpiresAt(Instant.now().plus("WECHAT".equals(o.getPaymentMethod())?Duration.ofMinutes(30):Duration.ofDays(7))); store.save(o);
@@ -90,6 +94,20 @@ public class BillingService {
     }
     @Transactional(readOnly=true)
     public List<String> reconciliationOrders() { return store.reconciliationOrders(); }
+    /** The database claim also limits simultaneous refreshes from different API/worker processes. */
+    @Transactional
+    public boolean claimReconciliation(String id) {
+        var o=requireOrder(store.lockOrder(id));
+        var now=Instant.now();
+        if(!"WECHAT".equals(o.getPaymentMethod())||!java.util.Set.of("PENDING_PAYMENT","EXPIRED").contains(o.getState())
+            ||(o.getReconciliationAfter()!=null&&o.getReconciliationAfter().isAfter(now))) return false;
+        o.setReconciliationAfter(now.plusSeconds(30));
+        return true;
+    }
+    @Transactional
+    public boolean claimRecovery() { return store.claimRecovery(Math.max(1000,config.getRecoveryIntervalMs())); }
+    @Transactional(readOnly=true)
+    public List<String> unsettledReservations(String after) { return store.unsettledReservations(after); }
     /** Only a platform operator may invoke this, after checking an actual receipt. */
     @Transactional
     public BillingDtos.OrderView confirmPayment(String id,BillingDtos.Confirmation input,Long operator) {
@@ -134,7 +152,8 @@ public class BillingService {
         o.setReceiptReference(receipt); o.setConfirmedBy(operator); o.setPaidAt(Instant.now()); o.setState("PAID");
         ledger(a,"order:"+o.getId(),"MEMBERSHIP".equals(o.getKind())?"GRANT":"PURCHASE",
             "MEMBERSHIP".equals(o.getKind())?o.getPlanSnapshot().name()+" · 会员赠送":"充值烟火",
-            "MEMBERSHIP".equals(o.getKind())?o.getCredits():0,"TOPUP".equals(o.getKind())?o.getCredits():0,0,o.getId(),null);
+            "MEMBERSHIP".equals(o.getKind())?o.getCredits():0,"TOPUP".equals(o.getKind())?o.getCredits():0,0,o.getId(),null,
+            operator!=null?operator:currentUserId());
         store.flush(); // receipt_reference uniqueness also prevents reusing one receipt across tenants.
         return view(o);
     }
@@ -150,6 +169,7 @@ public class BillingService {
         }
         requireEntitlement(a,capability);
         var r=new BillingReservation(); r.setTenantId(TenantContext.require()); r.setRequestKey(requestKey);
+        r.setCreatedBy(currentUserId());
         r.setCapability(capability); r.setInitialAmount(amount); store.save(r);
         hold(a,r,amount,"reserve:"+requestKey,description);
         return r.getId();
@@ -218,7 +238,11 @@ public class BillingService {
         ledger(a,eventKey,"RESERVE",description,-gift,-purchased,amount,null,r.getId());
     }
     private void ledger(BillingAccount a,String key,String type,String description,long gift,long purchased,long held,String order,String reservation) {
+        ledger(a,key,type,description,gift,purchased,held,order,reservation,currentUserId());
+    }
+    private void ledger(BillingAccount a,String key,String type,String description,long gift,long purchased,long held,String order,String reservation,Long actor) {
         var l=new BillingLedger(); l.setTenantId(TenantContext.require()); l.setEventKey(key); l.setType(type);
+        l.setActorUserId(actor);
         l.setDescription(description); l.setGiftDelta(gift); l.setPurchasedDelta(purchased); l.setHeldDelta(held);
         l.setAvailableAfter(a.available()); l.setHeldAfter(a.getHeld()); l.setOrderId(order); l.setReservationId(reservation);
         a.setUpdatedAt(Instant.now()); store.save(l);
@@ -244,7 +268,7 @@ public class BillingService {
     private BillingDtos.OrderView view(BillingOrder o) {
         String state="PENDING_PAYMENT".equals(o.getState())&&!o.getExpiresAt().isAfter(Instant.now())?"EXPIRED":o.getState();
         return new BillingDtos.OrderView(o.getId(),o.getKind(),o.getAmountMinor(),o.getCredits(),state,o.getPlanSnapshot(),
-            o.getCreatedAt(),o.getExpiresAt(),o.getPaidAt(),payment(),o.getPaymentMethod(),o.getPaymentCodeUrl());
+            o.getCreatedAt(),o.getExpiresAt(),o.getPaidAt(),payment(),o.getPaymentMethod(),o.getPaymentCodeUrl(),o.getCreatedBy(),o.getConfirmedBy());
     }
     @Transactional(readOnly=true)
     public BillingDtos.History<BillingDtos.OrderView> orders(int page,int size) {
@@ -255,10 +279,11 @@ public class BillingService {
     public BillingDtos.History<BillingDtos.LedgerView> ledger(int page,int size) {
         checkPage(page,size); var list=store.ledger(page,size);
         return new BillingDtos.History<>(list.stream().limit(size).map(l->new BillingDtos.LedgerView(l.getId(),l.getType(),l.getDescription(),
-            l.getGiftDelta()+l.getPurchasedDelta(),l.getHeldDelta(),l.getAvailableAfter(),l.getHeldAfter(),l.getCreatedAt())).toList(),list.size()>size);
+            l.getGiftDelta()+l.getPurchasedDelta(),l.getHeldDelta(),l.getAvailableAfter(),l.getHeldAfter(),l.getCreatedAt(),l.getActorUserId())).toList(),list.size()>size);
     }
     @Transactional
     public BillingDtos.PlanSnapshot createPlan(BillingDtos.NewPlan input) {
+        if(input.published()) requirePublishable(input.code(),null);
         var p=new BillingPlan(); p.setCode(input.code()); p.setName(input.name().trim()); p.setDescription(input.description().trim());
         p.setPriceMinor(input.priceMinor()); p.setDurationDays(input.durationDays()); p.setGiftCredits(input.giftCredits());
         p.setImageEnabled(input.imageEnabled()); p.setVideoEnabled(input.videoEnabled()); p.setPublished(input.published());
@@ -266,7 +291,17 @@ public class BillingService {
     }
     @Transactional
     public void publish(Long id,boolean published) {
-        var p=store.plan(id); if(p==null) throw bad("套餐不存在"); p.setPublished(published);
+        var p=store.plan(id); if(p==null) throw bad("套餐不存在");
+        if(published) requirePublishable(p.getCode(),id);
+        p.setPublished(published);
+    }
+    private void requirePublishable(String code,Long id) {
+        store.lockPlanCode(code);
+        if(store.publishedPlanExists(code,id)) throw bad("同一套餐标识已有上架版本，请先下架旧版本");
+    }
+    private Long currentUserId() {
+        var authentication=SecurityContextHolder.getContext().getAuthentication();
+        return authentication!=null&&authentication.getPrincipal() instanceof AuthPrincipal me?me.userId():null;
     }
     private void checkPage(int page,int size) { if(page<0||page>100000||size<1||size>50) throw bad("分页参数无效"); }
     private BizException bad(String message) { return BizException.of(ErrorCode.BAD_REQUEST,message); }

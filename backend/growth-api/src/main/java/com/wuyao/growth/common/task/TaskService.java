@@ -23,6 +23,16 @@ public class TaskService {
     private final ObjectMapper objectMapper;
     private final org.springframework.context.ApplicationEventPublisher events;
 
+    /** Public recovery projection; callers never access task entities or the repository. */
+    @Transactional(readOnly=true)
+    public List<TaskTerminalFailure> terminalFailures(List<Long> ids) {
+        if(ids.isEmpty()) return List.of();
+        Long tenant=TenantContext.require();
+        return repository.findAllById(ids).stream().filter(t->tenant.equals(t.getTenantId()))
+            .filter(t->t.getStatus()==TaskStatus.FAILED||t.getStatus()==TaskStatus.CANCELLED)
+            .map(TaskTerminalFailure::from).toList();
+    }
+
     @Value("${growth.worker.lease:30m}")
     private Duration lease;
 

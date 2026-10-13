@@ -64,6 +64,10 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 @Slf4j
 public class VideoWorkflowService {
+    @Transactional(readOnly=true)
+    public List<Long> billingRecoveryTaskIds(List<String> reservations) {
+        return reservations.isEmpty()?List.of():workflows.billingRecoveryTaskIds(reservations);
+    }
     private static final int MAX_REDIRECTS = 5;
     private static final DateTimeFormatter SIGNING_DATE = DateTimeFormatter
             .ofPattern("uuuuMMdd'T'HHmmss'Z'", Locale.ROOT)

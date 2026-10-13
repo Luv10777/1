@@ -9,6 +9,7 @@ import java.util.List;
 @Component @ConfigurationProperties(prefix="growth.billing") @Getter @Setter
 public class BillingProperties {
     private List<Long> operatorUserIds = List.of();
+    private long recoveryIntervalMs = 60000;
     private String paymentMethod = "WECHAT";
     private String paymentRecipient = "";
     private String paymentAccount = "";

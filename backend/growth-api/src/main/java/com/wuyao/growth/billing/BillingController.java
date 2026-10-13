@@ -31,6 +31,8 @@ public class BillingController {
     @PostMapping("/orders/subscription") public ApiResponse<BillingDtos.OrderView> subscribe(@Valid @RequestBody BillingDtos.Subscribe input,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.subscribe(input)); }
     @GetMapping("/orders/{id}") public ApiResponse<BillingDtos.OrderView> order(@PathVariable String id,
+        @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(service.order(id)); }
+    @PostMapping("/orders/{id}/refresh") public ApiResponse<BillingDtos.OrderView> refresh(@PathVariable String id,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.refresh(id)); }
     @PostMapping("/orders/{id}/cancel") public ApiResponse<BillingDtos.OrderView> cancel(@PathVariable String id,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.cancel(id)); }

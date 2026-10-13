@@ -5,6 +5,8 @@ import jakarta.persistence.LockModeType;
 import java.util.*;
 
 public interface ImageItemRepository extends JpaRepository<ImageItem,Long> {
+ @Query("select i.taskId from ImageItem i, ImageCreation c where c.id=i.creationId and c.billingReservationId in :reservations and i.billingHeld=true and i.taskId is not null")
+ List<Long> billingRecoveryTaskIds(List<String> reservations);
  @Query("select i.creationId from ImageItem i where i.id=:id")
  Optional<Long> creationId(Long id);
  List<ImageItem> findByCreationIdOrderByOrdinal(Long id);

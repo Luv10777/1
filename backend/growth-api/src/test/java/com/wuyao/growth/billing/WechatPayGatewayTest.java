@@ -52,7 +52,7 @@ class WechatPayGatewayTest {
     }
     @Test void paymentProofMustMatchMerchantCurrencyAmountAndTenantOrder() throws Exception {
         String id=UUID.randomUUID().toString();
-        var order=new BillingDtos.OrderView(id,"TOPUP",100,10,"PENDING_PAYMENT",null,Instant.now(),Instant.now().plusSeconds(600),null,null,"WECHAT",null);
+        var order=new BillingDtos.OrderView(id,"TOPUP",100,10,"PENDING_PAYMENT",null,Instant.now(),Instant.now().plusSeconds(600),null,null,"WECHAT",null,null,null);
         var proof=json.createObjectNode().put("trade_state","SUCCESS").put("appid","test-app").put("mchid","test-merchant")
                 .put("out_trade_no",id.replace("-","")).put("attach","7:"+id).put("transaction_id","test-transaction");
         proof.putObject("amount").put("total",100).put("currency","CNY");
@@ -64,6 +64,26 @@ class WechatPayGatewayTest {
     @Test void missingMerchantConfigurationDisablesPayment() {
         assertThat(gateway.configured()).isTrue();config.setApiV3Key("");
         assertThat(gateway.configured()).isFalse();assertThatThrownBy(()->gateway.query(UUID.randomUUID().toString())).hasMessageContaining("暂未开放");
+    }
+    @Test void nativePaymentExpiryUsesSecondsEvenWhenTheStoredInstantHasNanoseconds() throws Exception {
+        var http=mock(HttpClient.class);
+        gateway=new WechatPayGateway(config,json,http);
+        Instant expiry=Instant.parse("2030-01-02T03:04:05.987654321Z");
+        var order=new BillingDtos.OrderView(UUID.randomUUID().toString(),"TOPUP",100,10,"PENDING_PAYMENT",null,
+            Instant.now(),expiry,null,null,"WECHAT",null,null,null);
+        String body="{\"code_url\":\"weixin://wxpay/test\"}",time=Long.toString(Instant.now().getEpochSecond());
+        var response=new org.apache.hc.core5.http.message.BasicClassicHttpResponse(200);
+        response.setEntity(new org.apache.hc.core5.http.io.entity.StringEntity(body,org.apache.hc.core5.http.ContentType.APPLICATION_JSON));
+        response.setHeader("Wechatpay-Serial","TEST_KEY_ID");response.setHeader("Wechatpay-Timestamp",time);
+        response.setHeader("Wechatpay-Nonce","create-order");response.setHeader("Wechatpay-Signature",sign(body,time,"create-order"));
+        doAnswer(invocation->{
+            var request=(org.apache.hc.client5.http.classic.methods.HttpPost)invocation.getArgument(0);
+            var payload=json.readTree(org.apache.hc.core5.http.io.entity.EntityUtils.toString(request.getEntity()));
+            assertThat(payload.path("time_expire").asText()).isEqualTo("2030-01-02T11:04:05+08:00");
+            org.apache.hc.core5.http.io.HttpClientResponseHandler<?> handler=invocation.getArgument(1);
+            return handler.handleResponse(response);
+        }).when(http).execute(any(org.apache.hc.core5.http.ClassicHttpRequest.class),any(org.apache.hc.core5.http.io.HttpClientResponseHandler.class));
+        assertThat(gateway.create(order,7)).isEqualTo("weixin://wxpay/test");
     }
     @Test void missingOrderRecoveryAcceptsOnlyASignedProviderResponse() throws Exception {
         var http=mock(HttpClient.class);

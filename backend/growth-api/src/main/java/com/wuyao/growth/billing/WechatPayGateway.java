@@ -24,6 +24,7 @@ import java.security.cert.CertificateFactory;
 import java.security.spec.*;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -41,7 +42,7 @@ public class WechatPayGateway {
         body.put("description",order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name());
         body.put("out_trade_no",tradeNo(order.id())); body.put("notify_url",config.getNotifyUrl());
         body.put("attach",tenantId+":"+order.id());
-        body.put("time_expire",DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(order.expiresAt().atOffset(ZoneOffset.ofHours(8))));
+        body.put("time_expire",DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(order.expiresAt().truncatedTo(ChronoUnit.SECONDS).atOffset(ZoneOffset.ofHours(8))));
         body.put("amount",Map.of("total",order.amountMinor(),"currency","CNY"));
         JsonNode result=send("POST","/v3/pay/transactions/native",body);
         String url=result.path("code_url").asText();

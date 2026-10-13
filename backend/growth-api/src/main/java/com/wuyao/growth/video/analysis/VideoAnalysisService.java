@@ -30,6 +30,11 @@ public class VideoAnalysisService {
     private final com.wuyao.growth.video.VideoAnalysisUrlImporter urlImporter;
     private final BillingService billing;
 
+    @Transactional(readOnly=true)
+    public List<Long> billingRecoveryTaskIds(List<String> reservations) {
+        return reservations.isEmpty()?List.of():analyses.billingRecoveryTaskIds(reservations);
+    }
+
     public VideoAnalysisDtos.Limits limits() {
         return new VideoAnalysisDtos.Limits(config.getMaxBytes(), config.getMaxDurationSeconds(), config.getMaxFrames(),
                 gateway.configured(ModelAlias.VISION_ANALYZER), gateway.configured(ModelAlias.AUDIO_ANALYZER), BillingService.VIDEO_ANALYSIS_CREDITS);

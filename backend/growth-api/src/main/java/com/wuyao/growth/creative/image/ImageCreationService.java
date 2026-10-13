@@ -35,6 +35,14 @@ public class ImageCreationService {
  private final TenantRateLimiter rateLimiter;
  private final BillingService billing;
 
+ @Transactional(readOnly=true)
+ public List<Long> billingRecoveryTaskIds(List<String> reservations) {
+   if(reservations.isEmpty()) return List.of();
+   var ids=new ArrayList<Long>(creations.billingRecoveryTaskIds(reservations));
+   ids.addAll(items.billingRecoveryTaskIds(reservations));
+   return ids.stream().distinct().toList();
+ }
+
  @Value("${growth.image.tenant-max-concurrent:20}")
  private int tenantMaxConcurrent;
  @Value("${growth.image.global-max-concurrent:200}")
@@ -133,7 +141,6 @@ public class ImageCreationService {
  }
  @Transactional
  public String rename(Long id,String title) {
-   billing.lockForGeneration();
    String value=title.trim();
    if(value.isEmpty()) throw bad("作品名称不能为空");
    var root=root(find(id));
