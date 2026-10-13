@@ -45,7 +45,7 @@ async function downloadWork(work) {
 }
 const typeIcon = { video: Video, image: ImageIcon, copy: FileText, diagnosis: MapPin }
 const toneClasses = { cinnabar: 'tone-cinnabar', amber: 'tone-amber', blue: 'tone-blue', green: 'tone-green', rose: 'tone-rose', cyan: 'tone-cyan' }
-const reEdit = () => router.push('/creative')
+const reEdit = () => router.push('/image/create')
 const selectedWork = ref(null)
 const openDetails = (work) => { selectedWork.value = work }
 const closeDetails = () => { selectedWork.value = null }

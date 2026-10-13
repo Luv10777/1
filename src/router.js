@@ -33,9 +33,11 @@ import { inDesktop } from './utils/desktop'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
+const MerchantAllianceView = () => import('./views/MerchantAllianceView.vue')
+const InformationPublishingView = () => import('./views/InformationPublishingView.vue')
 
 const routes = [
-  { path: '/', redirect: '/dashboard' },
+  { path: '/', redirect: '/image/create' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
@@ -78,7 +80,8 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', eyebrow: 'GEO GROWTH', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', eyebrow: 'GEO GROWTH', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: 'AI 可见度报告', eyebrow: 'GEO GROWTH', icon: '◉', description: '分析品牌在主流 AI 回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: PlaceholderView, meta: { title: '商家联盟', eyebrow: 'PLANS & BENEFITS', icon: '◇', description: '查看商家合作权益、联合活动和联盟资源。' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { title: '商家联盟', navGroup: 'billing' } },
+  { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
   { path: '/notifications', name: 'notifications', component: PlaceholderView, meta: { title: '消息', eyebrow: 'SYSTEM', icon: '◌', description: '集中查看系统通知、审核提醒和任务动态。' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
@@ -98,7 +101,7 @@ const router = createRouter({
 router.beforeEach(async (to, from) => {
   if (to.meta.public) {
     const wechatCallback = [to, from].some(location => location.query.wechat_ticket || location.hash.startsWith('#wechat_ticket=') || location.query.wechat_error)
-    if (to.name === 'login' && auth.isAuthenticated && !wechatCallback) return { name: inDesktop ? 'digital-human' : 'dashboard' }
+    if (to.name === 'login' && auth.isAuthenticated && !wechatCallback) return { name: inDesktop ? 'digital-human' : 'image-create' }
     return true
   }
 

@@ -30,6 +30,6 @@ test('password length boundaries preserve spaces and code requires six digits', 
 test('redirects stay within the application and avoid login loops', () => {
   assert.equal(safeRedirect('/works?filter=draft'), '/works?filter=draft')
   for (const value of [undefined, '//example.com', 'https://example.com', '/\\example.com', '/login?mode=register']) {
-    assert.equal(safeRedirect(value), '/dashboard')
+    assert.equal(safeRedirect(value), '/image/create')
   }
 })

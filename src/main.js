@@ -20,6 +20,7 @@ import './publishing.css'
 import './brand.css'
 import './publishing-workspace.css'
 import './image-studio-polish.css'
+import './business-community.css'
 
 theme.apply()
 
