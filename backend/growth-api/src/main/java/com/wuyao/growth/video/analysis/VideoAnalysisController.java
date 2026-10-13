@@ -31,6 +31,8 @@ public class VideoAnalysisController {
         return ApiResponse.ok(service.importUrl(request, me.userId()));
     }
     @GetMapping("/{id}") public ApiResponse<VideoAnalysisDtos.View> get(@PathVariable Long id) { return ApiResponse.ok(service.get(id)); }
+    @PostMapping("/{id}/cancel")
+    public ApiResponse<VideoAnalysisDtos.View> cancel(@PathVariable Long id) { return ApiResponse.ok(service.cancel(id)); }
     @GetMapping
     public ApiResponse<PageResult<VideoAnalysisDtos.View>> list(@RequestParam(defaultValue = "0") int page,
                                                               @RequestParam(defaultValue = "20") int size) {

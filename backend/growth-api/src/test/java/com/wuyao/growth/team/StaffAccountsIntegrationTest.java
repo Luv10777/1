@@ -92,6 +92,7 @@ class StaffAccountsIntegrationTest {
         owner.execute("TRUNCATE sms_codes, tenants RESTART IDENTITY CASCADE");
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('甲商户') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('乙商户') RETURNING id", Long.class);
+        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, tenantA, tenantB);
         // 没有写角色的旧账号就是管理员。
         bossA = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000001', '甲管理员') RETURNING id", Long.class, tenantA);
         Long bossB = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000009', '乙管理员') RETURNING id", Long.class, tenantB);
@@ -237,6 +238,8 @@ class StaffAccountsIntegrationTest {
         JsonNode fresh = login(STAFF_PHONE);
         assertThat(fresh.path("user").path("role").asText()).isEqualTo("OWNER");
         assertThat(fresh.path("user").path("tenantId").asLong()).isNotIn(tenantA, tenantB);
+        refused(get("/api/stores"), fresh.path("accessToken").asText(), null, 400, 9001);
+        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, fresh.path("user").path("tenantId").asLong());
         assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
     }
 

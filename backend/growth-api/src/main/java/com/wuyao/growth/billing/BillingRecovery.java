@@ -23,6 +23,7 @@ public class BillingRecovery {
     private final TaskRepository tasks;
     private final ImageCreationService images;
     private final VideoWorkflowService videos;
+    private final com.wuyao.growth.video.analysis.VideoAnalysisService analyses;
     private final BillingService billing;
     private final BillingCheckoutService checkout;
     private final WechatPayGateway wechat;
@@ -42,6 +43,7 @@ public class BillingRecovery {
                     for(var event:events) {
                         try {
                             if(event.type().startsWith("IMAGE_")) images.taskFailed(event);
+                            else if(event.type().startsWith("VIDEO_ANALYSIS_")) analyses.taskFailed(event);
                             else videos.taskFailed(event);
                         } catch(RuntimeException e) { log.warn("烟火释放等待重试: tenant={} task={}",tenant,event.taskId(),e); }
                     }
@@ -59,7 +61,9 @@ public class BillingRecovery {
                 WHERE c.task_id=t.id AND c.plan IS NULL AND r.gift_held+r.purchased_held>0)
               OR EXISTS (SELECT 1 FROM image_items i WHERE i.task_id=t.id AND i.billing_held=true)
               OR EXISTS (SELECT 1 FROM video_workflows w JOIN billing_reservations r ON r.id=w.billing_reservation_id
-                WHERE w.task_id=t.id AND w.status<>'SUCCEEDED' AND r.gift_held+r.purchased_held>0))
+                WHERE w.task_id=t.id AND w.status<>'SUCCEEDED' AND r.gift_held+r.purchased_held>0)
+              OR EXISTS (SELECT 1 FROM video_analyses a JOIN billing_reservations r ON r.id=a.billing_reservation_id
+                WHERE a.task_id=t.id AND a.status<>'SUCCEEDED' AND r.gift_held+r.purchased_held>0))
               ORDER BY t.id LIMIT 50
             """).getResultList();
         return ids.stream().map(id->tasks.findById(id.longValue()).orElseThrow()).map(TaskTerminalFailure::from).toList();

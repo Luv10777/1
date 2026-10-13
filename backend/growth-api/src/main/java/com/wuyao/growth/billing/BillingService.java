@@ -14,6 +14,7 @@ import java.util.Objects;
 @Service @RequiredArgsConstructor
 public class BillingService {
     public static final int IMAGE_CREDITS = 3;
+    public static final int VIDEO_ANALYSIS_CREDITS = 1;
     public static final int CREDITS_PER_YUAN = 10;
     private final BillingStore store;
     private final BillingProperties config;
@@ -25,7 +26,7 @@ public class BillingService {
     @Transactional(readOnly=true)
     public BillingDtos.Summary summary(boolean canManage,boolean operator) {
         var a=store.account();
-        return new BillingDtos.Summary("烟火",CREDITS_PER_YUAN,IMAGE_CREDITS,
+        return new BillingDtos.Summary("烟火",CREDITS_PER_YUAN,IMAGE_CREDITS,VIDEO_ANALYSIS_CREDITS,
             a==null?0:a.available(),a==null?0:a.getGiftAvailable(),a==null?0:a.getPurchasedAvailable(),
             a==null?0:a.getHeld(),a!=null&&a.active(Instant.now()),a==null?null:a.getMemberUntil(),
             a==null?null:a.getPlanSnapshot(),canManage,operator,payment());
@@ -196,10 +197,15 @@ public class BillingService {
     }
     @Transactional
     public void requireMembership(String capability) { requireEntitlement(store.lockAccount(),capability); }
+    @Transactional(readOnly=true)
+    public void requirePlatformMembership() { requireActiveMembership(store.account()); }
+    private void requireActiveMembership(BillingAccount a) {
+        if(a==null||!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,"请先开通或续订会员，再使用平台功能");
+    }
     private void requireEntitlement(BillingAccount a,String capability) {
-        if(!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,"请先开通或续订会员，再开始创作");
+        requireActiveMembership(a);
         var p=a.getPlanSnapshot();
-        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); default->false; };
+        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); case "VIDEO_ANALYSIS"->true; default->false; };
         if(!enabled) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,"当前套餐尚未开放此项创作功能");
     }
     private void hold(BillingAccount a,BillingReservation r,long amount,String eventKey,String description) {

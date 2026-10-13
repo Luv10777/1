@@ -138,6 +138,7 @@ class FoundationIntegrationTest {
     @Autowired AssetProbeHandler probe;
     @Autowired VideoWorkflowService videoWorkflows;
     @Autowired BillingService billingService;
+    @Autowired com.wuyao.growth.video.analysis.VideoAnalysisService videoAnalyses;
     @Autowired com.wuyao.growth.billing.BillingRecovery billingRecovery;
     @Autowired BillingProperties billingConfig;
     @Autowired VideoPricingProperties pricingConfig;
@@ -190,6 +191,123 @@ class FoundationIntegrationTest {
         }
     }
 
+
+    @Test
+    void platformMembershipGateCoversBusinessApisAndLeavesSubscriptionAccessible() throws Exception {
+        String token = jwt.issueAccessToken(seedPasswordAccount(), tenantA, null);
+        owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute' WHERE tenant_id=?", tenantA);
+        for (String path : List.of("/api/assets", "/api/stores", "/api/brands", "/api/video/analyses",
+                "/api/image-creations/capabilities", "/api/products")) {
+            mvc.perform(get(path).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001));
+        }
+        mvc.perform(get("/api/billing/summary").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.memberActive").value(false))
+                .andExpect(jsonPath("$.data.videoAnalysisCredits").value(1));
+        mvc.perform(get("/api/billing/plans").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+    }
+
+    @Test
+    void videoAnalysisRequiresMembershipAndEnoughYanhuoBeforeAnyTaskIsSubmitted() {
+        Long asset = videoAnalysisAsset();
+        var request = new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-denied", "ai", "");
+        owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute' WHERE tenant_id=?", tenantA);
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> videoAnalyses.create(request, -1L)))).isEqualTo(9001);
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> videoAnalyses.upload(
+                new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Upload("a.mp4", "video/mp4", 3L), -1L)))).isEqualTo(9001);
+        owner.update("UPDATE billing_accounts SET member_until=now()+interval '1 day',gift_available=0,purchased_available=0 WHERE tenant_id=?", tenantA);
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> videoAnalyses.create(request, -1L)))).isEqualTo(9003);
+        assertThat(owner.queryForObject("SELECT count(*) FROM video_analyses", Long.class)).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE type LIKE 'VIDEO_ANALYSIS_%'", Long.class)).isZero();
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isZero();
+    }
+
+    @Test
+    void videoAnalysisConcurrentSubmissionsAndDuplicateCompletionConsumeOnlyOneYanhuo() throws Exception {
+        Long asset = videoAnalysisAsset();
+        var request = new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-once", "ai", "");
+        long before = TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available());
+        try (var executor = Executors.newFixedThreadPool(4)) {
+            var submissions = new ArrayList<Future<com.wuyao.growth.video.analysis.VideoAnalysisDtos.View>>();
+            for (int i = 0; i < 4; i++) submissions.add(executor.submit(() -> TenantContext.runAs(tenantA, () -> videoAnalyses.create(request, -1L))));
+            var first = submissions.getFirst().get(15, TimeUnit.SECONDS);
+            for (var submission : submissions) assertThat(submission.get(15, TimeUnit.SECONDS).id()).isEqualTo(first.id());
+            var reserved = TenantContext.runAs(tenantA, () -> billingService.summary(true, false));
+            assertThat(reserved.available()).isEqualTo(before - 1);
+            assertThat(reserved.held()).isEqualTo(1);
+            var task = tasks.claim("MEDIA_CPU", 1).getFirst();
+            // Accepted work can finish and settle even if the membership expires during processing.
+            owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute' WHERE tenant_id=?", tenantA);
+            assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.completed(first.id(), task, Map.of("summary", "test report")))).isTrue();
+            assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.completed(first.id(), task, Map.of()))).isFalse();
+            assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before - 1);
+            assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isZero();
+            assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='CAPTURE' AND tenant_id=?", Long.class, tenantA)).isEqualTo(1);
+            assertThat(code(() -> TenantContext.runAs(tenantB, () -> videoAnalyses.get(first.id())))).isEqualTo(1404);
+        }
+    }
+
+    @Test
+    void videoAnalysisFailureAndCancellationReturnYanhuoAndFenceLateResults() {
+        Long asset = videoAnalysisAsset();
+        long before = TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available());
+        var first = TenantContext.runAs(tenantA, () -> videoAnalyses.create(
+                new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-failed", "ai", ""), -1L));
+        var task = tasks.claim("MEDIA_CPU", 1).getFirst();
+        TenantContext.runAs(tenantA, () -> { videoAnalyses.failed(first.id(), task, "test failure"); videoAnalyses.failed(first.id(), task, "duplicate"); return null; });
+        tasks.failPermanently(task.getId(), task.getAttempts(), "TEST", "test failure");
+        var second = TenantContext.runAs(tenantA, () -> videoAnalyses.create(
+                new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-cancelled", "real", ""), -1L));
+        var cancelled = tasks.claim("MEDIA_CPU", 1).getFirst();
+        TenantContext.runAs(tenantA, () -> { videoAnalyses.cancel(second.id()); videoAnalyses.cancel(second.id()); return null; });
+        assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.completed(second.id(), cancelled, Map.of()))).isFalse();
+        var balance = TenantContext.runAs(tenantA, () -> billingService.summary(true, false));
+        assertThat(balance.available()).isEqualTo(before); assertThat(balance.held()).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='RELEASE' AND tenant_id=?", Long.class, tenantA)).isEqualTo(2);
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='CAPTURE' AND tenant_id=?", Long.class, tenantA)).isZero();
+    }
+
+    @Test
+    void videoAnalysisRecoveryReleasesReservationsAfterLostFailureEvents() {
+        Long asset = videoAnalysisAsset();
+        long before = TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available());
+        for (String status : List.of("FAILED", "CANCELLED")) {
+            var analysis = TenantContext.runAs(tenantA, () -> videoAnalyses.create(
+                    new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-recovery-" + status, "ai", ""), -1L));
+            var task = tasks.claim("MEDIA_CPU", 1).getFirst();
+            owner.update("UPDATE tasks SET status=?,lease_expires_at=NULL WHERE id=?", status, task.getId());
+            billingRecovery.recover(); billingRecovery.recover();
+            assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.get(analysis.id()).status())).isEqualTo("FAILED");
+        }
+        var balance = TenantContext.runAs(tenantA, () -> billingService.summary(true, false));
+        assertThat(balance.available()).isEqualTo(before); assertThat(balance.held()).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='RELEASE' AND tenant_id=?", Long.class, tenantA)).isEqualTo(2);
+    }
+
+    @Test
+    void videoAnalysisUrlImportsReserveTheSameOneYanhuoAndKeepRetriesIdempotent() {
+        when(imageGateway.configured(ModelAlias.VISION_ANALYZER)).thenReturn(true);
+        long before = TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available());
+        var request = new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Import("https://example.com/test.mp4", "analysis-url", "real", "");
+        var first = TenantContext.runAs(tenantA, () -> videoAnalyses.importUrl(request, -1L));
+        assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.importUrl(request, -1L)).id()).isEqualTo(first.id());
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before - 1);
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(1);
+        TenantContext.runAs(tenantA, () -> videoAnalyses.cancel(first.id()));
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before);
+    }
+
+    private Long videoAnalysisAsset() {
+        when(imageGateway.configured(ModelAlias.VISION_ANALYZER)).thenReturn(true);
+        String key = "t" + tenantA + "/test-video-analysis/" + UUID.randomUUID();
+        imageStorage.put(key, new byte[]{1, 2, 3}, "video/mp4");
+        return TenantContext.runAs(tenantA, () -> transactions.execute(status -> {
+            var asset = new Asset(); asset.setTenantId(tenantA); asset.setName("Test video.mp4");
+            asset.setType("VIDEO"); asset.setMimeType("video/mp4"); asset.setStatus("READY"); asset.setStorageKey(key);
+            return assetRepository.saveAndFlush(asset).getId();
+        }));
+    }
 
     private void setUpPaidBillingFixtures() {
         owner.execute("TRUNCATE billing_plans RESTART IDENTITY");

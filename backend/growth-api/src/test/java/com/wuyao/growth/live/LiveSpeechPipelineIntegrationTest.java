@@ -180,6 +180,7 @@ class LiveSpeechPipelineIntegrationTest {
         worker = new TaskWorker(tasks, handlers, List.of("LIVE_REPLY", "LIVE"), 5, Duration.ofMinutes(30), 10_000);
 
         tenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('直播测试') RETURNING id", Long.class);
+        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, tenant);
         Long user = owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?, 'host', '主播') RETURNING id", Long.class, tenant);
         token = jwt.issueAccessToken(user, tenant, null);
         store = api(post("/api/stores"), Map.of("name", "蜂蜜小店")).path("id").asLong();
@@ -533,6 +534,7 @@ class LiveSpeechPipelineIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks", Integer.class)).isZero();
         // Another tenant cannot see, let alone steer, this session's narration.
         Long otherTenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('别家') RETURNING id", Long.class);
+        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, otherTenant);
         Long outsider = owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?, 'outsider', '外人') RETURNING id", Long.class, otherTenant);
         mvc.perform(get(path("/auto-script")).header("Authorization", "Bearer " + jwt.issueAccessToken(outsider, otherTenant, null)))
                 .andExpect(jsonPath("$.code").value(1404));

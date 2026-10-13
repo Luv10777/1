@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { auth } from './stores/auth'
+import { refreshBilling } from './stores/billing'
 import LoginView from './views/LoginView.vue'
 import DashboardView from './views/DashboardView.vue'
 import AnalyticsView from './views/AnalyticsView.vue'
@@ -89,13 +90,18 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/404' },
 ]
 
+const membershipFreeRoutes = new Set(['billing', 'team', 'settings', 'help'])
+for (const route of routes) {
+  if (route.name && !route.meta?.public && !membershipFreeRoutes.has(route.name)) route.meta.requiresMembership = true
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 }),
 })
 
-router.beforeEach((to, from) => {
+router.beforeEach(async (to, from) => {
   if (to.meta.public) {
     const wechatCallback = [to, from].some(location => location.query.wechat_ticket || location.hash.startsWith('#wechat_ticket=') || location.query.wechat_error)
     if (to.name === 'login' && auth.isAuthenticated && !wechatCallback) return { name: inDesktop ? 'digital-human' : 'dashboard' }
@@ -107,10 +113,16 @@ router.beforeEach((to, from) => {
   }
 
   // 桌面端只做直播这一件事：别的页面一律回到直播页。
-  if (inDesktop && to.name !== 'digital-human') return { name: 'digital-human' }
+  if (inDesktop && !['digital-human', 'billing', 'help'].includes(to.name)) return { name: 'digital-human' }
 
   if (to.meta.role && !auth.hasRole(to.meta.role)) return { name: 'forbidden' }
   if (to.meta.ownerOnly && !auth.isOwner) return { name: 'forbidden' }
+  if (to.meta.requiresMembership) {
+    const account = await refreshBilling()
+    if (!account?.memberActive) return { name: 'billing', query: {
+      membership: account ? 'required' : 'unavailable', redirect: to.fullPath, module: to.meta.title,
+    } }
+  }
   return true
 })
 

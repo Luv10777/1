@@ -28,6 +28,7 @@ public class VideoAnalysis {
     @Column(nullable = false, length = 20) private String status = "QUEUED";
     @Column(nullable = false) private int progress = 0;
     @Column(name = "task_id") private Long taskId;
+    @Column(name = "billing_reservation_id", length = 36) private String billingReservationId;
     @Column(name = "duration_ms") private Integer durationMs;
     private Integer width;
     private Integer height;

@@ -1,5 +1,7 @@
 package com.wuyao.growth.common.config;
 
+import com.wuyao.growth.billing.PlatformMembershipInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
@@ -8,11 +10,22 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 
 @Configuration
-public class WebConfig {
+@RequiredArgsConstructor
+public class WebConfig implements WebMvcConfigurer {
+    private final PlatformMembershipInterceptor membership;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(membership).addPathPatterns("/api/**")
+                .excludePathPatterns("/api/auth/**", "/api/billing/**", "/api/team/**",
+                        "/api/player/ws", "/api/player/test-audio.wav", "/api/player/audio/**");
+    }
 
     @Bean
     public WebServerFactoryCustomizer<TomcatServletWebServerFactory> serverProtocol(

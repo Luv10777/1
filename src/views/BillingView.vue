@@ -8,6 +8,9 @@ import BillingPlanManager from '../components/BillingPlanManager.vue'
 
 const route = useRoute()
 const account = computed(() => billing.summary)
+const returnTo = computed(() => typeof route.query.redirect === 'string'
+  && route.query.redirect.startsWith('/') && !route.query.redirect.startsWith('//')
+  ? route.query.redirect : '/dashboard')
 const amount = ref(50)
 const preset = [10, 50, 100, 300]
 const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= 1 && amount.value <= 100000)
@@ -145,6 +148,8 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <div><p class="eyebrow">一方志 · 我的账户</p><h1>套餐与权益</h1></div>
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>
+    <div v-if="route.query.membership && !account?.memberActive" class="yanhuo-alert" role="status">{{ route.query.membership === 'unavailable' ? '暂时无法确认会员状态，请重新读取账户后继续。' : `使用${route.query.module || '平台功能'}需要先开通会员。充值烟火不会自动开通会员。` }}</div>
+    <RouterLink v-if="route.query.membership && account?.memberActive" :to="returnTo" class="generation-billing-link">会员已生效，继续使用{{ route.query.module || '平台功能' }} →</RouterLink>
     <div v-if="billing.error" class="yanhuo-alert" role="alert">{{ billing.error }}<button type="button" @click="refresh">重新读取</button></div>
     <div v-else-if="!account" class="yanhuo-empty" role="status">正在读取烟火账户...</div>
     <template v-if="account">
@@ -158,13 +163,14 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <span class="yanhuo-status" :class="{ active: account.memberActive }"><span />{{ membershipLabel }}</span>
           <h2>{{ account.plan?.name || '会员套餐待订阅' }}</h2>
           <p v-if="account.memberUntil">有效期至 {{ dateTime(account.memberUntil) }}</p>
-          <p v-else>开通会员后即可使用套餐内的创作权益。</p>
+          <p v-else>平台各模块均需先开通会员，再按对应规则使用烟火。</p>
           <div class="yanhuo-entitlements"><span :class="{ enabled: account.memberActive && account.plan?.imageEnabled }"><Check :size="14" />图片创作</span><span :class="{ enabled: account.memberActive && account.plan?.videoEnabled }"><Check :size="14" />视频创作</span></div>
         </div>
         <div class="yanhuo-rules">
           <h3>烟火计费</h3>
           <p><strong>1 元 = {{ account.creditsPerYuan }} 烟火</strong><br>每张图片 {{ account.imageCredits }} 烟火，优先使用会员赠送余额。</p>
-          <p>视频以生成前确认的报价预占烟火，交付后结算。未交付部分退回。</p>
+          <p>视频反推每次 {{ account.videoAnalysisCredits }} 烟火，分析成功后扣除，失败或取消退回。</p>
+          <p>视频生成以确认的报价预占烟火，交付后结算。其他模块按正式公布的规则计费。</p>
           <span><CircleHelp :size="14" />充值烟火可保留，创作需有效会员。</span>
         </div>
       </section>

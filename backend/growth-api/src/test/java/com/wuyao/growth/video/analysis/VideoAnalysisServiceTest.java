@@ -1,6 +1,7 @@
 package com.wuyao.growth.video.analysis;
 
 import com.wuyao.growth.asset.*;
+import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.storage.ObjectStorage;
 import com.wuyao.growth.common.task.*;
@@ -21,8 +22,9 @@ class VideoAnalysisServiceTest {
     private final TaskService tasks = mock(TaskService.class);
     private final TaskRepository taskRepository = mock(TaskRepository.class);
     private final AiGateway gateway = mock(AiGateway.class);
+    private final BillingService billing = mock(BillingService.class);
     private final VideoAnalysisService service = new VideoAnalysisService(analyses, assets, assetService, storage,
-            tasks, taskRepository, gateway, new VideoAnalysisProperties(), new VideoAnalysisUrlImporter());
+            tasks, taskRepository, gateway, new VideoAnalysisProperties(), new VideoAnalysisUrlImporter(), billing);
 
     @Test void oversizedUploadIsRejectedBeforeAnyUploadTicketIsIssued() {
         assertThatThrownBy(() -> service.upload(new VideoAnalysisDtos.Upload("a.mp4", "video/mp4", 104857601L), 1L))

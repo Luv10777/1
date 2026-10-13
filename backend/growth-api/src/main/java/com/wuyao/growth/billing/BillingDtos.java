@@ -8,7 +8,7 @@ public final class BillingDtos {
     private BillingDtos() {}
     public record PlanSnapshot(Long id, String code, String name, String description, long priceMinor,
                                int durationDays, long giftCredits, boolean imageEnabled, boolean videoEnabled) {}
-    public record Summary(String currencyName, int creditsPerYuan, int imageCredits, long available,
+    public record Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits, long available,
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
                           Instant memberUntil, PlanSnapshot plan, boolean canManage, boolean operator,
                           PaymentInstructions payment) {}

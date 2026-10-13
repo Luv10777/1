@@ -1,6 +1,7 @@
 package com.wuyao.growth.video.analysis;
 
 import com.wuyao.growth.asset.*;
+import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.storage.ObjectStorage;
 import com.wuyao.growth.common.task.*;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.Duration;
 import java.util.*;
@@ -26,13 +28,15 @@ public class VideoAnalysisService {
     private final AiGateway gateway;
     private final VideoAnalysisProperties config;
     private final com.wuyao.growth.video.VideoAnalysisUrlImporter urlImporter;
+    private final BillingService billing;
 
     public VideoAnalysisDtos.Limits limits() {
         return new VideoAnalysisDtos.Limits(config.getMaxBytes(), config.getMaxDurationSeconds(), config.getMaxFrames(),
-                gateway.configured(ModelAlias.VISION_ANALYZER), gateway.configured(ModelAlias.AUDIO_ANALYZER));
+                gateway.configured(ModelAlias.VISION_ANALYZER), gateway.configured(ModelAlias.AUDIO_ANALYZER), BillingService.VIDEO_ANALYSIS_CREDITS);
     }
 
     public AssetDtos.UploadTicket upload(VideoAnalysisDtos.Upload request, Long userId) {
+        billing.requireMembership("VIDEO_ANALYSIS");
         checkSize(request.sizeBytes());
         String extension = request.name().toLowerCase(Locale.ROOT);
         if (!extension.endsWith(".mp4") && !extension.endsWith(".mov")) {
@@ -43,6 +47,7 @@ public class VideoAnalysisService {
 
     @Transactional
     public VideoAnalysisDtos.View create(VideoAnalysisDtos.Create request, Long userId) {
+        billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VISION_ANALYZER)) {
             throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频反推模型尚未配置");
         }
@@ -58,6 +63,7 @@ public class VideoAnalysisService {
             }
             return view(prior, true);
         }
+        billing.requireMembership("VIDEO_ANALYSIS");
         if (!"VIDEO".equals(asset.getType()) || "INVALID".equals(asset.getStatus())) {
             throw BizException.of(ErrorCode.BAD_REQUEST, "请使用有效的视频素材");
         }
@@ -75,6 +81,8 @@ public class VideoAnalysisService {
         analysis.setMode(request.mode());
         analysis.setReverseNeed(need);
         analysis.setAssetId(asset.getId());
+        analysis.setBillingReservationId(billing.reserve("video-analysis:" + request.requestKey(), "VIDEO_ANALYSIS",
+                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 1 烟火"));
         analyses.saveAndFlush(analysis);
         Task task = tasks.submit(VideoAnalysisPrepareHandler.TYPE, "MEDIA_CPU", Map.of("analysisId", analysis.getId()),
                 "video-analysis-prepare-" + analysis.getId(), userId);
@@ -90,6 +98,7 @@ public class VideoAnalysisService {
 
     @Transactional
     public VideoAnalysisDtos.View importUrl(VideoAnalysisDtos.Import request, Long userId) {
+        billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VISION_ANALYZER)) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频反推模型尚未配置");
         String url = request.url().strip();
         try { urlImporter.validate(url); }
@@ -102,6 +111,8 @@ public class VideoAnalysisService {
                     || !Objects.equals(prior.getReverseNeed(), need)) throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的分析");
             return view(prior, true);
         }
+        String reservation = billing.reserve("video-analysis:" + request.requestKey(), "VIDEO_ANALYSIS",
+                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 1 烟火");
         var asset = new Asset();
         asset.setTenantId(TenantContext.require()); asset.setCreatedBy(userId);
         asset.setName("链接视频.mp4"); asset.setType("VIDEO"); asset.setMimeType("video/mp4");
@@ -112,6 +123,7 @@ public class VideoAnalysisService {
         a.setTenantId(asset.getTenantId()); a.setCreatedBy(userId); a.setAssetId(asset.getId());
         a.setName(asset.getName()); a.setMode(request.mode()); a.setReverseNeed(need);
         a.setRequestKey(request.requestKey()); a.setSourceUrl(url);
+        a.setBillingReservationId(reservation);
         analyses.saveAndFlush(a);
         var task = tasks.submit(VideoAnalysisPrepareHandler.TYPE, "MEDIA_CPU", Map.of("analysisId", a.getId()),
                 "video-analysis-prepare-" + a.getId(), userId);
@@ -203,6 +215,8 @@ public class VideoAnalysisService {
     public boolean completed(Long id, Task task, Map<String, Object> result) {
         var analysis = owned(id, task);
         if (analysis == null) return false;
+        if (analysis.getBillingReservationId() != null) billing.capture(analysis.getBillingReservationId(),
+                BillingService.VIDEO_ANALYSIS_CREDITS, "video-analysis:" + id + ":capture", "视频反推 · 分析完成");
         analysis.setResult(result); analysis.setStatus("SUCCEEDED"); analysis.setProgress(100);
         return true;
     }
@@ -211,12 +225,40 @@ public class VideoAnalysisService {
     public void failed(Long id, Task task, String message) {
         var analysis = owned(id, task);
         if (analysis == null) return;
+        markFailed(analysis, message);
+    }
+
+    @Transactional
+    public VideoAnalysisDtos.View cancel(Long id) {
+        billing.lockForGeneration();
+        var analysis = analyses.lock(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "分析记录不存在"));
+        if (!analysis.terminal()) {
+            if (analysis.getTaskId() != null) tasks.cancel(analysis.getTaskId());
+            markFailed(analysis, "分析已取消，预占烟火已退回");
+        }
+        return view(analysis, true);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void taskFailed(TaskTerminalFailure event) {
+        if (!(event.payload().get("analysisId") instanceof Number id)) return;
+        billing.lockForGeneration();
+        var analysis = analyses.lock(id.longValue()).orElse(null);
+        if (analysis == null || analysis.terminal() || !Objects.equals(analysis.getTaskId(), event.taskId())) return;
+        markFailed(analysis, "分析任务未能完成，预占烟火已退回，请重新分析");
+    }
+
+    private void markFailed(VideoAnalysis analysis, String message) {
+        if (analysis.getBillingReservationId() != null) billing.release(analysis.getBillingReservationId(),
+                "video-analysis:" + analysis.getId() + ":release", "视频反推 · 未完成，退回烟火");
         analysis.setStatus("FAILED"); analysis.setErrorMessage(message);
         assets.findById(analysis.getAssetId()).filter(a -> !"READY".equals(a.getStatus()))
                 .ifPresent(a -> a.setStatus("INVALID"));
     }
 
     private VideoAnalysis owned(Long id, Task task) {
+        // Phase changes, cancellation and settlement share the account-first lock order.
+        billing.lockForGeneration();
         if (taskRepository.findOwnedRunning(task.getId(), task.getAttempts()).isEmpty()) return null;
         var analysis = analyses.lock(id).orElseThrow();
         return analysis.terminal() || !Objects.equals(analysis.getTaskId(), task.getId()) ? null : analysis;

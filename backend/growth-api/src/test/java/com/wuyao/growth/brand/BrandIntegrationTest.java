@@ -80,6 +80,7 @@ class BrandIntegrationTest {
         owner.execute("TRUNCATE tenants RESTART IDENTITY CASCADE");
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('甲商户') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('乙商户') RETURNING id", Long.class);
+        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, tenantA, tenantB);
         userA = owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?, 'owner-a', '甲管理员') RETURNING id", Long.class, tenantA);
         Long userB = owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?, 'owner-b', '乙管理员') RETURNING id", Long.class, tenantB);
         tokenA = jwt.issueAccessToken(userA, tenantA, null);

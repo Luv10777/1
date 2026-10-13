@@ -15,6 +15,11 @@ watch(() => [auth.user?.id, auth.tenantId], () => refreshBilling(), { immediate:
 onMounted(() => { billingTimer = setInterval(reloadBalance, 30000); window.addEventListener('focus', reloadBalance) })
 onBeforeUnmount(() => { clearInterval(billingTimer); window.removeEventListener('focus', reloadBalance) })
 const router = useRouter()
+watch(() => billing.summary?.memberActive, active => {
+  if (active === false && route.meta.requiresMembership) router.replace({ name: 'billing', query: {
+    membership: 'required', redirect: route.fullPath, module: route.meta.title,
+  } })
+})
 const menuOpen = ref(false)
 const collapsed = ref(false)
 const accountOpen = ref(false)

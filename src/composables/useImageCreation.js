@@ -158,6 +158,7 @@ export function useImageCreation(workflow) {
     files.value.splice(index, 1)
   }
   async function deliver(operation) {
+    workspaceTab.value = 'result'
     persistPending(operation)
     let result
     if (operation.kind === 'create') result = await imageApi.create(operation.data)
@@ -189,11 +190,11 @@ export function useImageCreation(workflow) {
       if (product.value && !files.value.some(f => f.role === 'SUBJECT')) throw new Error('先上传至少一张商品照片')
       const submittedBrief = brief.value.trim()
       const submittedFiles = [...files.value]
+      workspaceTab.value = 'result'
       if (!product.value) {
         lastPrompt.value = submittedBrief
         optimisticBrief.value = submittedBrief
         optimistic.value = true
-        workspaceTab.value = 'result'
         brief.value = ''
         files.value = []
       }

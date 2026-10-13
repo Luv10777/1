@@ -7,6 +7,7 @@ export const videoAnalysisApi = {
   get: id => get(`/api/video/analyses/${id}`),
   create: data => post('/api/video/analyses', data),
   importUrl: data => post('/api/video/analyses/import-url', data),
+  cancel: id => post(`/api/video/analyses/${id}/cancel`, {}),
   rename: (id, name) => put(`/api/video/analyses/${id}/name`, { name }),
 }
 

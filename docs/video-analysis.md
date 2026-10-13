@@ -1,6 +1,6 @@
 # 视频反推接入与运行
 
-更新日期：2026-10-08。
+更新日期：2026-10-13。
 
 视频反推采用双模型架构：画面使用 OnlyRouter 的 `gpt-6-luna`，声音使用百炼工作空间的 `qwen3.8-omni-flash`。后端用 FFmpeg 提取带近似时间戳的图片和 WAV 音轨，先生成独立声音报告，再把声音报告与抽样画面交给画面模型生成最终拆解结果。前端使用真实任务状态展示两个阶段的进度、结果和历史。
 
@@ -78,17 +78,19 @@ npm run dev
 
 ## 接口与任务
 
-所有接口复用平台 JWT 认证、统一响应信封与数据库租户隔离。
+所有接口复用平台 JWT 认证、统一响应信封与数据库租户隔离，并要求有效会员。每次分析提交时预占 1 烟火，
+报告完成后扣除，失败或取消退回；同一提交编号的重放不会重复收费，重新分析则按新请求计费。
 
 | 方法 | 路径 | 功能 |
 | --- | --- | --- |
-| GET | `/api/video/analyses/limits` | 上传限制和模型是否配置 |
+| GET | `/api/video/analyses/limits` | 上传限制、模型是否配置与单次烟火价格 |
 | POST | `/api/video/analyses/upload-url` | 按文件名、MIME、大小申请直传地址 |
 | POST | `/api/video/analyses` | 用 `assetId`、`requestKey`、`mode`、`reverseNeed` 创建分析 |
 | POST | `/api/video/analyses/import-url` | 用公开 HTTPS 视频文件直链创建分析 |
 | GET | `/api/video/analyses/{id}` | 状态、结果、原视频和抽帧预览 |
 | GET | `/api/video/analyses?page=0&size=20` | 当前租户的分页历史，`size` 最大为 50 |
 | PUT | `/api/video/analyses/{id}/name` | 用 `name` 重命名历史记录 |
+| POST | `/api/video/analyses/{id}/cancel` | 取消未完成分析，退回预占烟火并阻止迟到结果写入 |
 
 本地上传流程为：申请签名地址 → 浏览器直接 PUT 到对象存储 → 创建分析 → 轮询详情。签名上传不携带平台 JWT。`mode` 为 `ai` 或 `real`；`reverseNeed` 是可选的关注点，最多 2000 字符。同一次提交须复用 `requestKey`，相同内容返回已有分析；同一编号用于不同内容则返回冲突。
 

@@ -1,5 +1,6 @@
 import { watch } from 'vue'
 import { auth } from './auth.js'
+import { billing } from './billing.js'
 import { storesApi } from '../services/storesApi.js'
 import { createStoreContext } from './storeContext.js'
 
@@ -8,6 +9,6 @@ try { storage = globalThis.localStorage } catch { /* Browsing without local stor
 const context = createStoreContext(storesApi, storage)
 export const { stores, selectedStoreId, selectedStoreRecord, selectedStore, storeLoading, storeError, loadStores, saveStore, archiveStore, createStore } = context
 
-watch(() => auth.isAuthenticated ? `${auth.tenantId}:${auth.user.id}` : '', identity => {
+watch(() => auth.isAuthenticated && billing.summary?.memberActive ? `${auth.tenantId}:${auth.user.id}` : '', identity => {
   context.setAccount(identity)
 }, { immediate: true, flush: 'sync' })

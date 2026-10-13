@@ -25,5 +25,6 @@ public final class VideoAnalysisDtos {
                        String reverseNeed, Integer durationMs, Integer width, Integer height,
                        String videoUrl, List<FrameView> frames, Map<String, Object> result,
                        String errorMessage, Instant createdAt) {}
-    public record Limits(long maxBytes, int maxDurationSeconds, int maxFrames, boolean configured, boolean audioConfigured) {}
+    public record Limits(long maxBytes, int maxDurationSeconds, int maxFrames, boolean configured, boolean audioConfigured,
+                         int creditsPerAnalysis) {}
 }

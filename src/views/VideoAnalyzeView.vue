@@ -5,6 +5,7 @@ import { videoAnalysisApi, uploadAnalysisVideo } from '../services/videoAnalysis
 import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
 import { customizeAnalysisRecreation, analysisRecreationRoute } from '../domain/videoAnalysisCustomization'
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
+import { billing, refreshBilling } from '../stores/billing'
 
 const router = useRouter()
 const route = useRoute()
@@ -119,6 +120,7 @@ function poll(id) {
       if (analysis.videoUrl && !objectUrl) previewUrl.value = analysis.videoUrl
       failures = 0
       if (analysisTerminal(analysis.status)) {
+        refreshBilling()
         error.value = analysis.status === 'FAILED' ? analysis.errorMessage || '分析未完成，请重试。' : ''
         refreshHistory()
         return
@@ -153,6 +155,7 @@ async function loadHistory(id) {
     if (disposed || String(route.query.history) !== String(id)) return
     releasePreview()
     current.value = analysis
+    refreshBilling()
     selectedFile.value = null
     selectedName.value = analysis.name
     uploadedAssetId.value = analysis.assetId
@@ -234,7 +237,21 @@ async function startScan() {
     poll(analysis.id)
     refreshHistory()
   } catch (e) { if (!disposed) error.value = e.message || '分析提交失败，请重试。' }
-  finally { if (!disposed) uploading.value = false }
+  finally { if (!disposed) uploading.value = false; refreshBilling() }
+}
+
+async function cancelScan() {
+  if (!current.value || uploading.value || analysisTerminal(current.value.status)) return
+  uploading.value = true
+  try {
+    const analysis = await videoAnalysisApi.cancel(current.value.id)
+    if (disposed) return
+    stopPolling()
+    current.value = analysis
+    error.value = analysis.errorMessage || ''
+    refreshHistory()
+  } catch (e) { if (!disposed) error.value = e.message || '取消失败，请刷新任务状态。' }
+  finally { if (!disposed) uploading.value = false; refreshBilling() }
 }
 
 async function copyText(text, label) {
@@ -315,6 +332,9 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <div v-else class="skeleton-player" :class="{ scanning: isScanning }"><div v-if="isScanning" class="scan-beam" /><div class="skeleton-grid" /><div class="skeleton-center"><span class="material-symbols-outlined">movie</span><p>{{ statusLabel }}</p><small>选择视频后点击开始分析</small></div></div>
         </section>
         <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan"><span class="material-symbols-outlined">auto_awesome</span>{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }} <span>↗</span></button>
+        <p class="generation-billing-note">每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火 · 提交时预占，分析成功后扣除，失败或取消退回。重新分析会再次计费。</p>
+        <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员 →</RouterLink>
+        <button v-if="current && !analysisTerminal(current.status)" type="button" class="premium-secondary" :disabled="uploading" @click="cancelScan">取消分析</button>
         <p class="privacy-note"><span class="material-symbols-outlined">lock</span>原视频保留供回看，临时文件自动清理</p>
         <div v-if="error" class="analysis-error" role="alert">{{ error }}<button v-if="pollingInterrupted" type="button" @click="error = ''; poll(current.id)">重新连接</button></div>
       </aside>

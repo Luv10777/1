@@ -59,7 +59,11 @@ async function saveTitle(entry) {
     <div v-if="studio.pending" class="creation-message" role="status">上次提交尚未确认，可以恢复原请求。<button type="button" :disabled="studio.busy" @click="studio.generate">恢复提交</button></div>
 
     <slot v-if="studio.workspaceTab === 'inspiration'" />
-    <p v-if="studio.workspaceTab === 'result' && studio.current" class="generation-billing-note">成功交付每张 3 烟火；修改或重做会生成新版本，并按交付张数扣费。</p>
+    <div v-else-if="studio.busy && !studio.current" class="creation-empty-result" role="status" aria-live="polite">
+      <span class="creation-pulse" />
+      <h2>正在提交创作需求</h2>
+      <p>商品照片上传完成后，生成进度与图片会显示在这里。</p>
+    </div>
     <div v-else-if="!studio.current" class="creation-empty-result">
       <span class="material-symbols-outlined" aria-hidden="true">image</span>
       <h2>{{ studio.product ? '你的产品套图，会展示在这里。' : '你的第一张海报，会展示在这里。' }}</h2>
@@ -67,6 +71,7 @@ async function saveTitle(entry) {
       <small>生成后可放大查看、下载与修改，作品会自动保存。</small>
     </div>
     <div v-else class="creation-output" :aria-busy="studio.active">
+      <p class="generation-billing-note">成功交付每张 3 烟火；修改或重做会生成新版本，并按交付张数扣费。</p>
       <div class="creation-progress" role="status" aria-live="polite"><span v-if="studio.active" class="creation-pulse" /><strong>{{ IMAGE_STATUS[studio.current.status] }}</strong><small>{{ studio.current.completed }}/{{ studio.current.count }} 张</small><button type="button" :disabled="studio.busy" @click="studio.load(studio.current.id)">刷新</button><button v-if="studio.active" type="button" :disabled="studio.busy" @click="studio.cancel()">取消生成</button></div>
       <p class="creation-original">{{ studio.current.brief || '根据商品照片自动创作' }}</p>
       <p v-if="studio.current.summary" class="creation-plan">{{ studio.current.summary }}</p>

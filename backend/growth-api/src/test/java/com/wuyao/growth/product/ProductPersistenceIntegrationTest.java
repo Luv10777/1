@@ -65,6 +65,7 @@ class ProductPersistenceIntegrationTest {
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         owner.execute("TRUNCATE tenants RESTART IDENTITY CASCADE");
         tenantId = owner.queryForObject("INSERT INTO tenants(name) VALUES ('商品测试租户') RETURNING id", Long.class);
+        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, tenantId);
         userId = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13800000001', '商品管理员') RETURNING id",
                 Long.class, tenantId);
         storeId = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '测试门店', ?) RETURNING id",
