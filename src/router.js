@@ -11,6 +11,7 @@ import ConsumerPreviewView from './views/ConsumerPreviewView.vue'
 import StoresView from './views/StoresView.vue'
 import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
+import MerchantAllianceView from './views/MerchantAllianceView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
 import BrandsView from './views/BrandsView.vue'
 import AssetsView from './views/AssetsView.vue'
@@ -78,7 +79,7 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', eyebrow: 'GEO GROWTH', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', eyebrow: 'GEO GROWTH', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: 'AI 可见度报告', eyebrow: 'GEO GROWTH', icon: '◉', description: '分析品牌在主流 AI 回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: PlaceholderView, meta: { title: '商家联盟', eyebrow: 'PLANS & BENEFITS', icon: '◇', description: '查看商家合作权益、联合活动和联盟资源。' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { title: '商家联盟', eyebrow: 'PLANS & BENEFITS', icon: '◇', description: '查看商家合作权益、联合活动和联盟资源。' } },
   { path: '/notifications', name: 'notifications', component: PlaceholderView, meta: { title: '消息', eyebrow: 'SYSTEM', icon: '◌', description: '集中查看系统通知、审核提醒和任务动态。' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
