@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, uploadLibraryImageReference, saveGeneratedImageToLibrary, downloadImage } from '../services/imageCreation'
 import { IMAGE_QUALITIES, POSTER_PURPOSE_GROUPS, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
-import { billing, refreshBilling } from '../stores/billing'
+import { billing, refreshBilling, requireMembership } from '../stores/billing'
 
 export function useImageCreation(workflow) {
   const route = useRoute()
@@ -172,10 +172,14 @@ export function useImageCreation(workflow) {
     await openCreation(result.id)
     await refreshHistory()
   }
-  async function run(action) {
+  async function run(action, creation = false) {
     if (busy.value) return
     busy.value = true; error.value = ''
-    try { await action() }
+    try {
+      if (creation) await requireMembership()
+      if (!alive) return
+      await action()
+    }
     catch (e) {
       error.value = e.message
       // Business rejection is definitive; a network/server failure may have accepted the request.
@@ -220,12 +224,12 @@ export function useImageCreation(workflow) {
       } finally {
         optimistic.value = false
       }
-    })
+    }, true)
   }
   function revise() {
     if (!revision.value.trim()) return
     run(() => deliver({ kind: current.value.status === 'NEEDS_INPUT' ? 'answer' : 'revision', id: current.value.id,
-      data: { requestKey: crypto.randomUUID(), instruction: revision.value.trim() } }))
+      data: { requestKey: crypto.randomUUID(), instruction: revision.value.trim() } }), true)
   }
   function revisePoster(item, changes) {
     if (!item || !changes) return
@@ -240,14 +244,14 @@ export function useImageCreation(workflow) {
     if (!instructions.length) return
     run(() => deliver({ kind: 'revision', id: current.value.id, data: {
       requestKey: crypto.randomUUID(), instruction: instructions.join('\n'), variation: changes.options?.find(option => ['LAYOUT', 'SCENE', 'MESSAGE'].includes(option)) || null,
-    } }))
+    } }), true)
   }
   function retry(item) {
     run(async () => {
       current.value = item ? await imageApi.retry(current.value.id, item)
         : await imageApi.retryPlan(current.value.id, current.value.taskId)
       await load(current.value.id)
-    })
+    }, true)
   }
   function cancel() {
     if (!current.value || !active.value) return
@@ -259,7 +263,7 @@ export function useImageCreation(workflow) {
   function editText(item) { textEdit.value = item; editHeadline.value = item.headline; editCaption.value = item.caption }
   function saveText() {
     run(() => deliver({ kind: 'text', id: current.value.id, itemId: textEdit.value.id,
-      data: { requestKey: crypto.randomUUID(), headline: editHeadline.value, caption: editCaption.value } }))
+      data: { requestKey: crypto.randomUUID(), headline: editHeadline.value, caption: editCaption.value } }), true)
   }
   function download(item) {
     if (!canUseAsset(item)) return
@@ -279,7 +283,7 @@ export function useImageCreation(workflow) {
   }
   function regenerate(item, variation = null) {
     run(() => deliver({ kind: 'regenerate', id: current.value.id, itemId: item.id,
-      data: { requestKey: crypto.randomUUID(), variation } }))
+      data: { requestKey: crypto.randomUUID(), variation } }), true)
   }
   async function loadCapabilities() {
     capabilityState.value = 'checking'

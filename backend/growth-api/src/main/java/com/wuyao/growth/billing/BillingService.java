@@ -220,7 +220,7 @@ public class BillingService {
     @Transactional(readOnly=true)
     public void requirePlatformMembership() { requireActiveMembership(store.account()); }
     private void requireActiveMembership(BillingAccount a) {
-        if(a==null||!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,"请先开通或续订会员，再使用平台功能");
+        if(a==null||!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,"您还未开通会员");
     }
     private void requireEntitlement(BillingAccount a,String capability) {
         requireActiveMembership(a);

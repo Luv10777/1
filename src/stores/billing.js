@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import { auth } from './auth'
-import { get, post } from '../utils/request'
+import { get, post, membershipRequired } from '../utils/request'
 
 export const billing = reactive({
   summary: null,
@@ -43,6 +43,13 @@ export async function loadBillingPlans() {
   const data = await get('/api/billing/plans')
   if (current === scope) billing.plans = data
   return data
+}
+
+export async function requireMembership() {
+  const account = await refreshBilling()
+  if (!account) throw new Error(billing.error || '暂时无法确认会员状态，请稍后重试')
+  if (!account.memberActive) throw membershipRequired()
+  return account
 }
 
 export const billingApi = {

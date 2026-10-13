@@ -22,6 +22,11 @@ class ApiError extends Error {
   }
 }
 
+export function membershipRequired() {
+  if (typeof window !== 'undefined') window.dispatchEvent?.(new Event('membership-required'))
+  return new ApiError('您还未开通会员', 9001, 400)
+}
+
 const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || ''
 
 /** 同一时刻只允许一个刷新请求，避免并发 401 打出一串刷新。 */
@@ -124,6 +129,9 @@ export async function request(endpoint, options = {}, allowRetry = true) {
     }
   }
 
+  if (body.code === 9001 && !['GET', 'HEAD', 'OPTIONS'].includes(options.method || 'GET')) {
+    throw membershipRequired()
+  }
   throw new ApiError(body.message || '请求失败', body.code, response.status)
 }
 

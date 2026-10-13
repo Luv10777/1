@@ -15,11 +15,6 @@ watch(() => [auth.user?.id, auth.tenantId], () => refreshBilling(), { immediate:
 onMounted(() => { billingTimer = setInterval(reloadBalance, 30000); window.addEventListener('focus', reloadBalance) })
 onBeforeUnmount(() => { clearInterval(billingTimer); window.removeEventListener('focus', reloadBalance) })
 const router = useRouter()
-watch(() => billing.summary?.memberActive, active => {
-  if (active === false && route.meta.requiresMembership) router.replace({ name: 'billing', query: {
-    membership: 'required', redirect: route.fullPath, module: route.meta.title,
-  } })
-})
 const menuOpen = ref(false)
 const collapsed = ref(false)
 const accountOpen = ref(false)
@@ -29,7 +24,7 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
-const needsStore = computed(() => connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
+const needsStore = computed(() => billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
 // 侧边栏和顶栏显示的是当前登录的人：名字来自会话，头像取名字的第一个字。
 const userName = computed(() => auth.user?.name || '未命名用户')

@@ -1,7 +1,7 @@
 <script setup>
 // 桌面端的外壳。软件只做直播这一件事，所以这里只有切换门店和退出登录，没有平台的其余导航；
 // 商品、知识库、门店这些资料仍在网页版里维护。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { auth } from '../stores/auth'
 import { billing, refreshBilling } from '../stores/billing'
@@ -11,14 +11,9 @@ import { findDesktopUpdate } from '../services/desktopUpdate'
 const router = useRouter()
 const route = useRoute()
 const userName = computed(() => auth.user?.name || '未命名用户')
-const needsStore = computed(() => route.name === 'digital-human' && (storeLoading.value || Boolean(storeError.value) || !selectedStoreId.value))
+const needsStore = computed(() => billing.summary?.memberActive !== false && route.name === 'digital-human' && (storeLoading.value || Boolean(storeError.value) || !selectedStoreId.value))
 let billingTimer
-watch(() => billing.summary?.memberActive, active => {
-  if (active === false && route.meta.requiresMembership) router.replace({ name: 'billing', query: {
-    membership: 'required', redirect: route.fullPath, module: route.meta.title,
-  } })
-})
-onMounted(() => { billingTimer = setInterval(refreshBilling, 30000) })
+onMounted(() => { refreshBilling(); billingTimer = setInterval(refreshBilling, 30000) })
 onBeforeUnmount(() => clearInterval(billingTimer))
 const logout = async () => { await auth.logout(); router.push({ name: 'login' }) }
 // 软件不会自动更新，由这里提醒：打开时看一次，软件一直开着的话每几小时再看一次。

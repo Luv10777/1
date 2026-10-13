@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
 
-test('all business pages require a verified membership and the subscription page remains reachable', async () => {
+test('business pages remain visible without membership while login and owner permissions are enforced', async () => {
   const vite = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom',
     plugins: [{ name: 'memory-router-test', enforce: 'pre', transform(code, id) {
       if (id.replaceAll('\\', '/').endsWith('/src/router.js')) return code
@@ -21,11 +21,9 @@ test('all business pages require a verified membership and the subscription page
     const { default: router } = await vite.ssrLoadModule('/src/router.js')
     auth.state.user = { id: 1, tenantId: 7 }
     auth.state.token = { accessToken: 'test-only' }
-    for (const route of router.getRoutes().filter(route => route.meta.requiresMembership && !route.meta.ownerOnly)) {
+    for (const route of router.getRoutes().filter(route => route.name && !route.meta.public && !route.meta.ownerOnly)) {
       await router.push(route.path)
-      assert.equal(router.currentRoute.value.name, 'billing', route.path)
-      assert.equal(router.currentRoute.value.query.membership, 'required')
-      assert.equal(router.currentRoute.value.query.redirect, route.path)
+      assert.equal(router.currentRoute.value.name, route.name, route.path)
     }
     account = { memberActive: true }
     for (const path of ['/image/create/product-set', '/video/analyze', '/assets/products', '/digital-human']) {
@@ -34,10 +32,12 @@ test('all business pages require a verified membership and the subscription page
     }
     failed = true
     await router.push('/video/analyze')
-    assert.equal(router.currentRoute.value.name, 'billing')
-    assert.equal(router.currentRoute.value.query.membership, 'unavailable', 'stale active membership must not permit entry')
+    assert.equal(router.currentRoute.value.name, 'video-analyze', 'an unavailable billing service must not hide the page')
     await router.push('/billing')
     assert.equal(router.currentRoute.value.name, 'billing')
+    auth.state.user.roles = ['staff']
+    await router.push('/team')
+    assert.equal(router.currentRoute.value.name, 'forbidden')
     auth.state.token = null
     await router.push('/video/analyze')
     assert.equal(router.currentRoute.value.name, 'login')

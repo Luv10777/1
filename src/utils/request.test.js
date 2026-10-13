@@ -49,6 +49,22 @@ test('HTTP error envelopes preserve errors and a 401 still refreshes and replays
       globalThis.fetch = async () => response(502, null)
       await assert.rejects(request('/api/test'), e => e.code === 'HTTP_ERROR' && e.status === 502)
     })
+    await t.test('membership rejection opens a prompt only for an action and preserves the error code', async () => {
+      const savedWindow = globalThis.window
+      const events = []
+      globalThis.window = { dispatchEvent: event => events.push(event.type) }
+      try {
+        globalThis.fetch = async () => response(400, { code: 9001, message: '您还未开通会员' })
+        await assert.rejects(request('/api/stores', { method: 'GET' }), e => e.code === 9001)
+        assert.deepEqual(events, [])
+        await assert.rejects(request('/api/image-creations', { method: 'POST', body: '{}' }),
+          e => e.code === 9001 && e.message === '您还未开通会员')
+        assert.deepEqual(events, ['membership-required'])
+      } finally {
+        if (savedWindow === undefined) delete globalThis.window
+        else globalThis.window = savedWindow
+      }
+    })
   } finally {
     globalThis.fetch = originalFetch
     if (originalStorage === undefined) delete globalThis.localStorage

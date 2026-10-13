@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** Membership is enforced on business APIs as well as page navigation. */
+/** Everyone can browse business pages; changing data and starting work require membership. */
 @Component
 @RequiredArgsConstructor
 public class PlatformMembershipInterceptor implements HandlerInterceptor {
@@ -14,7 +14,10 @@ public class PlatformMembershipInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        billing.requirePlatformMembership();
+        switch (request.getMethod()) {
+            case "GET", "HEAD", "OPTIONS" -> { }
+            default -> billing.requirePlatformMembership();
+        }
         return true;
     }
 }
