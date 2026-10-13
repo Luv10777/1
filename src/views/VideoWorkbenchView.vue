@@ -5,7 +5,7 @@ import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import { get, post } from '../utils/request'
 import { assetSource, assets as platformAssets } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
-import { billing, dateTime, number, refreshBilling } from '../stores/billing'
+import { billing, dateTime, number, refreshBilling, requireMembership } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
 
 const prompt = ref('')
@@ -263,6 +263,9 @@ const pollWorkflow = async item => {
 
 const generate = async () => {
   if (isGenerating.value || activeConversation.value?.loading) return
+  try { await requireMembership() }
+  catch (error) { activeConversation.value.notice = error.message; return }
+  if (disposed || isGenerating.value) return
   if (!prompt.value.trim()) { activeConversation.value.notice = '请先描述你的成片需求。'; return }
   const form = readForm()
   if (activeConversation.value?.workflow) createConversation(form)
@@ -304,6 +307,9 @@ const generate = async () => {
 const closeQuote = () => { if (!quoteBusy.value) { quoteDialog.value?.close(); quoted.value = null; quoteTarget = null } }
 const confirmQuote = async () => {
   if (!quoted.value?.quote.available || quoteBusy.value || !quoteTarget) return
+  try { await requireMembership() }
+  catch (error) { quoteError.value = error.message; return }
+  if (disposed || quoteBusy.value || !quoted.value || !quoteTarget) return
   const { request, quote } = quoted.value
   const item = quoteTarget
   quoteBusy.value = true; item.submitting = true; quoteError.value = ''
@@ -322,6 +328,9 @@ const confirmQuote = async () => {
 const retryVideo = async () => {
   const item = activeConversation.value
   if (!item?.workflow?.retryable || item.submitting) return
+  try { await requireMembership() }
+  catch (error) { item.notice = error.message; return }
+  if (disposed || item.submitting) return
   item.submitting = true
   try {
     const quote = await get('/api/video/workflows/' + item.workflow.id + '/retry-quote')

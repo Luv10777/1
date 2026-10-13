@@ -45,3 +45,37 @@ test('billing uses real account responses and isolates late responses after acco
     await vite.close()
   }
 })
+
+test('creation rechecks membership, prompts nonmembers and rejects a stale active account after network failure', async () => {
+  const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-billing-tests',
+    server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true } })
+  const savedFetch = globalThis.fetch
+  const savedWindow = globalThis.window
+  const events = []
+  globalThis.window = { dispatchEvent: event => events.push(event.type) }
+  const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
+  const { billing, refreshBilling, requireMembership } = await vite.ssrLoadModule('/src/stores/billing.js')
+  try {
+    auth.state.user = { id: 1, tenantId: 7 }
+    auth.state.token = { accessToken: 'test-only' }
+    let account = { memberActive: false }
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ code: 200, data: account }) })
+    await refreshBilling()
+    assert.deepEqual(events, [], 'loading the account must not prompt')
+    await assert.rejects(requireMembership(), e => e.code === 9001 && e.message === '您还未开通会员')
+    assert.deepEqual(events, ['membership-required'])
+    account = { memberActive: true }
+    assert.equal((await requireMembership()).memberActive, true)
+    assert.equal(events.length, 1)
+    globalThis.fetch = async () => { throw new Error('connection lost') }
+    await assert.rejects(requireMembership(), /connection lost/)
+    assert.equal(billing.summary.memberActive, true)
+    assert.equal(events.length, 1, 'network failure must not be described as missing membership')
+  } finally {
+    auth.state.user = null; auth.state.token = null
+    globalThis.fetch = savedFetch
+    if (savedWindow === undefined) delete globalThis.window
+    else globalThis.window = savedWindow
+    await vite.close()
+  }
+})

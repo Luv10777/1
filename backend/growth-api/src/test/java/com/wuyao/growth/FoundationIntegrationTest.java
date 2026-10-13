@@ -193,14 +193,31 @@ class FoundationIntegrationTest {
 
 
     @Test
-    void platformMembershipGateCoversBusinessApisAndLeavesSubscriptionAccessible() throws Exception {
+    void nonmembersCanBrowseBusinessApisButCannotStartWorkOrChangeData() throws Exception {
         String token = jwt.issueAccessToken(seedPasswordAccount(), tenantA, null);
+        long store = apiData(post("/api/stores"), token, Map.of("name", "浏览测试门店")).path("id").asLong();
         owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute' WHERE tenant_id=?", tenantA);
         for (String path : List.of("/api/assets", "/api/stores", "/api/brands", "/api/video/analyses",
-                "/api/image-creations/capabilities", "/api/products")) {
+                "/api/image-creations/capabilities", "/api/image-creations?workflow=POSTER",
+                "/api/video/capabilities", "/api/video/analyses/limits", "/api/video/workflows",
+                "/api/stores/" + store + "/products", "/api/stores/" + store + "/knowledge-context")) {
             mvc.perform(get(path).header("Authorization", "Bearer " + token))
-                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001));
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200));
         }
+        for (String path : List.of("/api/image-creations", "/api/video/workflows", "/api/video/quote",
+                "/api/video/analyses", "/api/video/analyses/import-url", "/api/assets/upload-url", "/api/stores")) {
+            mvc.perform(post(path).header("Authorization", "Bearer " + token)
+                            .contentType("application/json").content("{}"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001))
+                    .andExpect(jsonPath("$.message").value("您还未开通会员"));
+        }
+        mvc.perform(put("/api/image-creations/1/title").header("Authorization", "Bearer " + token)
+                        .contentType("application/json").content("{\"title\":\"未授权修改\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001));
+        mvc.perform(delete("/api/stores/" + store).header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001));
+        mvc.perform(get("/api/stores")).andExpect(status().isUnauthorized());
+        assertThat(owner.queryForObject("SELECT count(*) FROM tasks", Long.class)).isZero();
         mvc.perform(get("/api/billing/summary").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.memberActive").value(false))
                 .andExpect(jsonPath("$.data.videoAnalysisCredits").value(1));

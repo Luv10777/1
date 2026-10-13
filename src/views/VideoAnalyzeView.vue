@@ -5,7 +5,7 @@ import { videoAnalysisApi, uploadAnalysisVideo } from '../services/videoAnalysis
 import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
 import { customizeAnalysisRecreation, analysisRecreationRoute } from '../domain/videoAnalysisCustomization'
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
-import { billing, refreshBilling } from '../stores/billing'
+import { billing, refreshBilling, requireMembership } from '../stores/billing'
 
 const router = useRouter()
 const route = useRoute()
@@ -221,6 +221,8 @@ async function startScan() {
   error.value = ''
   if (!submissionKey || current.value) submissionKey = crypto.randomUUID()
   try {
+    await requireMembership()
+    if (disposed) return
     const request = { requestKey: submissionKey, mode: videoType.value, reverseNeed: reverseNeed.value.trim() }
     let analysis
     if (inputMode.value === 'url') {

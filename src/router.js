@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { auth } from './stores/auth'
-import { refreshBilling } from './stores/billing'
 import LoginView from './views/LoginView.vue'
 import DashboardView from './views/DashboardView.vue'
 import AnalyticsView from './views/AnalyticsView.vue'
@@ -90,11 +89,6 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/404' },
 ]
 
-const membershipFreeRoutes = new Set(['billing', 'team', 'settings', 'help'])
-for (const route of routes) {
-  if (route.name && !route.meta?.public && !membershipFreeRoutes.has(route.name)) route.meta.requiresMembership = true
-}
-
 const router = createRouter({
   history: createWebHistory(),
   routes,
@@ -117,12 +111,6 @@ router.beforeEach(async (to, from) => {
 
   if (to.meta.role && !auth.hasRole(to.meta.role)) return { name: 'forbidden' }
   if (to.meta.ownerOnly && !auth.isOwner) return { name: 'forbidden' }
-  if (to.meta.requiresMembership) {
-    const account = await refreshBilling()
-    if (!account?.memberActive) return { name: 'billing', query: {
-      membership: account ? 'required' : 'unavailable', redirect: to.fullPath, module: to.meta.title,
-    } }
-  }
   return true
 })
 

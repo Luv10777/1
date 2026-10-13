@@ -238,7 +238,8 @@ class StaffAccountsIntegrationTest {
         JsonNode fresh = login(STAFF_PHONE);
         assertThat(fresh.path("user").path("role").asText()).isEqualTo("OWNER");
         assertThat(fresh.path("user").path("tenantId").asLong()).isNotIn(tenantA, tenantB);
-        refused(get("/api/stores"), fresh.path("accessToken").asText(), null, 400, 9001);
+        assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
+        refused(post("/api/stores"), fresh.path("accessToken").asText(), Map.of("name", "未开通会员门店"), 400, 9001);
         com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, fresh.path("user").path("tenantId").asLong());
         assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
     }

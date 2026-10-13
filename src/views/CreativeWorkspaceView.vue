@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { creative } from '../stores/creative.js'
+import { requireMembership } from '../stores/billing.js'
 
 const examples = [
   '给一方志咖啡店新出的 29.9 元双人下午茶做 6 张小红书风格图片，年轻情侣、温暖高级、周末到店，不改产品外观。',
@@ -13,13 +14,21 @@ const isPlanned = computed(() => ['planned', 'blocked', 'confirmed', 'running', 
 const completedPercent = computed(() => creative.batch ? Math.round((creative.batch.completed / creative.batch.count) * 100) : 0)
 
 const interpret = async () => {
+  try { await requireMembership() }
+  catch (error) { creative.error = error.message; return }
   if (!brief.value.trim()) return
   try { await creative.interpret(brief.value, { contentCount: contentCount.value, channels: channels.value }) }
   catch { /* The store exposes the request error below the form. */ }
 }
 const useExample = (value) => { brief.value = value }
-const confirmPlan = () => creative.confirm(contentCount.value)
-const startBatch = () => creative.start()
+const confirmPlan = async () => {
+  try { await requireMembership(); creative.confirm(contentCount.value) }
+  catch (error) { creative.error = error.message }
+}
+const startBatch = async () => {
+  try { await requireMembership(); await creative.start() }
+  catch (error) { creative.error = error.message }
+}
 </script>
 
 <template>

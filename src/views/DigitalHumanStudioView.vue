@@ -7,7 +7,7 @@ import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
 import { get } from '../utils/request'
 import { assets as platformAssets, assetSource } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel } from '../services/videoConversations'
-import { billing, number, refreshBilling } from '../stores/billing'
+import { billing, number, refreshBilling, requireMembership } from '../stores/billing'
 
 const avatarInput = ref(null)
 const assetsInput = ref(null)
@@ -203,10 +203,12 @@ const selectLibraryItem = asset => {
   selectLibraryAsset(libraryType.value === 'audio' ? 'voice' : libraryType.value === 'video' ? 'video' : libraryTarget.value === 'avatar' ? 'avatar' : 'asset', asset)
   closeAssetLibrary()
 }
-const generate = () => {
+const generate = async () => {
   if (isGenerating.value) return
   notice.value = ''
   try {
+    await requireMembership()
+    if (isGenerating.value || quoting.value) return
     const input = digitalHumanVideoInput({ script: script.value, avatar: avatarFile.value,
       images: [productFile.value, packageFile.value, ...extraImages.value].filter(Boolean),
       videos: referenceVideos.value, voices: [voiceFile.value, ...extraVoices.value].filter(Boolean),
