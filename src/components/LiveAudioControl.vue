@@ -19,6 +19,8 @@ const props = defineProps({
   hostVoice: { type: Object, default: null },
   products: { type: Array, default: () => [] },
   view: { type: String, default: 'setup', validator: value => ['setup', 'live', 'review'].includes(value) },
+  // 有没有直播工作台。浏览器里没有：这一块只介绍两种开播方式、给下载入口，开始本场在页面顶部和开播前检查里。
+  workbench: { type: Boolean, default: true },
 })
 const emit = defineEmits(['open-workspace', 'start-session', 'edit-step'])
 const isDevelopment = import.meta.env.DEV
@@ -218,7 +220,32 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 
 <template>
   <section v-if="view !== 'review'" :id="view === 'setup' ? 'ls-step-launch' : undefined" class="panel ls-section audio-control" :class="{ 'audio-control-live': view === 'live' }">
-    <template v-if="view === 'setup'">
+    <template v-if="view === 'setup' && !workbench">
+      <div class="ls-card-head"><span class="mono">04</span><h3>开播方式</h3></div>
+      <div class="audio-ways">
+        <article class="audio-way">
+          <strong>手机端开播</strong>
+          <p>开启抖音直播后，将分享链接粘贴到手机 App，即可一键开播。</p>
+          <small>暂只支持安卓。少数机型可能不支持，有问题请联系售后。</small>
+          <div class="audio-way-actions">
+            <a v-if="desktopDownloads.android" class="ls-outline-button" href="/app" target="_blank" rel="noopener">下载安卓版</a>
+            <small v-else>安装包暂未提供</small>
+          </div>
+        </article>
+        <article class="audio-way">
+          <strong>桌面端开播</strong>
+          <p>开启抖音直播后，将分享链接粘贴到桌面端软件，即可一键开播。</p>
+          <div class="audio-way-actions">
+            <a v-if="desktopDownloads.windows" class="ls-outline-button" :href="desktopDownloads.windows" download>下载 Windows 版</a>
+            <a v-if="desktopDownloads.mac" class="ls-outline-button" :href="desktopDownloads.mac" download>下载 Mac 版</a>
+            <small v-if="!desktopDownloads.windows && !desktopDownloads.mac">安装包暂未提供</small>
+          </div>
+          <small>点「开始本场」会先保存配置，请用同一账号登录。Windows 提示「未知发布者」时选择「仍要运行」；Mac 首次打开需在「系统设置 → 隐私与安全性」中允许。</small>
+        </article>
+      </div>
+      <p class="audio-help">请按抖音当前规则，在抖音 App 中标识合成语音。</p>
+    </template>
+    <template v-else-if="view === 'setup'">
       <div class="panel-heading"><div><p class="eyebrow">STEP 03</p><h3>启动直播</h3></div></div>
       <p class="audio-intro">在抖音 App 内用摄像头开播；播报声音直接在这个网页播放，不需要另外连接设备。</p>
       <p class="audio-help">请按抖音当前规则，在抖音 App 中标识合成语音。</p>
@@ -321,6 +348,13 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-blockers li { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); font-size: 12px; }
 .audio-launch-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 18px; }
 .audio-launch-footer p { margin: 0; color: var(--ink-muted); font-size: 12px; }
+.audio-ways { display: grid; gap: 12px; }
+.audio-way { display: grid; gap: 8px; justify-items: start; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; }
+.audio-way > strong { font-size: 14px; font-weight: 600; }
+.audio-way > p { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.7; }
+.audio-way small { color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
+.audio-way-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.audio-way-actions a { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; font-size: 13px; text-decoration: none; }
 .audio-desktop { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; }
 .audio-desktop-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .audio-desktop-head > div:first-child { min-width: 0; }
