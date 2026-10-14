@@ -8,6 +8,7 @@ import com.aliyun.teautil.models.RuntimeOptions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -101,15 +102,18 @@ class AliyunSmsSenderTest {
         var rejected = response("isv.SMS_SIGNATURE_ILLEGAL");
         rejected.getBody().setRequestId("request-123").setMessage("private-provider-message");
         when(client.sendSmsWithOptions(any(), any())).thenReturn(rejected);
-        // 直接挂在这个类的日志上读，不读控制台：整套测试里别的 Spring 上下文关闭时会停掉控制台输出，读控制台会拿到空串。
+        // 直接挂在这个类的日志上读，并固定日志级别：日志级别和控制台输出是全 JVM 共用的，别的测试改过就会读到空串。
         var logger = (Logger) LoggerFactory.getLogger(AliyunSmsSender.class);
+        var previousLevel = logger.getLevel();
         var appender = new ListAppender<ILoggingEvent>();
         appender.start();
         logger.addAppender(appender);
+        logger.setLevel(Level.WARN);
         try {
             assertThatThrownBy(() -> sender.sendLoginCode("13800000001", "012345"))
                     .isInstanceOf(BizException.class);
         } finally {
+            logger.setLevel(previousLevel);
             logger.detachAppender(appender);
         }
         String logged = String.join("\n", appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
