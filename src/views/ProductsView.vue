@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
-import { Plus, Search, Package, Pencil, Trash2, X, ArrowUpRight } from 'lucide-vue-next'
+import { Plus, Search, Package, Pencil, Trash2, X, ArrowUpRight, ClipboardList, ExternalLink } from 'lucide-vue-next'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import ProductImage from '../components/ProductImage.vue'
 import { selectedStore, selectedStoreId, storeLoading, storeError } from '../stores/merchantContext'
@@ -139,8 +139,14 @@ async function deleteProduct() {
   <section class="products-page">
     <header class="products-header">
       <div><p class="products-eyebrow">ASSET CENTER / PRODUCTS</p><h1>商品库</h1><p class="products-subtitle">沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。</p></div>
-      <button type="button" class="product-button product-button-primary" :disabled="!loaded || detailLoading || saving" @click="openForm()"><Plus :size="17" />新建商品</button>
+      <div class="products-header-actions">
+        <RouterLink v-if="selectedStoreId" class="product-button" :to="`/store/${selectedStoreId}`" target="_blank"><ExternalLink :size="15" />预览店铺</RouterLink>
+        <RouterLink v-if="selectedStoreId" class="product-button" to="/orders"><ClipboardList :size="15" />订单管理</RouterLink>
+        <button type="button" class="product-button product-button-primary" :disabled="!loaded || detailLoading || saving" @click="openForm()"><Plus :size="17" />新建商品</button>
+      </div>
     </header>
+
+    <p class="products-commerce-note">线上售卖面向实物商品。顾客提交订单后，库存会按数量预留并进入商家确认流程。</p>
 
     <div class="products-toolbar">
       <div class="products-filters" role="group" aria-label="商品类型筛选">
@@ -161,11 +167,12 @@ async function deleteProduct() {
             <ProductImage :src="getProductImages(product)[0]" :name="product.name" />
             <span v-if="getProductImages(product).length > 1" class="product-image-count">{{ getProductImages(product).length }} 张</span>
           </div>
-          <div class="product-card-tags"><span v-if="product.sample" class="product-sample">示例</span><span class="product-category">{{ product.category }}</span></div>
+          <div class="product-card-tags"><span class="product-category">{{ product.category }}</span></div>
         </div>
         <p class="product-type-caption">{{ typeLabel(product.type) }}</p>
         <h2>{{ product.name }}</h2>
         <div class="product-price"><span class="product-currency">¥</span><strong>{{ product.price }}</strong><span>/ {{ product.unit }}</span></div>
+        <div class="product-commerce-status"><span :class="product.onlineStatus === 'PUBLISHED' ? 'is-published' : 'is-draft'">{{ product.onlineStatus === 'PUBLISHED' ? '线上已上架' : '暂不上架' }}</span><span>{{ product.inventory == null ? '不限制库存' : `库存 ${product.inventory}` }}</span></div>
         <p class="product-points">{{ product.points }}</p>
         <div class="product-card-footer">
           <time :datetime="product.updatedAt">更新于 {{ formatDate(product.updatedAt) }}</time>

@@ -35,11 +35,20 @@ const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
 const MerchantAllianceView = () => import('./views/MerchantAllianceView.vue')
 const InformationPublishingView = () => import('./views/InformationPublishingView.vue')
+const PublicStorefrontView = () => import('./views/PublicStorefrontView.vue')
+const PublicOrderView = () => import('./views/PublicOrderView.vue')
+const MerchantOrdersView = () => import('./views/MerchantOrdersView.vue')
+const PublicInformationView = () => import('./views/PublicInformationView.vue')
+const PublicInformationDetailView = () => import('./views/PublicInformationDetailView.vue')
 
 const routes = [
   { path: '/', redirect: '/image/create' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
+  { path: '/store/:storeId(\\d+)', name: 'public-storefront', component: PublicStorefrontView, meta: { public: true, title: '店铺商品' } },
+  { path: '/order/:token', name: 'public-order', component: PublicOrderView, meta: { public: true, title: '订单查询' } },
+  { path: '/information', name: 'public-information', component: PublicInformationView, meta: { public: true, title: '本地商家信息' } },
+  { path: '/information/:id(\\d+)', name: 'public-information-detail', component: PublicInformationDetailView, meta: { public: true, title: '信息详情' } },
   { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
   { path: '/app', name: 'app-download', component: AppDownloadView, meta: { public: true, title: '一方志 App' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
@@ -63,6 +72,7 @@ const routes = [
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
   { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', eyebrow: 'ASSET CENTER', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。' } },
+  { path: '/orders', name: 'merchant-orders', component: MerchantOrdersView, meta: { title: '订单管理', eyebrow: 'MERCHANT COMMERCE', navGroup: 'assets' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
   { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
   { path: '/reviews', name: 'reviews', component: ReviewsView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },

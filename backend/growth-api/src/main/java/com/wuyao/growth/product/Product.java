@@ -58,6 +58,12 @@ public class Product {
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    @Column(name = "online_status", nullable = false, length = 20)
+    private String onlineStatus = "DRAFT";
+
+    @Column
+    private Integer inventory;
+
     @Column(name = "deleted_at")
     private Instant deletedAt;
 

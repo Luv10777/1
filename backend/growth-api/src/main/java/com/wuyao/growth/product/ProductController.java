@@ -25,6 +25,11 @@ public class ProductController {
 
     private final ProductService productService;
 
+    @GetMapping("/api/public/stores/{storeId}/products")
+    public ApiResponse<List<ProductDtos.View>> publicStorefront(@PathVariable Long storeId) {
+        return ApiResponse.ok(productService.publicStorefront(storeId));
+    }
+
     @GetMapping("/api/stores/{storeId}/products")
     public ApiResponse<PageResult<ProductDtos.View>> list(
             @PathVariable Long storeId,

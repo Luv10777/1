@@ -14,6 +14,9 @@ test('validates required facts and rejects negative or over-precision prices', (
   for (const price of [-1, '19.999', '', 'Infinity', '1e3']) assert.ok(validateProduct({ ...validProduct(), price }).price)
   assert.deepEqual(validateProduct({ ...validProduct(), price: 0 }), {})
   assert.ok(validateProduct({ ...validProduct(), name: '  ' }).name)
+  assert.equal(validateProduct({ ...validProduct(), inventory: '12' }).inventory, undefined)
+  assert.ok(validateProduct({ ...validProduct(), inventory: '1.5' }).inventory)
+  assert.ok(validateProduct({ ...validProduct(), inventory: '2147483648' }).inventory)
 })
 
 test('normalizes form values without leaking sample IDs into new products', () => {

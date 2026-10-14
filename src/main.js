@@ -21,6 +21,7 @@ import './brand.css'
 import './publishing-workspace.css'
 import './image-studio-polish.css'
 import './business-community.css'
+import './public-commerce.css'
 
 theme.apply()
 

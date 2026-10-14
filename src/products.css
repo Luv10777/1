@@ -1,6 +1,12 @@
 .products-page,.product-dialog{font-family:var(--font-sans);color:var(--color-primary)}
 .products-page{padding-bottom:32px}
 .products-header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:6px 0 30px}
+.products-header-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
+.products-commerce-note{margin:18px 0;padding:10px 12px;border-left:2px solid var(--color-accent-text);color:var(--color-text-muted);font-size:12px;line-height:1.7}
+.product-commerce-status{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;color:var(--color-text-muted);font-size:11px}
+.product-commerce-status span:first-child{padding:3px 7px;border-radius:4px}
+.product-commerce-status .is-published{background:color-mix(in srgb,var(--color-success) 12%,transparent);color:var(--color-success)}
+.product-commerce-status .is-draft{background:var(--color-bg-subtle);color:var(--color-text-muted)}
 .products-eyebrow{margin:0 0 10px;color:var(--color-text-muted);font:11px var(--font-mono);letter-spacing:.14em}
 .products-header h1{margin:0;font:700 30px/1.4 var(--font-serif)}
 .products-subtitle{margin:12px 0 0;color:var(--color-text-muted);font-size:13px;line-height:1.8}

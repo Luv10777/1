@@ -210,6 +210,15 @@ public class AssetService {
     }
 
     @Transactional(readOnly = true)
+    public AssetDtos.DownloadTicket presignPublicProductImage(Long assetId) {
+        Asset asset = repository.findById(assetId)
+                .filter(value -> "READY".equals(value.getStatus()) && "IMAGE".equals(value.getType()))
+                .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "公开商品图片不存在"));
+        return new AssetDtos.DownloadTicket(assetId, storage.presignGet(asset.getStorageKey(), Duration.ofMinutes(30)),
+                java.time.Instant.now().plus(Duration.ofMinutes(30)));
+    }
+
+    @Transactional(readOnly = true)
     public PageResult<AssetDtos.AssetView> list(int page, int size) {
         if (page < 0 || size < 1 || size > 100) {
             throw BizException.of(ErrorCode.BAD_REQUEST, "page 必须非负，size 必须在 1 到 100 之间");

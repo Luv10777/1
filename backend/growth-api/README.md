@@ -417,8 +417,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V41 | 账号角色、店员的门店范围、声音样本按门店开放 | `feat/staff-accounts` |
 | V42 | 门店名只在营业中的门店之间唯一，关店后可再用 | `feat/store-library` |
 | V43 | 门店档案：`stores.profile`（交通指引、配套服务、特殊营业安排） | `feat/store-library` |
+| V50 | 商家申请、信息公开发布、实物商品上架、订单与公开店铺 RLS 策略 | `codex/guest-creation-browsing` |
 
-下一个可用编号：V44。
+下一个可用编号：V51。
 
 后端检查：
 

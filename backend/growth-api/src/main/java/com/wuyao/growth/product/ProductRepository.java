@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
@@ -32,6 +33,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                          Pageable pageable);
 
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
+
+    List<Product> findAllByStoreIdAndStatusAndOnlineStatusAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(
+            Long storeId, String status, String onlineStatus);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Product p where p.id = :id and p.status = 'ACTIVE' and p.onlineStatus = 'PUBLISHED' and p.deletedAt is null")
+    Optional<Product> findForSaleUpdate(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id = :id and p.deletedAt is null")

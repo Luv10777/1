@@ -111,6 +111,7 @@ const navGroups = [
       { name: 'brands', label: '品牌库', path: '/brands' },
       { name: 'merchants', label: '门店库', path: '/merchants' },
       { name: 'products', label: '商品库', path: '/assets/products' },
+      { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'knowledge', label: '知识库', path: '/knowledge' },
       { name: 'assets', label: '素材库', path: '/assets' },
       { name: 'works', label: '作品库', path: '/works' },
@@ -122,6 +123,7 @@ const navGroups = [
     items: [
       { name: 'billing', label: '套餐与权益', path: '/billing' },
       { name: 'merchant-alliance', label: '商家联盟', path: '/merchant-alliance' },
+      { name: 'information-publishing', label: '信息发布', path: '/information-publishing' },
     ],
   },
   {
