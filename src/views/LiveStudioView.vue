@@ -1,8 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ChevronDown, MessageSquare, Package, BarChart3 } from 'lucide-vue-next'
-import { selectedStore, selectedStoreId, stores } from '../stores/merchantContext'
+import { ArrowRight, Check, ChevronDown, MessageSquare, Package, BarChart3 } from 'lucide-vue-next'
+import { selectedStoreId, stores } from '../stores/merchantContext'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import VoiceLibraryPanel from '../components/VoiceLibraryPanel.vue'
 import LiveAudioControl from '../components/LiveAudioControl.vue'
@@ -27,25 +27,10 @@ const setStage = (next) => {
   stage.value = next
   sessionTools.value?.removeAttribute('open')
 }
-const steps = [
-  { key: 'voice', index: '01', label: '人设与声音' },
-  { key: 'script', index: '02', label: '话术与知识库' },
-  { key: 'launch', index: '03', label: '启动直播' },
-]
-const activeStep = ref('voice')
-// 已完成过首次配置的老用户，默认直达启动步骤
-const hasInitialConfig = ref(false)
-const editingConfig = ref(false)
-const showDetailedSetup = computed(() => !hasInitialConfig.value || editingConfig.value)
-const scrollToStep = (key) => {
-  activeStep.value = key
-  document.getElementById(`ls-step-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 const editStep = async (key) => {
   setStage('setup')
-  editingConfig.value = true
   await nextTick()
-  scrollToStep(key)
+  document.getElementById(`ls-step-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 /* ---------------- 01 真实声音资产与角色 ---------------- */
@@ -54,6 +39,7 @@ const voiceRoleSelection = ref([])
 const voiceLibraryStoreId = ref(null)
 const persona = ref({ name: '', style: '亲切自然' })
 const hostVoice = computed(() => voices.value.find(voice => voice.role === 'host'))
+const hostReady = computed(() => !!hostVoice.value && hostVoice.value.usable !== false)
 const cohostVoices = computed(() => voices.value.filter(voice => voice.role === 'cohost'))
 const withRoles = (list) => list.map(voice => ({ ...voice, role: voiceRoleSelection.value.find(item => item.id === voice.id)?.role || 'none' }))
 const updateVoiceLibrary = (available, complete = true) => {
@@ -192,7 +178,7 @@ const qaPairs = computed(() => {
 const qaFilter = ref('all')
 const qaFilters = computed(() => [
   { value: 'all', label: '全部', count: qaPairs.value.length },
-  { value: 'session', label: '本场通用', count: qaPairs.value.filter(pair => pair.scope === 'session').length },
+  { value: 'session', label: '本场', count: qaPairs.value.filter(pair => pair.scope === 'session').length },
   { value: 'store', label: '门店通用', count: qaPairs.value.filter(pair => pair.scope === 'store').length },
   ...(readOnlySession.value ? [{ value: 'product-snapshot', label: '商品问答', count: qaPairs.value.filter(pair => pair.scope === 'product-snapshot').length }] : productQueue.value.map(product => ({ value: product.id, label: product.name, count: qaPairs.value.filter(pair => pair.scope === product.id).length }))),
 ])
@@ -208,10 +194,19 @@ const qaPersistMode = ref('SESSION')
 const qaKnowledgeSetId = ref('')
 const qaNotice = ref('')
 const qaError = ref('')
+const qaHelpOpen = ref(false)
 watch(() => productQueue.value.map(product => product.id), (ids) => {
-  if (newQaScope.value !== 'session' && !ids.includes(newQaScope.value)) newQaScope.value = 'session'
+  if (newQaScope.value !== 'session' && !ids.includes(newQaScope.value)) { newQaScope.value = 'session'; qaPersistMode.value = 'SESSION' }
 })
-watch(newQaScope, () => { qaPersistMode.value = 'SESSION' })
+// 新问答保存到哪：仅本场；门店通用（同时存为门店知识库草稿）；某件商品（同时存进这件商品的问答）。
+const qaTarget = computed({
+  get: () => qaPersistMode.value === 'STORE_KNOWLEDGE' ? 'store' : newQaScope.value,
+  set: (target) => {
+    newQaScope.value = target === 'store' ? 'session' : target
+    qaPersistMode.value = target === 'session' ? 'SESSION' : target === 'store' ? 'STORE_KNOWLEDGE' : 'PRODUCT_FAQ'
+    if (target === 'store' && !qaKnowledgeSetId.value && knowledgeSets.value.length === 1) qaKnowledgeSetId.value = knowledgeSets.value[0].id
+  },
+})
 const cancelQaEdit = () => {
   newQ.value = ''
   newA.value = ''
@@ -385,7 +380,6 @@ const applyConfig = (input) => {
 const nextSessionName = () => defaultSessionName(new Date(), liveSessions.value.map(session => session.name))
 const resetDraft = () => {
   stage.value = 'setup'
-  activeStep.value = 'voice'
   sessionTools.value?.removeAttribute('open')
   activeSessionId.value = null
   currentSession.value = null
@@ -398,8 +392,6 @@ const resetDraft = () => {
   productPickerOpen.value = false
   manualProductOpen.value = false
   applyConfig(defaultLiveConfig())
-  hasInitialConfig.value = false
-  editingConfig.value = true
   draftNotice.value = ''
   draftError.value = ''
   savedFingerprint.value = fingerprint()
@@ -424,7 +416,6 @@ const saveDraftCore = async (ticket, storeId) => {
   currentSession.value = result
   rememberSession(result)
   savedFingerprint.value = serialized
-  hasInitialConfig.value = true
   return result
 }
 const saveDraft = async () => {
@@ -544,8 +535,6 @@ const loadSessionCore = async (id, ticket, storeId) => {
   productQueue.value = session.productIds.map(productId => libraryProducts.value.find(product => product.id === productId) || { id: productId, name: '已删除或不可用商品', tag: '请移除后保存', price: '—', source: 'library', faqs: [] })
   sessionQaPairs.value = rows.map(row => toSessionQa(row, productQueue.value))
   applyConfig(session.config)
-  hasInitialConfig.value = true
-  editingConfig.value = true
   savedFingerprint.value = fingerprint()
   // 正在进行的直接进工作台，已结束的看复盘，还没开始的继续配置。
   stage.value = stageFor(session.status)
@@ -694,7 +683,6 @@ onMounted(() => {
   if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) {
     manualProduct.value = { points: route.query.prompt }
     manualProductOpen.value = true
-    editingConfig.value = true
   }
   // 老版本的桌面端没有这项能力。
   if (desktopBridge?.link) {
@@ -713,81 +701,54 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="ls-page">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">CONTENT TOOLS / LIVE</p>
-        <h1><span class="placeholder-icon">◎</span>实景直播</h1>
-        <p class="page-intro">选好商品与声音，准备本场讲解；在抖音拍真实画面，播报声音由这个网页播放。</p>
+    <header class="ls-head">
+      <div class="ls-head-title">
+        <h1>实景直播</h1>
+        <span class="ls-stage-pill" :class="stage"><i class="status-pulse" />{{ sessionStatusLabel(currentStatus) }}</span>
       </div>
-      <div class="ls-head-side">
-        <span class="ls-stage-pill" :class="stage">
-          <i class="status-pulse" />{{ sessionStatusLabel(currentStatus) }}
-        </span>
-        <span class="mono ls-balance-mini">{{ selectedStore }}</span>
-      </div>
-    </div>
-
-    <section class="ls-draft-toolbar" aria-label="场次">
-      <div class="ls-draft-row">
-        <label class="ls-current-session"><span>当前场次</span><input v-model="sessionName" aria-label="场次名称" maxlength="160" :title="sessionName" :disabled="loadBusy || loadFailed || apiBusy || readOnlySession || !selectedStoreId" placeholder="为本场直播起个名字"></label>
+      <div class="ls-head-actions" aria-label="场次">
+        <details ref="sessionTools" class="ls-session-tools" @keydown.esc="sessionTools?.removeAttribute('open')">
+          <summary :title="sessionName"><span>{{ sessionName.trim() || '未命名场次' }}</span><ChevronDown :size="14" aria-hidden="true" /></summary>
+          <div class="ls-session-menu">
+            <label v-if="currentStatus === 'DRAFT'" class="ls-session-rename"><span>本场名称</span><input v-model="sessionName" aria-label="场次名称" maxlength="160" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId" placeholder="为本场直播起个名字"></label>
+            <p class="ls-session-menu-label">全部场次</p>
+            <p v-if="!liveSessions.length" class="ls-session-hint">还没有保存过场次。</p>
+            <ul v-else class="ls-session-list">
+              <li v-for="session in liveSessions" :key="session.id">
+                <button type="button" :class="{ current: session.id === activeSessionId }" :aria-current="session.id === activeSessionId ? 'true' : undefined" :disabled="loadBusy || apiBusy || (switchLocked && session.id !== runningSession.id)" @click="openSession(session.id)">
+                  <strong>{{ session.name }}</strong><small>{{ describeSession(session) }}</small>
+                </button>
+              </li>
+            </ul>
+            <p v-if="switchLocked" class="ls-session-hint">直播进行中，结束本场后才能查看其他场次。</p>
+            <button v-if="currentStatus === 'DRAFT' && activeSessionId" class="ls-session-delete" type="button" :disabled="loadBusy || apiBusy" @click="deleteDraft">删除这一场</button>
+          </div>
+        </details>
         <span class="ls-save-state" :class="{ dirty: currentStatus === 'DRAFT' && draftDirty, live: currentStatus === 'LIVE' }" role="status">{{ sessionBadge }}</span>
-        <div class="ls-draft-actions">
-          <details ref="sessionTools" class="ls-session-tools" @keydown.esc="sessionTools?.removeAttribute('open')">
-            <summary>全部场次 <ChevronDown :size="14" aria-hidden="true" /></summary>
-            <div class="ls-session-menu">
-              <p v-if="!liveSessions.length" class="ls-session-hint">还没有保存过场次。</p>
-              <ul v-else class="ls-session-list">
-                <li v-for="session in liveSessions" :key="session.id">
-                  <button type="button" :class="{ current: session.id === activeSessionId }" :aria-current="session.id === activeSessionId ? 'true' : undefined" :disabled="loadBusy || apiBusy || (switchLocked && session.id !== runningSession.id)" @click="openSession(session.id)">
-                    <strong>{{ session.name }}</strong><small>{{ describeSession(session) }}</small>
-                  </button>
-                </li>
-              </ul>
-              <p v-if="switchLocked" class="ls-session-hint">直播进行中，结束本场后才能查看其他场次。</p>
-            </div>
-          </details>
-          <template v-if="currentStatus === 'DRAFT'">
-            <button v-if="activeSessionId" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="deleteDraft">删除</button>
-            <button class="ls-ghost compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || (!!activeSessionId && !draftDirty)" @click="saveDraft">保存配置</button>
-            <button class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0" :title="blockers.length ? '还需要：' + blockers.map(item => item.label).join('、') : ''" @click="startSession">开始本场</button>
-          </template>
-          <button v-if="currentStatus === 'LIVE'" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="pauseSession">暂停本场</button>
-          <button v-if="currentStatus === 'PAUSED'" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="resumeSession">继续本场</button>
-          <button v-if="['LIVE', 'PAUSED'].includes(currentStatus)" class="ls-danger compact" type="button" :disabled="loadBusy || apiBusy" @click="endSession">结束本场</button>
-          <template v-if="currentStatus === 'ENDED'">
-            <button v-if="runningSession || pendingSession" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="openSession((runningSession || pendingSession).id)">{{ runningSession ? '回到直播中的场次' : '回到未开始的场次' }}</button>
-            <button v-else class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId" @click="newSession">新建场次</button>
-          </template>
-        </div>
+        <template v-if="currentStatus === 'DRAFT'">
+          <button class="ls-ghost compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || (!!activeSessionId && !draftDirty)" @click="saveDraft">保存配置</button>
+          <button class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0" :title="blockers.length ? '还需要：' + blockers.map(item => item.label).join('、') : ''" @click="startSession">开始本场</button>
+        </template>
+        <button v-if="currentStatus === 'LIVE'" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="pauseSession">暂停本场</button>
+        <button v-if="currentStatus === 'PAUSED'" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="resumeSession">继续本场</button>
+        <button v-if="['LIVE', 'PAUSED'].includes(currentStatus)" class="ls-danger compact" type="button" :disabled="loadBusy || apiBusy" @click="endSession">结束本场</button>
+        <template v-if="currentStatus === 'ENDED'">
+          <button v-if="runningSession || pendingSession" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="openSession((runningSession || pendingSession).id)">{{ runningSession ? '回到直播中的场次' : '回到未开始的场次' }}</button>
+          <button v-else class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId" @click="newSession">新建场次</button>
+        </template>
       </div>
+    </header>
+    <nav class="ls-stage-nav" aria-label="直播工作流程">
+      <button v-for="tab in stageTabs" :key="tab.key" type="button" :class="{ active: stage === tab.key }" :aria-pressed="stage === tab.key" @click="setStage(tab.key)">{{ tab.label }}</button>
+    </nav>
+    <div v-if="draftError || draftNotice || (readOnlySession && stage === 'setup')" class="ls-head-messages">
       <p v-if="draftError" class="ls-qa-error" role="alert">{{ draftError }}</p>
       <p v-if="draftNotice" class="ls-qa-notice" role="status">{{ draftNotice }}</p>
       <p v-if="readOnlySession && stage === 'setup'" class="ls-section-note">{{ currentStatus === 'ENDED' ? '这一场已结束，配置仅供查看。' : '直播进行中，配置已锁定。需要调整时请先结束本场，再新建场次。' }}</p>
-    </section>
-    <nav class="ls-stage-nav" aria-label="直播工作流程">
-      <button v-for="(tab, index) in stageTabs" :key="tab.key" type="button" :class="{ active: stage === tab.key }" :aria-pressed="stage === tab.key" @click="setStage(tab.key)"><span class="mono">0{{ index + 1 }}</span>{{ tab.label }}</button>
-    </nav>
-    <fieldset v-show="stage === 'setup'" class="ls-configuration-fields" :disabled="loadBusy || loadFailed || apiBusy || readOnlySession">
-      <!-- 步骤导航 -->
-      <nav v-if="showDetailedSetup" class="ls-stepbar" aria-label="配置步骤">
-        <button v-for="s in steps" :key="s.key" type="button" class="ls-step-chip" :class="{ active: activeStep === s.key }" @click="scrollToStep(s.key)">
-          <span class="mono">{{ s.index }}</span>{{ s.label }}
-        </button>
-        <button v-if="hasInitialConfig && editingConfig" type="button" class="ls-ghost compact ls-collapse-config" @click="editingConfig = false">收起编辑</button>
-      </nav>
-
-      <div class="ls-setup-content">
-        <section v-if="hasInitialConfig && !editingConfig" class="panel ls-setup-summary">
-          <div class="panel-heading"><div><p class="eyebrow">快速路径</p><h3>已保存配置，可继续完善</h3></div><button type="button" class="ls-ghost" @click="editingConfig = true">编辑配置</button></div>
-          <div class="ls-setup-summary-grid">
-            <span>当前音色 <strong>{{ hostVoice?.name || '未分配' }}</strong></span>
-            <span>知识库 <strong>{{ qaPairs.length }} 条</strong></span>
-            <span>促单节奏 <strong>{{ urgencyLabel.split(' · ')[0] }}</strong></span>
-            <span>助播 <strong>{{ !cohostVoices.length ? '未设置' : answeringCohost ? (cohostVoices.length > 1 ? `${cohostVoices.length} 个，${answeringCohost.name}回答弹幕` : `${answeringCohost.name}，回答弹幕`) : cohostVoices.length + ' 个，与主播轮流讲' }}</strong></span>
-          </div>
-        </section>
+    </div>
+    <div class="ls-setup-layout" :class="{ split: stage === 'setup' }">
+      <fieldset v-show="stage === 'setup'" class="ls-configuration-fields" :disabled="loadBusy || loadFailed || apiBusy || readOnlySession">
         <VoiceLibraryPanel
-          v-show="showDetailedSetup"
           id="ls-step-voice"
           v-model:persona="persona"
           :store-id="selectedStoreId"
@@ -796,158 +757,180 @@ onBeforeUnmount(() => {
           @change="updateVoiceSelection"
         />
 
-        <!-- 02 话术与知识库 -->
-        <section v-if="showDetailedSetup" id="ls-step-script" class="ls-section ls-two-col">
-          <article class="panel">
-            <div class="panel-heading"><div><p class="eyebrow">STEP 02 / A</p><h3>商品信息与话术风格</h3></div></div>
-
-            <div class="ls-product-queue">
-              <div class="ls-product-queue-head"><div><strong>本场商品清单（{{ productQueue.length }}件）</strong><span>自动讲解按此顺序循环</span></div><div class="ls-product-queue-actions"><button type="button" @click="openProductPicker">＋ 从商品库选择</button><button type="button" @click="openManualProduct">＋ 手动添加</button></div></div>
-              <p v-if="!productQueue.length" class="ls-product-empty">还没有添加商品，请从下方选择或手动添加。</p>
-              <div v-for="(product, index) in productQueue" :key="product.id" class="ls-product-queue-row">
-                <span class="ls-product-index">{{ index + 1 }}</span>
-                <span class="ls-product-copy"><strong>{{ product.name }}</strong><small>{{ product.tag }} · {{ product.price }}</small></span>
-                <div class="ls-product-order">
-                  <button type="button" :disabled="index === 0" aria-label="上移商品" @click="moveProduct(index, -1)">↑</button>
-                  <button type="button" :disabled="index === productQueue.length - 1" aria-label="下移商品" @click="moveProduct(index, 1)">↓</button>
-                  <button type="button" aria-label="移除商品" @click="removeProduct(index)">×</button>
-                </div>
+        <!-- 02 商品与讲解方式 -->
+        <section id="ls-step-script" class="panel ls-section">
+          <div class="ls-card-head"><span class="mono">02</span><h3>商品与讲解方式</h3></div>
+          <div class="ls-product-bar">
+            <span>本场商品 {{ productQueue.length }} 件 · 按顺序循环讲解</span>
+            <div class="ls-product-bar-actions"><button type="button" class="ls-outline-button" @click="openProductPicker">＋ 从商品库添加</button><button type="button" class="ls-outline-button" @click="openManualProduct">＋ 手动添加</button></div>
+          </div>
+          <p v-if="!productQueue.length" class="ls-product-none">还没有添加商品，请从商品库选择或手动添加。</p>
+          <div v-else class="ls-product-rows">
+            <div v-for="(product, index) in productQueue" :key="product.id" class="ls-product-item">
+              <span class="ls-product-no mono">{{ String(index + 1).padStart(2, '0') }}</span>
+              <span class="ls-product-copy"><strong>{{ product.name }}</strong><small>{{ product.tag }} · {{ product.price }}</small></span>
+              <div class="ls-product-order">
+                <button type="button" :disabled="index === 0" aria-label="上移商品" @click="moveProduct(index, -1)">↑</button>
+                <button type="button" :disabled="index === productQueue.length - 1" aria-label="下移商品" @click="moveProduct(index, 1)">↓</button>
+                <button type="button" aria-label="移除商品" @click="removeProduct(index)">×</button>
               </div>
             </div>
+          </div>
 
-            <div v-if="productPickerOpen" class="ls-modal-backdrop" role="presentation" @click.self="closeProductDialogs">
-              <section class="ls-modal panel-dark ls-product-modal" role="dialog" aria-modal="true" aria-labelledby="ls-product-picker-title">
-                <p class="eyebrow accent">PRODUCT LIBRARY</p>
-                <h3 id="ls-product-picker-title">从商品库选择</h3>
-                <p class="ls-modal-copy">可多选商品，加入本场清单后调整讲解顺序。</p>
-                <input v-model="productSearch" class="ls-product-search" type="search" placeholder="搜索商品名称、分类或价格…">
-                <div class="ls-product-list ls-product-modal-list">
-                  <label v-for="p in filteredLibraryProducts" :key="p.id" class="ls-product-row" :class="{ on: pickedProductIds.includes(p.id) }">
-                    <input type="checkbox" :checked="pickedProductIds.includes(p.id)" @change="toggleLibraryProduct(p)">
-                    <span class="ls-radio" />
-                    <span class="ls-product-copy"><strong>{{ p.name }}</strong><small>{{ p.tag }}</small></span>
-                    <span class="mono ls-product-price">{{ p.price }}</span>
-                  </label>
-                  <p v-if="!filteredLibraryProducts.length" class="ls-product-empty">没有匹配的商品。</p>
-                </div>
-                <div class="ls-modal-actions"><button type="button" class="primary-button compact" @click="closeProductDialogs">完成选择（{{ pickedProductIds.length }}）</button></div>
-              </section>
-            </div>
-            <ProductFormModal v-if="manualProductOpen" :product="manualProduct" :error="manualProductError" :busy="apiBusy || loadBusy" @save="addManualProduct" @close="closeProductDialogs" />
-
-            <div class="ls-tone">
-              <div v-for="group in toneGroups" :key="group.key" class="ls-tone-row">
-                <span class="ls-tone-label">{{ group.label }}</span>
-                <div class="ls-tone-options">
-                  <button v-for="opt in group.options" :key="opt" type="button" :class="{ on: isToneSelected(group.key, opt) }" @click="selectTone(group.key, opt)">{{ opt }}</button>
-                </div>
+          <div v-if="productPickerOpen" class="ls-modal-backdrop" role="presentation" @click.self="closeProductDialogs">
+            <section class="ls-modal panel-dark ls-product-modal" role="dialog" aria-modal="true" aria-labelledby="ls-product-picker-title">
+              <p class="eyebrow accent">PRODUCT LIBRARY</p>
+              <h3 id="ls-product-picker-title">从商品库选择</h3>
+              <p class="ls-modal-copy">可多选商品，加入本场清单后调整讲解顺序。</p>
+              <input v-model="productSearch" class="ls-product-search" type="search" placeholder="搜索商品名称、分类或价格…">
+              <div class="ls-product-list ls-product-modal-list">
+                <label v-for="p in filteredLibraryProducts" :key="p.id" class="ls-product-row" :class="{ on: pickedProductIds.includes(p.id) }">
+                  <input type="checkbox" :checked="pickedProductIds.includes(p.id)" @change="toggleLibraryProduct(p)">
+                  <span class="ls-radio" />
+                  <span class="ls-product-copy"><strong>{{ p.name }}</strong><small>{{ p.tag }}</small></span>
+                  <span class="mono ls-product-price">{{ p.price }}</span>
+                </label>
+                <p v-if="!filteredLibraryProducts.length" class="ls-product-empty">没有匹配的商品。</p>
               </div>
-              <div class="ls-tone-row ls-slider-row">
-                <span class="ls-tone-label">促单节奏</span>
-                <div class="ls-slider">
-                  <input v-model.number="urgency" type="range" min="1" max="5" step="0.01">
-                  <span class="ls-slider-value">{{ urgencyLabel }}</span>
-                </div>
+              <div class="ls-modal-actions"><button type="button" class="primary-button compact" @click="closeProductDialogs">完成选择（{{ pickedProductIds.length }}）</button></div>
+            </section>
+          </div>
+          <ProductFormModal v-if="manualProductOpen" :product="manualProduct" :error="manualProductError" :busy="apiBusy || loadBusy" @save="addManualProduct" @close="closeProductDialogs" />
+
+          <div class="ls-tone">
+            <div v-for="group in toneGroups" :key="group.key" class="ls-tone-row">
+              <span class="ls-tone-label">{{ group.label }}</span>
+              <div class="ls-tone-options">
+                <button v-for="opt in group.options" :key="opt" type="button" :class="{ on: isToneSelected(group.key, opt) }" @click="selectTone(group.key, opt)">{{ opt }}</button>
               </div>
             </div>
+            <div class="ls-tone-row ls-slider-row">
+              <span class="ls-tone-label">促单节奏</span>
+              <div class="ls-slider">
+                <input v-model.number="urgency" type="range" min="1" max="5" step="0.01">
+                <span class="ls-slider-value">{{ urgencyLabel }}</span>
+              </div>
+            </div>
+          </div>
 
-            <div class="ls-anti" :class="{ on: antiRepeat }">
-              <label class="ls-switch"><input v-model="antiRepeat" type="checkbox"><span /><em>话术防重复</em></label>
-              <p>开启后，自动讲解会参考刚讲过的内容换一个角度表达。你手动填写的播报内容不会被改写。</p>
-            </div>
-          </article>
+          <label class="ls-toggle-box">
+            <span class="ls-switch"><input v-model="antiRepeat" type="checkbox"><span /></span>
+            <span class="ls-toggle-copy"><strong>避免重复话术</strong><small>开启后，自动讲解会参考刚讲过的内容换一个角度表达。你手动填写的播报内容不会被改写。</small></span>
+          </label>
+        </section>
 
-          <article class="panel">
-            <div class="panel-heading"><div><p class="eyebrow">STEP 02 / B</p><h3>互动知识库</h3></div><span class="mono muted-text">{{ qaPairs.length }} 条</span></div>
-            <div class="ls-anti" :class="{ on: !!answeringCohost }">
-              <label class="ls-switch"><input v-model="replyByCohost" type="checkbox" :disabled="!cohostVoices.length"><span /><em>弹幕由助播回答</em></label>
-              <p v-if="!cohostVoices.length">需要先在“人设与声音”里设一位助播。不开启时，观众的提问由主播自己回答。</p>
-              <p v-else-if="answeringCohost">观众的提问由助播「{{ answeringCohost.name }}」回答，答完交回主播。这位助播不再参与轮流讲解{{ cohostVoices.length > 1 ? '，其余助播照常轮流' : '，讲解全部由主播完成' }}。</p>
-              <p v-else>开启后，观众的提问由最先设为助播的那一位回答，主播专心讲解；这位助播不再参与轮流讲解。</p>
-            </div>
-            <p class="ls-section-note">为本场准备常见问题与指定回复。观众问到这些问题时（问法不同也算），系统会把你写的回复改成口语说出来，意思和数字不变；没有对应问答时依据商品资料回答，资料里没有的不回答。观众说想买时会顺势引导下单；夸奖、闲聊不回，询问主播身份的也一律不回；投诉、说吃了不舒服、要退款这类不会自动回复，会在弹幕流里标出来等你处理。真实抖音弹幕尚未接入。</p>
-            <p class="ls-section-note">{{ readOnlySession ? '以下为场次启动时保存的知识快照。' : '门店通用来自知识库已启用规则；本场问答优先于商品问答与门店通用规则。' }}</p>
-            <p v-if="contextError" class="ls-qa-error" role="alert">{{ contextError }} <button type="button" class="ls-ghost compact" @click="reloadKnowledge">重试</button></p>
-            <div v-if="!readOnlySession && productQaPairs.length" class="ls-qa-product-tip">已自动带入 {{ productQaPairs.length }} 条本场商品问答</div>
-            <div class="ls-qa-filters" role="tablist" aria-label="问答范围">
-              <button v-for="filter in qaFilters" :key="filter.value" type="button" role="tab" :aria-selected="qaFilter === filter.value" :class="{ on: qaFilter === filter.value }" @click="qaFilter = filter.value">{{ filter.label }}（{{ filter.count }}）</button>
-            </div>
-            <p v-if="!visibleQaPairs.length" class="ls-section-note">暂无问答，可在下方添加。</p>
-            <ul class="ls-qa-list">
-              <li v-for="item in visibleQaPairs" :key="item.id" class="ls-qa-item">
-                <div v-if="editingQaId === item.id" class="ls-qa-inline-edit">
-                  <input v-model="newQ" maxlength="500" type="text" aria-label="编辑观众问题" placeholder="观众可能会问…">
-                  <textarea v-model="newA" maxlength="4000" aria-label="编辑回复话术" rows="2" placeholder="希望如何回答…" @keyup.ctrl.enter="addQa" />
-                  <div class="ls-qa-inline-actions">
-                    <button type="button" class="ls-ghost compact" @click="cancelQaEdit">取消</button>
-                    <button type="button" class="primary-button compact" @click="addQa">保存</button>
+        <!-- 03 弹幕问答 -->
+        <section id="ls-step-qa" class="panel ls-section">
+          <div class="ls-card-head">
+            <span class="mono">03</span><h3>弹幕问答</h3>
+            <button type="button" class="ls-card-link ls-card-head-side" :aria-expanded="qaHelpOpen" aria-controls="ls-qa-help" @click="qaHelpOpen = !qaHelpOpen">如何回答？</button>
+          </div>
+          <div v-show="qaHelpOpen" id="ls-qa-help" class="ls-qa-help">
+            <p>为本场准备常见问题与指定回复。观众问到这些问题时（问法不同也算），系统会把你写的回复改成口语说出来，意思和数字不变；没有对应问答时依据商品资料回答，资料里没有的不回答。观众说想买时会顺势引导下单；夸奖、闲聊不回，询问主播身份的也一律不回；投诉、说吃了不舒服、要退款这类不会自动回复，会在弹幕流里标出来等你处理。真实抖音弹幕尚未接入。</p>
+            <p>门店通用来自知识库已启用规则；本场问答优先于商品问答与门店通用规则。</p>
+          </div>
+          <label class="ls-toggle-box first">
+            <span class="ls-switch"><input v-model="replyByCohost" type="checkbox" :disabled="!cohostVoices.length"><span /></span>
+            <span class="ls-toggle-copy">
+              <strong>由助播回答弹幕</strong>
+              <small v-if="!cohostVoices.length" class="need">需要先在“主播与声音”里设一位助播。不开启时，观众的提问由主播自己回答。</small>
+              <small v-else-if="answeringCohost">观众的提问由助播「{{ answeringCohost.name }}」回答，答完交回主播。这位助播不再参与轮流讲解{{ cohostVoices.length > 1 ? '，其余助播照常轮流' : '，讲解全部由主播完成' }}。</small>
+              <small v-else>开启后，观众的提问由最先设为助播的那一位回答，主播专心讲解；这位助播不再参与轮流讲解。</small>
+            </span>
+          </label>
+          <p v-if="readOnlySession" class="ls-section-note">以下为场次启动时保存的知识快照。</p>
+          <p v-if="contextError" class="ls-qa-error" role="alert">{{ contextError }} <button type="button" class="ls-ghost compact" @click="reloadKnowledge">重试</button></p>
+          <div class="ls-qa-filters" role="tablist" aria-label="问答范围">
+            <button v-for="filter in qaFilters" :key="filter.value" type="button" role="tab" :aria-selected="qaFilter === filter.value" :class="{ on: qaFilter === filter.value }" @click="qaFilter = filter.value">{{ filter.label }} {{ filter.count }}</button>
+          </div>
+          <p v-if="!visibleQaPairs.length" class="ls-section-note">暂无问答，可在下方添加。</p>
+          <ul v-else class="ls-qa-rows">
+            <li v-for="item in visibleQaPairs" :key="item.id" class="ls-qa-row">
+              <div v-if="editingQaId === item.id" class="ls-qa-inline-edit">
+                <input v-model="newQ" maxlength="500" type="text" aria-label="编辑观众问题" placeholder="观众可能会问…">
+                <textarea v-model="newA" maxlength="4000" aria-label="编辑回复话术" rows="2" placeholder="希望如何回答…" @keyup.ctrl.enter="addQa" />
+                <div class="ls-qa-inline-actions">
+                  <button type="button" class="ls-ghost compact" @click="cancelQaEdit">取消</button>
+                  <button type="button" class="primary-button compact" @click="addQa">保存</button>
+                </div>
+              </div>
+              <template v-else>
+                <div class="ls-qa-row-copy"><strong>{{ item.q }}</strong><p>{{ item.a }}</p></div>
+                <div class="ls-qa-row-side">
+                  <span class="ls-qa-tag">{{ item.source }}{{ item.persistMode === 'PRODUCT_FAQ' ? ' · 已存商品库' : item.persistMode === 'STORE_KNOWLEDGE' ? ' · 已存知识库草稿' : '' }}</span>
+                  <div v-if="item.sourceType === 'session'" class="ls-qa-row-actions">
+                    <button type="button" :aria-label="`编辑 ${item.q}`" @click="editQa(item)">编辑</button>
+                    <button type="button" :aria-label="`删除 ${item.q}`" @click="removeQa(item)">删除</button>
                   </div>
                 </div>
-                <div v-else>
-                  <strong>Q · {{ item.q }}</strong>
-                  <p>A · {{ item.a }}</p>
-                  <span class="ls-qa-scope-tag">{{ item.source }}{{ item.persistMode === 'PRODUCT_FAQ' ? ' · 已存商品库' : item.persistMode === 'STORE_KNOWLEDGE' ? ' · 已存知识库草稿' : '' }}</span>
-                </div>
-                <div v-if="editingQaId !== item.id" class="ls-qa-actions">
-                  <button v-if="item.sourceType === 'session'" type="button" class="ls-edit" :aria-label="`编辑 ${item.q}`" @click="editQa(item)">✎</button>
-                  <button v-if="item.sourceType === 'session'" type="button" class="ls-remove" :aria-label="`删除 ${item.q}`" @click="removeQa(item)">×</button>
-                </div>
-              </li>
-            </ul>
-            <div v-if="!editingQaId" class="ls-qa-add">
-              <input v-model="newQ" maxlength="500" type="text" placeholder="观众可能会问…">
-              <input v-model="newA" maxlength="4000" type="text" placeholder="希望如何回答…" @keyup.enter="addQa">
-              <select v-model="newQaScope" aria-label="问答关联范围">
-                <option value="session">本场通用</option>
-                <option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option>
-              </select>
-              <div class="ls-qa-form-actions">
-                <button v-if="editingQaId" type="button" class="ls-ghost" @click="cancelQaEdit">取消</button>
-                <button type="button" class="ls-ghost" @click="addQa">{{ editingQaId ? '保存' : '添加' }}</button>
-              </div>
-            </div>
-            <div v-if="!editingQaId" class="ls-qa-destination">
-              <label>这条问答保存到
-                <select v-model="qaPersistMode" aria-label="这条问答保存位置">
-                  <option value="SESSION">仅本场</option>
-                  <option v-if="newQaScope !== 'session'" value="PRODUCT_FAQ">本场 + 关联商品问答</option>
-                  <option v-if="newQaScope === 'session'" value="STORE_KNOWLEDGE">本场 + 门店知识库草稿</option>
+              </template>
+            </li>
+          </ul>
+          <div v-if="!editingQaId" class="ls-qa-new">
+            <strong>添加问答</strong>
+            <input v-model="newQ" maxlength="500" type="text" aria-label="观众问题" placeholder="观众可能会问：比如「可以外卖吗」">
+            <textarea v-model="newA" maxlength="4000" rows="2" aria-label="回复话术" placeholder="希望如何回答" @keyup.ctrl.enter="addQa" />
+            <div class="ls-qa-new-foot">
+              <label>保存到
+                <select v-model="qaTarget" aria-label="这条问答保存位置">
+                  <option value="session">仅本场</option>
+                  <option value="store">门店通用</option>
+                  <option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option>
                 </select>
               </label>
               <select v-if="qaPersistMode === 'STORE_KNOWLEDGE'" v-model="qaKnowledgeSetId" aria-label="目标门店知识集">
                 <option value="" disabled>选择问答知识集</option>
                 <option v-for="set in knowledgeSets" :key="set.id" :value="set.id">{{ set.name }}</option>
               </select>
-              <small v-if="qaPersistMode === 'STORE_KNOWLEDGE'">{{ knowledgeSets.length ? '保存为草稿，需前往知识库启用。' : '请先到资产中心 / 知识库新建问答知识集。' }}</small>
+              <button type="button" class="primary-button compact" @click="addQa">添加</button>
             </div>
-            <p v-if="qaNotice" class="ls-qa-notice" role="status">{{ qaNotice }}</p>
-            <p v-if="qaError" class="ls-qa-error" role="alert">{{ qaError }}</p>
-          </article>
+            <small v-if="qaPersistMode === 'STORE_KNOWLEDGE'">{{ knowledgeSets.length ? '保存为草稿，需前往知识库启用。' : '请先到资产中心 / 知识库新建问答知识集。' }}</small>
+          </div>
+          <p v-if="qaNotice" class="ls-qa-notice" role="status">{{ qaNotice }}</p>
+          <p v-if="qaError" class="ls-qa-error" role="alert">{{ qaError }}</p>
         </section>
-      </div>
-    </fieldset>
-    <section v-if="stage === 'live'" class="panel ls-live-bar" aria-label="本场准备情况">
-      <div class="ls-live-metric ls-live-voice-metric"><p class="eyebrow">主讲音色</p><strong>{{ hostVoice?.name || '未选择' }}</strong><small>当前配置的播报声音</small></div>
-      <div class="ls-live-metric"><p class="eyebrow">本场商品</p><strong>{{ productQueue.length }} <small>件</small></strong><small>已选商品与讲解顺序</small></div>
-      <div class="ls-live-metric"><p class="eyebrow">互动知识库</p><strong>{{ qaPairs.length }} <small>条</small></strong><small>{{ readOnlySession ? '本场知识快照' : '当前配置的问答' }}</small></div>
-      <div class="ls-live-actions"><button type="button" class="ls-ghost compact" @click="editStep('voice')">{{ readOnlySession ? '查看配置' : '调整配置' }}</button><button type="button" class="ls-ghost compact" @click="setStage('review')">查看场次复盘</button></div>
-    </section>
-    <LiveAudioControl
-      ref="audioControl"
-      :key="selectedStoreId"
-      :view="stage"
-      :session-id="activeSessionId"
-      :store-id="selectedStoreId"
-      :session-status="currentSession?.status"
-      :session-error="draftError"
-      :blockers="blockers"
-      :ensure-session="ensureAudioSession"
-      :host-voice="hostVoice"
-      :products="productQueue"
-      @open-workspace="setStage('live')"
-      @start-session="startSession"
-      @edit-step="editStep"
-    />
+      </fieldset>
+      <section v-if="stage === 'live'" class="panel ls-live-bar" aria-label="本场准备情况">
+        <div class="ls-live-metric ls-live-voice-metric"><p class="eyebrow">主讲音色</p><strong>{{ hostVoice?.name || '未选择' }}</strong><small>当前配置的播报声音</small></div>
+        <div class="ls-live-metric"><p class="eyebrow">本场商品</p><strong>{{ productQueue.length }} <small>件</small></strong><small>已选商品与讲解顺序</small></div>
+        <div class="ls-live-metric"><p class="eyebrow">互动知识库</p><strong>{{ qaPairs.length }} <small>条</small></strong><small>{{ readOnlySession ? '本场知识快照' : '当前配置的问答' }}</small></div>
+        <div class="ls-live-actions"><button type="button" class="ls-ghost compact" @click="editStep('voice')">{{ readOnlySession ? '查看配置' : '调整配置' }}</button><button type="button" class="ls-ghost compact" @click="setStage('review')">查看场次复盘</button></div>
+      </section>
+      <LiveAudioControl
+        ref="audioControl"
+        :key="selectedStoreId"
+        :view="stage"
+        :session-id="activeSessionId"
+        :store-id="selectedStoreId"
+        :session-status="currentSession?.status"
+        :session-error="draftError"
+        :blockers="blockers"
+        :ensure-session="ensureAudioSession"
+        :host-voice="hostVoice"
+        :products="productQueue"
+        @open-workspace="setStage('live')"
+        @start-session="startSession"
+        @edit-step="editStep"
+      />
+      <aside v-if="stage === 'setup'" class="panel ls-precheck" aria-label="开播前检查">
+        <h3>开播前检查</h3>
+        <ul class="ls-check-list">
+          <li v-if="!sessionName.trim()" class="todo"><i aria-hidden="true" /><span>场次名称未填写</span></li>
+          <li :class="hostReady ? 'ok' : 'todo'"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>主播音色：{{ hostVoice ? hostVoice.name + (hostReady ? '' : '（不可用）') : '未选择' }}</span><button v-if="!hostReady && !readOnlySession" type="button" @click="editStep('voice')">去设置</button></li>
+          <li :class="productQueue.length ? 'ok' : 'todo'"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>本场商品 {{ productQueue.length }} 件</span><button v-if="!productQueue.length && !readOnlySession" type="button" @click="editStep('script')">去添加</button></li>
+          <li :class="{ ok: !!answeringCohost }"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>{{ answeringCohost ? `助播回答弹幕：${answeringCohost.name}` : '助播回答弹幕未开启（可选）' }}</span></li>
+        </ul>
+        <dl class="ls-precheck-facts">
+          <div><dt>称呼</dt><dd>{{ persona.name || '未设置' }}</dd></div>
+          <div><dt>风格</dt><dd>{{ persona.style }}</dd></div>
+          <div><dt>助播</dt><dd>{{ cohostVoices.length ? cohostVoices.map(voice => voice.name).join('、') : '无' }}</dd></div>
+          <div><dt>节奏</dt><dd>{{ urgencyLabel.split(' · ')[0] }}</dd></div>
+          <div><dt>问答</dt><dd>{{ qaPairs.length }} 条</dd></div>
+        </dl>
+        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场<ArrowRight :size="15" aria-hidden="true" /></button>
+        <button v-else-if="currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台<ArrowRight :size="15" aria-hidden="true" /></button>
+      </aside>
+    </div>
 
     <section v-if="stage === 'live'" class="ls-live-grid" aria-label="直播工作台">
       <div class="ls-live-main">
@@ -955,7 +938,7 @@ onBeforeUnmount(() => {
           <div class="panel-heading"><div><p class="eyebrow">REALTIME</p><h3>弹幕流与自动回复</h3></div><span class="ls-pending-badge" :class="{ ready: commentFeed.length }">{{ commentFeed.length ? `${commentFeed.length} 条` : '暂无弹幕' }}</span></div>
           <p v-if="inDesktop" class="ls-card-note">连接直播间后，这里显示从直播间读到的弹幕和自动回复。</p>
           <p v-else class="ls-card-note">真实抖音弹幕尚未接入，这里显示的是下方“模拟弹幕互动”发出的问题与回复。</p>
-          <div v-if="commentFeed.length" class="ls-realtime-feed"><article v-for="item in commentFeed" :key="item.id" class="ls-realtime-item" :class="{ attention: item.needsPerson }"><div class="ls-realtime-line"><span class="ls-realtime-kind">{{ item.providerLabel || '观众' }}</span><strong>{{ item.question }}</strong><small class="ls-realtime-state" :class="item.tone">{{ item.stateLabel }}</small></div><div v-if="item.answer" class="ls-realtime-line"><span class="ls-realtime-kind reply">回复</span><p>{{ item.answer }}</p><small v-if="item.sourceLabel">{{ item.sourceLabel }}</small></div><p v-else-if="item.note" class="ls-realtime-note">{{ item.note }}</p></article></div><div v-else class="ls-workspace-empty"><MessageSquare :size="32" :stroke-width="1.4" aria-hidden="true" /><strong>还没有弹幕</strong><p>在“开发测试 · 模拟弹幕互动”里发一条问题：与知识库文字一致的直接用原话回复，其余依据本场问答和商品资料自动回答。</p><button type="button" class="ls-ghost compact" @click="editStep('script')">查看互动知识库</button></div>
+          <div v-if="commentFeed.length" class="ls-realtime-feed"><article v-for="item in commentFeed" :key="item.id" class="ls-realtime-item" :class="{ attention: item.needsPerson }"><div class="ls-realtime-line"><span class="ls-realtime-kind">{{ item.providerLabel || '观众' }}</span><strong>{{ item.question }}</strong><small class="ls-realtime-state" :class="item.tone">{{ item.stateLabel }}</small></div><div v-if="item.answer" class="ls-realtime-line"><span class="ls-realtime-kind reply">回复</span><p>{{ item.answer }}</p><small v-if="item.sourceLabel">{{ item.sourceLabel }}</small></div><p v-else-if="item.note" class="ls-realtime-note">{{ item.note }}</p></article></div><div v-else class="ls-workspace-empty"><MessageSquare :size="32" :stroke-width="1.4" aria-hidden="true" /><strong>还没有弹幕</strong><p>在“开发测试 · 模拟弹幕互动”里发一条问题：与知识库文字一致的直接用原话回复，其余依据本场问答和商品资料自动回答。</p><button type="button" class="ls-ghost compact" @click="editStep('qa')">查看互动知识库</button></div>
         </article>
       </div>
       <aside class="ls-live-side">
@@ -1004,18 +987,19 @@ onBeforeUnmount(() => {
 <style scoped>
 .ls-configuration-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
 .ls-configuration-fields:disabled { opacity: .72; }
-.ls-draft-toolbar { margin: 0 0 20px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.ls-draft-row { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.ls-current-session { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-.ls-current-session > span { flex-shrink: 0; color: var(--ink-muted); font-size: 12px; }
-.ls-current-session input { width: min(100%, 360px); min-width: 0; height: 34px; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: 500 14px var(--font-sans); text-overflow: ellipsis; }
-.ls-current-session input:hover:not(:disabled) { border-color: var(--line); }
-.ls-current-session input:focus-visible { border-color: var(--cinnabar); outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+.ls-session-rename { display: grid; gap: 6px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); color: var(--ink-muted); font-size: 11px; }
+.ls-session-rename input { width: 100%; min-width: 0; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; outline: 0; background: var(--color-bg-surface); color: var(--ink); font: 500 13px var(--font-sans); }
+.ls-session-rename input:focus { border-color: var(--cinnabar); }
+.ls-session-menu-label { margin: 0 2px 6px; color: var(--ink-muted); font-size: 11px; }
+.ls-session-delete { display: block; width: 100%; margin-top: 12px; padding: 10px 2px 0; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--red); font-size: 12px; text-align: left; }
+.ls-session-delete:hover:not(:disabled) { text-decoration: underline; }
 .ls-save-state { font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
 .ls-save-state.dirty { color: var(--color-primary); }
 .ls-save-state.live { color: var(--color-success); }
 .ls-session-tools { position: relative; font-size: 12px; }
-.ls-session-tools summary { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px; color: var(--ink-soft); cursor: pointer; list-style: none; border-radius: 6px; }
+.ls-session-tools summary { display: flex; align-items: center; gap: 8px; height: 36px; max-width: 240px; padding: 0 10px 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-surface); color: var(--ink); font-size: 13px; cursor: pointer; list-style: none; }
+.ls-session-tools summary > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ls-session-tools summary > svg { flex: none; color: var(--ink-muted); }
 .ls-session-tools summary::-webkit-details-marker { display: none; }
 .ls-session-tools summary:focus-visible, .ls-stage-nav button:focus-visible, .ls-text-action:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 3px; }
 .ls-session-tools[open] summary svg { transform: rotate(180deg); }
@@ -1028,14 +1012,11 @@ onBeforeUnmount(() => {
 .ls-session-list strong { overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .ls-session-list small { color: var(--ink-muted); font-size: 11px; }
 .ls-session-hint { margin: 8px 2px 0; color: var(--ink-muted); font-size: 11px; line-height: 1.7; }
-.ls-stage-nav { display: flex; gap: 28px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
-.ls-stage-nav button { display: flex; align-items: center; gap: 8px; padding: 0 2px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-muted); font: 500 14px var(--font-sans); cursor: pointer; white-space: nowrap; }
-.ls-stage-nav .mono { font-size: 10px; opacity: .65; }
+.ls-stage-nav { display: flex; gap: 28px; margin: 0 0 20px; border-bottom: 1px solid var(--line); }
+.ls-stage-nav button { display: flex; align-items: center; gap: 8px; padding: 0 2px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-muted); font: 500 14px var(--font-sans); cursor: pointer; white-space: nowrap; }
 .ls-stage-nav button.active { color: var(--color-primary); border-bottom-color: var(--cinnabar); }
-.ls-draft-toolbar .primary-button.compact { height: 32px; min-height: 32px; padding: 0 14px; font-size: 12px; }
 .ls-client-placeholder { display: grid; place-content: center; flex: 0 0 80px; height: 80px; border: 1px dashed var(--line-strong); border-radius: 10px; text-align: center; color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
 .ls-qa-destination select { min-width: 0; max-width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px 10px; color: var(--ink); background: var(--night-panel); }
-.ls-draft-actions { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; gap: 8px; }
 .ls-connection-note { margin: 0 0 18px; font-size: 12px; line-height: 1.8; color: var(--ink-muted); }
 .ls-qa-destination { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--ink-muted); }
 .ls-qa-destination label { display: flex; align-items: center; gap: 8px; }
@@ -1077,13 +1058,8 @@ onBeforeUnmount(() => {
 .ls-gap-notice { margin: 12px 0 0; color: var(--green); font-size: 12px; }
 .ls-live-bar .ls-live-metric strong { overflow-wrap: anywhere; }
 @media (max-width: 700px) {
-  .ls-draft-row { flex-wrap: wrap; gap: 10px; }
-  .ls-current-session { flex-basis: 100%; }
-  .ls-current-session input { flex: 1; width: auto; }
-  .ls-draft-actions { margin-left: auto; }
   .ls-stage-nav { gap: 16px; }
-  .ls-stage-nav button { font-size: 13px; gap: 5px; }
-  .ls-stage-nav .mono { display: none; }
+  .ls-stage-nav button { font-size: 13px; }
   .ls-review-details { grid-template-columns: 1fr; gap: 24px; }
   .ls-live-bar { gap: 20px; }
   .ls-live-voice-metric { flex-basis: 100%; }

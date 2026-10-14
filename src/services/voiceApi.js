@@ -63,6 +63,7 @@ export function createVoiceApi({ request = defaultRequest, fetch: uploadFetch = 
     clone: id => write(`/api/voice-samples/${id}/clone`, 'POST', {}),
     refresh: id => write(`/api/voice-samples/${id}/refresh`, 'POST', {}),
     delete: remove,
+    preview: (storeId, data) => write(`/api/stores/${storeId}/voice/preview`, 'POST', data),
     synthesize: (storeId, data) => write(`/api/stores/${storeId}/voice/synthesize`, 'POST', data),
     async upload(storeId, { name, file, consent }) {
       if (!consent) throw new Error('请确认这是本人声音，或已获得声音所有者授权。')

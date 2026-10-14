@@ -3,6 +3,7 @@ package com.wuyao.growth.billing;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -49,7 +50,9 @@ class BillingConfigurationTest {
             """);
         var boot=new SpringApplication(ConfigurationOnly.class);
         boot.setWebApplicationType(WebApplicationType.NONE);
-        boot.setDefaultProperties(Map.of("spring.main.banner-mode","off","logging.level.root","ERROR"));
+        boot.setDefaultProperties(Map.of("spring.main.banner-mode","off"));
+        // 只读配置，不碰日志：这里改的日志级别是全 JVM 共用的，会让后面靠日志断言的测试收不到日志。
+        System.setProperty(LoggingSystem.SYSTEM_PROPERTY, LoggingSystem.NONE);
         try(var context=boot.run("--spring.config.location="+application.toUri(),
                 "--spring.config.import="+environment.toUri()+"[.properties]")) {
             assertThat(context.getBean(BillingProperties.class).getOperatorUserIds()).isEmpty();
@@ -57,6 +60,8 @@ class BillingConfigurationTest {
             assertThat(loaded).hasSize(1);
             assertThat(loaded.getFirst().getProviderModel()).isEqualTo("test-only");
             assertThat(loaded.getFirst().getReferenceVideoBilled()).isNull();
+        } finally {
+            System.clearProperty(LoggingSystem.SYSTEM_PROPERTY);
         }
     }
 }

@@ -18,6 +18,15 @@ public class VoiceService {
     private final ObjectStorage storage;
     private final StoreAccessService stores;
     private final List<VoiceUsageGuard> guards;
+    /** 试听固定念这一句。改了文案要把 PREVIEW_VERSION 加一，旧的试听音频才不会被继续播放。 */
+    static final String PREVIEW_TEXT = "欢迎来到我们的直播间，今天为大家介绍门店的商品，有任何问题都可以留言。";
+    private static final String PREVIEW_VERSION = "v1";
+    /** 克隆音色的试听音频紧挨着样本存放：同一个存储、同一个商户目录，删除样本时一起删。 */
+    static String previewKey(String sampleKey) { return sampleKey + "-preview-" + PREVIEW_VERSION + ".wav"; }
+    private String builtInPreviewKey(String voice) {
+        return "voice-previews/%s/%s/%s-%s.wav".formatted(pathPart(provider.code()), pathPart(provider.model()), pathPart(voice), PREVIEW_VERSION);
+    }
+    private static String pathPart(String value) { return value == null ? "_" : value.replaceAll("[^A-Za-z0-9._-]", "_"); }
     public VoiceDtos.Capabilities capabilities() {
         return new VoiceDtos.Capabilities(provider.code(), provider.configured(), true,
                 provider.configured() ? "语音服务已配置，实际音质和延迟需试听验证。" : "尚未配置语音供应商。可以先保存授权样本、配对播报页并测试接线。",
@@ -72,6 +81,8 @@ public class VoiceService {
             provider.deleteVoice(input.voiceId());
             samples.finishProviderDelete(id, userId, input.voiceId());
         }
+        // 试听音频也是这个人的声音，和样本一起删。
+        storage.delete(previewKey(input.key()));
         storage.delete(input.key());
         if (storage.stat(input.key()).isPresent()) throw VoiceSampleService.invalid("样本尚未删除，请重试");
         samples.finishDelete(id, userId);
@@ -93,6 +104,20 @@ public class VoiceService {
             throw VoiceSampleService.invalid("请选择当前门店已就绪的音色");
         if (!provider.supportsVoice(sample.providerVoiceId())) throw VoiceSampleService.invalid("该音色与当前合成模型不匹配，请使用原模型或重新创建音色");
         return sample.providerVoiceId();
+    }
+    /**
+     * 试听地址。同一个音色只在第一次试听时合成，音频存进对象存储，之后直接签发地址。
+     * 两个人同时第一次试听会各合成一次、写到同一个位置，结果一样。
+     */
+    public VoiceDtos.DownloadTicket preview(Long storeId, VoiceDtos.PreviewRequest request, Long userId) {
+        String voice = resolveVoice(storeId, request.sampleId(), request.builtInVoice(), userId);
+        String key = request.sampleId() == null ? builtInPreviewKey(voice)
+                : previewKey(samples.openTo(request.sampleId(), storeId).storageKey());
+        if (storage.stat(key).isEmpty()) {
+            var audio = provider.synthesize(PREVIEW_TEXT, voice, bytes -> { });
+            storage.put(key, PcmAudio.wav(audio.pcm(), audio.sampleRate()), "audio/wav");
+        }
+        return new VoiceDtos.DownloadTicket(storage.presignGet(key, Duration.ofMinutes(5)));
     }
     public VoiceProvider.Audio synthesizeAudio(Long storeId, VoiceDtos.SpeechRequest request, Long userId) {
         String voice = resolveVoice(storeId, request.sampleId(), request.builtInVoice(), userId);

@@ -37,6 +37,8 @@ public final class VoiceDtos {
                                String message, List<String> builtInVoices, String model) { }
     public record SpeechRequest(@NotBlank @Size(max=1000) String text, @Positive Long sampleId,
                                 @Size(max=120) String builtInVoice) { }
+    /** 试听哪个音色：克隆音色传 sampleId，系统音色传 builtInVoice。 */
+    public record PreviewRequest(@Positive Long sampleId, @Size(max=120) String builtInVoice) { }
     public record SpeechResult(String providerCode, String audioBase64, String mimeType,
                                long durationMillis, List<Long> pauseOffsetsMillis, long firstAudioMillis) { }
 }
