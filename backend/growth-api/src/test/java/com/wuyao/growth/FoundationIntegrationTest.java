@@ -2431,8 +2431,16 @@ class FoundationIntegrationTest {
         var specs = java.util.stream.IntStream.range(0, count).mapToObj(n -> Map.of(
                 "role", "场景" + n, "prompt", "夏日自然光，保持商品外观", "headline", headline, "caption", caption)).toList();
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE)))
-                .thenReturn(new ProviderResult(true, "TEST", null,
-                        Map.of("summary", "一组清爽的夏日图片", "visualDirection", "浅绿背景，自然光", "question", "", "items", specs), null, null));
+                .thenAnswer(invocation -> {
+                    var request = invocation.getArgument(0, ProviderRequest.class);
+                    if ("UNDERSTAND".equals(request.options().get("stage"))) {
+                        return new ProviderResult(true, "TEST", null, Map.of(
+                                "summary", "按用户要求完成一组清爽的夏日图片", "question", "",
+                                "mustChange", List.of(), "mustPreserve", List.of("商品外观"), "mustAvoid", List.of()), null, null);
+                    }
+                    return new ProviderResult(true, "TEST", null,
+                            Map.of("summary", "一组清爽的夏日图片", "visualDirection", "浅绿背景，自然光", "question", "", "items", specs), null, null);
+                });
     }
 
     private ProviderResult imageResult() {
@@ -2486,9 +2494,9 @@ class FoundationIntegrationTest {
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20).total())).isEqualTo(1);
         assertThat(TenantContext.runAs(tenantB, () -> imageCreations.works(0, 20).total())).isZero();
         var calls = ArgumentCaptor.forClass(ProviderRequest.class);
-        verify(imageGateway, times(3)).invokeReal(calls.capture());
-        assertThat(calls.getAllValues().get(1).idempotencyKey()).isEqualTo(calls.getAllValues().get(2).idempotencyKey());
-        assertThat(calls.getAllValues().get(2).options().get("operation")).isEqualTo("query");
+        verify(imageGateway, times(4)).invokeReal(calls.capture());
+        assertThat(calls.getAllValues().get(2).idempotencyKey()).isEqualTo(calls.getAllValues().get(3).idempotencyKey());
+        assertThat(calls.getAllValues().get(3).options().get("operation")).isEqualTo("query");
         clearInvocations(imageGateway);
         var edit = TenantContext.runAs(tenantA, () -> imageCreations.editText(created.id(), done.items().getFirst().id(),
                 new ImageDtos.TextEdit("text-edit-version", "Summer", "Fresh today"), null));
@@ -2577,7 +2585,7 @@ class FoundationIntegrationTest {
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.thread(revised.id())))).isEqualTo(1404);
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.rename(revised.id(), "越权改名")))).isEqualTo(1404);
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
-        verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
+        verify(imageGateway, times(2)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
                 && r.prompt().contains("\"variation\":\"LAYOUT\"") && r.prompt().contains("\"previousPoster\"")));
     }
 
@@ -2600,7 +2608,7 @@ class FoundationIntegrationTest {
         clearInvocations(imageGateway);
         var second=TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-second", "POSTER", 1, refs), null));
         runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
-        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
+        verify(imageGateway, times(2)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
                 && r.prompt().contains("recentPostersToAvoid")));
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(second.id()).items().getFirst().similarityWarning())).isTrue();
@@ -2617,7 +2625,7 @@ class FoundationIntegrationTest {
         clearInvocations(imageGateway);
         TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("poster-next", "POSTER", 1, List.of()), null));
         runImageTask("DEFAULT", imagePlanHandler);
-        verify(imageGateway).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
+        verify(imageGateway, times(2)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE
                 && r.prompt().contains("recentPostersToAvoid")));
         verify(imageGateway, never()).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));
     }
@@ -2661,10 +2669,18 @@ class FoundationIntegrationTest {
         enableImageModels();
         String prompt="Subject: tea; Lighting: studio lighting; Color: warm palette; Composition: asymmetric; Depth: deep focus; Quality: professional photography, sharp focus, 8K; Avoid: blurry, watermark";
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.TEXT_CREATIVE)))
-                .thenReturn(new ProviderResult(true,"TEST",null,Map.of(
-                        "summary", "茶饮摄影方案", "visualDirection", "studio lighting", "question", "",
-                        "items", List.of(Map.of("role", "主图", "prompt", prompt, "headline", "", "caption", "")),
-                        "_model", "claude-sonnet-4-6-ab"),null,null));
+                .thenAnswer(invocation -> {
+                    var request = invocation.getArgument(0, ProviderRequest.class);
+                    if ("UNDERSTAND".equals(request.options().get("stage"))) {
+                        return new ProviderResult(true,"TEST",null,Map.of(
+                                "summary", "茶饮摄影需求", "question", "", "mustChange", List.of(),
+                                "mustPreserve", List.of("茶饮主体"), "mustAvoid", List.of()),null,null);
+                    }
+                    return new ProviderResult(true,"TEST",null,Map.of(
+                            "summary", "茶饮摄影方案", "visualDirection", "studio lighting", "question", "",
+                            "items", List.of(Map.of("role", "主图", "prompt", prompt, "headline", "", "caption", "")),
+                            "_model", "claude-sonnet-4-6-ab"),null,null);
+                });
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
                 .thenReturn(new ProviderResult(true,"TEST","refined-job",Map.of("status","RUNNING"),null,null))
                 .thenReturn(imageResult());
@@ -2676,9 +2692,9 @@ class FoundationIntegrationTest {
         assertThat(result.status()).isEqualTo("SUCCEEDED");
         var item=TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(result.items().getFirst().id()));
         assertThat(item.getSpec().prompt()).startsWith(prompt);
-        verify(imageGateway,times(1)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_CREATIVE && r.tenantId().equals(tenantA)));
+        verify(imageGateway,times(2)).invokeReal(argThat(r -> r != null && r.alias()==ModelAlias.TEXT_CREATIVE && r.tenantId().equals(tenantA)));
         var calls=ArgumentCaptor.forClass(ProviderRequest.class);
-        verify(imageGateway,times(3)).invokeReal(calls.capture());
+        verify(imageGateway,times(4)).invokeReal(calls.capture());
         var imageCalls=calls.getAllValues().stream().filter(r->r.alias()==ModelAlias.IMAGE_PRIMARY).toList();
         assertThat(imageCalls).hasSize(2);
         assertThat(imageCalls.getFirst().prompt()).startsWith(prompt).isEqualTo(imageCalls.getLast().prompt());

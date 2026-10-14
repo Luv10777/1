@@ -66,7 +66,7 @@ const wallColumns = [buildWallColumn(0), buildWallColumn(3), buildWallColumn(6)]
 const visiblePlatforms = computed(() => platforms[platformGroup.value])
 const imageTypes = computed(() => platformGroup.value === 'local'
   ? [{ value: 'DISH', label: '菜品图', count: 3 }, { value: 'STORE', label: '门店美化图', count: 3 }]
-  : [{ value: 'PRODUCT_MAIN', label: '商品主图', count: 1 }, { value: 'WHITE_BG', label: '白底图', count: 1 }, { value: 'DETAIL', label: '详情图', count: 3 }, { value: 'SCENE_SET', label: '场景套图', count: 3 }])
+  : [{ value: 'PRODUCT_MAIN', label: '商品主图', count: 1 }, { value: 'DETAIL', label: '详情图', count: 3 }, { value: 'SCENE_SET', label: '场景套图', count: 3 }])
 function selectPlatformGroup(group) {
   platformGroup.value = group
   selectedPlatform.value = platforms[group][0].name

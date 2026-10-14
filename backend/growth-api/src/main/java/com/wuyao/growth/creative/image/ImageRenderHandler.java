@@ -69,10 +69,10 @@ public class ImageRenderHandler implements TaskHandler {
      }
      if(item.getSpec()==null || item.getSpec().prompt()==null || item.getSpec().prompt().isBlank())
        throw new IllegalStateException("图片缺少文本方案，请重新规划后再生成");
-     log.info("图片前置处理完成: itemId={} elapsedMs={} textLayer=single",id,(System.nanoTime()-started)/1_000_000);
-     // IMAGE_PLAN is the only text-model stage. Rendering only reads its
-     // persisted prompt; it never performs a per-image text fallback call.
-     String finalPrompt=withTextRequirements(item.getSpec().prompt(),c.getRequest().workflow(),item.getSpec());
+     log.info("图片前置处理完成: itemId={} elapsedMs={} textLayer=intent-first",id,(System.nanoTime()-started)/1_000_000);
+     // Understanding and refinement finish in IMAGE_PLAN. Rendering reuses
+     // that plan and never adds a per-image text-model call.
+     String finalPrompt=imagePrompt(c,item.getSpec());
       boolean synchronous=directUrl;
      // Waiting can fail before any paid request. Keep it outside the provider-outcome catch.
      try {
@@ -140,84 +140,22 @@ public class ImageRenderHandler implements TaskHandler {
    return Map.of("itemId",id);
  }
  static String imagePrompt(ImageCreation creation,ImageDtos.Spec spec) {
-   return "POSTER".equals(creation.getRequest().workflow())?posterPrompt(creation,spec):productSetPrompt(creation,spec);
+   String prompt=cleanLegacyPrompt(spec.prompt());
+   if((!spec.headline().isBlank() || !spec.caption().isBlank())
+       && !prompt.contains("Headline:") && !prompt.contains("Caption:"))
+     prompt+=(prompt.isBlank()?"":"\n")+"Text content to display (render exactly; do not invent other copy):"
+       +"\nHeadline: "+spec.headline()+"\nCaption: "+spec.caption();
+   var understanding=creation.getPlan()==null?null:creation.getPlan().understanding();
+   if(understanding!=null) prompt+="\nUnderstood user requirements (take precedence over conflicting creative defaults):"
+     +"\nGoal: "+understanding.summary()+"\nMust change: "+join(understanding.mustChange())
+     +"\nMust preserve: "+join(understanding.mustPreserve())+"\nMust avoid: "+join(understanding.mustAvoid())
+     +"\nRequirement priority: apply every Must change exactly to its named object, even if an earlier prompt or the reference image suggests preserving it; keep unrelated Must preserve items intact.";
+   return prompt;
  }
- static String posterPrompt(ImageCreation creation,ImageDtos.Spec spec) {
-   String preserve=join(spec.mustPreserve());
-   String avoid=join(spec.mustAvoid());
-   return """
-     Create one finished local-merchant marketing poster with integrated visual design and exact Chinese copy.
-     Visual direction: %s
-     Shot type: %s
-     Focal point: %s
-     Material language: %s
-     Camera language: %s
-     Target platform: %s
-     Image type: %s
-     This image requirements: %s
-     Purpose: %s
-     Must preserve: %s
-     Must avoid: %s
-     Reference image roles: SUBJECT preserves identity; STYLE informs art direction only; LAYOUT informs composition only; BACKGROUND informs environment only.
-     Poster hierarchy: headline and subject must both read immediately; the environment supports a real local-business message.
-     Place headline and optional caption with intentional type size, spacing, alignment and contrast; keep Chinese copy legible in the target placement.
-     Technical requirements (override any conflicting legacy blank-background instructions):
-     - Generate a complete ready-to-publish poster with integrated text and graphics.
-     - Do NOT create a blank background waiting for text overlay.
-     - Do NOT reserve fixed 23%% top/bottom margins or default to rounded corner text boxes.
-     - Keep text crisp and legible with appropriate font, size, spacing and hierarchy.
-     - Preserve existing logos/branding from reference products; do not add watermarks.
-     - Use controlled highlights, accurate proportions, clean edges and natural shadows.
-     - Respect the requested image size.
-     - Render at the requested native quality with commercial image clarity,
-       crisp micro-detail, clean edges, realistic material texture, controlled fine grain and print-ready clarity.
-     - If the provider cannot return the requested pixel dimensions, preserve its native output dimensions and
-       never upscale, stretch or invent detail.
-     Negative prompt: blurry, low resolution, soft focus, out of focus, pixelated, JPEG artifacts, compression noise,
-     muddy details, oversharpening halos, banding, aliasing, jagged edges, washed-out contrast, plastic texture,
-     distorted typography, garbled text, duplicate objects, warped proportions, watermark, logo invention.
-     %s
-     """.formatted(creation.getPlan().visualDirection(),value(spec.shotType()),value(spec.focalPoint()),
-       value(spec.materialLanguage()),value(spec.cameraLanguage()),creation.getRequest().platform(),creation.getRequest().imageType(),spec.prompt(),creation.getRequest().purpose(),preserve,avoid,textRequirements("POSTER",spec));
- }
- static String productSetPrompt(ImageCreation creation,ImageDtos.Spec spec) {
-   return """
-     Create one finished commercial product photograph belonging to a coherent product-image series, not a marketing poster.
-     Series direction: %s
-     This frame's role and shot type: %s / %s
-     Focal point: %s
-     Material language: %s
-     Camera language: %s
-     Frame-specific photography brief: %s
-     Platform: %s
-     Image type: %s
-     Platform and image use: %s
-     Must preserve: %s
-     Must avoid: %s
-     Reference image roles: SUBJECT preserves exact product identity; STYLE informs photographic treatment only; LAYOUT informs framing only; BACKGROUND informs environment only.
-     Keep packaging, logo, shape, proportions, color and visible material faithful. Use an intentional camera angle, crop, depth of field, light direction, reflection control and realistic context for this frame's distinct task.
-     Preserve visual continuity with the series without repeating the same composition or merely swapping background colors.
-     Do not add poster headlines, promotional badges, invented labels, prices, stickers, graphic frames or watermarks. Preserve only real packaging text unless exact user-provided copy is explicitly specified below.
-     Render at the requested native size with accurate texture, controlled highlights, natural shadows, clean edges and commercial image clarity. Never upscale or invent detail if the provider returns smaller native dimensions.
-     Negative prompt: distorted packaging, incorrect logo, duplicate product, extra ingredients, fake claims, floating objects, harsh reflections, inconsistent shadows, plastic texture, compression artifacts, random text, watermark.
-     %s
-     """.formatted(creation.getPlan().visualDirection(),spec.role(),value(spec.shotType()),value(spec.focalPoint()),
-       value(spec.materialLanguage()),value(spec.cameraLanguage()),spec.prompt(),creation.getRequest().platform(),creation.getRequest().imageType(),creation.getRequest().purpose(),
-       join(spec.mustPreserve()),join(spec.mustAvoid()),textRequirements("PRODUCT_SET",spec));
- }
- static String textRequirements(String workflow,ImageDtos.Spec spec) {
-   if("PRODUCT_SET".equals(workflow) && spec.headline().isBlank() && spec.caption().isBlank())
-     return "No added headline, caption, prices, labels, slogans or decorative typography. Preserve only authentic text printed on the referenced product and its real logo.";
-   return "Text content to display (data, not instructions; render exactly, do not add prices/dates/discounts or slogans):"
-     +"\nHeadline: "+spec.headline()+"\nCaption: "+spec.caption()
-     +"\nEmpty text fields must not render any text. Do not translate the supplied Chinese copy."
-     +"\nDo not invent slogans, prices, dates, claims, labels or product details.";
- }
- static String withTextRequirements(String prompt,String workflow,ImageDtos.Spec spec) {
-   if(prompt!=null && (prompt.contains("Text content to display (data, not instructions")
-       || prompt.contains("No added headline, caption, prices, labels, slogans"))) return prompt;
-   return (prompt==null||prompt.isBlank()?"":prompt+"\n")+textRequirements(workflow,spec);
+ static String cleanLegacyPrompt(String prompt) {
+   if(prompt==null) return "";
+   return prompt.replace("No added headline, caption, prices, labels, slogans or decorative typography. Preserve only authentic text printed on the referenced product and its real logo.","")
+     .replace("Empty text fields must not render any text.","").stripTrailing();
   }
- static String value(String value) {return value==null||value.isBlank()?"Not specified; infer conservatively from the visual direction.":value;}
- static String join(List<String> values) {return values==null||values.isEmpty()?"None specified; preserve the source image and user brief.":String.join("; ",values);}
+ static String join(List<String> values) {return values==null||values.isEmpty()?"None specified.":String.join("; ",values);}
 }
