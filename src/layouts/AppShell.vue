@@ -72,7 +72,6 @@ const navGroups = [
       { name: 'image-create', label: '图片创作', path: '/image/create' },
       { name: 'video-create', label: '视频创作', path: '/video/create' },
       { name: 'digital-human', label: '实景直播', path: '/digital-human' },
-      { name: 'copy-rewrite', label: '文案提取 / 仿写 / 重写', path: '/copy/rewrite' },
       { name: 'video-analyze', label: '视频反推', path: '/video/analyze' },
     ],
   },
@@ -129,11 +128,9 @@ const navGroups = [
     key: 'system',
     label: '系统',
     items: [
-      { name: 'notifications', label: '消息', path: '/notifications' },
       { name: 'tasks', label: '任务中心', path: '/tasks' },
       { name: 'team', label: '员工管理', path: '/team', ownerOnly: true },
       { name: 'settings', label: '系统设置', path: '/settings' },
-      { name: 'help', label: '帮助与反馈', path: '/help' },
     ],
   },
 ].filter(group => !['workspace', 'analytics', 'acquisition', 'publishing', 'customer-service', 'geo'].includes(group.key))
@@ -294,8 +291,6 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
             <RouterLink to="/information-publishing" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
-            <button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button>
-            <button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button>
             <button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ userInitial }}</span><span class="top-account-name">{{ userName }}</span></button>
           </div>
         </div>
@@ -331,7 +326,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
-@media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } .topbar .help-button { display: none; } }
-@media (max-width: 860px) { .topbar .header-store, .topbar .notification-button, .topbar .top-account { display: none; } }
+@media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
+@media (max-width: 860px) { .topbar .header-store, .topbar .top-account { display: none; } }
 @media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 11px; } .topbar-entry svg { display: none; } .topbar .header-brand strong { display: none; } }
 </style>

@@ -47,8 +47,8 @@ const routes = [
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '经营总览', eyebrow: 'TODAY / OPERATIONS' } },
   { path: '/creative', name: 'creative', component: CreativeWorkspaceView, meta: { title: '内容创作', eyebrow: 'CONTENT WORKSPACE' } },
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', eyebrow: 'CONTENT WORKSPACE', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },
-  { path: '/copy/extract', name: 'copy-extract', component: PlaceholderView, meta: { title: '文案提取', eyebrow: 'CONTENT TOOLS', icon: '↗', description: '从已有素材中提取可复用的卖点、语气与结构。' } },
-  { path: '/copy/rewrite', name: 'copy-rewrite', component: PlaceholderView, meta: { title: '文案提取 / 仿写 / 重写', eyebrow: 'CONTENT TOOLS', icon: 'Aa', description: '从已有素材提取文案，在保留核心信息的基础上完成仿写与多平台重写。' } },
+  { path: '/copy/extract', name: 'copy-extract', redirect: '/image/create' },
+  { path: '/copy/rewrite', name: 'copy-rewrite', redirect: '/image/create' },
   { path: '/video/analyze', name: 'video-analyze', component: VideoAnalyzeView, meta: { title: '视频反推', eyebrow: 'CONTENT TOOLS', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },
   { path: '/image/create', name: 'image-create', component: ImageCreateView, meta: { title: '图片创作', eyebrow: 'CONTENT TOOLS', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。', navGroup: 'content' } },
   { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { title: '营销海报', eyebrow: 'CONTENT TOOLS', description: '为一次活动定下主视觉。', navGroup: 'content' } },
@@ -82,11 +82,11 @@ const routes = [
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', eyebrow: 'GEO GROWTH', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
   { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { title: '商家联盟', navGroup: 'billing' } },
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
-  { path: '/notifications', name: 'notifications', component: PlaceholderView, meta: { title: '消息', eyebrow: 'SYSTEM', icon: '◌', description: '集中查看系统通知、审核提醒和任务动态。' } },
+  { path: '/notifications', name: 'notifications', redirect: '/image/create' },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: PlaceholderView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '管理成员、角色、通知和平台连接配置。' } },
-  { path: '/help', name: 'help', component: PlaceholderView, meta: { title: '帮助与反馈', eyebrow: 'SYSTEM', icon: '?', description: '查找使用说明、常见问题并提交产品反馈。' } },
+  { path: '/help', name: 'help', redirect: '/image/create' },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },
   { path: '/404', name: 'not-found', component: NotFoundView, meta: { title: '页面不存在', public: true } },
   { path: '/:pathMatch(.*)*', redirect: '/404' },
@@ -110,7 +110,7 @@ router.beforeEach(async (to, from) => {
   }
 
   // 桌面端只做直播这一件事：别的页面一律回到直播页。
-  if (inDesktop && !['digital-human', 'billing', 'help'].includes(to.name)) return { name: 'digital-human' }
+  if (inDesktop && !['digital-human', 'billing'].includes(to.name)) return { name: 'digital-human' }
 
   if (to.meta.role && !auth.hasRole(to.meta.role)) return { name: 'forbidden' }
   if (to.meta.ownerOnly && !auth.isOwner) return { name: 'forbidden' }
