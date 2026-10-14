@@ -56,6 +56,14 @@ test('creation rechecks membership, prompts nonmembers and rejects a stale activ
   const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
   const { billing, refreshBilling, requireMembership } = await vite.ssrLoadModule('/src/stores/billing.js')
   try {
+    let guestRequests = 0
+    globalThis.fetch = async () => { guestRequests++; throw new Error('guests must not request account data') }
+    assert.equal(await refreshBilling(), null)
+    assert.deepEqual(events, [], 'guest browsing must not prompt for login')
+    await assert.rejects(requireMembership(), /请先登录/)
+    assert.deepEqual(events, ['login-required'], 'creation asks a guest to log in')
+    assert.equal(guestRequests, 0, 'a guest action must not request billing or submit a generation')
+    events.length = 0
     auth.state.user = { id: 1, tenantId: 7 }
     auth.state.token = { accessToken: 'test-only' }
     let account = { memberActive: false }

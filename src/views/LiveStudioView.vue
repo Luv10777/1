@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { auth } from '../stores/auth'
 import { ChevronDown, MessageSquare, Package, BarChart3 } from 'lucide-vue-next'
 import { selectedStore, selectedStoreId, stores } from '../stores/merchantContext'
 import ProductFormModal from '../components/ProductFormModal.vue'
@@ -428,6 +429,7 @@ const saveDraftCore = async (ticket, storeId) => {
   return result
 }
 const saveDraft = async () => {
+  if (!auth.requireLogin()) return
   if (apiBusy.value || loadBusy.value || readOnlySession.value) return
   const ticket = screenTicket
   const storeId = selectedStoreId.value
@@ -444,6 +446,7 @@ const saveDraft = async () => {
   }
 }
 const transitionSession = async (action) => {
+  if (!auth.requireLogin()) return
   if (apiBusy.value || loadBusy.value || !selectedStoreId.value) return
   const ticket = screenTicket
   const storeId = selectedStoreId.value
@@ -619,6 +622,7 @@ const openSession = async (id) => {
 }
 // 新的一场沿用上一场的音色、话术风格、商品和本场问答；第一次用时没有可沿用的，就从空白开始。
 const newSession = async () => {
+  if (!auth.requireLogin()) return
   if (apiBusy.value || loadBusy.value || switchLocked.value) return
   if (pendingSession.value) { await openSession(pendingSession.value.id); return }
   const source = currentSession.value?.id ? currentSession.value : liveSessions.value[0]
@@ -748,8 +752,8 @@ onBeforeUnmount(() => {
           </details>
           <template v-if="currentStatus === 'DRAFT'">
             <button v-if="activeSessionId" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="deleteDraft">删除</button>
-            <button class="ls-ghost compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || (!!activeSessionId && !draftDirty)" @click="saveDraft">保存配置</button>
-            <button class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0" :title="blockers.length ? '还需要：' + blockers.map(item => item.label).join('、') : ''" @click="startSession">开始本场</button>
+            <button class="ls-ghost compact" type="button" :disabled="auth.isAuthenticated && (loadBusy || loadFailed || apiBusy || !selectedStoreId || (!!activeSessionId && !draftDirty))" @click="saveDraft">保存配置</button>
+            <button class="primary-button compact" type="button" :disabled="auth.isAuthenticated && (loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0)" :title="auth.isAuthenticated && blockers.length ? '还需要：' + blockers.map(item => item.label).join('、') : ''" @click="startSession">开始本场</button>
           </template>
           <button v-if="currentStatus === 'LIVE'" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="pauseSession">暂停本场</button>
           <button v-if="currentStatus === 'PAUSED'" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="resumeSession">继续本场</button>

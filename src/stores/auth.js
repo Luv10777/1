@@ -158,6 +158,12 @@ export const auth = {
     return Boolean(state.user?.roles?.includes(role))
   },
 
+  requireLogin() {
+    if (this.isAuthenticated) return true
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('login-required'))
+    return false
+  },
+
   getAuthHeader() {
     return state.token?.accessToken ? `Bearer ${state.token.accessToken}` : null
   },

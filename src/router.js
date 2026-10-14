@@ -49,16 +49,16 @@ const routes = [
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', eyebrow: 'CONTENT WORKSPACE', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },
   { path: '/copy/extract', name: 'copy-extract', redirect: '/image/create' },
   { path: '/copy/rewrite', name: 'copy-rewrite', redirect: '/image/create' },
-  { path: '/video/analyze', name: 'video-analyze', component: VideoAnalyzeView, meta: { title: '视频反推', eyebrow: 'CONTENT TOOLS', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },
-  { path: '/image/create', name: 'image-create', component: ImageCreateView, meta: { title: '图片创作', eyebrow: 'CONTENT TOOLS', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。', navGroup: 'content' } },
-  { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { title: '营销海报', eyebrow: 'CONTENT TOOLS', description: '为一次活动定下主视觉。', navGroup: 'content' } },
-  { path: '/image/create/product-set', name: 'image-create-product-set', component: ImageCreateView, meta: { title: '产品套图', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '围绕同一件商品生成一组有秩序的画面。', navGroup: 'content' } },
-  { path: '/video/create', name: 'video-create', component: VideoCreateView, meta: { title: '视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
-  { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { title: '视频工作台', eyebrow: 'CONTENT TOOLS', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },
+  { path: '/video/analyze', name: 'video-analyze', component: VideoAnalyzeView, meta: { guest: true, title: '视频反推', eyebrow: 'CONTENT TOOLS', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },
+  { path: '/image/create', name: 'image-create', component: ImageCreateView, meta: { guest: true, title: '图片创作', eyebrow: 'CONTENT TOOLS', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。', navGroup: 'content' } },
+  { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { guest: true, title: '营销海报', eyebrow: 'CONTENT TOOLS', description: '为一次活动定下主视觉。', navGroup: 'content' } },
+  { path: '/image/create/product-set', name: 'image-create-product-set', component: ImageCreateView, meta: { guest: true, title: '产品套图', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '围绕同一件商品生成一组有秩序的画面。', navGroup: 'content' } },
+  { path: '/video/create', name: 'video-create', component: VideoCreateView, meta: { guest: true, title: '视频创作', eyebrow: 'CONTENT TOOLS', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
+  { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { guest: true, title: '视频工作台', eyebrow: 'CONTENT TOOLS', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', eyebrow: 'CONTENT TOOLS', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
-  { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { title: '实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，系统负责话术、声音克隆与弹幕自动回复。' } },
+  { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { guest: true, title: '实景直播', eyebrow: 'CONTENT TOOLS', icon: '◎', description: '手机拍真实场景开播，系统负责话术、声音克隆与弹幕自动回复。' } },
   { path: '/digital-human/history', name: 'digital-human-history', component: PlaceholderView, meta: { title: '直播弹幕与回复记录', eyebrow: 'CONTENT TOOLS / LIVE HISTORY', icon: '◷', description: '查看本场直播中的观众弹幕与回复内容。历史记录页将在后续版本接入完整数据。' } },
-  { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
+  { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { guest: true, title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
   { path: '/merchants', name: 'merchants', component: StoresView, meta: { title: '门店库', eyebrow: 'ASSET CENTER', icon: '⌂', description: '查看和管理本商户的门店。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
   { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
@@ -106,6 +106,7 @@ router.beforeEach(async (to, from) => {
   }
 
   if (!auth.isAuthenticated) {
+    if (to.meta.guest && !inDesktop) return true
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 

@@ -8,6 +8,7 @@ import { useImageCreation } from '../composables/useImageCreation'
 import { IMAGE_QUALITIES, IMAGE_RATIOS, imageDimensions } from '../domain/imageCreation'
 import { assetApi } from '../services/imageCreation'
 import { assets, assetSource } from '../stores/assetLibrary'
+import { auth } from '../stores/auth'
 import '../image-workflow.css'
 
 const studio = useImageCreation('PRODUCT_SET')
@@ -90,6 +91,7 @@ watch([selectedPlatform, imageType], () => {
   studio.purpose = selectedPlatform.value + ' / ' + imageTypes.value.find(type => type.value === imageType.value)?.label
 }, { immediate: true })
 onMounted(async () => {
+  if (!auth.isAuthenticated) return
   try {
     const result = await assetApi.images()
     libraryAssets.value = (result?.items || []).filter(asset => asset.type === 'IMAGE' && asset.status === 'READY' && asset.previewUrl)
@@ -111,7 +113,7 @@ onMounted(async () => {
             <input ref="fileInput" type="file" accept="image/jpeg,image/png" multiple @change="studio.addFiles" />
             <span class="product-upload-icon material-symbols-outlined" aria-hidden="true">add_photo_alternate</span><strong>上传清晰的商品图</strong><small>JPG、PNG · 每张不超过 20 MB</small><span class="product-upload-action">从本地选择</span>
           </label>
-          <button type="button" class="product-library-action" :disabled="studio.locked" @click="libraryOpen = !libraryOpen"><span class="material-symbols-outlined" aria-hidden="true">photo_library</span>{{ libraryOpen ? '收起素材库' : '从素材库选择' }}</button>
+          <button type="button" class="product-library-action" :disabled="studio.locked" @click="auth.requireLogin() && (libraryOpen = !libraryOpen)"><span class="material-symbols-outlined" aria-hidden="true">photo_library</span>{{ libraryOpen ? '收起素材库' : '从素材库选择' }}</button>
           <PosterReferenceLibrary v-if="libraryOpen" :files="studio.files" :disabled="studio.locked" :source-assets="libraryAssets" @choose="studio.addLibraryAsset" @close="libraryOpen = false" />
           <ImageReferenceList :files="studio.files" :disabled="studio.locked" @remove="studio.removeFile" @role="(index, role) => studio.files[index].role = role" />
           <p class="creation-field-hint">上传同一商品的不同角度，第一张主体照为主参考。</p>
@@ -141,9 +143,9 @@ onMounted(async () => {
         <p class="generation-billing-note">本次预占 {{ studio.estimatedCredits }} 烟火 · 成功交付每张 3 烟火，未交付部分退回。</p>
         <RouterLink v-if="studio.billing.summary && !studio.billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员 →</RouterLink>
         <p v-if="studio.error" class="creation-item-error" role="alert">{{ studio.error }}</p>
-        <p class="product-demo-note" role="status">{{ studio.capabilityState === 'checking' ? '正在检查创作服务…' : studio.capabilityState === 'error' ? `创作服务检查失败：${studio.capabilityError}` : !studio.configured ? '图片创作服务尚未接通，可先准备商品照片' : '自动安排主图、细节与场景' }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p>
+        <p class="product-demo-note" role="status">{{ studio.requiresLogin ? '登录后开始创作' : studio.capabilityState === 'checking' ? '正在检查创作服务…' : studio.capabilityState === 'error' ? `创作服务检查失败：${studio.capabilityError}` : !studio.configured ? '图片创作服务尚未接通，可先准备商品照片' : '自动安排主图、细节与场景' }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p>
         <div class="product-save-line"><span>保存到</span><strong>作品库</strong><span class="creation-result-destination">生成后在画图区查看</span></div>
-        <div class="product-footer-actions"><button type="button" class="product-reset" :disabled="studio.locked" @click="reset">重置</button><button type="submit" class="product-generate" :disabled="studio.busy || !studio.configured || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.active ? '创作中…' : '立即生成' }} <span v-if="!studio.active">→</span></button></div>
+        <div class="product-footer-actions"><button type="button" class="product-reset" :disabled="studio.locked" @click="reset">重置</button><button type="submit" class="product-generate" :disabled="studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.active ? '创作中…' : '立即生成' }} <span v-if="!studio.active">→</span></button></div>
       </footer>
     </form>
     <div class="product-showcase">

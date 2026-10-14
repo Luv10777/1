@@ -6,6 +6,7 @@ import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, an
 import { customizeAnalysisRecreation, analysisRecreationRoute } from '../domain/videoAnalysisCustomization'
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
 import { billing, refreshBilling, requireMembership } from '../stores/billing'
+import { auth } from '../stores/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,8 +56,8 @@ const quickFocus = computed(() => videoType.value === 'ai'
   : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '重新生成', text: '侧重把实拍视频重新生成，给出中文总提示词与简短分镜，逐字保留原口播供我修改' }])
 const promptText = computed(() => result.value?.prompt || '')
 const duration = computed(() => current.value?.durationMs ? current.value.durationMs / 1000 : previewDuration.value)
-const canStart = computed(() => !isScanning.value && !loadingHistory.value && limits.value.configured
-  && (inputMode.value === 'url' ? Boolean(videoUrl.value.trim()) : Boolean(selectedFile.value || uploadedAssetId.value)))
+const canStart = computed(() => !isScanning.value && !loadingHistory.value && (!auth.isAuthenticated || (limits.value.configured
+  && (inputMode.value === 'url' ? Boolean(videoUrl.value.trim()) : Boolean(selectedFile.value || uploadedAssetId.value)))))
 const progress = computed(() => uploading.value ? 5 : current.value?.progress || 0)
 const statusLabel = computed(() => {
   if (uploading.value) return '正在上传视频'
@@ -101,6 +102,7 @@ const realMetrics = computed(() => [
 function stopPolling() { window.clearTimeout(pollTimer); pollGeneration += 1 }
 
 async function refreshHistory() {
+  if (!auth.isAuthenticated) return
   try {
     const page = await videoAnalysisApi.list()
     if (!disposed) reverseHistories.value = page.items || page.content || []
@@ -146,6 +148,7 @@ async function openHistory(item) {
 }
 
 async function loadHistory(id) {
+  if (!auth.isAuthenticated) return
   if (!/^\d+$/.test(String(id))) return
   stopPolling()
   loadingHistory.value = true
@@ -216,6 +219,7 @@ function onMetadata(event) {
 }
 
 async function startScan() {
+  if (!auth.requireLogin()) return
   if (!canStart.value) return
   uploading.value = true
   error.value = ''
@@ -282,6 +286,7 @@ watch(() => route.query.history, id => { if (id && String(current.value?.id) !==
 watch(() => current.value?.id, () => { recreationRoute.value = 'filming'; merchantEdits.value = {} })
 watch([videoType, reverseNeed, inputMode, videoUrl], () => { if (!uploading.value) submissionKey = '' })
 onMounted(async () => {
+  if (!auth.isAuthenticated) return
   const settled = await Promise.allSettled([videoAnalysisApi.limits(), refreshHistory()])
   if (disposed) return
   if (settled[0].status === 'fulfilled') {

@@ -24,6 +24,10 @@ import './business-community.css'
 
 theme.apply()
 
+window.addEventListener('login-required', () => {
+  if (router.currentRoute.value.name !== 'login') router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+})
+
 window.addEventListener('auth-expired', () => {
   auth.clearSession()
   if (router.currentRoute.value.name !== 'login') router.replace({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })

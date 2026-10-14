@@ -43,8 +43,15 @@ test('business pages remain visible without membership while login and owner per
     await router.push('/team')
     assert.equal(router.currentRoute.value.name, 'forbidden')
     auth.state.token = null
-    await router.push('/video/analyze')
-    assert.equal(router.currentRoute.value.name, 'login')
+    for (const path of ['/', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio']) {
+      await router.push(path)
+      assert.equal(router.currentRoute.value.path, path === '/' ? '/image/create' : path, 'guests can browse ' + path)
+    }
+    for (const path of ['/merchant-alliance', '/information-publishing', '/works', '/assets/products', '/tasks', '/team', '/billing', '/settings']) {
+      await router.push(path)
+      assert.equal(router.currentRoute.value.name, 'login', path + ' requires login')
+      assert.equal(router.currentRoute.value.query.redirect, path, 'login returns to the intended page')
+    }
   } finally {
     auth.state.user = null; auth.state.token = null
     globalThis.fetch = originalFetch; await vite.close()

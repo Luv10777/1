@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { auth } from '../stores/auth'
 
 const recentTasks = [
   { id: 'v_1001', title: '双十一美妆大促混剪.mp4', type: '生成视频', status: 'completed', time: '10分钟前', cover: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=300&q=80' },
@@ -54,7 +55,7 @@ const openTask = (task) => {
         </RouterLink>
       </section>
 
-      <section class="recent-video-section" aria-labelledby="recent-video-title">
+      <section v-if="auth.isAuthenticated" class="recent-video-section" aria-labelledby="recent-video-title">
         <div class="recent-video-heading">
           <div>
             <p class="video-create-kicker">ACTIVITY STREAM <span>·</span> LAST 7 DAYS</p>

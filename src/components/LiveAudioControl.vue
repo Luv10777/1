@@ -1,6 +1,7 @@
 <script setup>
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowRight, Volume2 } from 'lucide-vue-next'
+import { auth } from '../stores/auth'
 import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from '../services/liveApi'
 import { LivePlayerSession } from '../services/livePlayerSession'
 import { desktopLink, inDesktop } from '../utils/desktop'
@@ -29,6 +30,7 @@ const openingDesktop = ref(false)
 const desktopError = ref('')
 // 桌面端里看到的是服务器上保存的配置，所以先把这边还没保存的修改存下来，再带着当前门店把软件唤起来。
 const openDesktop = async () => {
+  if (!auth.requireLogin()) return
   if (openingDesktop.value) return
   openingDesktop.value = true
   desktopError.value = ''
@@ -226,7 +228,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
       <p v-if="sessionError" class="audio-error" role="alert">{{ sessionError }}</p>
       <div class="audio-launch-footer">
         <p>{{ sessionStatus === 'DRAFT' ? '开始后配置会锁定，并进入直播工作台。' : sessionStatus === 'ENDED' ? '这一场已结束。' : '本场已开始，可在工作台管理播报。' }}</p>
-        <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="!storeId || blockers.length > 0" @click="emit('start-session')">开始本场<ArrowRight :size="15" /></button>
+        <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="auth.isAuthenticated && (!storeId || blockers.length > 0)" @click="emit('start-session')">开始本场<ArrowRight :size="15" /></button>
         <button v-else-if="sessionStatus !== 'ENDED'" type="button" class="primary-button compact" :disabled="!storeId" @click="emit('open-workspace')">前往直播工作台<ArrowRight :size="15" /></button>
       </div>
       <div v-if="desktopDownloads.android" class="audio-desktop">

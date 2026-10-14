@@ -4,6 +4,7 @@ import { imageApi, uploadImageReference, uploadLibraryImageReference, saveGenera
 import { IMAGE_QUALITIES, POSTER_PURPOSE_GROUPS, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
 import { billing, refreshBilling, requireMembership } from '../stores/billing'
+import { auth } from '../stores/auth'
 
 export function useImageCreation(workflow) {
   const route = useRoute()
@@ -47,6 +48,7 @@ export function useImageCreation(workflow) {
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
   const estimatedCredits = computed(() => (product.value ? Number(count.value) : 1) * 3)
   const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
+  const requiresLogin = computed(() => !auth.isAuthenticated)
   const supportsRatio = value => {
     const ratios = capabilities.value?.qualityRatios
     if (!ratios) return true
@@ -78,6 +80,7 @@ export function useImageCreation(workflow) {
     else sessionStorage.removeItem(pendingKey)
   }
   async function refreshHistory(reset = true) {
+    if (!auth.isAuthenticated) return
     try {
       const page = reset ? 0 : historyPage.value + 1
       const result = await imageApi.history(workflow, page)
@@ -87,6 +90,7 @@ export function useImageCreation(workflow) {
     } catch (e) { if (alive) error.value = e.message }
   }
   async function load(id) {
+    if (!auth.isAuthenticated) return
     clearTimeout(pollTimer)
     const sequence = ++refreshSequence
     try {
@@ -187,6 +191,7 @@ export function useImageCreation(workflow) {
     } finally { busy.value = false; refreshBilling() }
   }
   function generate() {
+    if (!auth.requireLogin()) return
     if (active.value || (!configured.value && !pending.value)) return
     run(async () => {
       if (pending.value) return deliver(pending.value)
@@ -286,6 +291,7 @@ export function useImageCreation(workflow) {
       data: { requestKey: crypto.randomUUID(), variation } }), true)
   }
   async function loadCapabilities() {
+    if (!auth.isAuthenticated) return
     capabilityState.value = 'checking'
     capabilityError.value = ''
     try {
@@ -298,6 +304,7 @@ export function useImageCreation(workflow) {
     }
   }
   onMounted(async () => {
+    if (!auth.isAuthenticated) return
     try {
       const saved = sessionStorage.getItem(pendingKey)
       if (saved) pending.value = JSON.parse(saved)
@@ -342,6 +349,6 @@ export function useImageCreation(workflow) {
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
-    supportsQuality, loadCapabilities, billing, estimatedCredits,
+    supportsQuality, loadCapabilities, billing, estimatedCredits, requiresLogin,
   })
 }
