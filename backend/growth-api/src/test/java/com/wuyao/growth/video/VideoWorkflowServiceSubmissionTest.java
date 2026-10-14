@@ -147,6 +147,17 @@ class VideoWorkflowServiceSubmissionTest {
     }
 
     @Test
+    void volcengineVideoReferencesKeepTheSameExpiryProtectionAsImageReferences() throws Exception {
+        Map<String, Object> expired = Map.of("content", List.of(Map.of("type", "video_url",
+                "video_url", Map.of("url", signedUrl(Instant.now().minusSeconds(7200), 3600)))));
+        freeze(expired);
+        assertThatThrownBy(() -> service.prepareSubmissionRequest(42L, task, Map.of()))
+                .isInstanceOfSatisfying(NonRetryableTaskException.class,
+                        error -> assertThat(error.errorCode()).isEqualTo("VIDEO_REFERENCE_URL_EXPIRED"));
+        assertThat(workflow.getProviderSubmitBody()).isEqualTo(json.writeValueAsString(expired));
+    }
+
+    @Test
     void aStaleLeaseCannotRecordDispatch() {
         when(tasks.ownsExecution(task)).thenReturn(false);
         assertThat(service.prepareSubmissionRequest(42L, task, Map.of("prompt", "旋转"))).isEmpty();

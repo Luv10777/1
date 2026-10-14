@@ -11,16 +11,26 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 480P–4K 画质、作品记录与版本修改。New API / OpenAI 协议配置、可选桥接协议与运行边界见
 [图片工作流接入文档](../../docs/image-workflow.md)。真实模型需在服务端单独配置。
 
-视频工作流使用 OnlyRouter 的 Chat Completions 协议配置和 OpenAI 兼容视频接口，任务链为
-`VIDEO_SUBMIT → VIDEO_POLL → VIDEO_IMPORT → VIDEO_QA`。供应商查询接口在 `completed`
-后通过 `/v1/videos/{id}/content` 返回 302，worker 取得临时结果地址，下载到对象存储后
-再向前端签发内部预览地址。
+视频工作流默认使用 Haomaotoken 的 `VOLCENGINE` 协议，任务链为
+`VIDEO_SUBMIT → VIDEO_POLL → VIDEO_IMPORT → VIDEO_QA`。通过
+`POST /api/v3/contents/generations/tasks` 提交 `content`、`duration`、`ratio`、`resolution`，
+再通过 `GET /api/v3/contents/generations/tasks/{jobId}` 异步轮询；成功后读取 `content.video_url`。
+worker 将结果下载到对象存储，再向前端签发内部预览地址。
+旧 `CHAT_COMPLETIONS` 配置仍支持 OpenAI 视频接口及 `/v1/videos/{id}/content` 的 302 地址。
 视频模型能力和参数约束由后端 `/api/video/capabilities` 提供；Seedance 供应商通过
 `VIDEO_PROVIDER_BASE_URL`、`VIDEO_PROVIDER_API_KEY`、`VIDEO_PROVIDER_SUBMIT_PATH` 和
-`VIDEO_PROVIDER_POLL_PATH` 和 `VIDEO_PROVIDER_CONTENT_PATH` 配置，两个路径中都使用
+`VIDEO_PROVIDER_POLL_PATH` 配置；`VIDEO_PROVIDER_CONTENT_PATH` 仅用于旧协议，查询路径中使用
 `{jobId}` 占位符。前端使用稳定模型别名，网关将其映射为供应商模型 ID；默认 ID 可通过
 `VIDEO_MODEL_SEEDANCE_2_5`、`VIDEO_MODEL_SEEDANCE_2_0`、`VIDEO_MODEL_SEEDANCE_2_0_MINI`
 和 `VIDEO_MODEL_SEEDANCE_2_0_FAST` 覆盖。
+默认实际模型为 `seedance-2.5`、`seedance-2.0`、`seedance-2.0-mini`、`seedance-2.0-fast`。
+`VIDEO_PROVIDER_API_KEY_SEEDANCE_2_5`、`VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0`、
+`VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_FAST`、`VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_MINI`
+可分别覆盖公共密钥；提交和轮询必须使用同一模型对应的密钥。密钥只存于服务端配置。
+接口依据：[Haomaotoken 提交文档](https://haomaotoken.apifox.cn/513007162e0)、
+[轮询结果文档](https://haomaotoken.apifox.cn/513007171e0)。
+更换供应商前先停止视频 worker，确认没有在途或可能已提交的待恢复任务，再切换配置。
+供应商地址和实际模型名改变后，需要重新核验视频计价；无有效计价时继续拒绝新生成请求。
 
 视频参考素材的预签名 URL 默认有效 6 小时，可用 `VIDEO_REFERENCE_PRESIGN_TTL_SECONDS=21600`
 配置。实际 TTL 为 `max(配置值, VIDEO_MAX_DURATION_SECONDS + 安全余量)`；安全余量为

@@ -23,6 +23,7 @@ class VideoProviderHandlerRetryTest {
         var workflow = new VideoWorkflow();
         workflow.setId(42L);
         workflow.setProviderJobId("job-42");
+        workflow.setModel("SEEDANCE_2_0_FAST");
         workflow.setProviderSubmitStartedAt(Instant.now());
         workflow.setProviderSubmitRequest(Map.of());
         var task = new Task();
@@ -35,7 +36,7 @@ class VideoProviderHandlerRetryTest {
         when(service.prepareSubmissionRequest(eq(42L), same(task), anyMap())).thenReturn(Optional.of("{}"));
         var original = new VideoProviderGateway.ProviderHttpException(status, "HTTP " + status);
         when(provider.submit(anyString(), anyString())).thenThrow(original);
-        when(provider.poll(anyString(), anyString())).thenThrow(original);
+        when(provider.poll(eq("job-42"), eq("SEEDANCE_2_0_FAST"), anyString())).thenThrow(original);
         TaskHandler handler = stage.equals("SUBMIT") ? new VideoSubmitHandler(service, provider, workflows)
                 : new VideoPollHandler(service, provider, workflows);
         if (!retryable) {

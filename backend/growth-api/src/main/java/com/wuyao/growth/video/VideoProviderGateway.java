@@ -23,12 +23,14 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
- * OnlyRouter/OpenAI-compatible provider boundary: submit returns a remote job id,
- * poll returns a state, and completed jobs expose a 302 content URL.
+ * Asynchronous video provider boundary. Volcengine tasks return their video URL in
+ * the polling response; the legacy OpenAI video endpoint exposes a content redirect.
  * The provider's URL is never exposed by the controller.
  */
 @Component
@@ -41,21 +43,26 @@ public class VideoProviderGateway {
     private final AssetService assets;
     private final HttpClient httpClient;
 
-    @Value("${growth.video.provider.base-url:https://api.onlyrouter.ai/v1}") private String baseUrl;
+    @Value("${growth.video.provider.base-url:https://haomaotoken.com}") private String baseUrl;
     @Value("${growth.video.provider.api-key:}") private String apiKey;
-    @Value("${growth.video.provider.submit-path:/videos}") private String submitPath;
-    @Value("${growth.video.provider.poll-path:/videos/{jobId}}") private String pollPath;
-    @Value("${growth.video.provider.content-path:/videos/{jobId}/content}") private String contentPath;
-    @Value("${growth.video.provider.name:seedance}") private String providerName;
-    @Value("${growth.video.provider.protocol:CHAT_COMPLETIONS}") private String protocol;
+    @Value("${growth.video.provider.api-key-seedance-2-5:}") private String seedance25ApiKey;
+    @Value("${growth.video.provider.api-key-seedance-2-0:}") private String seedance20ApiKey;
+    @Value("${growth.video.provider.api-key-seedance-2-0-mini:}") private String seedance20MiniApiKey;
+    @Value("${growth.video.provider.api-key-seedance-2-0-fast:}") private String seedance20FastApiKey;
+    @Value("${growth.video.provider.submit-path:/api/v3/contents/generations/tasks}") private String submitPath;
+    @Value("${growth.video.provider.poll-path:/api/v3/contents/generations/tasks/{jobId}}") private String pollPath;
+    @Value("${growth.video.provider.content-path:/v1/videos/{jobId}/content}") private String contentPath;
+    @Value("${growth.video.provider.name:haomaotoken}") private String providerName;
+    @Value("${growth.video.provider.protocol:VOLCENGINE}") private String protocol;
     @Value("${growth.video.provider.timeout-seconds:60}") private long timeoutSeconds;
-    @Value("${growth.video.model.seedance-2-5:doubao-seedance-2-5-260128}") private String seedance25;
-    @Value("${growth.video.model.seedance-2-0:doubao-seedance-2-0-260128}") private String seedance20;
-    @Value("${growth.video.model.seedance-2-0-mini:doubao-seedance-2-0-mini-260128}") private String seedance20Mini;
-    @Value("${growth.video.model.seedance-2-0-fast:doubao-seedance-2-0-fast-260128}") private String seedance20Fast;
+    @Value("${growth.video.model.seedance-2-5:seedance-2.5}") private String seedance25;
+    @Value("${growth.video.model.seedance-2-0:seedance-2.0}") private String seedance20;
+    @Value("${growth.video.model.seedance-2-0-mini:seedance-2.0-mini}") private String seedance20Mini;
+    @Value("${growth.video.model.seedance-2-0-fast:seedance-2.0-fast}") private String seedance20Fast;
 
     public boolean configured() {
-        return baseUrl != null && !baseUrl.isBlank() && apiKey != null && !apiKey.isBlank();
+        return hasText(baseUrl) && (hasText(apiKey) || hasText(seedance25ApiKey)
+                || hasText(seedance20ApiKey) || hasText(seedance20MiniApiKey) || hasText(seedance20FastApiKey));
     }
 
     public SubmitResult submit(VideoDtos.Create request, String idempotencyKey) {
@@ -65,6 +72,7 @@ public class VideoProviderGateway {
 
     /** Refresh references only while the workflow is known never to have dispatched a request. */
     public Map<String, Object> buildSubmitRequest(VideoDtos.Create request) {
+        if (volcengine()) return buildVolcengineRequest(request);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerModel(request.model()));
         body.put("seconds", request.durationSeconds());
@@ -74,7 +82,7 @@ public class VideoProviderGateway {
         body.put("mode", request.referenceVideoAssetId() != null ? "video-to-video"
                 : request.referenceImageAssetIds().isEmpty() ? "text-to-video" : "image-to-video");
         if (!request.referenceImageAssetIds().isEmpty()) {
-            var content = new java.util.ArrayList<Map<String, Object>>();
+            var content = new ArrayList<Map<String, Object>>();
             if (!prompt.isBlank()) content.add(Map.of("type", "text", "text", prompt));
             for (Long assetId : request.referenceImageAssetIds()) {
                 content.add(Map.of("type", "image_url", "role", "reference_image",
@@ -95,6 +103,26 @@ public class VideoProviderGateway {
         return body;
     }
 
+    private Map<String, Object> buildVolcengineRequest(VideoDtos.Create request) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", providerModel(request.model()));
+        var content = new ArrayList<Map<String, Object>>();
+        if (!request.prompt().isBlank()) content.add(Map.of("type", "text", "text", request.prompt()));
+        for (Long assetId : request.referenceImageAssetIds()) {
+            content.add(Map.of("type", "image_url", "role", "reference_image",
+                    "image_url", Map.of("url", assets.presignedReference(assetId, "IMAGE"))));
+        }
+        if (request.referenceVideoAssetId() != null) {
+            content.add(Map.of("type", "video_url", "role", "reference_video",
+                    "video_url", Map.of("url", assets.presignedReference(request.referenceVideoAssetId(), "VIDEO"))));
+        }
+        body.put("content", content);
+        body.put("duration", request.durationSeconds());
+        if (!"auto".equals(request.ratio())) body.put("ratio", request.ratio());
+        body.put("resolution", request.resolution().toLowerCase(Locale.ROOT));
+        return body;
+    }
+
     public SubmitResult submit(Map<String, Object> body, String idempotencyKey) {
         try {
             return submit(json.writeValueAsString(body), idempotencyKey);
@@ -106,17 +134,20 @@ public class VideoProviderGateway {
     /** Send the exact persisted JSON bytes; reserializing JSONB can change key order. */
     public SubmitResult submit(String body, String idempotencyKey) {
         requireConfigured();
-        JsonNode response = send("POST", submitPath, body, idempotencyKey);
+        String key = submissionApiKey(body);
+        JsonNode response = send("POST", submitPath, body, idempotencyKey, key);
         String jobId = firstText(response, "id", "task_id", "job_id");
         if (jobId == null) throw providerError("供应商未返回任务 ID");
         return new SubmitResult(providerName, jobId, normalizeStatus(firstText(response, "status", "state")));
     }
 
-    public PollResult poll(String jobId, String idempotencyKey) {
+    public PollResult poll(String jobId, String model, String idempotencyKey) {
         requireConfigured();
-        JsonNode response = send("GET", pollPath.replace("{jobId}", jobId), null, idempotencyKey);
+        String key = apiKeyForModel(model);
+        JsonNode response = send("GET", pollPath.replace("{jobId}", jobId), null, idempotencyKey, key);
         String status = normalizeStatus(firstText(response, "status", "state"));
-        String url = "SUCCEEDED".equals(status) ? resolveContentUrl(jobId) : null;
+        String url = "SUCCEEDED".equals(status)
+                ? (volcengine() ? resultVideoUrl(response) : resolveContentUrl(jobId, key)) : null;
         JsonNode usage=response.path("usage");
         if(usage.isMissingNode()) usage=response.path("data").path("usage");
         Long tokens=usage.path("completion_tokens").asLong(0)>0?usage.path("completion_tokens").asLong():null;
@@ -126,18 +157,14 @@ public class VideoProviderGateway {
 
     public String providerName() { return providerName; }
 
-    /** The only protocol currently implemented by this gateway. */
     public String protocol() { return protocol; }
 
-    private JsonNode send(String method, String path, String body, String idempotencyKey) {
+    private JsonNode send(String method, String path, String body, String idempotencyKey, String key) {
         try {
             URI endpoint = VideoUrlSecurity.checkedHttps(joinUrl(path));
-            if (!"CHAT_COMPLETIONS".equalsIgnoreCase(protocol)) {
-                throw providerError("视频供应商协议暂不支持: " + protocol);
-            }
             var request = "POST".equals(method) ? new HttpPost(endpoint) : new HttpGet(endpoint);
             request.setConfig(requestConfig());
-            request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+            request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + key);
             request.setHeader(HttpHeaders.ACCEPT, "application/json");
             if (idempotencyKey != null && !idempotencyKey.isBlank()) {
                 request.setHeader("Idempotency-Key", idempotencyKey);
@@ -165,7 +192,7 @@ public class VideoProviderGateway {
         }
     }
 
-    private String resolveContentUrl(String jobId) {
+    private String resolveContentUrl(String jobId, String key) {
         try {
             URI current = VideoUrlSecurity.checkedHttps(joinUrl(contentPath.replace("{jobId}", jobId)));
             String providerHost = current.getHost();
@@ -173,7 +200,7 @@ public class VideoProviderGateway {
                 var request = new HttpGet(current);
                 request.setConfig(requestConfig());
                 if (providerHost.equalsIgnoreCase(current.getHost())) {
-                    request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+                    request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + key);
                 }
                 RedirectResponse response = httpClient.execute(request, result -> {
                     int status = result.getCode();
@@ -205,6 +232,60 @@ public class VideoProviderGateway {
         }
     }
 
+    private String resultVideoUrl(JsonNode response) {
+        String url = videoUrl(response.path("content"));
+        if (url == null) url = videoUrl(response.path("data").path("content"));
+        if (url == null) throw providerError("供应商已完成但未返回视频 URL");
+        return VideoUrlSecurity.checkedHttps(url).toString();
+    }
+
+    private String videoUrl(JsonNode content) {
+        if (content.isArray()) {
+            for (JsonNode item : content) {
+                String url = videoUrl(item);
+                if (url != null) return url;
+            }
+        } else if (content.isObject()) {
+            JsonNode video = content.path("video_url");
+            if (video.isTextual() && hasText(video.asText())) return video.asText();
+            if (video.isObject()) return firstText(video, "url");
+        }
+        return null;
+    }
+
+    private String submissionApiKey(String body) {
+        if (!volcengine()) return requireApiKey(apiKey);
+        try {
+            String model = json.readTree(body).path("model").asText();
+            for (String alias : new String[]{"SEEDANCE_2_5", "SEEDANCE_2_0", "SEEDANCE_2_0_MINI", "SEEDANCE_2_0_FAST"}) {
+                if (providerModel(alias).equals(model)) return apiKeyForModel(alias);
+            }
+            throw providerError("不支持的视频供应商模型");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw providerError("视频供应商请求无法解析");
+        }
+    }
+
+    private String apiKeyForModel(String model) {
+        String override = switch (model) {
+            case "SEEDANCE_2_5" -> seedance25ApiKey;
+            case "SEEDANCE_2_0" -> seedance20ApiKey;
+            case "SEEDANCE_2_0_MINI" -> seedance20MiniApiKey;
+            case "SEEDANCE_2_0_FAST" -> seedance20FastApiKey;
+            default -> throw providerError("不支持的视频模型: " + model);
+        };
+        return requireApiKey(hasText(override) ? override : apiKey);
+    }
+
+    private String requireApiKey(String key) {
+        if (!hasText(key)) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频模型密钥尚未配置，请联系管理员");
+        return key;
+    }
+
+    private boolean volcengine() { return "VOLCENGINE".equalsIgnoreCase(protocol); }
+
+    private boolean hasText(String value) { return value != null && !value.isBlank(); }
+
     private RequestConfig requestConfig() {
         return RequestConfig.custom()
                 .setConnectionRequestTimeout(Timeout.ofSeconds(10))
@@ -229,7 +310,7 @@ public class VideoProviderGateway {
 
     private void requireConfigured() {
         if (!configured()) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频供应商尚未配置，请联系管理员");
-        if (!"CHAT_COMPLETIONS".equalsIgnoreCase(protocol)) {
+        if (!volcengine() && !"CHAT_COMPLETIONS".equalsIgnoreCase(protocol)) {
             throw BizException.of(ErrorCode.VIDEO_PROVIDER_ERROR, "视频供应商协议暂不支持: " + protocol);
         }
     }
@@ -264,9 +345,9 @@ public class VideoProviderGateway {
 
     private String normalizeStatus(String status) {
         if (status == null) return "RUNNING";
-        return switch (status.toUpperCase()) {
+        return switch (status.toUpperCase(Locale.ROOT)) {
             case "SUCCESS", "SUCCEEDED", "COMPLETED", "DONE" -> "SUCCEEDED";
-            case "FAIL", "FAILED", "ERROR" -> "FAILED";
+            case "FAIL", "FAILED", "ERROR", "EXPIRED" -> "FAILED";
             case "CANCELLED", "CANCELED" -> "CANCELLED";
             case "QUEUED", "PENDING" -> "QUEUED";
             default -> "RUNNING";
@@ -296,9 +377,18 @@ public class VideoProviderGateway {
         if (error != null && error.isObject()) {
             String code = firstText(error, "code");
             String message = firstText(error, "message");
-            return code == null ? message : code + (message == null ? "" : ": " + message);
+            return redactCredentials(code == null ? message : code + (message == null ? "" : ": " + message));
         }
-        return firstText(node, "message");
+        if (node.path("data").isObject()) return errorMessage(node.path("data"));
+        return redactCredentials(firstText(node, "message"));
+    }
+
+    private String redactCredentials(String message) {
+        if (message == null) return null;
+        for (String key : new String[]{apiKey, seedance25ApiKey, seedance20ApiKey, seedance20MiniApiKey, seedance20FastApiKey}) {
+            if (hasText(key)) message = message.replace(key, "[redacted]");
+        }
+        return message;
     }
 
     private record RedirectResponse(int status, String location) {}
