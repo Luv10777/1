@@ -8,11 +8,12 @@ import com.aliyun.teautil.models.RuntimeOptions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.net.SocketTimeoutException;
@@ -20,7 +21,6 @@ import java.net.SocketTimeoutException;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(OutputCaptureExtension.class)
 class AliyunSmsSenderTest {
     private final Client client = mock(Client.class);
     private final ObjectMapper json = new ObjectMapper();
@@ -97,13 +97,23 @@ class AliyunSmsSenderTest {
     }
 
     @Test
-    void rejectionLogsDiagnosticIdentifiersWithoutRequestOrMessage(CapturedOutput output) throws Exception {
+    void rejectionLogsDiagnosticIdentifiersWithoutRequestOrMessage() throws Exception {
         var rejected = response("isv.SMS_SIGNATURE_ILLEGAL");
         rejected.getBody().setRequestId("request-123").setMessage("private-provider-message");
         when(client.sendSmsWithOptions(any(), any())).thenReturn(rejected);
-        assertThatThrownBy(() -> sender.sendLoginCode("13800000001", "012345"))
-                .isInstanceOf(BizException.class);
-        assertThat(output.getOut()).contains("isv.SMS_SIGNATURE_ILLEGAL", "request-123")
+        // 直接挂在这个类的日志上读，不读控制台：整套测试里别的 Spring 上下文关闭时会停掉控制台输出，读控制台会拿到空串。
+        var logger = (Logger) LoggerFactory.getLogger(AliyunSmsSender.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThatThrownBy(() -> sender.sendLoginCode("13800000001", "012345"))
+                    .isInstanceOf(BizException.class);
+        } finally {
+            logger.detachAppender(appender);
+        }
+        String logged = String.join("\n", appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
+        assertThat(logged).contains("isv.SMS_SIGNATURE_ILLEGAL", "request-123")
                 .doesNotContain("13800000001", "012345", "private-provider-message");
     }
 }
