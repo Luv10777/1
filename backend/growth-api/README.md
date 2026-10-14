@@ -508,6 +508,9 @@ V41 同时删除了 `store_members.role`，并清掉管理员名下的成员记�
 - 直播选音色、试听合成都按"样本是否开放给当前门店"判断；`GET /api/stores/{storeId}/voice-samples` 只返回开放给该店的样本，
   每项带 `storeIds`。
 - `voice_sample_stores` 到样本和门店都是带 `tenant_id` 的复合外键，样本开放不到别的商户的门店。
+- 试听走 `POST /api/stores/{storeId}/voice/preview` `{sampleId}` 或 `{builtInVoice}`，返回 `{downloadUrl}`。
+  同一个音色只在第一次试听时合成一句固定文案，WAV 存进对象存储，之后直接签发地址。克隆音色的试听存在
+  `<样本 key>-preview-v1.wav`，删除样本时一并删除；系统音色存在 `voice-previews/<供应商>/<模型>/` 下，各商户共用。
 
 ### 门店、商品、知识库与直播配置
 
