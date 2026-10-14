@@ -1,0 +1,46 @@
+<script setup>
+import { Store, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2 } from 'lucide-vue-next'
+import { selectedStoreRecord } from '../stores/merchantContext'
+import { useBusinessSubmission } from '../composables/useBusinessSubmission'
+import { businessCommunityService } from '../services/businessCommunity'
+
+const industries = ['餐饮 / 茶饮', '零售 / 生活服务', '家居 / 家装', '美妆 / 个护', '文旅 / 休闲', '企业服务', '其他']
+const blankForm = () => ({ merchantName: selectedStoreRecord.value?.name || '', companyName: '', industry: '', region: '', creditCode: '', contactName: '', contactPhone: '', introduction: '', declarationAccepted: false })
+const { form, editor, submitting, receipt, error, reset, submit, clearFieldError } = useBusinessSubmission(blankForm, businessCommunityService.applyForAlliance)
+</script>
+
+<template>
+  <div class="business-page merchant-alliance-page">
+    <header class="business-heading"><div><p class="business-overline"><Store :size="15" aria-hidden="true" />商家入驻</p><h1>商家联盟</h1><p>汇集一方商家，记录真实经营，连接活动与合作机会。</p></div><RouterLink to="/information-publishing" class="business-link">发布信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
+    <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
+    <template v-else>
+      <section class="merchant-alliance-intro"><div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h2>让一方好生意，<br />遇见更多同行。</h2><p>建立商家档案，展示经营特色，让活动、供求与合作需求被更多人看见。</p><RouterLink to="/merchants" class="business-link">管理门店资料<ArrowRight :size="15" aria-hidden="true" /></RouterLink></div><img class="merchant-alliance-photo" src="/images/publishing/restaurant.jpg" alt="街边小店内的桌椅和暖灯" /></section>
+      <ol class="business-process" aria-label="商家入驻流程"><li class="is-current"><span>01</span><strong>填写申请</strong></li><li><span>02</span><strong>资料审核</strong></li><li><span>03</span><strong>入驻联盟</strong></li></ol>
+      <div class="business-editor-layout">
+        <form ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
+          <fieldset class="business-form-fields" :disabled="submitting">
+            <section class="business-form-section">
+              <div class="business-section-title"><span>01</span><h2>商家基本资料</h2></div>
+              <div class="business-field-grid">
+                <label class="business-field"><span>商家名称<b>*</b></span><input v-model="form.merchantName" name="merchant-name" maxlength="80" required placeholder="门店或品牌的对外名称" /></label>
+                <label class="business-field"><span>主体名称<b>*</b></span><input v-model="form.companyName" name="company-name" maxlength="120" required placeholder="营业执照上的企业或个体户名称" /></label>
+                <label class="business-field"><span>经营行业<b>*</b></span><select v-model="form.industry" name="merchant-industry" required><option value="" disabled>请选择经营行业</option><option v-for="industry in industries" :key="industry" :value="industry">{{ industry }}</option></select></label>
+                <label class="business-field"><span>经营地区<b>*</b></span><input v-model="form.region" name="merchant-region" maxlength="80" required placeholder="省、市、区及主要经营范围" /></label>
+              </div>
+              <label class="business-field"><span>统一社会信用代码<b>*</b></span><input v-model.trim="form.creditCode" name="credit-code" minlength="18" maxlength="18" required pattern="[0-9ABCDEFGHJKLMNPQRTUWXY]{18}" placeholder="填写营业执照上的 18 位代码" title="请输入 18 位统一社会信用代码" @input="form.creditCode = form.creditCode.toUpperCase()" /><small>请与营业执照上的主体名称和统一社会信用代码保持一致。</small></label>
+              <label class="business-field"><span>商家介绍<b>*</b><small>{{ form.introduction.length }}/1000</small></span><textarea v-model="form.introduction" name="merchant-introduction" maxlength="1000" rows="4" required placeholder="介绍主营产品、服务特色与希望开展的合作" /></label>
+            </section>
+            <section class="business-form-section"><div class="business-section-title"><span>02</span><h2>入驻联系人</h2></div><div class="business-field-grid"><label class="business-field"><span>联系人姓名<b>*</b></span><input v-model="form.contactName" name="contact-name" autocomplete="name" maxlength="40" required placeholder="负责人或授权联系人" /></label><label class="business-field"><span>联系电话<b>*</b></span><input v-model="form.contactPhone" name="contact-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required pattern="[0-9+\(\)\- ]{6,20}" placeholder="手机号或固定电话" title="请填写 6 至 20 位电话号码，可包含加号、括号、空格和连字符" /></label></div></section>
+            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="merchant-declaration" type="checkbox" required /><span>我确认申请资料真实、准确，并已获得经营主体的授权。</span></label></div>
+          </fieldset>
+          <p v-if="error" class="business-form-feedback business-message-error" role="alert">{{ error }}</p>
+          <footer class="business-form-actions"><span>带 * 的项目为必填项</span><div><button class="business-button business-button-primary" type="submit" :disabled="submitting"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在提交…' : '提交入驻申请' }}</button></div></footer>
+        </form>
+        <aside class="business-preview-column">
+          <section class="merchant-preparation"><div class="business-section-title"><FileCheck2 :size="19" aria-hidden="true" /><h2>入驻流程</h2></div><ol><li><span>1</span><div><strong>填写商家资料</strong><p>填写经营主体、统一社会信用代码与商家介绍。</p></div></li><li><span>2</span><div><strong>平台审核</strong><p>核对经营主体与申请资料，必要时联系申请人补充材料。</p></div></li><li><span>3</span><div><strong>入驻商家联盟</strong><p>审核通过后建立商家档案，开展信息展示与合作交流。</p></div></li></ol><p class="business-footnote">请确保商家资料与实际经营情况一致，联系电话可正常接通。</p></section>
+          <RouterLink to="/information-publishing" class="merchant-next-step"><FilePenLine :size="23" aria-hidden="true" /><div><strong>发布商家信息</strong><p>分享门店活动、合作机会与供求需求。</p></div><ArrowRight :size="17" aria-hidden="true" /></RouterLink>
+        </aside>
+      </div>
+    </template>
+  </div>
+</template>

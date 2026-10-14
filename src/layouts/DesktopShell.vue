@@ -31,7 +31,7 @@ onBeforeUnmount(() => clearInterval(updateTimer))
   <div class="app-frame paper-app">
     <main class="main-area paper-main">
       <header class="topbar paper-topbar"><div class="topbar-inner">
-        <span class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>AI 实景直播</small></span>
+        <span class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>实景直播</small></span>
         <div class="topbar-actions">
           <select v-if="stores.length > 1" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading">
             <option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option>

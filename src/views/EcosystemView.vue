@@ -29,7 +29,7 @@ const runSandbox = () => {
 
 <template>
   <div class="ecosystem-page">
-    <div class="page-heading ecosystem-heading"><div><p class="eyebrow">OPEN ECOSYSTEM / GOVERNANCE</p><h1>把增长能力，放进可治理的边界里。</h1><p class="page-intro">组织策略、外部应用、模板和 AI 动作都先经过 Scope、版本、预算与审批。这里是第五阶段的 Sandbox 预览，不代表正式开放平台已经上线。</p></div><span class="ecosystem-pill"><span class="status-pulse" /> SANDBOX / INTERNAL</span></div>
+    <div class="page-heading ecosystem-heading"><div><p class="eyebrow">OPEN ECOSYSTEM / GOVERNANCE</p><h1>把增长能力，放进可治理的边界里。</h1><p class="page-intro">组织策略、外部应用、模板和自动化动作都先经过 Scope、版本、预算与审批。这里是第五阶段的 Sandbox 预览，不代表正式开放平台已经上线。</p></div><span class="ecosystem-pill"><span class="status-pulse" /> SANDBOX / INTERNAL</span></div>
 
     <div class="ecosystem-tabs"><button v-for="tab in [{ key: 'overview', label: '治理总览' }, { key: 'organization', label: '组织与策略' }, { key: 'developer', label: '应用与 Scope' }, { key: 'agent', label: 'Growth OS' }]" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button></div>
 

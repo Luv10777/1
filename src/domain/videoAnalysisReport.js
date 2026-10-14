@@ -32,7 +32,7 @@ export function buildVideoAnalysisReport(analysis, edits = {}) {
   const result = customizeAnalysisRecreation(analysis, edits) || {}
   const mode = analysisReportMode(analysis)
   const real = mode === 'real'
-  const title = real ? '实拍视频拆解与复刻报告' : 'AI 视频提示词与分镜复刻报告'
+  const title = real ? '实拍视频拆解与复刻报告' : '生成视频提示词与分镜复刻报告'
   const audio = result.audioAnalyzed === true && result.audio?.status === 'ANALYZED' ? result.audio : null
   const duration = Math.max(0, Number(analysis.durationMs || 0) / 1000)
   const generatedAt = analysis.createdAt && !Number.isNaN(Date.parse(analysis.createdAt))
@@ -51,7 +51,7 @@ export function buildVideoAnalysisReport(analysis, edits = {}) {
   const primarySectionCount = sections.length
   if (!real) addSection('制作参考', planReport(result, mode, 'ai'))
   addSection('原视频观察与复刻重点', paragraph(result.summary || '暂无视频概要。') + facts([
-      { label: '分析类型', text: real ? '实拍视频：照着拍，或用 AI 重做' : 'AI 视频：提示词复刻与逐镜生成' },
+      { label: '分析类型', text: real ? '实拍视频：照着拍，或重新生成' : '生成视频：提示词复刻与逐镜生成' },
       { label: '视频时长', text: `${duration.toFixed(1)} 秒` },
       { label: '画面尺寸', text: analysis.width && analysis.height ? `${analysis.width} × ${analysis.height}` : '未记录' },
       { label: '拆解镜头', text: `${result.shots?.length || 0} 个` },
@@ -64,7 +64,7 @@ export function buildVideoAnalysisReport(analysis, edits = {}) {
   if (real) {
     addSection('方案一：照着实拍', planReport(result, mode, 'filming')
       + promptBlock('按顺序执行的拍摄脚本', result.reuseScript) + shotReport(result.shots, mode, 'filming'))
-    addSection('方案二：用 AI 重做', paragraph(PRODUCT_REFERENCE_GUIDANCE) + promptBlock('整体视频生成提示词', result.prompt)
+    addSection('方案二：重新生成', paragraph(PRODUCT_REFERENCE_GUIDANCE) + promptBlock('整体视频生成提示词', result.prompt)
       + promptBlock('可直接复制的分镜脚本', result.generationScript)
       + promptBlock('生成时需要避免的问题', result.negativePrompt) + planReport(result, mode, 'ai'))
   }
@@ -100,7 +100,7 @@ dl{margin:16px 0}dl>div{display:grid;grid-template-columns:148px minmax(0,1fr);g
 footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--report-rule);font-size:13px;color:var(--report-muted)}
 @media(max-width:640px){main{margin:0;padding:24px 20px}h1{font-size:26px}dl>div{grid-template-columns:1fr;gap:4px}.toolbar{justify-content:flex-start}}
 @page{size:A4;margin:18mm}@media print{body{background:#fff;font-size:11pt}main{max-width:none;margin:0;padding:0}.toolbar,.copy-button{display:none}h2,h3,h4{break-after:avoid}dl>div,.prompt,li{break-inside:avoid}section{margin-top:24px}.prompt{border:1px solid #dedee1;background:#fff}}
-</style></head><body><main><header><p class="brand">梧曜 AI · 视频反推</p><h1>${title}</h1>${paragraph(analysis.name || '未命名视频')}
+</style></head><body><main><header><p class="brand">梧曜 · 视频反推</p><h1>${title}</h1>${paragraph(analysis.name || '未命名视频')}
 ${generatedAt ? `<p class="meta">分析时间：${escapeHtml(generatedAt)}（北京时间）</p>` : ''}</header>
 <div class="toolbar"><button type="button" onclick="window.print()">打印 / 保存为 PDF</button></div>
 ${real ? sections.join('\n') : sections.slice(0, primarySectionCount).join('\n') + '<details class="reference"><summary>查看画面拆解与声音参考</summary>' + sections.slice(primarySectionCount).join('\n') + '</details>'}<footer>上传自己的商品参考图，复制整体提示词和分镜脚本到视频生成工具中。具体生成效果取决于工具和参考素材。</footer>

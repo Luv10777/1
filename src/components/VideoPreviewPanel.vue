@@ -37,7 +37,7 @@ defineEmits(['switch-workspace'])
     <div class="video-canvas-heading absolute top-6 z-10 flex justify-between items-center pointer-events-none">
       <h2 class="text-gray-400 font-medium">成片预览</h2>
       <div class="video-mode-switch" role="group" aria-label="切换工作台">
-        <button type="button" :class="{ active: activeWorkspace === 'video' }" :aria-pressed="activeWorkspace === 'video'" @click="$emit('switch-workspace', '/video/workbench')"><span class="material-symbols-outlined">auto_awesome</span>视频工作台</button>
+        <button type="button" :class="{ active: activeWorkspace === 'video' }" :aria-pressed="activeWorkspace === 'video'" @click="$emit('switch-workspace', '/video/workbench')">视频工作台</button>
         <button type="button" :class="{ active: activeWorkspace === 'digital-human' }" :aria-pressed="activeWorkspace === 'digital-human'" @click="$emit('switch-workspace', '/digital-human/studio')"><span class="material-symbols-outlined">record_voice_over</span>数字人摄影棚</button>
       </div>
     </div>

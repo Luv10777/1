@@ -206,7 +206,7 @@ public final class ConsoleActivity extends Activity {
         card.setClickable(true);
 
         card.addView(words("还差一步：允许一方志在后台运行", 20, true, 0xFF2A2A2A));
-        card.addView(words("直播时抖音在前台，一方志在后台读弹幕、放 AI 的声音。\n\n不给这项允许，手机会在一方志退到后台后把它暂停：AI 讲到一半就没有声音了，弹幕也不再回答，而且没有任何提示。", 15, false, 0xFF444444));
+        card.addView(words("直播时抖音在前台，一方志在后台读弹幕、播放讲解语音。\n\n不给这项允许，手机会在一方志退到后台后把它暂停：播报到一半就没有声音了，弹幕也不再回答，而且没有任何提示。", 15, false, 0xFF444444));
         Button allow = new Button(this);
         allow.setText("去允许");
         allow.setAllCaps(false);

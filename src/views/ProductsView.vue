@@ -138,7 +138,7 @@ async function deleteProduct() {
 <template>
   <section class="products-page">
     <header class="products-header">
-      <div><p class="products-eyebrow">ASSET CENTER / PRODUCTS</p><h1>商品库</h1><p class="products-subtitle">沉淀门店爆款、团购券与实物资产，为 AI 直播讲解与内容创作提供商品事实库。</p></div>
+      <div><p class="products-eyebrow">ASSET CENTER / PRODUCTS</p><h1>商品库</h1><p class="products-subtitle">沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。</p></div>
       <button type="button" class="product-button product-button-primary" :disabled="!loaded || detailLoading || saving" @click="openForm()"><Plus :size="17" />新建商品</button>
     </header>
 

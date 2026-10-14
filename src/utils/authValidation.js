@@ -23,5 +23,5 @@ export function codeError(code) {
 export function safeRedirect(value) {
   return typeof value === 'string' && /^\/(?!\/)/.test(value)
     && !/[\\\s]/.test(value) && !/^\/login(?:[/?#]|$)/.test(value)
-    ? value : '/dashboard'
+    ? value : '/image/create'
 }

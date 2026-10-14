@@ -81,15 +81,15 @@ onBeforeUnmount(() => { mounted = false; relay?.stop(); relay = null })
     <div class="live-danmaku-head">
       <div>
         <strong>直播间弹幕<span>试用</span></strong>
-        <p>连接后，软件在后台读取你直播间里的弹幕，交给 AI 判断该不该回、怎么回。只读取弹幕文字，不保存观众的昵称和账号；礼物、点赞、进场不处理。</p>
+        <p>连接后，软件在后台读取你直播间里的弹幕，自动判断该不该回、怎么回。只读取弹幕文字，不保存观众的昵称和账号；礼物、点赞、进场不处理。</p>
       </div>
       <button type="button" :class="state ? 'ls-ghost compact' : 'primary-button compact'" :disabled="resolving || (!state && !room.trim())" @click="toggle">{{ state ? '断开' : resolving ? '正在查找直播间…' : '连接直播间' }}</button>
     </div>
     <label v-if="!state"><span>直播间分享链接（连上过一次会记住，下次直接点“连接直播间”）</span><input v-model="room" :disabled="resolving" maxlength="500" placeholder="在抖音 App 的直播间点“分享 → 复制链接”，把复制到的内容整段粘贴到这里"></label>
     <p v-if="state?.message" class="live-danmaku-status" role="status">{{ state.message }}</p>
-    <p v-if="state" class="live-danmaku-note">已读到 {{ state.received }} 条：交给 AI {{ Math.max(0, state.forwarded - lost - passed - blocked) }} 条，不用回 {{ passed }} 条（打招呼、刷屏一类），已屏蔽 {{ blocked }} 条（辱骂、引流一类），重复或刷屏过密 {{ state.skipped }} 条，未送达 {{ lost }} 条。</p>
+    <p v-if="state" class="live-danmaku-note">已读到 {{ state.received }} 条：自动处理 {{ Math.max(0, state.forwarded - lost - passed - blocked) }} 条，不用回 {{ passed }} 条（打招呼、刷屏一类），已屏蔽 {{ blocked }} 条（辱骂、引流一类），重复或刷屏过密 {{ state.skipped }} 条，未送达 {{ lost }} 条。</p>
     <p v-if="error" class="live-danmaku-error" role="alert">{{ error }}</p>
-    <p class="live-danmaku-note">这项功能还在试用：读取方式不是抖音官方接口，抖音网页改版时可能暂时失效。弹幕多的时候优先处理提问、想买和投诉，每 10 分钟最多让 AI 处理 30 条。</p>
+    <p class="live-danmaku-note">这项功能还在试用：读取方式不是抖音官方接口，抖音网页改版时可能暂时失效。弹幕多的时候优先处理提问、想买和投诉，每 10 分钟最多自动处理 30 条。</p>
   </div>
 </template>
 

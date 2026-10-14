@@ -178,7 +178,7 @@ const reset = () => {
     <header class="store-info-header">
       <div>
         <h1>门店信息管理</h1>
-        <p class="store-info-intro">维护可被消费者、运营和 AI 准确引用的门店基础事实。</p>
+        <p class="store-info-intro">维护可被消费者、运营和系统准确引用的门店基础事实。</p>
       </div>
     </header>
 
@@ -248,7 +248,7 @@ const reset = () => {
         <nav class="anchor-nav" aria-label="表单分区">
           <a v-for="item in sectionLinks" :key="item.id" :href="`#${item.id}`" :class="{ active: activeSection === item.id }" @click="scrollToSection(item.id, $event)"><span>{{ item.no }}</span><strong>{{ item.label }}</strong><i /></a>
         </nav>
-        <div class="aside-note"><span class="material-symbols-outlined">verified_user</span><div><strong>真实事实优先</strong><p>这里的信息会成为 AI 生成内容和门店问答的可信来源。</p></div></div>
+        <div class="aside-note"><span class="material-symbols-outlined">verified_user</span><div><strong>真实事实优先</strong><p>这里的信息会成为生成内容和门店问答的可信来源。</p></div></div>
       </aside>
     </div>
   </div>

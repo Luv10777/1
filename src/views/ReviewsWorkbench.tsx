@@ -19,7 +19,6 @@ import {
   Search,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Star,
   X,
 } from "lucide-react";
@@ -72,7 +71,7 @@ const PLATFORM_META: { label: Platform; tone: string }[] = [
 const FILTERS = [
   "全部星级",
   "需掌柜确认",
-  "AI 已代发",
+  "已自动代发",
   "低星差评",
   "已处理",
 ] as const;
@@ -253,7 +252,7 @@ export default function ReviewsWorkbench() {
       (platform === "全部" || review.platform === platform) &&
       (filter === "全部星级" ||
         (filter === "需掌柜确认" && review.status === "pending") ||
-        (filter === "AI 已代发" && review.status === "auto") ||
+        (filter === "已自动代发" && review.status === "auto") ||
         (filter === "低星差评" && review.rating <= 3) ||
         (filter === "已处理" && review.status !== "pending")) &&
       `${review.nickname} ${review.content} ${review.order}`
@@ -884,7 +883,6 @@ export default function ReviewsWorkbench() {
                               }
                             >
                               <span>
-                                <Sparkles size={14} />
                                 {review.status === "auto"
                                   ? "灵犀已发出温润回应"
                                   : `已回复并同步至${review.platform}`}

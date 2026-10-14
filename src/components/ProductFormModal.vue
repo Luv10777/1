@@ -200,7 +200,7 @@ async function submit() {
                 </label>
               </fieldset>
               <section class="product-faq-section" aria-labelledby="product-faq-title">
-                <div class="product-faq-heading"><div><h3 id="product-faq-title">商品专属常见问答 <span>（选填）</span></h3><p>配置后，AI 直播及客服会优先使用这些回答。</p></div><span class="product-faq-count">{{ form.faqs.length }} 条</span></div>
+                <div class="product-faq-heading"><div><h3 id="product-faq-title">商品专属常见问答 <span>（选填）</span></h3><p>配置后，直播及客服会优先使用这些回答。</p></div><span class="product-faq-count">{{ form.faqs.length }} 条</span></div>
                 <div v-if="form.faqs.length" class="product-faq-list">
                   <article v-for="(faq, index) in form.faqs" :key="faq.id || index" class="product-faq-card">
                     <div><strong>Q · {{ faq.question }}</strong><p>A · {{ faq.answer }}</p></div>

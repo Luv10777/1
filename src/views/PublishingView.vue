@@ -22,7 +22,6 @@ import {
   Upload,
   Trash2,
   Send,
-  WandSparkles,
   UsersRound,
   Images,
   PenLine,
@@ -521,7 +520,7 @@ onBeforeUnmount(() => {
           <p class="pub-music-note">使用自有或已获授权的音频。平台曲库与发布混音尚未接入，当前可在此试听效果。</p>
         </div>
 
-        <div v-show="mediaPanel === 'features'" class="feature-tags pub-section"><h2>AI 店铺特征</h2><p>识别服务待接入。上传素材后，可先手动标注门店特征。</p><label>特征标签<input class="pub-input" placeholder="例如：街边小馆、炭火、手作" /></label></div>
+        <div v-show="mediaPanel === 'features'" class="feature-tags pub-section"><h2>店铺特征</h2><p>识别服务待接入。上传素材后，可先手动标注门店特征。</p><label>特征标签<input class="pub-input" placeholder="例如：街边小馆、炭火、手作" /></label></div>
       </section>
       <section class="editor-column" tabindex="0" aria-label="文案与本地化挂载">
         <nav class="pub-column-tabs" aria-label="发布设置"><button v-for="panel in editorPanels" :key="panel.id" type="button" :aria-pressed="editorPanel === panel.id" @click="editorPanel = panel.id">{{ panel.label }}<small v-if="panel.id === 'accounts'">{{ selectedAccounts.length }}</small></button></nav>
@@ -594,7 +593,7 @@ onBeforeUnmount(() => {
           <div class="section-heading">
             <div>
               <h2 class="flex items-center gap-2">
-                <PenLine :size="18" aria-hidden="true" />文本内容与 AI 润色
+                <PenLine :size="18" aria-hidden="true" />文本内容与润色
               </h2>
               <p>针对{{ activePlatform }}的内容规范，实时同步右侧预览。</p>
             </div>
@@ -602,8 +601,8 @@ onBeforeUnmount(() => {
           <div class="copy-version-tabs" aria-label="文案风格"><button v-for="version in copyVariants" :key="version" :aria-pressed="copyVersion === version" :disabled="!!aiBusy || publishing" @click="selectCopyVersion(version)">{{ version }}</button></div>
           <div class="pub-field-heading">
             <label class="field-label" for="title">作品标题</label>
-            <button type="button" class="pub-field-generate" aria-label="AI 智能生成作品标题" aria-controls="title" :aria-busy="aiBusy === '生成作品标题'" :disabled="!!aiBusy || publishing" title="根据当前门店生成标题（本地演示）" @click="runAction('生成作品标题')">
-              <LoaderCircle v-if="aiBusy === '生成作品标题'" class="pub-loading" :size="14" /><WandSparkles v-else :size="14" />{{ aiBusy === '生成作品标题' ? '生成中…' : 'AI 智能生成' }}
+            <button type="button" class="pub-field-generate" aria-label="智能生成作品标题" aria-controls="title" :aria-busy="aiBusy === '生成作品标题'" :disabled="!!aiBusy || publishing" title="根据当前门店生成标题（本地演示）" @click="runAction('生成作品标题')">
+              <LoaderCircle v-if="aiBusy === '生成作品标题'" class="pub-loading" :size="14" />{{ aiBusy === '生成作品标题' ? '生成中…' : '智能生成' }}
             </button>
           </div><input
             id="title"
@@ -619,17 +618,17 @@ onBeforeUnmount(() => {
           </p>
           <div class="pub-field-heading">
             <label class="field-label" for="body">正文描述</label>
-            <button type="button" class="pub-field-generate" aria-label="AI 智能生成正文描述" aria-controls="body" :aria-busy="aiBusy === '生成正文描述'" :disabled="!!aiBusy || publishing" title="根据当前门店生成正文（本地演示）" @click="runAction('生成正文描述')">
-              <LoaderCircle v-if="aiBusy === '生成正文描述'" class="pub-loading" :size="14" /><WandSparkles v-else :size="14" />{{ aiBusy === '生成正文描述' ? '生成中…' : 'AI 智能生成' }}
+            <button type="button" class="pub-field-generate" aria-label="智能生成正文描述" aria-controls="body" :aria-busy="aiBusy === '生成正文描述'" :disabled="!!aiBusy || publishing" title="根据当前门店生成正文（本地演示）" @click="runAction('生成正文描述')">
+              <LoaderCircle v-if="aiBusy === '生成正文描述'" class="pub-loading" :size="14" />{{ aiBusy === '生成正文描述' ? '生成中…' : '智能生成' }}
             </button>
           </div><textarea id="body" v-model="body" :readonly="aiBusy === '生成正文描述'" class="pub-textarea" rows="4" />
           <details class="ai-toolbar">
             <summary class="ai-toolbar-head">
-              <span><WandSparkles :size="15" /> AI 提效工具</span><small>本地演示 · 未连接 AI 服务</small>
+              <span> 提效工具</span><small>本地演示 · 未连接生成服务</small>
             </summary>
             <div class="ai-actions" :aria-busy="!!aiBusy">
-              <button :disabled="!!aiBusy" @click="runAction('AI 扩写 / 润色')">
-                AI 扩写 / 润色
+              <button :disabled="!!aiBusy" @click="runAction('扩写 / 润色')">
+                扩写 / 润色
               </button><button :disabled="!!aiBusy" @click="runAction('敏感词自检')">
                 敏感词自检
               </button><button

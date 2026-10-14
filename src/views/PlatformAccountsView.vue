@@ -80,7 +80,7 @@ onBeforeUnmount(() => { clearInterval(clock); clearTimeout(noticeTimer) })
         <div>
           <div class="mb-3 flex items-center gap-2 text-xs font-medium text-brand-muted"><span>全网发布</span><span>/</span><span class="text-brand-accent-ink">账号授权中心</span></div>
           <h1 class="m-0 font-serif text-[28px] font-semibold tracking-normal text-brand-primary">账号矩阵</h1>
-          <p class="mb-0 mt-2 text-sm leading-6 text-brand-muted">统一管理多端社交媒体与本地生活账号授权，保障 AI 自动分发链路畅通</p>
+          <p class="mb-0 mt-2 text-sm leading-6 text-brand-muted">统一管理多端社交媒体与本地生活账号授权，保障自动分发链路畅通</p>
         </div>
         <button :class="[primaryButton, 'mt-6 max-sm:mt-0']" @click="openConnect()"><Plus :size="17" />绑定互通</button>
       </header>

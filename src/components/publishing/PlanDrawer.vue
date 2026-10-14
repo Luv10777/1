@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
-import { Check, Clock3, MapPin, ShieldCheck, Sparkles, X } from 'lucide-vue-next'
+import { Check, Clock3, MapPin, ShieldCheck, X } from 'lucide-vue-next'
 import PlatformMark from '../accounts/PlatformMark.vue'
 import { bands, planAccounts, stores, weekdays } from '../../data/publishingPlans'
 
@@ -71,9 +71,9 @@ function save() {
                 </fieldset>
                 <fieldset class="m-0 border-0 p-0">
                   <legend class="mb-4 flex items-center gap-2 text-sm font-semibold"><span class="flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600">4</span>内容抓取策略</legend>
-                  <p class="m-0 mb-3 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">内容源：AI 探店视频草稿箱 · 未发布分类</p>
+                  <p class="m-0 mb-3 rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-500">内容源：探店视频草稿箱 · 未发布分类</p>
                   <div class="flex gap-5"><label v-for="source in ['顺序消耗', '随机消耗']" :key="source" class="flex items-center gap-1.5 text-sm"><input v-model="form.source" type="radio" :value="source" name="source" class="accent-blue-600" />{{ source }}</label></div>
-                  <label class="mt-4 flex items-start gap-2 rounded-xl bg-blue-50/70 p-3"><input v-model="form.autoFill" type="checkbox" class="mt-0.5 accent-blue-600" /><span><span class="flex items-center gap-1 text-xs font-medium text-blue-700"><Sparkles :size="13" />无草稿时，触发 AI 自动补齐生产</span><span class="mt-1 block text-[11px] leading-5 text-slate-500">演示模式生成本地占位作品，供排期交互预览。</span></span></label>
+                  <label class="mt-4 flex items-start gap-2 rounded-xl bg-blue-50/70 p-3"><input v-model="form.autoFill" type="checkbox" class="mt-0.5 accent-blue-600" /><span><span class="flex items-center gap-1 text-xs font-medium text-blue-700">无草稿时，自动补齐内容</span><span class="mt-1 block text-[11px] leading-5 text-slate-500">演示模式生成本地占位作品，供排期交互预览。</span></span></label>
                 </fieldset>
                 <p v-if="error" role="alert" class="text-sm text-rose-600">{{ error }}</p>
               </form>

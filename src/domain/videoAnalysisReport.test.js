@@ -26,7 +26,7 @@ function analysis(mode = 'ai') {
 
 test('AI export is a concise Chinese reading report with optional observations and no internal metadata', () => {
   const html = buildVideoAnalysisReport(analysis())
-  for (const text of ['AI 视频提示词与分镜复刻报告', '按什么顺序生成', '可直接复制的分镜脚本', '00:00–00:06', '打印 / 保存为 PDF', '10:00']) assert.ok(html.includes(text), text)
+  for (const text of ['生成视频提示词与分镜复刻报告', '按什么顺序生成', '可直接复制的分镜脚本', '00:00–00:06', '打印 / 保存为 PDF', '10:00']) assert.ok(html.includes(text), text)
   assert.ok(html.includes('本次没有完成声音分析'))
   assert.ok(!html.includes('照着拍的操作步骤'))
   for (const text of ['internal-provider-name', 'privateTokenCount', '"shots":', '"negativePrompt":', '<pre>', '<code>']) assert.ok(!html.includes(text), text)
@@ -34,7 +34,7 @@ test('AI export is a concise Chinese reading report with optional observations a
 
 test('real export includes filming and AI conversion even when the page is viewing only one route', () => {
   const html = buildVideoAnalysisReport(analysis('real'))
-  for (const text of ['实拍视频拆解与复刻报告', '方案一：照着实拍', '方案二：用 AI 重做', '灯光怎么布置', '声音怎么录',
+  for (const text of ['实拍视频拆解与复刻报告', '方案一：照着实拍', '方案二：重新生成', '灯光怎么布置', '声音怎么录',
     '手机固定在杯子前方', '先用如图中产品参考图生成首帧', '可直接复制的分镜脚本']) assert.ok(html.includes(text), text)
   assert.ok(!html.includes('按什么顺序生成'))
 })
