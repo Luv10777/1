@@ -117,6 +117,7 @@ class VoiceServiceTest {
         assertThat(sample.getStatus()).isEqualTo("DELETED");
         verify(provider, times(2)).deleteVoice("voice-existing");
         verify(storage).delete("sample-key");
+        verify(storage).delete(VoiceService.previewKey("sample-key"));
     }
 
     @Test void aVoiceThatSomethingStillDependsOnIsNotDeletedAndNothingIsTouched() {
@@ -174,6 +175,46 @@ class VoiceServiceTest {
         assertThat(result.firstAudioMillis()).isEqualTo(123);
         assertThat(java.util.Base64.getDecoder().decode(result.audioBase64())).hasSize(pcm.length + 44);
         assertThat(result.pauseOffsetsMillis()).containsExactly(620L);
+    }
+
+    @Test void previewIsSynthesizedOnceThenServedFromStorage() {
+        readySample();
+        String key = VoiceService.previewKey("sample-key");
+        when(storage.stat(key)).thenReturn(Optional.empty(), Optional.of(new ObjectStorage.StoredObject(100, "audio/wav")));
+        when(storage.presignGet(eq(key), any())).thenReturn("https://storage.test/preview");
+        when(provider.synthesize(eq(VoiceService.PREVIEW_TEXT), eq("voice-existing"), any()))
+                .thenReturn(new VoiceProvider.Audio(new byte[4800], 24000, 50));
+        var request = new VoiceDtos.PreviewRequest(10L, null);
+
+        assertThat(service.preview(2L, request, 3L).downloadUrl()).isEqualTo("https://storage.test/preview");
+        assertThat(service.preview(2L, request, 3L).downloadUrl()).isEqualTo("https://storage.test/preview");
+
+        verify(provider, times(1)).synthesize(anyString(), anyString(), any());
+        verify(storage, times(1)).put(eq(key), any(byte[].class), eq("audio/wav"));
+    }
+
+    @Test void builtInPreviewIsKeptApartFromMerchantSamples() {
+        when(provider.model()).thenReturn("model/a");
+        when(provider.synthesize(anyString(), eq("builtin"), any())).thenReturn(new VoiceProvider.Audio(new byte[4800], 24000, 50));
+        when(storage.stat(anyString())).thenReturn(Optional.empty());
+
+        service.preview(2L, new VoiceDtos.PreviewRequest(null, "builtin"), 3L);
+
+        verify(storage).put(eq("voice-previews/test-provider/model_a/builtin-v1.wav"), any(byte[].class), eq("audio/wav"));
+    }
+
+    @Test void previewRefusesAVoiceThisStoreCannotUse() {
+        readySample();
+        assertThatThrownBy(() -> service.preview(99L, new VoiceDtos.PreviewRequest(10L, null), 3L)).hasMessageContaining("当前门店");
+        verify(provider, never()).synthesize(anyString(), anyString(), any());
+        verify(storage, never()).put(anyString(), any(byte[].class), anyString());
+    }
+
+    @Test void deletingASampleAlsoDeletesItsPreview() {
+        readySample();
+        service.delete(10L, 3L);
+        verify(storage).delete(VoiceService.previewKey("sample-key"));
+        verify(storage).delete("sample-key");
     }
 
     @Test void createdIdIsSavedBeforeFirstStatusRequest() {

@@ -51,6 +51,11 @@ public class VoiceController {
     public ApiResponse<Void> delete(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
         voices.delete(id, me.userId()); return ApiResponse.ok(null);
     }
+    /** 试听音频的播放地址；第一次试听时合成并保存，之后直接返回。 */
+    @PostMapping("/stores/{storeId}/voice/preview")
+    public ApiResponse<VoiceDtos.DownloadTicket> preview(@PathVariable Long storeId, @Valid @RequestBody VoiceDtos.PreviewRequest request, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(voices.preview(storeId, request, me.userId()));
+    }
     @PostMapping("/stores/{storeId}/voice/synthesize")
     public ApiResponse<VoiceDtos.SpeechResult> synthesize(@PathVariable Long storeId, @Valid @RequestBody VoiceDtos.SpeechRequest request, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(voices.synthesize(storeId, request, me.userId()));
