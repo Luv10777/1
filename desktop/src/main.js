@@ -117,7 +117,7 @@ function openConsole() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: `${app.getName()} · AI 实景直播`,
+    title: `${app.getName()} · 实景直播`,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(here, 'preload.cjs'),

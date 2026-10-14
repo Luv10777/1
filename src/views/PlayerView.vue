@@ -225,7 +225,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="player-page">
     <header class="player-topbar">
-      <div class="player-brand"><span class="player-brand-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>AI 直播播报页</small></span></div>
+      <div class="player-brand"><span class="player-brand-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>直播播报页</small></span></div>
       <div class="player-topbar-meta"><span class="player-live-dot" /> {{ sessionName }}</div>
     </header>
     <main class="player-main">
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
         <div v-else class="player-queue-empty">暂无待播内容</div>
       </section>
       <section class="player-bottom-bar"><div><span class="player-bottom-label">播放控制</span><strong>{{ player.paused ? '播报已暂停' : player.loading ? '音频正在缓冲' : player.current ? '正在播放本场音频' : '等待音频' }}</strong></div><div class="player-bottom-actions"><button type="button" class="player-button primary" :disabled="!started || status === 'invalid'" @click="togglePause">{{ player.paused || isAudioSuspended ? '继续播报' : '暂停播报' }}</button></div></section>
-      <p class="player-compliance">本场直播包含 AI 合成语音，请按平台规定进行标识。页面不能检测配件连接状态或观众端收音效果。</p>
+      <p class="player-compliance">本场直播包含合成语音，请按平台规定进行标识。页面不能检测配件连接状态或观众端收音效果。</p>
     </main>
   </div>
 </template>

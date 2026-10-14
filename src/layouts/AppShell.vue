@@ -39,7 +39,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keyboard))
 watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll.value?.scrollTo({ top: 0 }); refreshBilling() })
 
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
-const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'auto_awesome', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
+const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'edit_note', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
 
 const navGroups = [
   {
@@ -55,7 +55,7 @@ const navGroups = [
     label: '运营分析',
     items: [
       { name: 'analytics', label: '各平台数据看板', path: '/analytics' },
-      { name: 'diagnosis', label: 'AI 诊断报告', path: '/analytics/diagnosis' },
+      { name: 'diagnosis', label: '诊断报告', path: '/analytics/diagnosis' },
       { name: 'analytics-platforms', label: '数据接口管理', path: '/analytics/platforms' },
     ],
   },
@@ -69,9 +69,9 @@ const navGroups = [
     key: 'content',
     label: '内容工具',
     items: [
-      { name: 'image-create', label: 'AI 图片创作', path: '/image/create' },
-      { name: 'video-create', label: 'AI 视频创作', path: '/video/create' },
-      { name: 'digital-human', label: 'AI实景直播', path: '/digital-human' },
+      { name: 'image-create', label: '图片创作', path: '/image/create' },
+      { name: 'video-create', label: '视频创作', path: '/video/create' },
+      { name: 'digital-human', label: '实景直播', path: '/digital-human' },
       { name: 'copy-rewrite', label: '文案提取 / 仿写 / 重写', path: '/copy/rewrite' },
       { name: 'video-analyze', label: '视频反推', path: '/video/analyze' },
     ],
@@ -102,7 +102,7 @@ const navGroups = [
       { name: 'geo-brand', label: '品牌信息设置', path: '/geo/brand' },
       { name: 'geo-services', label: '增值服务', path: '/geo/services' },
       { name: 'geo-keywords', label: '关键词监控', path: '/geo/keywords' },
-      { name: 'geo-visibility', label: 'AI 可见度报告', path: '/geo/visibility' },
+      { name: 'geo-visibility', label: '可见度报告', path: '/geo/visibility' },
     ],
   },
   {
@@ -304,7 +304,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
           <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>
-          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : auth.isOwner ? '创建门店后，即可管理商品、维护知识库并配置 AI 实景直播。' : '请联系管理员在“员工管理”里把门店分配给你，分配后刷新即可使用。') }}</p>
+          <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : auth.isOwner ? '创建门店后，即可管理商品、维护知识库并配置实景直播。' : '请联系管理员在“员工管理”里把门店分配给你，分配后刷新即可使用。') }}</p>
           <button v-if="storeError" class="secondary-button compact" @click="loadStores">重新加载</button>
           <button v-else-if="!storeLoading && auth.isOwner" class="primary-button compact" @click="openStoreForm()">＋ 新建门店</button>
           <button v-else-if="!storeLoading" class="secondary-button compact" @click="loadStores">刷新</button>
@@ -312,7 +312,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         <slot v-else />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
-      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">auto_awesome</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information-publishing" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>入驻</small></RouterLink></nav>
+      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information-publishing" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>入驻</small></RouterLink></nav>
     </main>
   </div>
 </template>

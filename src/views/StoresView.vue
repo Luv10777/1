@@ -94,7 +94,7 @@ async function closeStore(store) {
     <div v-else class="empty-state">
       <div class="empty-mark">⌂</div>
       <h2>{{ auth.isOwner ? '先建第一家门店' : '还没有分配给你的门店' }}</h2>
-      <p>{{ auth.isOwner ? '有了门店，才能录入商品、维护知识库并配置 AI 实景直播。' : '请联系管理员在“员工管理”里把门店分配给你。' }}</p>
+      <p>{{ auth.isOwner ? '有了门店，才能录入商品、维护知识库并配置实景直播。' : '请联系管理员在“员工管理”里把门店分配给你。' }}</p>
       <button v-if="auth.isOwner" class="primary-button" @click="openCreate">新建门店</button>
       <button v-else class="ghost-button" @click="loadStores">刷新</button>
     </div>

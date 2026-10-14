@@ -199,10 +199,10 @@ const send = (mock = false) => run(async current => {
     if (!current()) return
     notice.value = mock
       ? ({
-          answering: '已收到。AI 会先判断这条弹幕该不该回、怎么回，结果见上方弹幕流。',
+          answering: '已收到。系统会先判断这条弹幕该不该回、怎么回，结果见上方弹幕流。',
           unanswered: '这条没有处理，原因见上方弹幕流。',
           // 这两类按规则直接放过，不问 AI，也不记入弹幕流。
-          skipped: '这条属于打招呼、刷屏一类，不需要回复，没有交给 AI。',
+          skipped: '这条属于打招呼、刷屏一类，不需要回复，未触发自动回复。',
           blocked: '这条含有辱骂、引流或被屏蔽的词，不会回复。',
         })[result.status] || '这条弹幕之前已经处理过，结果见上方弹幕流。'
       : '已提交合成，完成后自动加入播报队列，进度见下方播报记录。'
@@ -218,8 +218,8 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
   <section v-if="view !== 'review'" :id="view === 'setup' ? 'ls-step-launch' : undefined" class="panel ls-section audio-control" :class="{ 'audio-control-live': view === 'live' }">
     <template v-if="view === 'setup'">
       <div class="panel-heading"><div><p class="eyebrow">STEP 03</p><h3>启动直播</h3></div></div>
-      <p class="audio-intro">在抖音 App 内用摄像头开播；AI 声音直接在这个网页播放，不需要另外连接设备。</p>
-      <p class="audio-help">请按抖音当前规则，在抖音 App 中标识 AI 合成语音。</p>
+      <p class="audio-intro">在抖音 App 内用摄像头开播；播报声音直接在这个网页播放，不需要另外连接设备。</p>
+      <p class="audio-help">请按抖音当前规则，在抖音 App 中标识合成语音。</p>
       <ul v-if="sessionStatus === 'DRAFT' && blockers.length" class="audio-blockers" aria-label="开始前还需要完成">
         <li v-for="item in blockers" :key="item.key"><span>还需要{{ item.label }}</span><button v-if="item.step" type="button" class="audio-text-button" @click="emit('edit-step', item.step)">去完成<ArrowRight :size="13" /></button></li>
       </ul>
@@ -231,14 +231,14 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
       </div>
       <div v-if="desktopDownloads.android" class="audio-desktop">
         <div class="audio-desktop-head">
-          <div><strong>只用一台安卓手机开播<span>试用</span></strong><p>不用电脑：抖音在前台直播，一方志 App 在后台读弹幕、让 AI 用声音回答。商品、话术和问答仍在这里配置，App 只负责开播。目前只有安卓版，苹果手机装不了。</p></div>
+          <div><strong>只用一台安卓手机开播<span>试用</span></strong><p>不用电脑：抖音在前台直播，一方志 App 在后台读弹幕、用声音回答。商品、话术和问答仍在这里配置，App 只负责开播。目前只有安卓版，苹果手机装不了。</p></div>
           <div class="audio-desktop-actions"><a class="primary-button compact" href="/app" target="_blank" rel="noopener">安卓版下载页</a></div>
         </div>
         <p class="audio-help">电脑上打开下载页会看到二维码，用手机扫；手机上打开就是下载按钮。只在少数手机上试过，读取弹幕用的不是抖音官方接口。</p>
       </div>
       <div v-if="desktopDownloads.windows || desktopDownloads.mac" class="audio-desktop">
         <div class="audio-desktop-head">
-          <div><strong>让 AI 回答直播间弹幕<span>试用</span></strong><p>网页版读不到抖音直播间里的弹幕。装上桌面端、在桌面端里开播，AI 才能看到观众发的弹幕并回答。商品、话术和问答仍在这里配置，桌面端只负责开播。<template v-if="!desktopDownloads.mac">目前只有 Windows 版。</template><template v-else-if="!desktopDownloads.windows">目前只有 Mac 版。</template></p></div>
+          <div><strong>自动回答直播间弹幕<span>试用</span></strong><p>网页版读不到抖音直播间里的弹幕。装上桌面端、在桌面端里开播，才能读取观众发的弹幕并自动回答。商品、话术和问答仍在这里配置，桌面端只负责开播。<template v-if="!desktopDownloads.mac">目前只有 Windows 版。</template><template v-else-if="!desktopDownloads.windows">目前只有 Mac 版。</template></p></div>
           <div class="audio-desktop-actions">
             <a class="ls-ghost compact" :href="desktopLink(storeId)" :aria-disabled="openingDesktop" @click.prevent="openDesktop">{{ openingDesktop ? '正在保存…' : '打开桌面端' }}</a>
             <a v-if="desktopDownloads.windows" :class="onMac && desktopDownloads.mac ? 'ls-ghost compact' : 'primary-button compact'" :href="desktopDownloads.windows" download>下载 Windows 版</a>
@@ -297,7 +297,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
       </details>
       <details v-if="isDevelopment" class="audio-secondary audio-developer">
         <summary>开发测试<span>模拟弹幕互动（Mock）</span></summary>
-        <div class="audio-secondary-body"><p class="audio-help">未连接抖音，在这里手动输入一条观众弹幕。AI 先判断它是哪一类：提问就依据本场问答和商品资料用口语回答，资料里没有的不回答；想买就顺势引导下单；投诉、身体不适、退款不由 AI 回，标出来等人处理；夸奖、闲聊不回，问主播是不是真人或 AI 的也一律不回。回复合成后在句子之间插播。</p><label class="audio-field"><span>测试问题</span><input v-model="mockQuestion" :disabled="busy || ended" maxlength="500" placeholder="输入一条观众可能会发的弹幕"></label><button type="button" class="ls-ghost compact" :disabled="busy || !online || ended || !mockQuestion.trim()" @click="send(true)">发送测试弹幕</button></div>
+        <div class="audio-secondary-body"><p class="audio-help">未连接抖音，在这里手动输入一条观众弹幕。系统先判断它是哪一类：提问就依据本场问答和商品资料用口语回答，资料里没有的不回答；想买就顺势引导下单；投诉、身体不适、退款不会自动回复，标出来等人处理；夸奖、闲聊不回，询问主播身份的也一律不回。回复合成后在句子之间插播。</p><label class="audio-field"><span>测试问题</span><input v-model="mockQuestion" :disabled="busy || ended" maxlength="500" placeholder="输入一条观众可能会发的弹幕"></label><button type="button" class="ls-ghost compact" :disabled="busy || !online || ended || !mockQuestion.trim()" @click="send(true)">发送测试弹幕</button></div>
       </details>
     </template>
     <p v-if="notice" class="audio-notice" role="status">{{ notice }}</p>

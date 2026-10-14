@@ -46,13 +46,13 @@ const showGeneration = computed(() => reportMode.value === 'ai' || recreationRou
 const recreationSteps = computed(() => analysisRecreationSteps(result.value, reportMode.value, recreationRoute.value))
 const modeHint = computed(() => videoType.value === 'ai'
   ? '生成可直接复制的中文总提示词和简短分镜，保留原口播，也可改成你想说的话。'
-  : '侧重机位、运镜、灯光与拍摄步骤，同时提供用 AI 重做的方案。')
+  : '侧重机位、运镜、灯光与拍摄步骤，同时提供重新生成的方案。')
 const needPlaceholder = computed(() => videoType.value === 'ai'
   ? '例如：保留镜头动作和节奏，列出原视频口播供我修改…'
-  : '例如：用手机怎么拍？灯光怎么摆？或重点拆解用 AI 重做的方法…')
+  : '例如：用手机怎么拍？灯光怎么摆？或重点拆解重新生成的方法…')
 const quickFocus = computed(() => videoType.value === 'ai'
   ? [{ label: '提示词复刻', text: '侧重可直接复制的中文整体提示词，画面商品用如图中产品，逐字保留原口播供我修改' }, { label: '分镜脚本', text: '用简短分镜写清时间、动作、运镜和衔接，逐字保留原口播供我修改' }]
-  : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '用 AI 重做', text: '侧重把实拍视频用 AI 重做，给出中文总提示词与简短分镜，逐字保留原口播供我修改' }])
+  : [{ label: '照着实拍', text: '侧重低成本实拍复刻，写清手机机位、运镜、布光和拍摄步骤' }, { label: '重新生成', text: '侧重把实拍视频重新生成，给出中文总提示词与简短分镜，逐字保留原口播供我修改' }])
 const promptText = computed(() => result.value?.prompt || '')
 const duration = computed(() => current.value?.durationMs ? current.value.durationMs / 1000 : previewDuration.value)
 const canStart = computed(() => !isScanning.value && !loadingHistory.value && limits.value.configured
@@ -318,11 +318,11 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         <section class="premium-panel type-panel">
           <div class="panel-head"><div><span class="step-index">02</span><strong>视频类型</strong></div><small>分析模式</small></div>
           <div class="pill-switch">
-            <button type="button" :disabled="isScanning" :class="{ active: videoType === 'ai' }" @click="videoType = 'ai'"><span class="material-symbols-outlined">auto_awesome</span>AI 视频</button>
+            <button type="button" :disabled="isScanning" :class="{ active: videoType === 'ai' }" @click="videoType = 'ai'">生成视频</button>
             <button type="button" :disabled="isScanning" :class="{ active: videoType === 'real' }" @click="videoType = 'real'"><span class="material-symbols-outlined">videocam</span>实拍视频</button>
           </div>
           <p class="mode-hint">{{ modeHint }}</p>
-          <p v-if="result && reportMode !== videoType" class="mode-hint">当前报告为{{ reportMode === 'ai' ? 'AI 视频' : '实拍视频' }}拆解，点击“重新分析”生成所选类型的报告。</p>
+          <p v-if="result && reportMode !== videoType" class="mode-hint">当前报告为{{ reportMode === 'ai' ? '生成视频' : '实拍视频' }}拆解，点击“重新分析”生成所选类型的报告。</p>
           <div class="need-field">
             <label for="reverse-need">反推需求 <em>可选</em></label><textarea id="reverse-need" v-model="reverseNeed" :disabled="isScanning" maxlength="2000" :placeholder="needPlaceholder"></textarea>
             <div><button v-for="focus in quickFocus" :key="focus.label" type="button" :disabled="isScanning" @click="reverseNeed = focus.text">{{ focus.label }}</button></div>
@@ -333,7 +333,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <video v-if="previewUrl" ref="player" class="analysis-video" :src="previewUrl" :style="{ aspectRatio: previewAspectRatio }" controls playsinline preload="metadata" @loadedmetadata="onMetadata" />
           <div v-else class="skeleton-player" :class="{ scanning: isScanning }"><div v-if="isScanning" class="scan-beam" /><div class="skeleton-grid" /><div class="skeleton-center"><span class="material-symbols-outlined">movie</span><p>{{ statusLabel }}</p><small>选择视频后点击开始分析</small></div></div>
         </section>
-        <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan"><span class="material-symbols-outlined">auto_awesome</span>{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }} <span>↗</span></button>
+        <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }} <span>↗</span></button>
         <p class="generation-billing-note">每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火 · 提交时预占，分析成功后扣除，失败或取消退回。重新分析会再次计费。</p>
         <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员 →</RouterLink>
         <button v-if="current && !analysisTerminal(current.status)" type="button" class="premium-secondary" :disabled="uploading" @click="cancelScan">取消分析</button>
@@ -343,7 +343,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 
       <section class="premium-console" :aria-busy="Boolean(isScanning || loadingHistory)">
         <div class="console-head">
-          <div><p class="premium-overline">分析工作区</p><h2>{{ reportMode === 'ai' ? 'AI 提示词与分镜复刻' : '实拍拆解与复刻方案' }}</h2></div>
+          <div><p class="premium-overline">分析工作区</p><h2>{{ reportMode === 'ai' ? '提示词与分镜复刻' : '实拍拆解与复刻方案' }}</h2></div>
           <div class="console-tools history-tools">
             <button type="button" class="history-trigger" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen; historyOpen && refreshHistory()"><span class="material-symbols-outlined">history</span><span>反推历史</span><span class="material-symbols-outlined history-chevron">expand_more</span></button>
             <div v-if="historyOpen" class="history-menu">
@@ -357,11 +357,11 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         <div v-else class="console-body" :class="{ 'real-console': reportMode === 'real' }">
           <div v-if="reportMode === 'real'" class="recreation-tabs" role="group" aria-label="选择复刻方式">
             <button type="button" :aria-pressed="recreationRoute === 'filming'" :class="{ active: recreationRoute === 'filming' }" @click="recreationRoute = 'filming'"><span class="material-symbols-outlined">videocam</span>照着实拍</button>
-            <button type="button" :aria-pressed="recreationRoute === 'ai'" :class="{ active: recreationRoute === 'ai' }" @click="recreationRoute = 'ai'"><span class="material-symbols-outlined">auto_awesome</span>用 AI 重做</button>
+            <button type="button" :aria-pressed="recreationRoute === 'ai'" :class="{ active: recreationRoute === 'ai' }" @click="recreationRoute = 'ai'">重新生成</button>
           </div>
           <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '上传自己的商品参考图，把口播改成你想说的话，复制总提示词和简短分镜生成相似视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
           <section v-if="showGeneration" class="readable-prompt" aria-label="可直接复制的复刻提示词">
-            <div class="reuse-script-head"><span>{{ reportMode === 'real' ? '用 AI 重做的复刻提示词' : '可直接复制的复刻提示词' }}</span><button type="button" @click="copyText(promptText, 'prompt')">{{ copied === 'prompt' ? '已复制' : '复制中文提示词' }}</button></div>
+            <div class="reuse-script-head"><span>{{ reportMode === 'real' ? '重新生成的复刻提示词' : '可直接复制的复刻提示词' }}</span><button type="button" @click="copyText(promptText, 'prompt')">{{ copied === 'prompt' ? '已复制' : '复制中文提示词' }}</button></div>
             <p class="product-reference-guide">{{ PRODUCT_REFERENCE_GUIDANCE }}</p>
             <p class="copyable-content" tabindex="0" aria-label="整体复刻提示词正文">{{ promptText }}</p><details><summary>生成时需要避免的问题</summary><p>{{ result.negativePrompt }}</p></details>
           </section>
@@ -392,7 +392,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <p v-if="!result.recreation" class="analysis-legacy">这份历史报告保留了原有拆解，重新分析可获得更具体的逐镜操作步骤。</p>
           <p v-if="result.promptsLocalized" class="analysis-legacy">中文提示词已根据这份记录的画面拆解整理，可直接复制使用；重新分析可获得更完整的分镜提示词。</p>
           <section v-if="recreationSteps.length" class="recreation-plan" aria-label="复刻制作方案">
-            <div class="section-caption"><span>{{ reportMode === 'ai' ? 'AI 复刻制作方案' : showGeneration ? '用 AI 重做的制作方案' : '实拍前的准备与做法' }}</span><small>按步骤执行</small></div>
+            <div class="section-caption"><span>{{ reportMode === 'ai' ? '复刻制作方案' : showGeneration ? '重新生成的制作方案' : '实拍前的准备与做法' }}</span><small>按步骤执行</small></div>
             <article v-for="(step, index) in recreationSteps" :key="step.title"><span class="plan-number">{{ String(index + 1).padStart(2, '0') }}</span><div><h3>{{ step.title }}</h3><p>{{ step.text }}</p></div></article>
           </section>
           <template v-if="reportMode === 'ai'">
@@ -420,7 +420,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <div v-if="result.limitations.length" class="analysis-limitations"><strong>观察限制</strong><p v-for="(item, index) in result.limitations" :key="index">{{ item }}</p></div>
           </details>
           <p class="report-export-hint">导出为排版好的中文报告，双击即可阅读，也可打印或保存为 PDF。{{ reportMode === 'real' ? '实拍报告同时包含两种复刻方案。' : '' }}</p>
-          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame"><span class="material-symbols-outlined">auto_awesome</span>一键生成同款 <span>↗</span></button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
+          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame">一键生成同款 <span>↗</span></button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
           <p v-if="showGeneration" class="report-export-hint">已修改的总提示词、分镜脚本和画面设置将自动填入视频创作页，上传自己的商品参考图后即可生成。</p>
         </div>
       </section>

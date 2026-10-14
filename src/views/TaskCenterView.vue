@@ -125,7 +125,7 @@ filteredTasks.value = tasks.value
               </button>
             </div>
           </div>
-          <p class="header-desc">所有AI生成任务的统一管理和监控</p>
+          <p class="header-desc">所有生成任务的统一管理和监控</p>
         </header>
 
         <section class="filter-bar">
@@ -157,7 +157,7 @@ filteredTasks.value = tasks.value
           v-else-if="tasks.length === 0"
           icon="◌"
           title="暂无任务"
-          description="还没有创建任何AI生成任务"
+          description="还没有创建任何生成任务"
         />
 
         <div v-else class="task-list">

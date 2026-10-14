@@ -164,7 +164,7 @@ export function toSpeechFeedItem(item, products = []) {
 }
 
 const COMMENT_STATES = {
-  ANSWERING: { label: 'AI 正在回答', tone: 'working' },
+  ANSWERING: { label: '正在回答', tone: 'working' },
   ANSWERED: { label: '已回复', tone: 'done' },
   UNANSWERED: { label: '未回复', tone: 'failed' },
   FAILED: { label: '回复失败', tone: 'failed' },
@@ -173,7 +173,7 @@ const COMMENT_STATES = {
   // 投诉、说吃了不舒服、要退款、问是不是真人：AI 不回，但一定要让人看到。
   ATTENTION: { label: '需要人工处理', tone: 'failed' },
 }
-const ANSWER_SOURCES = { SESSION: '本场问答', PRODUCT_FAQ: '商品问答', PRODUCT: '商品知识', STORE: '门店知识库', AI: 'AI 依据资料回答' }
+const ANSWER_SOURCES = { SESSION: '本场问答', PRODUCT_FAQ: '商品问答', PRODUCT: '商品知识', STORE: '门店知识库', AI: '依据资料回答' }
 const COMMENT_PROVIDERS = { MOCK: '模拟弹幕', DOUYIN_WEB: '直播间弹幕' }
 
 /** 弹幕流里的一条：观众问了什么、回了什么、回答出自哪里；没回的要说明原因。 */
@@ -225,6 +225,6 @@ export function describePlayback(playback) {
       return { label, detail: waiting ? `${now} · 待播 ${waiting} 条` : now }
     }
     default:
-      return { label: '未开始', detail: '点击开始播报，AI 声音会从这台电脑播放。播报期间请保持本页面打开。' }
+      return { label: '未开始', detail: '点击开始播报，播报声音会从这台电脑播放。播报期间请保持本页面打开。' }
   }
 }

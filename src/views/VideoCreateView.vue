@@ -3,9 +3,9 @@ import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 const recentTasks = [
-  { id: 'v_1001', title: '双十一美妆大促混剪.mp4', type: 'AI 视频', status: 'completed', time: '10分钟前', cover: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=300&q=80' },
+  { id: 'v_1001', title: '双十一美妆大促混剪.mp4', type: '生成视频', status: 'completed', time: '10分钟前', cover: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=300&q=80' },
   { id: 'v_1002', title: 'CEO 年度寄语数字人.mp4', type: '数字人', status: 'rendering', time: '正在渲染 · 68%', cover: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&q=80' },
-  { id: 'v_1003', title: '秋季新品全景展示.mp4', type: 'AI 视频', status: 'completed', time: '昨天 15:30', cover: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300&q=80' },
+  { id: 'v_1003', title: '秋季新品全景展示.mp4', type: '生成视频', status: 'completed', time: '昨天 15:30', cover: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300&q=80' },
 ]
 
 const selectedTask = ref(null)
@@ -20,7 +20,7 @@ const openTask = (task) => {
     <header class="video-create-header">
       <div class="video-create-title-row">
         <div>
-          <h1>AI 视频创作 <span class="video-create-spark">✦</span></h1>
+          <h1>视频创作</h1>
           <p class="video-create-subtitle">把脚本、商品信息和品牌资产组合成高转化短视频，或一键唤醒专属数字人。</p>
         </div>
         <div class="video-create-status"><span class="video-create-status-dot" /> 云端工作区已就绪</div>
@@ -35,7 +35,7 @@ const openTask = (task) => {
             <div class="video-entry-icon video-entry-icon-cinnabar"><span class="material-symbols-outlined">movie_edit</span></div>
           </div>
           <div class="video-entry-copy">
-            <h2>AI 视频生成</h2>
+            <h2>视频生成</h2>
             <p>支持文本生视频、图生视频与智能混剪。将零散素材一键自动包装为极具网感的营销短视频。</p>
           </div>
           <span class="video-entry-cta">进入创作台 <span aria-hidden="true">→</span></span>

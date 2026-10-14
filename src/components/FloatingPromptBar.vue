@@ -21,7 +21,7 @@ defineExpose({ focus: () => promptInput.value?.focus() })
       <p v-if="studio.error" class="creation-item-error" role="alert">{{ studio.error }}</p>
     </div>
     <form class="floating-prompt-bar" @submit.prevent="studio.generate">
-      <div class="creation-prompt-context"><span><span class="prompt-pill-dot" />说一句需求，AI 帮你安排文案与画面</span></div>
+      <div class="creation-prompt-context"><span><span class="prompt-pill-dot" />说一句需求，自动安排文案与画面</span></div>
       <textarea ref="promptInput" v-model="studio.brief" :disabled="studio.locked" rows="2" maxlength="2000" placeholder="说说门店、商品和活动... 例如：周末奶茶第二杯半价，突出招牌饮品，做张朋友圈海报" aria-label="描述你的海报需求" @keydown.meta.enter.prevent="studio.generate" @keydown.ctrl.enter.prevent="studio.generate" />
       <div class="prompt-toolbar">
         <fieldset class="prompt-tools" :disabled="studio.locked">

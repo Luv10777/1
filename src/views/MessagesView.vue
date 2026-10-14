@@ -5,7 +5,7 @@ import {
   Archive, ArrowDown, BellOff, BookOpen, Bot, Check, ChevronDown, MessageSquare,
   Clock3, Edit3, FileText, Leaf, MoreHorizontal,
   Paperclip, PanelRightClose, PanelRightOpen, PenLine, Plus, RotateCcw, Search,
-  Send, Settings2, Smile, Sparkles, Tag, WandSparkles, Zap, X,
+  Send, Settings2, Smile, Tag, Zap, X,
 } from 'lucide-vue-next'
 
 const channels = [
@@ -19,7 +19,7 @@ const channels = [
 const states = [
   { key: 'all', label: '全部对话' },
   { key: 'todo', label: '未读' },
-  { key: 'draft', label: 'AI 已拟稿' },
+  { key: 'draft', label: '已拟稿' },
   { key: 'done', label: '已回复' },
 ]
 
@@ -205,7 +205,7 @@ function addQuickReply(text) {
               <div class="draft-card-header"><div class="draft-title"><span class="ai-orb"><Leaf :size="15" /></span><div><strong>一方灵犀 · 拟稿笺</strong><small>已关联本店《周末包间预订须知 & 秋季双人餐单》</small></div></div><button class="regenerate-button" @click="draftText = toneDrafts[selectedTone]"><RotateCcw :size="14" /> 重新推演</button></div>
               <div class="draft-paper"><div class="draft-paper-stamp">灵犀</div><div v-if="!isEditingDraft" class="draft-copy" @click="isEditingDraft = true">{{ draftText }}</div><textarea v-else v-model="draftText" class="draft-inline-editor" @blur="isEditingDraft = false" /><button v-if="!isEditingDraft" class="inline-edit-button" @click="isEditingDraft = true"><Edit3 :size="13" /> 点击文字可直接修改</button></div>
               <div class="tone-row"><span>调整语气</span><button v-for="tone in Object.keys(toneDrafts)" :key="tone" :class="['tone-pill', { active: selectedTone === tone }]" @click="setTone(tone)">{{ tone }}</button></div>
-              <div class="draft-actions"><button class="draft-secondary" @click="draftVisible = false"><Archive :size="15" /> 暂缓</button><button class="draft-refine" @click="refineDraft"><WandSparkles :size="15" /> 精修 / 上屏</button><button class="draft-confirm" :disabled="sending" @click="sendDraft"><span class="stamp-mark">印</span>{{ sending ? '正在钤印…' : '钤印发送' }}</button></div>
+              <div class="draft-actions"><button class="draft-secondary" @click="draftVisible = false"><Archive :size="15" /> 暂缓</button><button class="draft-refine" @click="refineDraft"> 精修 / 上屏</button><button class="draft-confirm" :disabled="sending" @click="sendDraft"><span class="stamp-mark">印</span>{{ sending ? '正在钤印…' : '钤印发送' }}</button></div>
             </section>
           </transition>
         </div>
@@ -220,7 +220,7 @@ function addQuickReply(text) {
       <aside v-if="selectedConversation && rightRailOpen" class="context-panel panel-paper">
         <div class="context-header"><div><h2>掌柜手记</h2><span>客户与知识上下文</span></div><button class="round-icon" @click="rightRailOpen = false"><PanelRightClose :size="16" /></button></div>
         <section class="profile-section"><div class="profile-section-title"><h3>本客小像</h3><button><Edit3 :size="13" /> 编辑</button></div><div class="customer-profile"><span class="customer-avatar avatar-sage large">{{ selectedConversation.initials }}</span><div><strong>{{ selectedConversation.name }}</strong><span>小红书 · {{ selectedConversation.level }}</span></div><span class="profile-score">A<small>熟客度</small></span></div><div class="profile-stats"><div><strong>3</strong><span>历史到店</span></div><div><strong>¥ 1,280</strong><span>累计消费</span></div><div><strong>86%</strong><span>核销意向</span></div></div><div class="note-box"><PenLine :size="14" /><span>老熟客，爱坐窗边靠竹林位。对宠物友好政策比较关注。</span></div></section>
-        <section class="context-section"><div class="profile-section-title"><h3>知识依据</h3><button><BookOpen :size="13" /> 3 条</button></div><div class="grounding-card"><span class="grounding-icon"><FileText :size="15" /></span><div><strong>周末包间预订须知</strong><span>景观位 · 宠物规约 · 预约规则</span></div><Check :size="14" /></div><div class="grounding-card"><span class="grounding-icon green"><Sparkles :size="15" /></span><div><strong>秋季大闸蟹预售套餐</strong><span>秋蟹双人餐 · 现点现蒸</span></div><Check :size="14" /></div><div class="grounding-card"><span class="grounding-icon amber"><Clock3 :size="15" /></span><div><strong>今日门店状态</strong><span>晚市尚余 6 席 · 适合带宠</span></div><Check :size="14" /></div></section>
+        <section class="context-section"><div class="profile-section-title"><h3>知识依据</h3><button><BookOpen :size="13" /> 3 条</button></div><div class="grounding-card"><span class="grounding-icon"><FileText :size="15" /></span><div><strong>周末包间预订须知</strong><span>景观位 · 宠物规约 · 预约规则</span></div><Check :size="14" /></div><div class="grounding-card"><span class="grounding-icon green"></span><div><strong>秋季大闸蟹预售套餐</strong><span>秋蟹双人餐 · 现点现蒸</span></div><Check :size="14" /></div><div class="grounding-card"><span class="grounding-icon amber"><Clock3 :size="15" /></span><div><strong>今日门店状态</strong><span>晚市尚余 6 席 · 适合带宠</span></div><Check :size="14" /></div></section>
         <section class="context-section shortcuts"><div class="profile-section-title"><h3>话术锦囊</h3><button><MoreHorizontal :size="15" /></button></div><button @click="addQuickReply('地址：青石巷 18 号，导航搜索「一方·竹里」即可抵达')"><span class="shortcut-icon"><ArrowDown :size="14" /></span><span><strong>定位指引</strong><small>青石巷 18 号 · 距地铁 600m</small></span><Plus :size="14" /></button><button @click="addQuickReply('Wi-Fi：YIFANGZHI_GUEST，密码 88888888')"><span class="shortcut-icon"><Zap :size="14" /></span><span><strong>Wi-Fi 信息</strong><small>YIFANGZHI_GUEST</small></span><Plus :size="14" /></button><button @click="addQuickReply('为您附上本店菜单，欢迎提前选餐')"><span class="shortcut-icon"><FileText :size="14" /></span><span><strong>发送菜单</strong><small>秋季菜单 · 12 道时令菜</small></span><Plus :size="14" /></button></section>
         <div class="context-footer"><span class="status-pip" /> 灵犀依据已实时同步 <span>·</span> <button>查看全部知识库</button></div>
       </aside>

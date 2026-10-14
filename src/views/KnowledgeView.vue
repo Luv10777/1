@@ -247,7 +247,7 @@ async function changeSetStatus(item, action) {
 <template>
   <div class="knowledge-page">
     <header v-if="!faqDetailOpen" class="knowledge-header">
-      <div class="header-copy"><h1>知识库</h1><p>管理 {{ selectedStore || '当前门店' }} 的 AI 专属知识上下文</p></div>
+      <div class="header-copy"><h1>知识库</h1><p>管理 {{ selectedStore || '当前门店' }} 的专属知识上下文</p></div>
       <div class="header-tools">
         <label class="knowledge-search"><Search :size="16" stroke-width="1.8" /><input v-model="searchQuery" type="search" placeholder="搜索知识名称、ID 或说明" aria-label="搜索知识库" /></label>
         <div class="filter-wrap">
@@ -277,7 +277,7 @@ async function changeSetStatus(item, action) {
     <main v-if="!faqDetailOpen">
       <section class="faq-feature-card">
         <div class="faq-feature-mark"><MessageCircleQuestion :size="22" stroke-width="1.8" /></div>
-        <div class="faq-feature-copy"><p class="eyebrow">FAQ KNOWLEDGE SET</p><h2>常见问答集</h2><p>把门店经验整理成可复用的问答对，发布后自动用于 AI 实景直播的门店通用知识。</p><div class="faq-feature-meta"><span>{{ faqSets.length }} 个问答集</span><i /><span>{{ faqTotal }} 个问答对</span><i /><span>{{ publishedTotal }} 个已发布</span></div></div>
+        <div class="faq-feature-copy"><p class="eyebrow">FAQ KNOWLEDGE SET</p><h2>常见问答集</h2><p>把门店经验整理成可复用的问答对，发布后自动用于实景直播的门店通用知识。</p><div class="faq-feature-meta"><span>{{ faqSets.length }} 个问答集</span><i /><span>{{ faqTotal }} 个问答对</span><i /><span>{{ publishedTotal }} 个已发布</span></div></div>
         <button type="button" class="faq-feature-action" :disabled="loading || saving || !selectedStoreId || !!loadError" @click="activeTab = 'faq'; selectedStatus = 'all'; searchQuery = ''">管理问答集 <ArrowUpRight :size="15" /></button>
       </section>
       <div class="list-toolbar"><div><strong>{{ filteredKnowledge.length }}</strong> 个知识集 <span>·</span> 最近更新优先</div><button class="view-button" type="button" :disabled="loading" @click="archiveOpen = true"><Archive :size="14" /> 归档管理 <span v-if="archivedKnowledge.length" class="archive-count">{{ archivedKnowledge.length }}</span></button></div>
@@ -348,7 +348,7 @@ async function changeSetStatus(item, action) {
           <header class="modal-header"><div><p class="eyebrow">FAQ RESPONSE</p><h2 id="faq-pair-title">{{ editingFaqPair ? '编辑问答对' : '添加问答对' }}</h2></div><button type="button" class="close-button" aria-label="关闭" :disabled="saving" @click="closeEditor('pair')">×</button></header>
           <form class="faq-pair-form" @submit.prevent="saveFaqPair">
             <label class="faq-field"><span>用户问题</span><input v-model="faqForm.question" :disabled="saving" required maxlength="500" placeholder="例如：你们支持哪些配送方式？" /></label>
-            <label class="faq-field"><span>标准答案</span><textarea v-model="faqForm.answer" :disabled="saving" required rows="6" placeholder="输入 AI 应该采用的准确、完整回答" /></label>
+            <label class="faq-field"><span>标准答案</span><textarea v-model="faqForm.answer" :disabled="saving" required rows="6" placeholder="输入应采用的准确、完整回答" /></label>
             <label class="faq-field"><span>状态</span><select v-model="faqForm.status" :disabled="saving"><option value="ACTIVE">已启用</option><option value="DRAFT">草稿</option></select></label>
             <p v-if="formError" class="faq-form-notice" role="alert">{{ formError }}</p>
             <footer class="faq-form-footer"><button type="button" class="ghost-button" :disabled="saving" @click="closeEditor('pair')">取消</button><button type="submit" class="create-button" :disabled="saving">{{ saving ? '保存中…' : '保存问答对' }}</button></footer>
@@ -361,7 +361,7 @@ async function changeSetStatus(item, action) {
         <section class="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-title">
           <header class="modal-header"><div><p class="eyebrow">KNOWLEDGE ARCHIVE</p><h2 id="archive-title">归档管理</h2><p class="archive-subtitle">归档知识集保留在这里，不再用于新的直播。</p></div><button type="button" class="close-button" aria-label="关闭" @click="archiveOpen = false">×</button></header>
           <div class="archive-body"><div v-if="archivedKnowledge.length" class="archive-list"><article v-for="item in archivedKnowledge" :key="item.id" class="archive-row"><div class="archive-icon"><Archive :size="17" /></div><div class="archive-copy"><h3>{{ item.name }}</h3><div><span>{{ item.kind === 'FAQ' ? '常见问答' : '文档资料' }}</span><i /><span>归档于 {{ formatDate(item.updatedAt) }}</span></div><p>{{ item.description || '暂无说明' }}</p></div><span class="status-badge status-draft">已归档</span></article></div><div v-else class="archive-empty"><Archive :size="25" /><strong>暂无归档知识集</strong><span>在知识列表中归档的内容会显示在这里。</span></div></div>
-          <footer class="archive-footer"><span>归档内容不会被 AI 检索</span><button type="button" class="ghost-button" @click="archiveOpen = false">完成</button></footer>
+          <footer class="archive-footer"><span>归档内容不会被检索</span><button type="button" class="ghost-button" @click="archiveOpen = false">完成</button></footer>
         </section>
       </div>
     </Transition>

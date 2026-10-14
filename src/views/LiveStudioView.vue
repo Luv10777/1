@@ -470,7 +470,7 @@ const transitionSession = async (action) => {
       audioControl.value?.startPlayback(result.id)
     }
     if (action === 'end') stage.value = 'review'
-    draftNotice.value = action === 'start' ? '本场已开始，AI 声音会在本页播放；抖音开播仍需在抖音 App 操作。' : action === 'end' ? '本场记录已结束，播报已停止；请确认已在抖音 App 结束直播。' : ''
+    draftNotice.value = action === 'start' ? '本场已开始，播报声音会在本页播放；抖音开播仍需在抖音 App 操作。' : action === 'end' ? '本场记录已结束，播报已停止；请确认已在抖音 App 结束直播。' : ''
   } catch (error) {
     if (isCurrent(ticket, storeId)) draftError.value = error.message || '场次操作失败，请重试。'
   } finally {
@@ -716,8 +716,8 @@ onBeforeUnmount(() => {
     <div class="page-heading">
       <div>
         <p class="eyebrow">CONTENT TOOLS / LIVE</p>
-        <h1><span class="placeholder-icon">◎</span>AI实景直播</h1>
-        <p class="page-intro">选好商品与声音，准备本场讲解；在抖音拍真实画面，AI 声音由这个网页播放。</p>
+        <h1><span class="placeholder-icon">◎</span>实景直播</h1>
+        <p class="page-intro">选好商品与声音，准备本场讲解；在抖音拍真实画面，播报声音由这个网页播放。</p>
       </div>
       <div class="ls-head-side">
         <span class="ls-stage-pill" :class="stage">
@@ -865,10 +865,10 @@ onBeforeUnmount(() => {
               <p v-else-if="answeringCohost">观众的提问由助播「{{ answeringCohost.name }}」回答，答完交回主播。这位助播不再参与轮流讲解{{ cohostVoices.length > 1 ? '，其余助播照常轮流' : '，讲解全部由主播完成' }}。</p>
               <p v-else>开启后，观众的提问由最先设为助播的那一位回答，主播专心讲解；这位助播不再参与轮流讲解。</p>
             </div>
-            <p class="ls-section-note">为本场准备常见问题与指定回复。观众问到这些问题时（问法不同也算），AI 会把你写的回复改成口语说出来，意思和数字不变；没有对应问答时依据商品资料回答，资料里没有的不回答。观众说想买时会顺势引导下单；夸奖、闲聊不回，问主播是不是真人或 AI 的也一律不回；投诉、说吃了不舒服、要退款这类不由 AI 回，会在弹幕流里标出来等你处理。真实抖音弹幕尚未接入。</p>
+            <p class="ls-section-note">为本场准备常见问题与指定回复。观众问到这些问题时（问法不同也算），系统会把你写的回复改成口语说出来，意思和数字不变；没有对应问答时依据商品资料回答，资料里没有的不回答。观众说想买时会顺势引导下单；夸奖、闲聊不回，询问主播身份的也一律不回；投诉、说吃了不舒服、要退款这类不会自动回复，会在弹幕流里标出来等你处理。真实抖音弹幕尚未接入。</p>
             <p class="ls-section-note">{{ readOnlySession ? '以下为场次启动时保存的知识快照。' : '门店通用来自知识库已启用规则；本场问答优先于商品问答与门店通用规则。' }}</p>
             <p v-if="contextError" class="ls-qa-error" role="alert">{{ contextError }} <button type="button" class="ls-ghost compact" @click="reloadKnowledge">重试</button></p>
-            <div v-if="!readOnlySession && productQaPairs.length" class="ls-qa-product-tip">✨ 已自动带入 {{ productQaPairs.length }} 条本场商品问答</div>
+            <div v-if="!readOnlySession && productQaPairs.length" class="ls-qa-product-tip">已自动带入 {{ productQaPairs.length }} 条本场商品问答</div>
             <div class="ls-qa-filters" role="tablist" aria-label="问答范围">
               <button v-for="filter in qaFilters" :key="filter.value" type="button" role="tab" :aria-selected="qaFilter === filter.value" :class="{ on: qaFilter === filter.value }" @click="qaFilter = filter.value">{{ filter.label }}（{{ filter.count }}）</button>
             </div>
@@ -877,7 +877,7 @@ onBeforeUnmount(() => {
               <li v-for="item in visibleQaPairs" :key="item.id" class="ls-qa-item">
                 <div v-if="editingQaId === item.id" class="ls-qa-inline-edit">
                   <input v-model="newQ" maxlength="500" type="text" aria-label="编辑观众问题" placeholder="观众可能会问…">
-                  <textarea v-model="newA" maxlength="4000" aria-label="编辑回复话术" rows="2" placeholder="希望 AI 怎么答…" @keyup.ctrl.enter="addQa" />
+                  <textarea v-model="newA" maxlength="4000" aria-label="编辑回复话术" rows="2" placeholder="希望如何回答…" @keyup.ctrl.enter="addQa" />
                   <div class="ls-qa-inline-actions">
                     <button type="button" class="ls-ghost compact" @click="cancelQaEdit">取消</button>
                     <button type="button" class="primary-button compact" @click="addQa">保存</button>
@@ -896,7 +896,7 @@ onBeforeUnmount(() => {
             </ul>
             <div v-if="!editingQaId" class="ls-qa-add">
               <input v-model="newQ" maxlength="500" type="text" placeholder="观众可能会问…">
-              <input v-model="newA" maxlength="4000" type="text" placeholder="希望 AI 怎么答…" @keyup.enter="addQa">
+              <input v-model="newA" maxlength="4000" type="text" placeholder="希望如何回答…" @keyup.enter="addQa">
               <select v-model="newQaScope" aria-label="问答关联范围">
                 <option value="session">本场通用</option>
                 <option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option>
@@ -952,10 +952,10 @@ onBeforeUnmount(() => {
     <section v-if="stage === 'live'" class="ls-live-grid" aria-label="直播工作台">
       <div class="ls-live-main">
         <article class="panel ls-feed-panel">
-          <div class="panel-heading"><div><p class="eyebrow">REALTIME</p><h3>弹幕流与 AI 回复</h3></div><span class="ls-pending-badge" :class="{ ready: commentFeed.length }">{{ commentFeed.length ? `${commentFeed.length} 条` : '暂无弹幕' }}</span></div>
-          <p v-if="inDesktop" class="ls-card-note">连接直播间后，这里显示从直播间读到的弹幕和 AI 的回复。</p>
+          <div class="panel-heading"><div><p class="eyebrow">REALTIME</p><h3>弹幕流与自动回复</h3></div><span class="ls-pending-badge" :class="{ ready: commentFeed.length }">{{ commentFeed.length ? `${commentFeed.length} 条` : '暂无弹幕' }}</span></div>
+          <p v-if="inDesktop" class="ls-card-note">连接直播间后，这里显示从直播间读到的弹幕和自动回复。</p>
           <p v-else class="ls-card-note">真实抖音弹幕尚未接入，这里显示的是下方“模拟弹幕互动”发出的问题与回复。</p>
-          <div v-if="commentFeed.length" class="ls-realtime-feed"><article v-for="item in commentFeed" :key="item.id" class="ls-realtime-item" :class="{ attention: item.needsPerson }"><div class="ls-realtime-line"><span class="ls-realtime-kind">{{ item.providerLabel || '观众' }}</span><strong>{{ item.question }}</strong><small class="ls-realtime-state" :class="item.tone">{{ item.stateLabel }}</small></div><div v-if="item.answer" class="ls-realtime-line"><span class="ls-realtime-kind reply">回复</span><p>{{ item.answer }}</p><small v-if="item.sourceLabel">{{ item.sourceLabel }}</small></div><p v-else-if="item.note" class="ls-realtime-note">{{ item.note }}</p></article></div><div v-else class="ls-workspace-empty"><MessageSquare :size="32" :stroke-width="1.4" aria-hidden="true" /><strong>还没有弹幕</strong><p>在“开发测试 · 模拟弹幕互动”里发一条问题：与知识库文字一致的直接用原话回复，其余由 AI 依据本场问答和商品资料回答。</p><button type="button" class="ls-ghost compact" @click="editStep('script')">查看互动知识库</button></div>
+          <div v-if="commentFeed.length" class="ls-realtime-feed"><article v-for="item in commentFeed" :key="item.id" class="ls-realtime-item" :class="{ attention: item.needsPerson }"><div class="ls-realtime-line"><span class="ls-realtime-kind">{{ item.providerLabel || '观众' }}</span><strong>{{ item.question }}</strong><small class="ls-realtime-state" :class="item.tone">{{ item.stateLabel }}</small></div><div v-if="item.answer" class="ls-realtime-line"><span class="ls-realtime-kind reply">回复</span><p>{{ item.answer }}</p><small v-if="item.sourceLabel">{{ item.sourceLabel }}</small></div><p v-else-if="item.note" class="ls-realtime-note">{{ item.note }}</p></article></div><div v-else class="ls-workspace-empty"><MessageSquare :size="32" :stroke-width="1.4" aria-hidden="true" /><strong>还没有弹幕</strong><p>在“开发测试 · 模拟弹幕互动”里发一条问题：与知识库文字一致的直接用原话回复，其余依据本场问答和商品资料自动回答。</p><button type="button" class="ls-ghost compact" @click="editStep('script')">查看互动知识库</button></div>
         </article>
       </div>
       <aside class="ls-live-side">
@@ -979,14 +979,14 @@ onBeforeUnmount(() => {
         </div>
         <div v-if="currentSession && readOnlySession" class="ls-gaps">
           <h3>观众问了但没答上的问题<small v-if="unanswered.length"> · {{ unanswered.length }} 个</small></h3>
-          <p class="ls-card-note">这些提问在本场资料里找不到答案，AI 没有回复。补成商品问答后，下一场选了这件商品会自动带上；地址、营业时间这类门店通用的问题请到知识库添加。目前只有模拟弹幕会进这份清单。</p>
+          <p class="ls-card-note">这些提问在本场资料里找不到答案，未自动回复。补成商品问答后，下一场选了这件商品会自动带上；地址、营业时间这类门店通用的问题请到知识库添加。目前只有模拟弹幕会进这份清单。</p>
           <p v-if="gapNotice" class="ls-gap-notice" role="status">{{ gapNotice }}</p>
           <ul v-if="unanswered.length" class="ls-gap-list">
             <li v-for="row in unanswered" :key="row.text">
               <div class="ls-gap-row"><strong>{{ row.text }}</strong><small v-if="row.count > 1">问了 {{ row.count }} 次</small><button v-if="gapDraft?.key !== row.text" type="button" class="ls-ghost compact" :disabled="!productQueue.length || gapBusy" @click="openGap(row)">补成问答</button></div>
               <form v-if="gapDraft?.key === row.text" class="ls-gap-form" @submit.prevent="saveGap">
                 <label><span>问题</span><input v-model="gapDraft.question" maxlength="1000"></label>
-                <label><span>回答</span><textarea v-model="gapDraft.answer" rows="2" maxlength="4000" placeholder="像对顾客说话那样写，AI 会照这个意思用口语回答" /></label>
+                <label><span>回答</span><textarea v-model="gapDraft.answer" rows="2" maxlength="4000" placeholder="像对顾客说话那样写，系统会照这个意思用口语回答" /></label>
                 <label><span>属于哪件商品</span><select v-model="gapDraft.productId"><option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option></select></label>
                 <p v-if="gapError" class="ls-gap-error" role="alert">{{ gapError }}</p>
                 <div class="ls-gap-actions"><button type="submit" class="primary-button compact" :disabled="gapBusy">{{ gapBusy ? '保存中…' : '保存为商品问答' }}</button><button type="button" class="ls-ghost compact" :disabled="gapBusy" @click="gapDraft = null">取消</button></div>

@@ -40,7 +40,7 @@ export function analysisReportMode(analysis, selectedMode = 'ai') {
 
 export function analysisRecreationSteps(result, mode, route = 'filming') {
   const fields = mode === 'real'
-    ? route === 'ai' ? [['aiWorkflow', '用 AI 重做的步骤']]
+    ? route === 'ai' ? [['aiWorkflow', '重新生成的步骤']]
       : [['preparation', '开拍准备'], ['cameraSetup', '相机位置与移动'], ['lightingSetup', '灯光怎么布置'],
           ['recording', '声音怎么录'], ['editing', '剪辑怎么做']]
     : [['workflow', '按什么顺序生成'], ['consistency', '前后镜头如何保持一致'], ['assembly', '剪辑与声音怎么合成']]
