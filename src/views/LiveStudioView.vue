@@ -483,6 +483,7 @@ const launchingApp = ref(false)
 const appPromptOpen = ref(false)
 const appDownloads = ref({ windows: '', mac: '', android: '' })
 const launchFromBrowser = async () => {
+  if (!auth.requireLogin()) return
   if (launchingApp.value) return
   launchingApp.value = true
   draftError.value = ''
