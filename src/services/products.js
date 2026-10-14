@@ -6,7 +6,7 @@ export const productTypes = [
 export const productCategories = ['餐饮美食', '丽人美业', '休闲娱乐', '食品生鲜', '日用百货', '生活服务', '其他']
 
 export function emptyProduct() {
-  return { name: '', type: 'physical', category: '', price: '', unit: '', specifications: '', promotion: '', points: '', images: [], faqs: [] }
+  return { name: '', type: 'physical', category: '', price: '', unit: '', specifications: '', promotion: '', points: '', inventory: '', onlineStatus: 'DRAFT', images: [], faqs: [] }
 }
 
 // An explicit empty gallery means the legacy image was removed.
@@ -35,12 +35,15 @@ export function validateProduct(product) {
   if (!/^\d+(\.\d{1,2})?$/.test(String(product.price)) || !Number.isFinite(Number(product.price))) {
     errors.price = '请填写大于等于 0 的售价，最多两位小数'
   }
+  if (product.inventory !== '' && product.inventory != null && (!/^\d+$/.test(String(product.inventory)) || !Number.isInteger(Number(product.inventory)) || Number(product.inventory) > 2147483647)) {
+    errors.inventory = '库存须为 0 至 2147483647 的整数；留空表示不限制库存'
+  }
   return errors
 }
 
 export function normalizeProduct(product) {
   return Object.fromEntries(Object.keys(emptyProduct()).map(key => [key,
-    key === 'images' ? getProductImages(product) : key === 'faqs' ? (Array.isArray(product.faqs) ? product.faqs.map(pair => ({ id: pair.id || `faq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, question: String(pair.question || '').trim(), answer: String(pair.answer || '').trim(), status: pair.status || 'active' })).filter(pair => pair.question && pair.answer) : []) : key === 'price' ? Number(product[key]) : String(product[key] ?? '').trim(),
+    key === 'images' ? getProductImages(product) : key === 'faqs' ? (Array.isArray(product.faqs) ? product.faqs.map(pair => ({ id: pair.id || `faq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, question: String(pair.question || '').trim(), answer: String(pair.answer || '').trim(), status: pair.status || 'active' })).filter(pair => pair.question && pair.answer) : []) : key === 'price' ? Number(product[key]) : key === 'onlineStatus' ? (product[key] || 'DRAFT') : String(product[key] ?? '').trim(),
   ]))
 }
 

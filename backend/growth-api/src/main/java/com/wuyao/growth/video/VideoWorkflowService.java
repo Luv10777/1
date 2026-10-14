@@ -392,8 +392,9 @@ public class VideoWorkflowService {
             JsonNode content = root.path("content");
             if (content.isArray()) {
                 for (JsonNode item : content) {
-                    if ("image_url".equals(item.path("type").asText())) {
-                        expirations.add(referenceExpiry(item.path("image_url").path("url").asText()));
+                    String type = item.path("type").asText();
+                    if ("image_url".equals(type) || "video_url".equals(type)) {
+                        expirations.add(referenceExpiry(item.path(type).path("url").asText()));
                     }
                 }
             }

@@ -7,6 +7,7 @@ import { assetSource, assets as platformAssets } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 import { billing, dateTime, number, refreshBilling, requireMembership } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
+import { auth } from '../stores/auth'
 
 const prompt = ref('')
 const format = ref('auto')
@@ -155,6 +156,7 @@ if (recreationPrompt && Number(route.query.duration) > 30) activeConversation.va
 saveActiveConversation()
 
 const loadHistory = async (nextPage = 0) => {
+  if (!auth.requireLogin()) return
   if (historyLoading.value) return
   historyLoading.value = true
   historyError.value = ''
@@ -174,9 +176,9 @@ const loadHistory = async (nextPage = 0) => {
     historyLoading.value = false
   }
 }
-onMounted(() => loadHistory())
+onMounted(() => { if (auth.isAuthenticated) loadHistory() })
 
-get('/api/video/capabilities').then(data => { if (Array.isArray(data) && data.length) capabilities.value = data }).catch(() => {})
+if (auth.isAuthenticated) get('/api/video/capabilities').then(data => { if (Array.isArray(data) && data.length) capabilities.value = data }).catch(() => {})
 
 const clampSettings = () => {
   duration.value = Math.min(durationMax.value, Math.max(5, duration.value))
@@ -192,6 +194,7 @@ const addImageFiles = (fileList) => {
 }
 const previewUrl = file => { const url = URL.createObjectURL(file); objectUrls.add(url); return url }
 const openImageLibrary = async () => {
+  if (!auth.requireLogin()) return
   libraryOpen.value = true
   libraryLoading.value = true
   libraryError.value = ''

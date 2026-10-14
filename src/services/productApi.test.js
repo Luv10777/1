@@ -5,7 +5,7 @@ import { createProductApi, productPayload } from './productApi.js'
 const detail = (id = 8) => ({
   id, storeId: 3, name: '茶饮券', type: 'VOUCHER', category: '餐饮美食', price: 19.9,
   saleUnit: '张', specification: '饮品任选一杯', promotionRule: '周末可用', coreSellingPoints: '现点现做',
-  version: 4, images: [{ id: 5, assetId: 11, sortOrder: 0 }],
+  version: 4, inventory: 15, onlineStatus: 'PUBLISHED', images: [{ id: 5, assetId: 11, sortOrder: 0 }],
   faqs: [{ id: 13, question: '需要预约吗？', answer: '无需预约。', status: 'ACTIVE', version: 2 }],
 })
 
@@ -24,6 +24,8 @@ test('loads every product page and fetches omitted FAQs before returning UI reco
   assert.equal(products[0].faqs[0].status, 'active')
   assert.equal(products[0].faqs[0].version, 2)
   assert.equal(products[0].unit, '张')
+  assert.equal(products[0].inventory, 15)
+  assert.equal(products[0].onlineStatus, 'PUBLISHED')
   assert.equal(products[0].type, 'voucher')
   assert.equal(products[0].images[0].assetId, 11)
   assert.equal(products[0].images[0].url, 'https://assets.test/11')
@@ -41,6 +43,8 @@ test('round trips facts, gallery order, FAQ content and optimistic version witho
   assert.equal(payload.specification, '饮品任选一杯')
   assert.equal(payload.promotionRule, '周末可用')
   assert.equal(payload.coreSellingPoints, '现点现做')
+  assert.equal(payload.inventory, 15)
+  assert.equal(payload.onlineStatus, 'PUBLISHED')
   assert.equal(payload.version, 4)
   assert.deepEqual(payload.images, [{ assetId: 12, sortOrder: 0 }, { assetId: 11, sortOrder: 1 }])
   assert.deepEqual(payload.faqs, [{ question: '需要预约吗？', answer: '无需预约。', sortOrder: 0 }])

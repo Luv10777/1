@@ -118,6 +118,14 @@ public class StoreService {
         return storeRepository.findByIdAndStatus(storeId, "ACTIVE").map(StoreDtos.Profile::of);
     }
 
+    /** Public storefront data is filtered by the stores RLS policy to stores with published content. */
+    @Transactional(readOnly = true)
+    public StoreDtos.Profile publicProfile(Long storeId) {
+        return storeRepository.findByIdAndStatus(storeId, "ACTIVE")
+                .map(StoreDtos.Profile::of)
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "店铺不存在或尚未公开内容"));
+    }
+
     /** 请求里没带的项（null）保持原样，带了的整项替换。 */
     private StoreDtos.Extras extras(StoreDtos.Extras current, String transportGuide, List<String> amenities,
                                     List<StoreDtos.SpecialHour> specialHours) {

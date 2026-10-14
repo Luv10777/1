@@ -130,12 +130,12 @@ growth.billing.payment-instructions=付款后请向客服提供订单号和付�
 
 ## 视频核验费率
 
-当前供应商为 OnlyRouter，真实模型名由 `VIDEO_MODEL_*` 配置映射，接口为 `/v1/videos`。费率匹配完整供应商地址、实际模型名、分辨率、`t2v` / `v2v` 输入模式。没有唯一且有效的核验配置时，报价不可用，生成请求被拒绝。
+当前视频网关默认供应商为 Haomaotoken，真实模型名由 `VIDEO_MODEL_*` 配置映射，接口为 `/api/v3/contents/generations/tasks`。费率匹配完整供应商地址、实际模型名、分辨率、`t2v` / `v2v` 输入模式。没有唯一且有效的核验配置时，报价不可用，生成请求被拒绝。切换接口不会自动迁移或启用旧供应商费率。
 
 当前模式由是否存在参考视频决定：纯文字和仅带参考图片都匹配 `t2v`，带参考视频才匹配 `v2v`。
 这说明内部报价匹配方式，不能据此假定参考图片没有供应商成本；正式费率须覆盖对应输入的实际账单。
 
-核验时需要商户账户真实生效价格，不能直接把公开价格目录当作商户成本。公开模型目录 `https://onlyrouter.ai/api/models` 的视频价格以美元 / 百万视频 tokens 表示，并区分分辨率、输入模式与账户档位。内部已实现公式来源为相邻中转项目 `plugins/tasks/doubao/plugin.js`；在正式开放某个费率前，应再与当前供应商接口文档及该商户实际用量账单核对。
+核验时需要商户账户真实生效价格，不能直接把公开价格目录当作商户成本。Haomaotoken 的公开目录 `https://haomaotoken.com/api/pricing` 包含模型、输入模式、分辨率的计价表达式和分组折扣，需核对每个模型实际使用的令牌分组及账单。现有 tokens 公式来源为之前中转项目 `plugins/tasks/doubao/plugin.js`；在正式开放某个费率前，应再与当前供应商接口文档及该商户实际用量账单核对。
 
 预占计算：
 
@@ -159,8 +159,8 @@ growth:
   billing:
     video:
       rates:
-        - provider-base-url: https://api.onlyrouter.ai
-          provider-model: doubao-seedance-2-0-260128
+        - provider-base-url: https://haomaotoken.com
+          provider-model: seedance-2.0
           resolution: 720p
           video-input: t2v
           usd-per-million-tokens: null

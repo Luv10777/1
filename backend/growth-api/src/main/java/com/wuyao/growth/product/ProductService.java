@@ -52,7 +52,7 @@ public class ProductService {
         product.setStoreId(storeId);
         product.setCreatedBy(userId);
         apply(product, req.name(), req.type(), req.category(), req.price(), req.saleUnit(),
-                req.specification(), req.promotionRule(), req.coreSellingPoints());
+                req.specification(), req.promotionRule(), req.coreSellingPoints(), req.inventory(), req.onlineStatus());
         Product saved = productRepository.save(product);
         if (req.images() != null) replaceImages(saved, req.images(), tenantId);
         if (req.faqs() != null) replaceFaqs(saved, req.faqs(), userId, tenantId);
@@ -75,7 +75,7 @@ public class ProductService {
         }
         checkVersion(product.getVersion(), req.version());
         apply(product, req.name(), req.type(), req.category(), req.price(), req.saleUnit(),
-                req.specification(), req.promotionRule(), req.coreSellingPoints());
+                req.specification(), req.promotionRule(), req.coreSellingPoints(), req.inventory(), req.onlineStatus());
         touchProduct(product);
         if (req.images() != null) replaceImages(product, req.images(), product.getTenantId());
         if (req.faqs() != null) replaceFaqs(product, req.faqs(), userId, product.getTenantId());
@@ -139,6 +139,53 @@ public class ProductService {
         return faqRepository.findByProductIdAndDeletedAtIsNullOrderBySortOrderAscIdAsc(productId)
                 .stream().map(ProductDtos.FaqListView::of).toList();
     }
+
+    @Transactional(readOnly = true)
+    public List<ProductDtos.View> publicStorefront(Long storeId) {
+        return productRepository.findAllByStoreIdAndStatusAndOnlineStatusAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(
+                        storeId, "ACTIVE", "PUBLISHED")
+                .stream().map(product -> ProductDtos.View.of(product,
+                        imageRepository.findByProductIdOrderBySortOrderAscIdAsc(product.getId()).stream()
+                                .map(ProductDtos.ImageView::of).toList(), List.of()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SaleProduct> saleProducts(List<Long> productIds) {
+        return productRepository.findAllById(productIds).stream()
+                .filter(product -> "ACTIVE".equals(product.getStatus()) && "PUBLISHED".equals(product.getOnlineStatus())
+                        && product.getDeletedAt() == null && "PHYSICAL".equals(product.getType()))
+                .map(product -> new SaleProduct(product.getId(), product.getTenantId(), product.getStoreId(),
+                        product.getName(), product.getPrice(), product.getInventory()))
+                .toList();
+    }
+
+    @Transactional
+    public SaleProduct reserveForOrder(Long productId, int quantity) {
+        Product product = productRepository.findForSaleUpdate(productId)
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "商品已下架或不存在"));
+        if (!"PHYSICAL".equals(product.getType())) throw BizException.of(ErrorCode.BAD_REQUEST, "目前只支持实物商品下单");
+        if (product.getInventory() != null) {
+            if (product.getInventory() < quantity) throw BizException.of(ErrorCode.CONFLICT, "商品库存不足，请调整购买数量");
+            product.setInventory(product.getInventory() - quantity);
+            product.setUpdatedAt(Instant.now());
+        }
+        return new SaleProduct(product.getId(), product.getTenantId(), product.getStoreId(),
+                product.getName(), product.getPrice(), product.getInventory());
+    }
+
+    @Transactional
+    public void restoreInventory(Long productId, int quantity) {
+        productRepository.findByIdAndDeletedAtIsNull(productId).ifPresent(product -> {
+            if (product.getInventory() != null) {
+                product.setInventory(product.getInventory() + quantity);
+                product.setUpdatedAt(Instant.now());
+            }
+        });
+    }
+
+    public record SaleProduct(Long id, Long tenantId, Long storeId, String name,
+                              java.math.BigDecimal price, Integer inventory) {}
 
     @Transactional
     public ProductDtos.FaqListView createFaq(Long productId, ProductDtos.FaqRequest req, Long userId) {
@@ -256,7 +303,7 @@ public class ProductService {
 
     private static void apply(Product product, String name, String type, String category,
                               java.math.BigDecimal price, String saleUnit, String specification,
-                              String promotionRule, String coreSellingPoints) {
+                              String promotionRule, String coreSellingPoints, Integer inventory, String onlineStatus) {
         product.setName(name.trim());
         product.setType(normalizeType(type));
         product.setCategory(category.trim());
@@ -265,6 +312,11 @@ public class ProductService {
         product.setSpecification(blankToNull(specification));
         product.setPromotionRule(blankToNull(promotionRule));
         product.setCoreSellingPoints(blankToNull(coreSellingPoints));
+        if ("PUBLISHED".equals(onlineStatus) && !"PHYSICAL".equals(normalizeType(type))) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "线上店铺目前只支持发布实物商品");
+        }
+        product.setOnlineStatus(onlineStatus);
+        product.setInventory(inventory);
     }
 
     private static String normalizeType(String type) {

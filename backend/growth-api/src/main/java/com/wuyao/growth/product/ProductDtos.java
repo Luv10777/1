@@ -1,6 +1,7 @@
 package com.wuyao.growth.product;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
@@ -29,8 +30,16 @@ public final class ProductDtos {
             @Size(max = 500) String specification,
             @Size(max = 1000) String promotionRule,
             @Size(max = 2000) String coreSellingPoints,
+            @PositiveOrZero @Max(value = 2147483647, message = "库存不能超过 2147483647") Integer inventory,
+            @NotBlank @Pattern(regexp = "DRAFT|PUBLISHED") String onlineStatus,
             @Valid List<ImageRequest> images,
             @Valid List<FaqRequest> faqs) {
+        public CreateRequest(String name, String type, String category, BigDecimal price, String saleUnit,
+                             String specification, String promotionRule, String coreSellingPoints,
+                             List<ImageRequest> images, List<FaqRequest> faqs) {
+            this(name, type, category, price, saleUnit, specification, promotionRule, coreSellingPoints,
+                    null, "DRAFT", images, faqs);
+        }
     }
 
     public record UpdateRequest(
@@ -43,9 +52,17 @@ public final class ProductDtos {
             @Size(max = 500) String specification,
             @Size(max = 1000) String promotionRule,
             @Size(max = 2000) String coreSellingPoints,
+            @PositiveOrZero @Max(value = 2147483647, message = "库存不能超过 2147483647") Integer inventory,
+            @NotBlank @Pattern(regexp = "DRAFT|PUBLISHED") String onlineStatus,
             @NotNull(message = "商品版本不能为空") @PositiveOrZero Long version,
             @Valid List<ImageRequest> images,
             @Valid List<FaqRequest> faqs) {
+        public UpdateRequest(String name, String type, String category, BigDecimal price, String saleUnit,
+                             String specification, String promotionRule, String coreSellingPoints,
+                             Long version, List<ImageRequest> images, List<FaqRequest> faqs) {
+            this(name, type, category, price, saleUnit, specification, promotionRule, coreSellingPoints,
+                    null, "DRAFT", version, images, faqs);
+        }
     }
 
     public record ImageRequest(
@@ -74,13 +91,22 @@ public final class ProductDtos {
     public record View(Long id, Long storeId, String name, String type, String category,
                        BigDecimal price, String saleUnit, String specification,
                        String promotionRule, String coreSellingPoints, String status,
+                       String onlineStatus, Integer inventory,
                        Long version, Instant createdAt, Instant updatedAt,
                        List<ImageView> images, List<FaqView> faqs) {
+
+        public View(Long id, Long storeId, String name, String type, String category,
+                    BigDecimal price, String saleUnit, String specification, String promotionRule,
+                    String coreSellingPoints, String status, Long version, Instant createdAt,
+                    Instant updatedAt, List<ImageView> images, List<FaqView> faqs) {
+            this(id, storeId, name, type, category, price, saleUnit, specification, promotionRule,
+                    coreSellingPoints, status, "DRAFT", null, version, createdAt, updatedAt, images, faqs);
+        }
 
         static View of(Product product, List<ImageView> images, List<FaqView> faqs) {
             return new View(product.getId(), product.getStoreId(), product.getName(), product.getType(),
                     product.getCategory(), product.getPrice(), product.getSaleUnit(), product.getSpecification(),
-                    product.getPromotionRule(), product.getCoreSellingPoints(), product.getStatus(),
+                    product.getPromotionRule(), product.getCoreSellingPoints(), product.getStatus(), product.getOnlineStatus(), product.getInventory(),
                     product.getVersion(), product.getCreatedAt(), product.getUpdatedAt(), images, faqs);
         }
     }

@@ -3,8 +3,29 @@
 .business-overline { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; color: var(--ink-muted); font-size: 12px; }
 .business-heading h1 { margin: 0 0 12px; font: 600 clamp(28px, 3vw, 36px)/1.2 var(--font-serif); }
 .business-heading > div > p:last-child { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
+.business-records { padding:18px 20px; margin:0 0 24px; border:1px solid var(--line); border-radius:6px; background:var(--night-panel); }
+.business-records-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+.business-records-heading>div>span { color:var(--ink-muted); font:10px var(--font-mono); }
+.business-records-heading h2 { margin:5px 0 0; font-size:14px; font-weight:600; }
+.business-record-refresh,.business-record-icon { display:grid; place-items:center; width:32px; height:32px; border:1px solid var(--line); border-radius:4px; background:var(--night); color:var(--ink-muted); }
+.business-record-refresh:hover,.business-record-icon:hover { color:var(--color-accent-text); border-color:var(--color-accent-text); }
+.business-record-list { display:grid; padding:0; margin:0; list-style:none; }
+.business-record-list>li { display:flex; align-items:center; gap:12px; min-width:0; padding:12px 0; border-bottom:1px solid var(--line); }
+.business-record-list>li:last-child { padding-bottom:0; border-bottom:0; }
+.business-record-main { display:grid; gap:5px; flex:1; min-width:0; }
+.business-record-main>strong { overflow-wrap:anywhere; font-size:12px; font-weight:500; }
+.business-record-main>small { color:var(--ink-muted); font-size:10px; line-height:1.6; }
+.business-record-main>.business-category-tag { justify-self:start; }
+.business-record-status { flex:0 0 auto; padding:4px 7px; border-radius:3px; background:var(--color-bg-subtle); color:var(--ink-muted); font-size:10px; }
+.business-record-status.is-published,.business-record-status.status-approved { background:color-mix(in srgb,var(--color-success) 12%,transparent); color:var(--color-success); }
+.business-record-status.is-offline,.business-record-status.status-rejected { background:color-mix(in srgb,var(--color-error) 10%,transparent); color:var(--color-error); }
+.business-record-actions { display:flex; gap:6px; }
+.business-record-icon { width:30px; height:30px; cursor:pointer; }
+.business-record-empty { margin:0; padding:14px 0 0; color:var(--ink-muted); font-size:11px; line-height:1.7; }
+.business-review-note { color:var(--color-warning)!important; }
 .business-link { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12px; white-space: nowrap; }
 .business-link:hover { color: var(--color-accent-text); }
+.business-heading-links { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:16px; }
 .business-process { display: flex; align-items: center; gap: 0; padding: 16px 0; margin: 0 0 24px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); list-style: none; }
 .business-process li { display: flex; align-items: center; gap: 9px; flex: 1; color: var(--ink-muted); }
 .business-process li + li::before { content: ''; width: 32px; height: 1px; margin: 0 24px 0 0; background: var(--line); }
@@ -106,4 +127,4 @@
 .merchant-next-step:hover strong { color: var(--color-accent-text); }
 @media (max-width: 1100px) { .business-editor-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; } .business-form-section { padding: 20px; } .business-categories small { display: none; } }
 @media (max-width: 960px) { .business-editor-layout { grid-template-columns: minmax(0, 1fr); } .business-preview-column { grid-template-columns: minmax(0, 1fr) minmax(220px, .7fr); align-items: start; } .business-writing-guide { padding: 20px 0; } }
-@media (max-width: 640px) { .business-heading { align-items: flex-start; flex-direction: column; gap: 12px; } .business-heading h1 { font-size: 28px; } .business-heading > .business-link { align-self: flex-end; } .business-process { justify-content: space-between; gap: 10px; } .business-process li { flex: initial; gap: 5px; } .business-process li + li::before { display: none; } .business-process strong { font-size: 11px; } .business-form-section { padding: 18px; } .business-field-grid { grid-template-columns: minmax(0, 1fr); } .business-field-grid > .business-field:last-child { margin-bottom: 20px; } .business-preview-column { grid-template-columns: minmax(0, 1fr); } .business-writing-guide { padding: 0 4px; } .business-form-actions { padding: 16px 18px; } .business-form-actions > div { margin-left: auto; } .business-declaration { padding: 18px; } .business-form-feedback { margin-left: 18px; margin-right: 18px; } .business-categories { gap: 8px; } .business-categories label { padding: 11px 9px; } .business-categories label > svg { display: none; } .merchant-alliance-intro { grid-template-columns: minmax(0, 1fr); } .merchant-alliance-intro > div { padding: 24px; } .merchant-alliance-photo { min-height: 0; height: 160px; } }
+@media (max-width: 640px) { .business-records { padding:15px; } .business-record-list>li { align-items:flex-start; flex-wrap:wrap; } .business-record-main { flex-basis:calc(100% - 95px); } .business-record-actions { width:100%; justify-content:flex-end; } .business-heading-links { align-self:stretch; justify-content:flex-start; } .business-heading h1 { font-size: 28px; } .business-process { justify-content: space-between; gap: 10px; } .business-process li { flex: initial; gap: 5px; } .business-process li + li::before { display: none; } .business-process strong { font-size: 11px; } .business-form-section { padding: 18px; } .business-field-grid { grid-template-columns: minmax(0, 1fr); } .business-field-grid > .business-field:last-child { margin-bottom: 20px; } .business-preview-column { grid-template-columns: minmax(0, 1fr); } .business-writing-guide { padding: 0 4px; } .business-form-actions { padding: 16px 18px; } .business-form-actions > div { margin-left: auto; } .business-declaration { padding: 18px; } .business-form-feedback { margin-left: 18px; margin-right: 18px; } .business-categories { gap: 8px; } .business-categories label { padding: 11px 9px; } .business-categories label > svg { display: none; } .merchant-alliance-intro { grid-template-columns: minmax(0, 1fr); } .merchant-alliance-intro > div { padding: 24px; } .merchant-alliance-photo { min-height: 0; height: 160px; } }

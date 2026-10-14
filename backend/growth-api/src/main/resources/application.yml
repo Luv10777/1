@@ -158,19 +158,23 @@ growth:
     reference-max-height: ${VIDEO_REFERENCE_MAX_HEIGHT:4096}
     ffprobe-path: ${FFPROBE_PATH:ffprobe}
     provider:
-      name: ${VIDEO_PROVIDER_NAME:onlyrouter}
-      protocol: ${VIDEO_PROVIDER_PROTOCOL:CHAT_COMPLETIONS}
-      base-url: ${VIDEO_PROVIDER_BASE_URL:https://api.onlyrouter.ai}
+      name: ${VIDEO_PROVIDER_NAME:haomaotoken}
+      protocol: ${VIDEO_PROVIDER_PROTOCOL:VOLCENGINE}
+      base-url: ${VIDEO_PROVIDER_BASE_URL:https://haomaotoken.com}
       api-key: ${VIDEO_PROVIDER_API_KEY:}
-      submit-path: ${VIDEO_PROVIDER_SUBMIT_PATH:/v1/videos}
-      poll-path: ${VIDEO_PROVIDER_POLL_PATH:/v1/videos/{jobId}}
+      api-key-seedance-2-5: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_5:}
+      api-key-seedance-2-0: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0:}
+      api-key-seedance-2-0-mini: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_MINI:}
+      api-key-seedance-2-0-fast: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_FAST:}
+      submit-path: ${VIDEO_PROVIDER_SUBMIT_PATH:/api/v3/contents/generations/tasks}
+      poll-path: ${VIDEO_PROVIDER_POLL_PATH:/api/v3/contents/generations/tasks/{jobId}}
       content-path: ${VIDEO_PROVIDER_CONTENT_PATH:/v1/videos/{jobId}/content}
       timeout-seconds: ${VIDEO_PROVIDER_TIMEOUT_SECONDS:60}
     model:
-      seedance-2-5: ${VIDEO_MODEL_SEEDANCE_2_5:doubao-seedance-2-5-260628}
-      seedance-2-0: ${VIDEO_MODEL_SEEDANCE_2_0:doubao-seedance-2-0-260128}
-      seedance-2-0-mini: ${VIDEO_MODEL_SEEDANCE_2_0_MINI:doubao-seedance-2-0-mini-260615}
-      seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:doubao-seedance-2-0-fast-260128}
+      seedance-2-5: ${VIDEO_MODEL_SEEDANCE_2_5:seedance-2.5}
+      seedance-2-0: ${VIDEO_MODEL_SEEDANCE_2_0:seedance-2.0}
+      seedance-2-0-mini: ${VIDEO_MODEL_SEEDANCE_2_0_MINI:seedance-2.0-mini}
+      seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:seedance-2.0-fast}
     poll-seconds: ${VIDEO_POLL_SECONDS:15}
   billing:
     payment-method: WECHAT

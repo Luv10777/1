@@ -21,8 +21,13 @@ import './brand.css'
 import './publishing-workspace.css'
 import './image-studio-polish.css'
 import './business-community.css'
+import './public-commerce.css'
 
 theme.apply()
+
+window.addEventListener('login-required', () => {
+  if (router.currentRoute.value.name !== 'login') router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+})
 
 window.addEventListener('auth-expired', () => {
   auth.clearSession()

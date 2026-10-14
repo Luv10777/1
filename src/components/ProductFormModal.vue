@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
+import { nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
 import { X, Package, Ticket, Upload, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import ProductImage from './ProductImage.vue'
@@ -19,6 +19,7 @@ function prepareCategory() {
   }
 }
 if (!isReadOnly.value) prepareCategory()
+watch(() => form.type, type => { if (type !== 'physical') form.onlineStatus = 'DRAFT' })
 const errors = ref({})
 const nameInput = ref(null)
 const closeButton = ref(null)
@@ -155,6 +156,8 @@ async function submit() {
                   <div><dt>商品分类</dt><dd>{{ form.category || '—' }}</dd></div>
                   <div><dt>商品规格</dt><dd>{{ form.specifications || '—' }}</dd></div>
                   <div><dt>促销与使用规则</dt><dd>{{ form.promotion || '—' }}</dd></div>
+                  <div><dt>库存</dt><dd>{{ form.inventory === '' ? '不限制' : `${form.inventory} 件` }}</dd></div>
+                  <div><dt>线上售卖</dt><dd>{{ form.onlineStatus === 'PUBLISHED' ? '已上架' : '未上架' }}</dd></div>
                 </dl>
                 <section class="product-detail-section"><h3>核心卖点</h3><p>{{ form.points || '—' }}</p></section>
               </div>
@@ -191,6 +194,23 @@ async function submit() {
                     <small v-if="errors.unit" id="product-unit-error" class="product-error">{{ errors.unit }}</small>
                   </label>
                 </div>
+                <template v-if="form.type === 'physical'">
+                  <div class="product-form-columns">
+                    <label class="product-field">
+                      <span>可售库存</span>
+                      <input v-model="form.inventory" type="number" min="0" step="1" inputmode="numeric" placeholder="留空表示不限制库存" :aria-invalid="!!errors.inventory" aria-describedby="product-inventory-hint product-inventory-error">
+                      <small id="product-inventory-hint">售出后自动扣减，取消订单后恢复。</small>
+                      <small v-if="errors.inventory" id="product-inventory-error" class="product-error">{{ errors.inventory }}</small>
+                    </label>
+                    <fieldset class="product-type-field" aria-label="店铺售卖状态">
+                      <legend>线上店铺</legend>
+                      <div class="product-type-options">
+                        <label :class="{ selected: form.onlineStatus === 'DRAFT' }"><input v-model="form.onlineStatus" type="radio" value="DRAFT"><span>暂不上架</span></label>
+                        <label :class="{ selected: form.onlineStatus === 'PUBLISHED' }"><input v-model="form.onlineStatus" type="radio" value="PUBLISHED"><span>公开售卖</span></label>
+                      </div>
+                    </fieldset>
+                  </div>
+                </template>
                 <label class="product-field"><span>商品规格</span><input v-model="form.specifications" maxlength="300" :placeholder="form.type === 'voucher' ? '例如：双人套餐，含两杯饮品和一份甜点' : '例如：120g / 罐，独立小包装'"></label>
                 <label class="product-field"><span>促销与使用规则</span><textarea v-model="form.promotion" rows="2" maxlength="1000" :placeholder="form.type === 'voucher' ? '有效期、预约要求、可用门店、核销方式与优惠限制…' : '包邮条件、优惠组合、限购数量与活动有效期…'" /></label>
                 <label class="product-field">

@@ -1,5 +1,6 @@
 <script setup>
-import { Store, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2 } from 'lucide-vue-next'
+import { onMounted, ref } from 'vue'
+import { Store, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
@@ -7,11 +8,32 @@ import { businessCommunityService } from '../services/businessCommunity'
 const industries = ['餐饮 / 茶饮', '零售 / 生活服务', '家居 / 家装', '美妆 / 个护', '文旅 / 休闲', '企业服务', '其他']
 const blankForm = () => ({ merchantName: selectedStoreRecord.value?.name || '', companyName: '', industry: '', region: '', creditCode: '', contactName: '', contactPhone: '', introduction: '', declarationAccepted: false })
 const { form, editor, submitting, receipt, error, reset, submit, clearFieldError } = useBusinessSubmission(blankForm, businessCommunityService.applyForAlliance)
+const applications = ref([])
+const applicationsLoading = ref(false)
+const applicationsError = ref('')
+const statusLabel = { PENDING_REVIEW: '审核中', APPROVED: '已通过', REJECTED: '需补充资料' }
+
+async function loadApplications() {
+  applicationsLoading.value = true
+  applicationsError.value = ''
+  try { applications.value = await businessCommunityService.applications() }
+  catch (failure) { applicationsError.value = failure.message || '申请记录暂时无法读取。' }
+  finally { applicationsLoading.value = false }
+}
+
+onMounted(loadApplications)
 </script>
 
 <template>
   <div class="business-page merchant-alliance-page">
     <header class="business-heading"><div><p class="business-overline"><Store :size="15" aria-hidden="true" />商家入驻</p><h1>商家联盟</h1><p>汇集一方商家，记录真实经营，连接活动与合作机会。</p></div><RouterLink to="/information-publishing" class="business-link">发布信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
+    <section class="business-records" aria-labelledby="merchant-applications-title">
+      <div class="business-records-heading"><div><span>APPLICATION STATUS</span><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
+      <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>
+      <p v-else-if="applicationsLoading && !applications.length" class="business-record-empty" role="status">正在读取申请记录…</p>
+      <p v-else-if="!applications.length" class="business-record-empty">提交申请后，可在这里查看平台审核状态和意见。</p>
+      <ul v-else class="business-record-list"><li v-for="application in applications" :key="application.id"><div class="business-record-main"><strong>{{ application.merchantName }} · {{ application.companyName }}</strong><small>{{ application.industry }} · {{ application.region }} · {{ new Date(application.createdAt).toLocaleDateString('zh-CN') }}</small><small v-if="application.reviewNote" class="business-review-note">平台意见：{{ application.reviewNote }}</small></div><span class="business-record-status" :class="`status-${application.status.toLowerCase()}`">{{ statusLabel[application.status] || application.status }}</span></li></ul>
+    </section>
     <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
     <template v-else>
       <section class="merchant-alliance-intro"><div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h2>让一方好生意，<br />遇见更多同行。</h2><p>建立商家档案，展示经营特色，让活动、供求与合作需求被更多人看见。</p><RouterLink to="/merchants" class="business-link">管理门店资料<ArrowRight :size="15" aria-hidden="true" /></RouterLink></div><img class="merchant-alliance-photo" src="/images/publishing/restaurant.jpg" alt="街边小店内的桌椅和暖灯" /></section>

@@ -41,7 +41,7 @@ class VideoProviderGatewayTest {
         var gateway = gateway(mock(AssetService.class), http);
 
         assertThat(gateway.submit("{}", "submit-key").status()).isEqualTo("CANCELLED");
-        var polled = gateway.poll("job-cancel", "poll-key");
+        var polled = gateway.poll("job-cancel", "SEEDANCE_2_0", "poll-key");
         assertThat(polled.status()).isEqualTo("CANCELLED");
         assertThat(polled.resultUrl()).isNull();
         verify(http, times(2)).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
@@ -127,11 +127,181 @@ class VideoProviderGatewayTest {
             return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(
                     request.getRequestUri().endsWith("/content") ? content : poll);
         });
-        assertThatThrownBy(() -> gateway(mock(AssetService.class), http).poll("job-1", "poll-key"))
+        assertThatThrownBy(() -> gateway(mock(AssetService.class), http).poll("job-1", "SEEDANCE_2_0", "poll-key"))
                 .isInstanceOfSatisfying(VideoProviderGateway.ProviderHttpException.class, e -> {
                     assertThat(e.status()).isEqualTo(status);
                     assertThat(e.retryable()).isEqualTo(retryable);
                 });
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SEEDANCE_2_0, seedance-2.0, shared-key", "SEEDANCE_2_5, seedance-2.5, shared-key",
+            "SEEDANCE_2_0_FAST, seedance-2.0-fast, fast-key", "SEEDANCE_2_0_MINI, seedance-2.0-mini, mini-key"})
+    void volcengineSubmitAndPollUseTheSameModelCredential(String alias, String model, String key) throws Exception {
+        var http = mock(HttpClient.class);
+        var requests = new ArrayList<ClassicHttpRequest>();
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
+                .thenAnswer(invocation -> {
+                    ClassicHttpRequest request = invocation.getArgument(0);
+                    requests.add(request);
+                    var response = mock(ClassicHttpResponse.class);
+                    when(response.getCode()).thenReturn(200);
+                    when(response.getEntity()).thenReturn(new StringEntity(request instanceof HttpPost
+                            ? "{\"id\":\"job-1\",\"status\":\"queued\"}"
+                            : "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://haomaotoken.com/video.mp4\"},\"usage\":{\"completion_tokens\":1234}}",
+                            ContentType.APPLICATION_JSON));
+                    return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+                });
+        var gateway = volcengineGateway(mock(AssetService.class), http);
+        // Persisted JSON must remain byte-for-byte identical even when selecting a credential.
+        String persisted = "{ \"model\":\"" + model + "\", \"content\":[{\"type\":\"text\",\"text\":\"旋转\"}], \"duration\":5 }";
+
+        assertThat(gateway.submit(persisted, "submit-key").provider()).isEqualTo("haomaotoken");
+        var result = gateway.poll("job-1", alias, "poll-key");
+
+        assertThat(result.status()).isEqualTo("SUCCEEDED");
+        assertThat(result.resultUrl()).isEqualTo("https://haomaotoken.com/video.mp4");
+        assertThat(result.billingTokens()).isEqualTo(1234L);
+        assertThat(requests).hasSize(2);
+        assertThat(requests.get(0).getRequestUri()).endsWith("/api/v3/contents/generations/tasks");
+        assertThat(requests.get(1).getRequestUri()).endsWith("/api/v3/contents/generations/tasks/job-1");
+        for (var request : requests) assertThat(request.getFirstHeader("Authorization").getValue()).isEqualTo("Bearer " + key);
+        assertThat(requests.get(0).getFirstHeader("Idempotency-Key").getValue()).isEqualTo("submit-key");
+        assertThat(requests.get(1).getFirstHeader("Idempotency-Key").getValue()).isEqualTo("poll-key");
+        assertThat(((HttpPost) requests.getFirst()).getEntity().getContent().readAllBytes())
+                .containsExactly(persisted.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void volcengineBuildsMultimodalContentAndUsesDurationAndRatioFields() {
+        var assets = mock(AssetService.class);
+        when(assets.presignedReference(7L, "IMAGE")).thenReturn("https://storage.example/image.png");
+        when(assets.presignedReference(8L, "VIDEO")).thenReturn("https://storage.example/video.mp4");
+        var gateway = volcengineGateway(assets, mock(HttpClient.class));
+
+        var body = new ObjectMapper().valueToTree(gateway.buildSubmitRequest(new VideoDtos.Create(
+                "request-1", "商品旋转", List.of(7L), 8L, "SEEDANCE_2_0", "9:16", 5, "4K")));
+
+        assertThat(body.path("model").asText()).isEqualTo("seedance-2.0");
+        assertThat(body.path("duration").asInt()).isEqualTo(5);
+        assertThat(body.path("ratio").asText()).isEqualTo("9:16");
+        assertThat(body.path("resolution").asText()).isEqualTo("4k");
+        assertThat(body.has("seconds") || body.has("mode") || body.has("prompt") || body.has("input_reference")).isFalse();
+        assertThat(body.path("content").size()).isEqualTo(3);
+        assertThat(body.path("content").get(0).path("text").asText()).isEqualTo("商品旋转");
+        assertThat(body.path("content").get(1).path("image_url").path("url").asText()).endsWith("/image.png");
+        assertThat(body.path("content").get(2).path("type").asText()).isEqualTo("video_url");
+        assertThat(body.path("content").get(2).path("role").asText()).isEqualTo("reference_video");
+        assertThat(body.path("content").get(2).path("video_url").path("url").asText()).endsWith("/video.mp4");
+    }
+
+    @Test
+    void volcengineTextOnlyRequestOmitsAutomaticRatioAndDoesNotNeedAssets() {
+        var assets = mock(AssetService.class);
+        var body = new ObjectMapper().valueToTree(volcengineGateway(assets, mock(HttpClient.class))
+                .buildSubmitRequest(new VideoDtos.Create("request-1", "商品旋转", List.of(), null,
+                        "SEEDANCE_2_0_MINI", "auto", 5, "480p")));
+        assertThat(body.path("content").size()).isEqualTo(1);
+        assertThat(body.path("content").get(0).path("type").asText()).isEqualTo("text");
+        assertThat(body.has("ratio")).isFalse();
+        verifyNoInteractions(assets);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"status\":\"succeeded\"}",
+            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"http://haomaotoken.com/video.mp4\"}}",
+            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://127.0.0.1/video.mp4\"}}"})
+    void completedVolcengineTaskCannotImportAMissingOrUnsafeResult(String responseBody) throws Exception {
+        var http = mock(HttpClient.class);
+        jsonResponse(http, responseBody);
+        assertThatThrownBy(() -> volcengineGateway(mock(AssetService.class), http)
+                .poll("job-1", "SEEDANCE_2_0_MINI", "poll-key")).isInstanceOf(RuntimeException.class);
+        verify(http, times(1)).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
+    }
+
+    @Test
+    void volcengineCanReadWrappedContentArraysAndTotalTokenUsage() throws Exception {
+        var http = mock(HttpClient.class);
+        jsonResponse(http, "{\"data\":{\"status\":\"succeeded\",\"content\":[{\"type\":\"video_url\",\"video_url\":{\"url\":\"https://haomaotoken.com/video.mp4\"}}],\"usage\":{\"total_tokens\":900}}}");
+        var result = volcengineGateway(mock(AssetService.class), http).poll("job-1", "SEEDANCE_2_0_FAST", "poll-key");
+        assertThat(result.resultUrl()).isEqualTo("https://haomaotoken.com/video.mp4");
+        assertThat(result.billingTokens()).isEqualTo(900L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"queued", "running", "processing", "failed", "cancelled", "expired"})
+    void unfinishedOrFailedVolcengineTasksDoNotFetchVideoContent(String status) throws Exception {
+        var http = mock(HttpClient.class);
+        jsonResponse(http, "{\"status\":\"" + status + "\",\"error\":{\"code\":\"GenerationFailed\",\"message\":\"请调整提示词\"}}");
+        var result = volcengineGateway(mock(AssetService.class), http).poll("job-1", "SEEDANCE_2_0_FAST", "poll-key");
+        assertThat(result.resultUrl()).isNull();
+        assertThat(result.error()).isEqualTo("GenerationFailed: 请调整提示词");
+        assertThat(result.status()).isEqualTo(switch (status) {
+            case "expired" -> "FAILED";
+            case "processing" -> "RUNNING";
+            default -> status.toUpperCase();
+        });
+        verify(http, times(1)).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
+    }
+
+    @Test
+    void providerErrorsNeverReturnModelCredentialsToLogsOrTheUser() throws Exception {
+        var http = mock(HttpClient.class);
+        jsonResponse(http, "{\"data\":{\"status\":\"failed\",\"error\":{\"message\":\"invalid shared-key fast-key mini-key\"}}}");
+        var gateway = volcengineGateway(mock(AssetService.class), http);
+        assertThat(gateway.poll("job-1", "SEEDANCE_2_0_MINI", "poll-key").error())
+                .isEqualTo("invalid [redacted] [redacted] [redacted]");
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
+                .thenAnswer(invocation -> {
+                    var response = mock(ClassicHttpResponse.class);
+                    when(response.getCode()).thenReturn(401);
+                    when(response.getEntity()).thenReturn(new StringEntity("{\"error\":{\"message\":\"invalid mini-key\"}}",
+                            ContentType.APPLICATION_JSON));
+                    return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+                });
+        assertThatThrownBy(() -> gateway.submit("{\"model\":\"seedance-2.0-mini\"}", "submit-key"))
+                .isInstanceOf(VideoProviderGateway.ProviderHttpException.class)
+                .hasMessageContaining("[redacted]").hasMessageNotContaining("mini-key");
+    }
+
+    @Test
+    void modelCredentialsWorkWithoutACommonKeyAndAnUnconfiguredModelFailsBeforeHttp() throws Exception {
+        var http = mock(HttpClient.class);
+        jsonResponse(http, "{\"id\":\"job-1\",\"status\":\"queued\"}");
+        var gateway = volcengineGateway(mock(AssetService.class), http);
+        ReflectionTestUtils.setField(gateway, "apiKey", "");
+        assertThat(gateway.configured()).isTrue();
+        gateway.submit("{\"model\":\"seedance-2.0-mini\"}", "submit-key");
+        assertThatThrownBy(() -> gateway.submit("{\"model\":\"seedance-2.5\"}", "submit-key"))
+                .hasMessageContaining("密钥尚未配置");
+        assertThatThrownBy(() -> gateway.submit("{\"model\":\"unknown\"}", "submit-key"))
+                .hasMessageContaining("不支持");
+        assertThatThrownBy(() -> gateway.poll("job-1", "SEEDANCE_2_0", "poll-key"))
+                .hasMessageContaining("密钥尚未配置");
+        verify(http, times(1)).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
+    }
+
+    private void jsonResponse(HttpClient http, String body) throws Exception {
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
+                .thenAnswer(invocation -> {
+                    var response = mock(ClassicHttpResponse.class);
+                    when(response.getCode()).thenReturn(200);
+                    when(response.getEntity()).thenReturn(new StringEntity(body, ContentType.APPLICATION_JSON));
+                    return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+                });
+    }
+
+    private VideoProviderGateway volcengineGateway(AssetService assets, HttpClient http) {
+        var gateway = gateway(assets, http);
+        ReflectionTestUtils.setField(gateway, "baseUrl", "https://haomaotoken.com");
+        ReflectionTestUtils.setField(gateway, "protocol", "VOLCENGINE");
+        ReflectionTestUtils.setField(gateway, "providerName", "haomaotoken");
+        ReflectionTestUtils.setField(gateway, "submitPath", "/api/v3/contents/generations/tasks");
+        ReflectionTestUtils.setField(gateway, "pollPath", "/api/v3/contents/generations/tasks/{jobId}");
+        ReflectionTestUtils.setField(gateway, "apiKey", "shared-key");
+        ReflectionTestUtils.setField(gateway, "seedance20FastApiKey", "fast-key");
+        ReflectionTestUtils.setField(gateway, "seedance20MiniApiKey", "mini-key");
+        return gateway;
     }
 
     private VideoProviderGateway gateway(AssetService assets, HttpClient httpClient) {
@@ -143,6 +313,10 @@ class VideoProviderGatewayTest {
         ReflectionTestUtils.setField(gateway, "contentPath", "/v1/videos/{jobId}/content");
         ReflectionTestUtils.setField(gateway, "protocol", "CHAT_COMPLETIONS");
         ReflectionTestUtils.setField(gateway, "providerName", "onlyrouter");
+        ReflectionTestUtils.setField(gateway, "seedance25", "seedance-2.5");
+        ReflectionTestUtils.setField(gateway, "seedance20", "seedance-2.0");
+        ReflectionTestUtils.setField(gateway, "seedance20Fast", "seedance-2.0-fast");
+        ReflectionTestUtils.setField(gateway, "seedance20Mini", "seedance-2.0-mini");
         return gateway;
     }
 }

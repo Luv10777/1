@@ -8,6 +8,7 @@ import { get } from '../utils/request'
 import { assets as platformAssets, assetSource } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel } from '../services/videoConversations'
 import { billing, number, refreshBilling, requireMembership } from '../stores/billing'
+import { auth } from '../stores/auth'
 
 const avatarInput = ref(null)
 const assetsInput = ref(null)
@@ -118,6 +119,7 @@ const revokeBlob = item => {
 }
 
 const openAssetLibrary = async (type, target = 'assets') => {
+  if (!auth.requireLogin()) return
   libraryTarget.value = target
   libraryType.value = type
   libraryQuery.value = ''

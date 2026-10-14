@@ -45,4 +45,5 @@ public class AssetController {
     public ApiResponse<AssetDtos.DownloadTicket> downloadUrl(@PathVariable Long id) {
         return ApiResponse.ok(assetService.presignDownload(id));
     }
+
 }

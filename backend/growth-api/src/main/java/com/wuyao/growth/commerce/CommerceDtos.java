@@ -1,0 +1,63 @@
+package com.wuyao.growth.commerce;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.AssertTrue;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+
+public final class CommerceDtos {
+    private CommerceDtos() {}
+
+    public record RequestedItem(@NotNull @Min(1) Long productId, @Min(1) @Max(99) int quantity) {}
+    public record PlaceOrderRequest(
+            @NotEmpty @Size(max = 20) List<@Valid RequestedItem> items,
+            @NotBlank @Size(max = 80) String buyerName,
+            @NotBlank @Pattern(regexp = "[0-9+()\\- ]{6,20}") String buyerPhone,
+            @NotBlank @Size(max = 500) String shippingAddress,
+            @Size(max = 500) String buyerNote) {}
+
+    public record Line(Long productId, String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
+        static Line of(SalesOrderItem item) {
+            return new Line(item.getProductId(), item.getProductName(), item.getUnitPrice(), item.getQuantity(), item.getLineTotal());
+        }
+    }
+
+    public record Receipt(Long id, String orderNumber, String lookupToken, String status, BigDecimal totalAmount,
+                          String shippingCompany, String trackingNumber, List<Line> items, Instant createdAt) {
+        static Receipt of(SalesOrder order, List<SalesOrderItem> items, boolean includeToken) {
+            return new Receipt(order.getId(), order.getOrderNumber(), includeToken ? order.getLookupToken() : null,
+                    order.getStatus(), order.getTotalAmount(), order.getShippingCompany(), order.getTrackingNumber(),
+                    items.stream().map(Line::of).toList(), order.getCreatedAt());
+        }
+    }
+
+    public record MerchantOrder(Long id, String orderNumber, String buyerName, String buyerPhone,
+                                String shippingAddress, String shippingCompany, String trackingNumber,
+                                String buyerNote, String status, BigDecimal totalAmount,
+                                List<Line> items, Instant createdAt, Instant updatedAt) {
+        static MerchantOrder of(SalesOrder order, List<SalesOrderItem> items) {
+            return new MerchantOrder(order.getId(), order.getOrderNumber(), order.getBuyerName(), order.getBuyerPhone(),
+                    order.getShippingAddress(), order.getShippingCompany(), order.getTrackingNumber(), order.getBuyerNote(),
+                    order.getStatus(), order.getTotalAmount(),
+                    items.stream().map(Line::of).toList(), order.getCreatedAt(), order.getUpdatedAt());
+        }
+    }
+
+    public record StatusRequest(@NotBlank @Pattern(regexp = "CONFIRMED|SHIPPED|COMPLETED|CANCELLED") String status,
+                                @Size(max = 60) String shippingCompany,
+                                @Size(max = 120) String trackingNumber) {
+        @AssertTrue(message = "标记发货前请填写承运方或配送方式")
+        public boolean shippingCompanyRequiredForShipment() {
+            return !"SHIPPED".equals(status) || (shippingCompany != null && !shippingCompany.isBlank());
+        }
+    }
+}

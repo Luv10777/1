@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Wallet, ArrowUpRight, Store, FilePenLine } from 'lucide-vue-next'
+import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound } from 'lucide-vue-next'
 import { billing, number, refreshBilling } from '../stores/billing'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
@@ -22,10 +22,10 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
-const needsStore = computed(() => billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
+const needsStore = computed(() => auth.isAuthenticated && billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
 // 侧边栏和顶栏显示的是当前登录的人：名字来自会话，头像取名字的第一个字。
-const userName = computed(() => auth.user?.name || '未命名用户')
+const userName = computed(() => auth.isAuthenticated ? auth.user?.name || '未命名用户' : '登录')
 const userInitial = computed(() => userName.value.slice(0, 1))
 // Reviews is a long-form feed and must use the shell's normal page scrolling.
 // Keeping it in the edge-workspace list applies overflow:hidden and prevents
@@ -72,7 +72,6 @@ const navGroups = [
       { name: 'image-create', label: '图片创作', path: '/image/create' },
       { name: 'video-create', label: '视频创作', path: '/video/create' },
       { name: 'digital-human', label: '实景直播', path: '/digital-human' },
-      { name: 'copy-rewrite', label: '文案提取 / 仿写 / 重写', path: '/copy/rewrite' },
       { name: 'video-analyze', label: '视频反推', path: '/video/analyze' },
     ],
   },
@@ -112,6 +111,7 @@ const navGroups = [
       { name: 'brands', label: '品牌库', path: '/brands' },
       { name: 'merchants', label: '门店库', path: '/merchants' },
       { name: 'products', label: '商品库', path: '/assets/products' },
+      { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'knowledge', label: '知识库', path: '/knowledge' },
       { name: 'assets', label: '素材库', path: '/assets' },
       { name: 'works', label: '作品库', path: '/works' },
@@ -123,17 +123,16 @@ const navGroups = [
     items: [
       { name: 'billing', label: '套餐与权益', path: '/billing' },
       { name: 'merchant-alliance', label: '商家联盟', path: '/merchant-alliance' },
+      { name: 'information-publishing', label: '信息发布', path: '/information-publishing' },
     ],
   },
   {
     key: 'system',
     label: '系统',
     items: [
-      { name: 'notifications', label: '消息', path: '/notifications' },
       { name: 'tasks', label: '任务中心', path: '/tasks' },
       { name: 'team', label: '员工管理', path: '/team', ownerOnly: true },
       { name: 'settings', label: '系统设置', path: '/settings' },
-      { name: 'help', label: '帮助与反馈', path: '/help' },
     ],
   },
 ].filter(group => !['workspace', 'analytics', 'acquisition', 'publishing', 'customer-service', 'geo'].includes(group.key))
@@ -195,8 +194,9 @@ const expandActiveGroup = () => {
 // 只有管理员能用的入口对店员收起；接口本身也会拒绝。
 const canSee = item => !item.ownerOnly || auth.isOwner
 const closeMenu = () => { menuOpen.value = false }
-// 先等会话清掉再跳转，否则路由守卫看到的还是已登录，会把人送回内容工具而不是登录页。
-const logout = async () => { await auth.logout(); router.push({ name: 'login' }) }
+// 清掉会话后返回可直接浏览的功能首页。
+const loginLocation = computed(() => ({ name: 'login', query: { redirect: route.fullPath } }))
+const logout = async () => { await auth.logout(); accountOpen.value = false; router.push('/image/create') }
 </script>
 
 <template>
@@ -207,7 +207,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
         <RouterLink to="/image/create" class="brand-link" aria-label="一方志内容工具"><span class="brand-mark seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="brand-copy"><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
         <button class="icon-button sidebar-close" aria-label="关闭导航" @click="closeMenu">×</button>
       </div>
-      <div class="tenant-switcher paper-tenant" :class="{ switchable: stores.length > 1 }">
+      <div v-if="auth.isAuthenticated" class="tenant-switcher paper-tenant" :class="{ switchable: stores.length > 1 }">
         <span class="tenant-avatar">{{ selectedStoreRecord?.name?.slice(0, 1) || '店' }}</span>
         <span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span>
         <template v-if="stores.length > 1">
@@ -275,11 +275,12 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
       </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
-        <RouterLink :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
+        <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
           <Wallet :size="18" class="sidebar-yanhuo-icon" />
           <div class="sidebar-yanhuo-copy"><div><span>可用烟火</span><ArrowUpRight :size="14" /></div><strong>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong><p>{{ billing.error ? '账户暂不可读' : billing.summary?.memberActive ? billing.summary.plan?.name : billing.summary?.plan ? '会员已到期' : '尚未开通会员' }}<span v-if="billing.summary?.held"> · 预占 {{ number(billing.summary.held) }}</span></p><span class="sidebar-yanhuo-action">套餐与充值</span></div>
         </RouterLink>
-        <div class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ userInitial }}</span><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ userInitial }}</span><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
       </div>
     </aside>
     <main class="main-area paper-main">
@@ -290,13 +291,11 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
           <RouterLink to="/image/create" class="header-brand" aria-label="一方志内容工具"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
-            <select v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select>
+            <select v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select>
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
             <RouterLink to="/information-publishing" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
-            <button class="help-button" aria-label="帮助中心" @click="router.push('/help')">?</button>
-            <button class="notification-button" aria-label="通知" @click="router.push('/notifications')">◌<span class="notification-dot" /></button>
-            <button class="top-account" aria-label="账户设置" @click="router.push('/settings')"><span class="user-avatar small">{{ userInitial }}</span><span class="top-account-name">{{ userName }}</span></button>
+            <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><span class="user-avatar small"><template v-if="auth.isAuthenticated">{{ userInitial }}</template><UserRound v-else :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
           </div>
         </div>
       </header>
@@ -331,7 +330,7 @@ const logout = async () => { await auth.logout(); router.push({ name: 'login' })
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
-@media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } .topbar .help-button { display: none; } }
-@media (max-width: 860px) { .topbar .header-store, .topbar .notification-button, .topbar .top-account { display: none; } }
+@media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
+@media (max-width: 860px) { .topbar .header-store, .topbar .top-account { display: none; } }
 @media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 11px; } .topbar-entry svg { display: none; } .topbar .header-brand strong { display: none; } }
 </style>

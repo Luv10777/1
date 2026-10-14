@@ -588,7 +588,7 @@ class FoundationIntegrationTest {
         assertThat(owner.queryForObject("select count(*) from tasks where idempotency_key like 'video-poll-%-retry-1-%'", Integer.class)).isEqualTo(1);
         var poll = tasks.claim("VIDEO_PROVIDER", 1).getFirst();
         var provider = mock(VideoProviderGateway.class);
-        when(provider.poll(eq("job-original"), anyString())).thenReturn(
+        when(provider.poll(eq("job-original"), anyString(), anyString())).thenReturn(
                 new VideoProviderGateway.PollResult("SUCCEEDED", "https://media.example/fresh.mp4", null));
 
         TenantContext.runAs(tenantA, () -> new VideoPollHandler(videoWorkflows, provider, videoWorkflowRepository).handle(poll));

@@ -1,8 +1,6 @@
-import { post } from '../utils/request.js'
+import { del, get, post, put } from '../utils/request.js'
 
-// 前端提交契约：由后端保存申请并返回 { id, status: 'PENDING_REVIEW' }。
-// growth-api 尚未实现这两个接口；不使用浏览器存储或模拟回执兜底。
-async function submitForReview(endpoint, values) {
+async function submit(endpoint, values, expectedStatus) {
   let receipt
   try {
     receipt = await post(endpoint, values)
@@ -15,13 +13,19 @@ async function submitForReview(endpoint, values) {
     }
     throw failure
   }
-  if (!receipt?.id || receipt.status !== 'PENDING_REVIEW') {
-    throw new Error('未收到有效的提交回执，请保留当前内容并联系平台确认。')
+  if (!receipt?.id || receipt.status !== expectedStatus) {
+    throw new Error('未收到有效的业务回执，请保留当前内容并联系平台确认。')
   }
   return receipt
 }
 
 export const businessCommunityService = {
-  submitInformation: values => submitForReview('/api/information-publications', values),
-  applyForAlliance: values => submitForReview('/api/merchant-alliance/applications', values),
+  submitInformation: values => submit('/api/information-publications', values, 'PUBLISHED'),
+  applyForAlliance: values => submit('/api/merchant-alliance/applications', values, 'PENDING_REVIEW'),
+  applications: () => get('/api/merchant-alliance/applications'),
+  publications: () => get('/api/information-publications'),
+  updatePublication: (id, values) => put(`/api/information-publications/${id}`, values),
+  takePublicationOffline: id => del(`/api/information-publications/${id}`),
+  publicFeed: params => get('/api/public/information', Object.fromEntries(Object.entries(params || {}).filter(([, value]) => value != null && value !== ''))),
+  publicInformation: id => get(`/api/public/information/${id}`),
 }

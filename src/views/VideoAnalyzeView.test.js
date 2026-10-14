@@ -51,7 +51,11 @@ test('merchant edits immediately update the real view, copy, export and generati
       ], audioAnalyzed: true, audio: { status: 'ANALYZED', summary: '原口播清晰', speech: '自然口播', music: '轻音乐', ambience: '无',
         transcript: [{ start: 0, end: 6, text: '旧牌新品，活动 99 元，欢迎选购。' }], effects: [], limitations: [] } } })
   let app
+  let auth
   try {
+    ;({ auth } = await vite.ssrLoadModule('/src/stores/auth.js'))
+    auth.state.user = { id: 1, tenantId: 7 }
+    auth.state.token = { accessToken: 'test-only' }
     const { videoAnalysisApi } = await vite.ssrLoadModule('/src/services/videoAnalysis.js')
     videoAnalysisApi.limits = async () => ({ configured: true, maxDurationSeconds: 60, maxBytes: 104857600 })
     videoAnalysisApi.list = async () => ({ items: [] })
@@ -109,6 +113,7 @@ test('merchant edits immediately update the real view, copy, export and generati
     assert.doesNotMatch(copyText(), /上条记录的口播|欢喜/)
   } finally {
     app?.unmount()
+    if (auth) { auth.state.user = null; auth.state.token = null }
     URL.createObjectURL = savedCreateUrl
     for (const [key, descriptor] of Object.entries(savedGlobals)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor)

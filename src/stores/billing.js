@@ -46,6 +46,7 @@ export async function loadBillingPlans() {
 }
 
 export async function requireMembership() {
+  if (!auth.requireLogin()) throw new Error('请先登录后开始创作')
   const account = await refreshBilling()
   if (!account) throw new Error(billing.error || '暂时无法确认会员状态，请稍后重试')
   if (!account.memberActive) throw membershipRequired()

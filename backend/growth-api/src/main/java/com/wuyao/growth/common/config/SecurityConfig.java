@@ -39,6 +39,7 @@ public class SecurityConfig {
                                 "/api/player/ws",
                                 "/api/player/test-audio.wav",
                                 "/api/player/audio/**",
+                                "/api/public/**",
                                 "/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {

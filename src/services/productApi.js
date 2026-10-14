@@ -12,6 +12,8 @@ export function productPayload(values, update = false) {
     specification: values.specifications || '',
     promotionRule: values.promotion || '',
     coreSellingPoints: values.points || '',
+    inventory: values.inventory === '' || values.inventory == null ? null : Number(values.inventory),
+    onlineStatus: values.onlineStatus || 'DRAFT',
     images: (values.images || []).map((image, sortOrder) => {
       if (!image?.assetId) throw new Error('商品图片尚未上传完成，请重新上传。')
       return { assetId: image.assetId, sortOrder }
@@ -48,6 +50,8 @@ export function createProductApi({ request = defaultRequest, fetch: uploadFetch 
       specifications: product.specification || '',
       promotion: product.promotionRule || '',
       points: product.coreSellingPoints || '',
+      inventory: product.inventory == null ? '' : product.inventory,
+      onlineStatus: product.onlineStatus || 'DRAFT',
       faqs: (product.faqs || []).map(faqFromApi),
       images: await Promise.all((product.images || []).map(async image => {
         // A preview failure must not report a committed product save as failed.
