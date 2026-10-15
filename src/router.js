@@ -108,10 +108,20 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
+export function handleAuthExpired() {
+  auth.clearSession()
+  const current = router.currentRoute.value
+  if (!current.matched.length || current.meta.public || (current.meta.guest && !inDesktop)) return
+  return router.replace({ name: 'login', query: { redirect: current.fullPath } })
+}
+
 router.beforeEach(async (to, from) => {
   if (to.meta.public) {
     const wechatCallback = [to, from].some(location => location.query.wechat_ticket || location.hash.startsWith('#wechat_ticket=') || location.query.wechat_error)
-    if (to.name === 'login' && auth.isAuthenticated && !wechatCallback) return { name: inDesktop ? 'digital-human' : 'image-create' }
+    if (to.name === 'login' && !wechatCallback) {
+      const savedHomeLogin = !inDesktop && !from.matched.length && to.query.redirect === '/dashboard' && !to.query.mode
+      if (auth.isAuthenticated || savedHomeLogin) return { name: inDesktop ? 'digital-human' : 'image-create' }
+    }
     return true
   }
 

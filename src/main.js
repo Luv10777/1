@@ -1,7 +1,7 @@
 import './utils/crypto-polyfill.js'
 import { createApp } from 'vue'
 import App from './App.vue'
-import router from './router'
+import router, { handleAuthExpired } from './router'
 import { theme } from './stores/theme'
 import { auth } from './stores/auth'
 import './style.css'
@@ -29,10 +29,7 @@ window.addEventListener('login-required', () => {
   if (router.currentRoute.value.name !== 'login') router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
 })
 
-window.addEventListener('auth-expired', () => {
-  auth.clearSession()
-  if (router.currentRoute.value.name !== 'login') router.replace({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
-})
+window.addEventListener('auth-expired', handleAuthExpired)
 
 async function startApp() {
   if (auth.isAuthenticated) await auth.restore()
