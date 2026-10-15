@@ -1,9 +1,11 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { Store, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
+import { auth } from '../stores/auth'
+import MerchantFeaturedProduct from '../components/MerchantFeaturedProduct.vue'
 
 const industries = ['餐饮 / 茶饮', '零售 / 生活服务', '家居 / 家装', '美妆 / 个护', '文旅 / 休闲', '企业服务', '其他']
 const blankForm = () => ({ merchantName: selectedStoreRecord.value?.name || '', companyName: '', industry: '', region: '', creditCode: '', contactName: '', contactPhone: '', introduction: '', declarationAccepted: false })
@@ -21,13 +23,19 @@ async function loadApplications() {
   finally { applicationsLoading.value = false }
 }
 
-onMounted(loadApplications)
+onMounted(() => { if (auth.isAuthenticated) loadApplications() })
+watch(() => auth.isAuthenticated, signedIn => {
+  if (signedIn) loadApplications()
+  else { applications.value = []; applicationsError.value = '' }
+})
 </script>
 
 <template>
   <div class="business-page merchant-alliance-page">
-    <header class="business-heading"><div><p class="business-overline"><Store :size="15" aria-hidden="true" />商家入驻</p><h1>商家联盟</h1><p>汇集一方商家，记录真实经营，连接活动与合作机会。</p></div><RouterLink to="/information-publishing" class="business-link">发布信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
-    <section class="business-records" aria-labelledby="merchant-applications-title">
+    <header class="business-heading"><div><p class="business-overline"><Store :size="15" aria-hidden="true" />一方志 · 商家联盟</p><h1>一方好物，一起经营。</h1><p>发现商家实物商品，也让你的好生意被更多人看见。</p></div><RouterLink to="/information" class="business-link">浏览商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
+    <MerchantFeaturedProduct />
+    <header id="merchant-application" class="merchant-application-heading"><div><span class="merchant-section-index">02 / 商家入驻</span><h2>成为一方商家</h2><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></header>
+    <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
       <div class="business-records-heading"><div><span>APPLICATION STATUS</span><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>
       <p v-else-if="applicationsLoading && !applications.length" class="business-record-empty" role="status">正在读取申请记录…</p>
@@ -36,10 +44,10 @@ onMounted(loadApplications)
     </section>
     <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
     <template v-else>
-      <section class="merchant-alliance-intro"><div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h2>让一方好生意，<br />遇见更多同行。</h2><p>建立商家档案，展示经营特色，让活动、供求与合作需求被更多人看见。</p><RouterLink to="/merchants" class="business-link">管理门店资料<ArrowRight :size="15" aria-hidden="true" /></RouterLink></div><img class="merchant-alliance-photo" src="/images/publishing/restaurant.jpg" alt="街边小店内的桌椅和暖灯" /></section>
       <ol class="business-process" aria-label="商家入驻流程"><li class="is-current"><span>01</span><strong>填写申请</strong></li><li><span>02</span><strong>资料审核</strong></li><li><span>03</span><strong>入驻联盟</strong></li></ol>
       <div class="business-editor-layout">
-        <form ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
+        <section v-if="!auth.isAuthenticated" class="merchant-application-login"><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h3>为每一方商家立传</h3><p>登录后填写经营主体与联系人资料，提交入驻申请并查看审核进度。</p><RouterLink :to="{ name: 'login', query: { redirect: '/merchant-alliance' } }" class="business-button business-button-primary">登录并申请入驻<ArrowRight :size="16" aria-hidden="true" /></RouterLink><span>购买上方商品无需登录</span></section>
+        <form v-else ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
           <fieldset class="business-form-fields" :disabled="submitting">
             <section class="business-form-section">
               <div class="business-section-title"><span>01</span><h2>商家基本资料</h2></div>
@@ -60,7 +68,7 @@ onMounted(loadApplications)
         </form>
         <aside class="business-preview-column">
           <section class="merchant-preparation"><div class="business-section-title"><FileCheck2 :size="19" aria-hidden="true" /><h2>入驻流程</h2></div><ol><li><span>1</span><div><strong>填写商家资料</strong><p>填写经营主体、统一社会信用代码与商家介绍。</p></div></li><li><span>2</span><div><strong>平台审核</strong><p>核对经营主体与申请资料，必要时联系申请人补充材料。</p></div></li><li><span>3</span><div><strong>入驻商家联盟</strong><p>审核通过后建立商家档案，开展信息展示与合作交流。</p></div></li></ol><p class="business-footnote">请确保商家资料与实际经营情况一致，联系电话可正常接通。</p></section>
-          <RouterLink to="/information-publishing" class="merchant-next-step"><FilePenLine :size="23" aria-hidden="true" /><div><strong>发布商家信息</strong><p>分享门店活动、合作机会与供求需求。</p></div><ArrowRight :size="17" aria-hidden="true" /></RouterLink>
+          <RouterLink to="/information" class="merchant-next-step"><FilePenLine :size="23" aria-hidden="true" /><div><strong>逛逛商家信息广场</strong><p>了解门店活动、合作机会与供求需求。</p></div><ArrowRight :size="17" aria-hidden="true" /></RouterLink>
         </aside>
       </div>
     </template>

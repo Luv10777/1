@@ -125,6 +125,83 @@
 .merchant-next-step strong { font-size: 13px; font-weight: 500; }
 .merchant-next-step p { margin: 7px 0 0; color: var(--ink-muted); font-size: 11px; line-height: 1.7; }
 .merchant-next-step:hover strong { color: var(--color-accent-text); }
+.merchant-section-index { color: var(--ink-muted); font: 11px/1.6 var(--font-sans); letter-spacing: .08em; }
+.merchant-goods { margin: 32px 0 48px; }
+.merchant-goods-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+.merchant-goods-heading h2 { margin: 8px 0 0; font: 500 clamp(19px, 2vw, 24px)/1.5 var(--font-serif); text-wrap: pretty; }
+.merchant-goods-caption { display: flex; align-items: center; gap: 7px; padding-bottom: 4px; color: var(--ink-muted); font-size: 11px; white-space: nowrap; }
+.merchant-featured-product { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--night-panel); }
+.merchant-product-gallery { min-width: 0; padding: 24px; border-right: 1px solid var(--line); }
+.merchant-product-photo { position: relative; display: grid; place-items: center; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.merchant-product-photo > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.merchant-photo-label { position: absolute; bottom: 12px; left: 12px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--night-panel); color: var(--ink-muted); font-size: 10px; }
+.merchant-photo-empty { padding: 20px; color: var(--color-text-muted); font-size: 12px; }
+.merchant-product-thumbnails { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.merchant-product-thumbnails > button { display: grid; place-items: center; width: 56px; height: 56px; padding: 3px; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: #fff; }
+.merchant-product-thumbnails > button[aria-pressed='true'] { border-color: var(--color-accent); outline: 1px solid var(--color-accent); outline-offset: 2px; }
+.merchant-product-thumbnails > button > img { width: 100%; height: 100%; object-fit: contain; }
+.merchant-product-thumbnails > span { margin-left: auto; color: var(--ink-muted); font: 10px var(--font-mono); }
+.merchant-product-copy { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 32px 36px; }
+.merchant-product-kicker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; color: var(--ink-muted); font-size: 11px; }
+.merchant-product-kicker > span + span { padding-left: 9px; border-left: 1px solid var(--line); }
+.merchant-product-copy h3 { margin: 0; font: 600 clamp(26px, 3vw, 38px)/1.4 var(--font-serif); letter-spacing: .02em; overflow-wrap: anywhere; text-wrap: pretty; }
+.merchant-product-description { margin: 16px 0 0; color: var(--ink-muted); font-size: 13px; line-height: 1.9; text-wrap: pretty; }
+.merchant-product-specification { margin: 10px 0 0; color: var(--ink-muted); font-size: 11px; line-height: 1.8; text-wrap: pretty; }
+.merchant-product-price { display: flex; align-items: baseline; gap: 5px; margin: 24px 0; color: var(--color-accent-text); }
+.merchant-product-price > span { font-size: 20px; }
+.merchant-product-price > strong { font: 500 clamp(30px, 3vw, 38px)/1.2 var(--font-mono); letter-spacing: -.05em; }
+.merchant-product-price > small { margin-left: 6px; color: var(--ink-muted); font-size: 12px; }
+.merchant-product-facts { display: grid; gap: 13px; padding: 20px 0; margin: 0 0 24px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11px; line-height: 1.7; }
+.merchant-product-facts > div { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 14px; }
+.merchant-product-facts dt { color: var(--ink-muted); }
+.merchant-product-facts dd { display: flex; align-items: center; gap: 6px; margin: 0; overflow-wrap: anywhere; }
+.merchant-product-facts dd svg { flex-shrink: 0; color: var(--ink-muted); }
+.merchant-product-purchase { display: flex; gap: 12px; }
+.merchant-quantity { display: flex; align-items: center; flex-shrink: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 4px; }
+.merchant-quantity button { display: grid; place-items: center; width: 34px; height: 42px; padding: 0; border: 0; background: transparent; color: var(--ink); }
+.merchant-quantity button:disabled { color: var(--ink-muted); opacity: .4; cursor: not-allowed; }
+.merchant-quantity button:hover:not(:disabled) { background: var(--color-bg-subtle); }
+.merchant-quantity output { min-width: 28px; text-align: center; font: 12px var(--font-mono); }
+.merchant-buy-button { flex: 1; min-height: 44px; font-size: 13px; }
+.merchant-buy-button:disabled { cursor: not-allowed; }
+.merchant-buy-button > svg:last-child { margin-left: auto; }
+.merchant-product-order-note { display: flex; align-items: flex-start; gap: 6px; margin: 12px 0 0; color: var(--ink-muted); font-size: 10px; line-height: 1.8; }
+.merchant-product-order-note > svg { flex-shrink: 0; margin-top: 2px; }
+.merchant-shop-link { align-self: flex-start; margin-top: 20px; font-size: 11px; }
+.merchant-goods-state { display: grid; justify-items: center; gap: 12px; min-height: 220px; padding: 32px 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel); color: var(--ink-muted); text-align: center; }
+.merchant-goods-state > p { margin: 0; font-size: 12px; line-height: 1.8; }
+.merchant-application-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 24px; padding-top: 32px; border-top: 1px solid var(--line); }
+.merchant-application-heading h2 { margin: 8px 0 10px; font: 600 26px/1.4 var(--font-serif); }
+.merchant-application-heading p { margin: 0; color: var(--ink-muted); font-size: 12px; line-height: 1.8; text-wrap: pretty; }
+.merchant-application-heading .merchant-alliance-seal { width: 36px; height: 36px; margin: 0; flex-shrink: 0; }
+.merchant-application-login { display: flex; flex-direction: column; align-items: flex-start; padding: 36px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel); }
+.merchant-application-login h3 { margin: 2px 0 14px; font: 600 24px/1.5 var(--font-serif); }
+.merchant-application-login p { max-width: 390px; margin: 0 0 28px; color: var(--ink-muted); font-size: 13px; line-height: 1.9; text-wrap: pretty; }
+.merchant-application-login > span:last-child { margin-top: 12px; color: var(--ink-muted); font-size: 11px; }
+.merchant-checkout-dialog { position: fixed; inset: 0; z-index: 1000; }
+.merchant-checkout-backdrop { position: fixed; inset: 0; background: rgb(30 27 23 / 38%); }
+.merchant-checkout-position { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; overflow-y: auto; }
+.merchant-checkout-panel { position: relative; width: min(100%, 520px); max-height: calc(100dvh - 48px); padding: 28px; border: 1px solid var(--line); border-radius: 8px; overflow-y: auto; background: var(--night-panel); color: var(--ink); }
+.merchant-checkout-panel > header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.merchant-checkout-panel h2 { margin: 6px 0 0; font: 600 23px/1.5 var(--font-serif); }
+.merchant-checkout-panel > header > button { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--ink-muted); }
+.merchant-checkout-description { margin: 14px 0 20px; color: var(--ink-muted); font-size: 12px; line-height: 1.8; }
+.merchant-checkout-item { display: flex; align-items: center; gap: 12px; padding: 14px 0; margin-bottom: 24px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.merchant-checkout-item > img { display: block; flex-shrink: 0; width: 60px; height: 60px; border: 1px solid var(--line); border-radius: 4px; object-fit: contain; background: #fff; }
+.merchant-checkout-item > div { display: grid; gap: 8px; min-width: 0; }
+.merchant-checkout-item strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.merchant-checkout-item span { color: var(--ink-muted); font: 11px var(--font-mono); }
+.merchant-checkout-item > strong { margin-left: auto; flex-shrink: 0; font: 12px var(--font-mono); }
+.merchant-checkout-panel .business-field { margin-bottom: 16px; }
+.merchant-checkout-panel form > footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 20px; margin-top: 24px; border-top: 1px solid var(--line); }
+.merchant-checkout-panel form > footer > span { display: grid; gap: 6px; color: var(--ink-muted); font-size: 11px; }
+.merchant-checkout-panel form > footer strong { color: var(--ink); font: 16px var(--font-mono); }
+.merchant-checkout-error { margin: 16px 0 0; font-size: 12px; line-height: 1.8; }
+.merchant-checkout-result > p { margin: 16px 0; color: var(--ink-muted); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.merchant-product-thumbnails button:focus-visible, .merchant-quantity button:focus-visible, .merchant-checkout-panel > header > button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+@media (max-width: 1100px) { .merchant-product-copy { padding: 24px; } .merchant-product-gallery { padding: 18px; } }
+@media (max-width: 760px) { .merchant-featured-product { grid-template-columns: minmax(0, 1fr); } .merchant-product-gallery { border-right: 0; border-bottom: 1px solid var(--line); } .merchant-product-photo { max-width: 480px; margin: 0 auto; } .merchant-product-copy { padding: 24px; } .merchant-goods { margin-top: 24px; margin-bottom: 32px; } .merchant-goods-heading { align-items: flex-start; flex-direction: column; gap: 10px; } .merchant-product-copy h3 { font-size: 30px; } .merchant-application-login { padding: 24px; } }
+@media (max-width: 640px) { .merchant-checkout-position { padding: 12px; } .merchant-checkout-panel { max-height: calc(100dvh - 24px); padding: 22px 18px; } .merchant-checkout-panel .business-field-grid { gap: 0; } .merchant-checkout-panel .business-field-grid > .business-field:last-child { margin-bottom: 16px; } .merchant-goods-heading h2 { font-size: 20px; } .merchant-product-copy { padding: 22px 18px; } .merchant-application-heading { padding-top: 24px; } }
 @media (max-width: 1100px) { .business-editor-layout { grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; } .business-form-section { padding: 20px; } .business-categories small { display: none; } }
 @media (max-width: 960px) { .business-editor-layout { grid-template-columns: minmax(0, 1fr); } .business-preview-column { grid-template-columns: minmax(0, 1fr) minmax(220px, .7fr); align-items: start; } .business-writing-guide { padding: 20px 0; } }
 @media (max-width: 640px) { .business-records { padding:15px; } .business-record-list>li { align-items:flex-start; flex-wrap:wrap; } .business-record-main { flex-basis:calc(100% - 95px); } .business-record-actions { width:100%; justify-content:flex-end; } .business-heading-links { align-self:stretch; justify-content:flex-start; } .business-heading h1 { font-size: 28px; } .business-process { justify-content: space-between; gap: 10px; } .business-process li { flex: initial; gap: 5px; } .business-process li + li::before { display: none; } .business-process strong { font-size: 11px; } .business-form-section { padding: 18px; } .business-field-grid { grid-template-columns: minmax(0, 1fr); } .business-field-grid > .business-field:last-child { margin-bottom: 20px; } .business-preview-column { grid-template-columns: minmax(0, 1fr); } .business-writing-guide { padding: 0 4px; } .business-form-actions { padding: 16px 18px; } .business-form-actions > div { margin-left: auto; } .business-declaration { padding: 18px; } .business-form-feedback { margin-left: 18px; margin-right: 18px; } .business-categories { gap: 8px; } .business-categories label { padding: 11px 9px; } .business-categories label > svg { display: none; } .merchant-alliance-intro { grid-template-columns: minmax(0, 1fr); } .merchant-alliance-intro > div { padding: 24px; } .merchant-alliance-photo { min-height: 0; height: 160px; } }

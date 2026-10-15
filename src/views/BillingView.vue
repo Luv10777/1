@@ -164,7 +164,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <span class="yanhuo-status" :class="{ active: account.memberActive }"><span />{{ membershipLabel }}</span>
           <h2>{{ account.plan?.name || '会员套餐待订阅' }}</h2>
           <p v-if="account.memberUntil">有效期至 {{ dateTime(account.memberUntil) }}</p>
-          <p v-else>平台各模块均需先开通会员，再按对应规则使用烟火。</p>
+          <p v-else>信息发布与商品购买无需会员；AI 创作需开通会员，再按规则使用烟火。</p>
           <div class="yanhuo-entitlements"><span :class="{ enabled: account.memberActive && account.plan?.imageEnabled }"><Check :size="14" />图片创作</span><span :class="{ enabled: account.memberActive && account.plan?.videoEnabled }"><Check :size="14" />视频创作</span></div>
         </div>
         <div class="yanhuo-rules">
@@ -177,7 +177,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
       <section id="topup" class="yanhuo-topup">
         <div class="yanhuo-section-title"><h2>添一份烟火</h2><p>充值烟火</p></div>
-        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用平台功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
         <form @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small>{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
           <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : paymentLabel }}</button></div>

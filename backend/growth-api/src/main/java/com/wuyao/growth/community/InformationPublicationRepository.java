@@ -11,7 +11,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface InformationPublicationRepository extends JpaRepository<InformationPublication, Long> {
-    List<InformationPublication> findAllByOrderByCreatedAtDescIdDesc();
+    List<InformationPublication> findAllByTenantIdOrderByCreatedAtDescIdDesc(Long tenantId);
+
+    Optional<InformationPublication> findByIdAndTenantId(Long id, Long tenantId);
 
     @Query("select i from InformationPublication i where i.status = 'PUBLISHED' " +
             "and (i.validUntil is null or i.validUntil >= :today) " +

@@ -1,9 +1,12 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { FilePenLine, Eye, MapPin, Store, ArrowRight, Send, Check, CheckCircle2, ExternalLink, Pencil, RefreshCw, X } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
+import { auth } from '../stores/auth'
+import { informationDate, publicationState } from '../utils/informationPresentation'
+import InformationContent from '../components/InformationContent.vue'
 
 const categories = [
   { value: 'activity', label: '门店活动', description: '新品、到店体验与店内活动' },
@@ -24,13 +27,21 @@ const previewOpen = ref(false)
 const previewPanel = ref(null)
 const categoryLabel = computed(() => categories.find(item => item.value === form.category)?.label || '商家信息')
 const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+let recordsVersion = 0
 
 async function loadPublications() {
+  if (!auth.isAuthenticated) return
+  const attempt = ++recordsVersion
   publicationsLoading.value = true
   publicationsError.value = ''
-  try { publications.value = await businessCommunityService.publications() }
-  catch (failure) { publicationsError.value = failure.message || '发布记录暂时无法读取。' }
-  finally { publicationsLoading.value = false }
+  try {
+    const result = await businessCommunityService.publications()
+    if (attempt === recordsVersion) publications.value = result
+  } catch (failure) {
+    if (attempt === recordsVersion) publicationsError.value = failure.message || '发布记录暂时无法读取。'
+  } finally {
+    if (attempt === recordsVersion) publicationsLoading.value = false
+  }
 }
 
 function editPublication(item) {
@@ -42,7 +53,7 @@ function editPublication(item) {
     summary: item.summary || '', content: item.content, contactName: item.contactName || '',
     contactPhone: item.contactPhone || '', validUntil: item.validUntil || '', declarationAccepted: true,
   })
-  nextTick(() => editor.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  nextTick(() => editor.value?.querySelector('input[name="information-title"]')?.focus())
 }
 
 async function takeOffline(item) {
@@ -57,13 +68,22 @@ async function takeOffline(item) {
 watch(receipt, value => {
   if (value) loadPublications()
 })
-onMounted(loadPublications)
+watch(() => `${auth.tenantId}:${auth.user?.id}`, () => {
+  recordsVersion++
+  publications.value = []
+  publicationsError.value = ''
+  publicationsLoading.value = false
+  editingPublication.value = null
+  actionError.value = ''
+  loadPublications()
+}, { immediate: true })
+onBeforeUnmount(() => { recordsVersion++ })
 
 async function preview() {
   previewOpen.value = !previewOpen.value
   if (previewOpen.value) {
     await nextTick()
-    previewPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    previewPanel.value?.focus()
   }
 }
 
@@ -86,12 +106,12 @@ function startInformation() {
       <p v-if="publicationsError" class="business-message-error" role="alert">{{ publicationsError }}</p>
       <p v-else-if="publicationsLoading && !publications.length" class="business-record-empty" role="status">正在读取发布记录…</p>
       <p v-else-if="!publications.length" class="business-record-empty">已发布的活动、供求和合作信息会显示在这里。</p>
-      <ul v-else class="business-record-list"><li v-for="item in publications" :key="item.id"><div class="business-record-main"><span class="business-category-tag">{{ categories.find(category => category.value === item.category)?.label || '商家信息' }}</span><strong>{{ item.title }}</strong><small>{{ item.merchantName }} · {{ item.region }} · {{ new Date(item.publishedAt || item.createdAt).toLocaleDateString('zh-CN') }}</small></div><span class="business-record-status" :class="item.status === 'PUBLISHED' ? 'is-published' : 'is-offline'">{{ item.status === 'PUBLISHED' ? '公开中' : '已下架' }}</span><div class="business-record-actions"><RouterLink v-if="item.status === 'PUBLISHED'" :to="`/information/${item.id}`" target="_blank" class="business-record-icon" :aria-label="`打开 ${item.title} 的公开页面`" title="打开公开页面"><ExternalLink :size="15" /></RouterLink><button v-if="item.status === 'PUBLISHED'" type="button" class="business-record-icon" :aria-label="`编辑 ${item.title}`" title="编辑" @click="editPublication(item)"><Pencil :size="15" /></button><button v-if="item.status === 'PUBLISHED'" type="button" class="business-record-icon" :aria-label="`下架 ${item.title}`" title="下架" @click="takeOffline(item)"><X :size="16" /></button></div></li></ul>
+      <ul v-else class="business-record-list"><li v-for="item in publications" :key="item.id"><div class="business-record-main"><span class="business-category-tag">{{ categories.find(category => category.value === item.category)?.label || '商家信息' }}</span><strong>{{ item.title }}</strong><small>{{ item.merchantName }} · {{ item.region }} · {{ informationDate(item.publishedAt || item.createdAt) }}</small></div><span class="business-record-status" :class="publicationState(item).className">{{ publicationState(item).label }}</span><div class="business-record-actions"><RouterLink v-if="publicationState(item).visible" :to="`/information/${item.id}`" target="_blank" class="business-record-icon" :aria-label="`打开 ${item.title} 的公开页面`" title="打开公开页面"><ExternalLink :size="15" /></RouterLink><button v-if="item.status === 'PUBLISHED'" type="button" class="business-record-icon" :disabled="submitting" :aria-label="`编辑 ${item.title}`" title="编辑" @click="editPublication(item)"><Pencil :size="15" /></button><button v-if="item.status === 'PUBLISHED'" type="button" class="business-record-icon" :disabled="submitting" :aria-label="`下架 ${item.title}`" title="下架" @click="takeOffline(item)"><X :size="16" /></button></div></li></ul>
       <p v-if="actionError" class="business-message-error" role="alert">{{ actionError }}</p>
     </section>
 
     <section v-if="receipt" class="business-submission-result" role="status">
-      <CheckCircle2 :size="36" aria-hidden="true" /><h2>{{ editingPublication ? '发布内容已更新' : '信息已公开发布' }}</h2><p>这条信息现在可以通过公开链接查看。</p><span>发布编号：{{ receipt.id }}</span><RouterLink class="business-button" :to="`/information/${receipt.id}`" target="_blank">打开公开页面<ExternalLink :size="15" /></RouterLink>
+      <CheckCircle2 :size="36" aria-hidden="true" /><h2>{{ editingPublication ? '发布内容已更新' : '信息已公开发布' }}</h2><p>「{{ receipt.title }}」已保存，并显示在信息广场。</p><span>发布编号：{{ receipt.id }}</span><RouterLink class="business-button" :to="`/information/${receipt.id}`" target="_blank">查看发布后的页面<ExternalLink :size="15" /></RouterLink><RouterLink to="/information" class="business-link">回到信息广场<ArrowRight :size="15" aria-hidden="true" /></RouterLink>
       <button class="business-button business-button-primary" type="button" @click="startInformation">继续发布信息<ArrowRight :size="15" aria-hidden="true" /></button>
     </section>
     <template v-else>
@@ -123,14 +143,14 @@ function startInformation() {
         </form>
 
         <aside class="business-preview-column">
-          <section ref="previewPanel" class="business-preview" :class="{ 'is-expanded': previewOpen }" aria-label="信息预览">
+          <section ref="previewPanel" class="business-preview" :class="{ 'is-expanded': previewOpen }" tabindex="-1" aria-label="信息预览">
             <div class="business-preview-label"><Eye :size="15" aria-hidden="true" /><span>{{ previewOpen ? '完整信息预览' : '信息预览' }}</span></div>
             <article>
               <span class="business-category-tag">{{ categoryLabel }}</span>
               <h2>{{ form.title.trim() || '信息标题' }}</h2>
               <p v-if="form.summary.trim()" class="business-preview-summary">{{ form.summary.trim() }}</p>
               <div class="business-publisher"><span class="business-publisher-mark"><Store :size="19" aria-hidden="true" /></span><div><strong>{{ form.merchantName.trim() || '商家名称' }}</strong><span><MapPin :size="12" aria-hidden="true" />{{ form.region.trim() || '所在地区' }}</span></div></div>
-              <div class="business-preview-body" :class="{ 'is-collapsed': !previewOpen }">{{ form.content.trim() || '填写详细内容后，可在此查看展示效果。' }}</div>
+              <div class="business-preview-body" :class="{ 'is-collapsed': !previewOpen }"><InformationContent :content="form.content.trim() || '填写详细内容后，可在此查看展示效果。'" /></div>
               <dl class="business-preview-details"><div><dt>有效期</dt><dd>{{ form.validUntil || '长期有效' }}</dd></div><div v-if="form.contactName.trim()"><dt>联系人</dt><dd>{{ form.contactName.trim() }}</dd></div><div v-if="form.contactPhone.trim()"><dt>联系电话</dt><dd>{{ form.contactPhone.trim() }}</dd></div></dl>
             </article>
           </section>
