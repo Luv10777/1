@@ -52,7 +52,8 @@ public class CommunityService {
 
     @Transactional
     public CommunityDtos.InformationView update(Long id, CommunityDtos.InformationRequest request) {
-        var value = publications.findById(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
+        var value = publications.findByIdAndTenantId(id, TenantContext.require())
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
         apply(value, request);
         value.setStatus("PUBLISHED");
         value.setUpdatedAt(Instant.now());
@@ -61,14 +62,16 @@ public class CommunityService {
 
     @Transactional
     public void takeOffline(Long id) {
-        var value = publications.findById(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
+        var value = publications.findByIdAndTenantId(id, TenantContext.require())
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
         value.setStatus("OFFLINE");
         value.setUpdatedAt(Instant.now());
     }
 
     @Transactional(readOnly = true)
     public java.util.List<CommunityDtos.InformationView> publications() {
-        return publications.findAllByOrderByCreatedAtDescIdDesc().stream().map(CommunityDtos.InformationView::of).toList();
+        return publications.findAllByTenantIdOrderByCreatedAtDescIdDesc(TenantContext.require()).stream()
+                .map(CommunityDtos.InformationView::of).toList();
     }
 
     @Transactional(readOnly = true)

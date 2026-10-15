@@ -43,11 +43,11 @@ test('business pages remain visible without membership while login and owner per
     await router.push('/team')
     assert.equal(router.currentRoute.value.name, 'forbidden')
     auth.state.token = null
-    for (const path of ['/', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio']) {
+    for (const path of ['/', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio', '/merchant-alliance', '/information', '/information/7?category=supply']) {
       await router.push(path)
-      assert.equal(router.currentRoute.value.path, path === '/' ? '/image/create' : path, 'guests can browse ' + path)
+      assert.equal(router.currentRoute.value.path, path === '/' ? '/image/create' : path.split('?')[0], 'guests can browse ' + path)
     }
-    for (const path of ['/merchant-alliance', '/information-publishing', '/works', '/assets/products', '/tasks', '/team', '/billing', '/settings']) {
+    for (const path of ['/information-publishing', '/works', '/assets/products', '/tasks', '/team', '/billing', '/settings']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.name, 'login', path + ' requires login')
       assert.equal(router.currentRoute.value.query.redirect, path, 'login returns to the intended page')

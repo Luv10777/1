@@ -20,7 +20,7 @@ public final class ImageDtos {
         @Pattern(regexp = "1K|2K|4K") String quality,
         @Min(1) @Max(6) int count,
         @NotNull @Pattern(regexp = "TAOBAO|JD|PDD|XIAOHONGSHU|MEITUAN|TAOBAO_FLASH|DOUYIN_GROUP|DIANPING|WECHAT|DOUYIN|ELEME|OFFLINE|LOCAL") String platform,
-        @NotNull @Pattern(regexp = "PRODUCT_MAIN|WHITE_BG|DETAIL|SCENE_SET|DISH|STORE|POSTER") String imageType,
+        @NotNull @Pattern(regexp = "PRODUCT_MAIN|DETAIL|SCENE_SET|DISH|STORE|POSTER") String imageType,
         @NotNull @Size(max = 80) String purpose,
         @NotNull @Size(max = 80) String style,
         @Size(max = 40) String templateId) {}
@@ -45,7 +45,13 @@ public final class ImageDtos {
     public record Work(Long id, Long creationId, String workflow, String title,
                        String url, String quality, int width, int height, Instant createdAt) {}
     public record Dimensions(int width, int height) {}
-    public record Plan(String summary, String question, String visualDirection, List<Spec> items, PlanningTrace planning) {
+    public record Understanding(String summary, String question, List<String> mustChange,
+                                List<String> mustPreserve, List<String> mustAvoid) {}
+    public record Plan(String summary, String question, String visualDirection, List<Spec> items,
+                       PlanningTrace planning, Understanding understanding) {
+        public Plan(String summary, String question, String visualDirection, List<Spec> items, PlanningTrace planning) {
+            this(summary, question, visualDirection, items, planning, null);
+        }
         public Plan(String summary, String question, String visualDirection, List<Spec> items) {
             this(summary, question, visualDirection, items, null);
         }

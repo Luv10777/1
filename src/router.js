@@ -90,7 +90,7 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', eyebrow: 'GEO GROWTH', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', eyebrow: 'GEO GROWTH', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', eyebrow: 'GEO GROWTH', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { title: '商家联盟', navGroup: 'billing' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商家入驻', navGroup: 'billing' } },
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
   { path: '/notifications', name: 'notifications', redirect: '/image/create' },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },

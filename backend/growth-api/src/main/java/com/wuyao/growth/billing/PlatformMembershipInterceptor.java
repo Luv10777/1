@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** Everyone can browse business pages; changing data and starting work require membership. */
+/** Browsing is open; membership is required for writes outside WebConfig's exclusions. */
 @Component
 @RequiredArgsConstructor
 public class PlatformMembershipInterceptor implements HandlerInterceptor {

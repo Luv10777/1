@@ -21,11 +21,13 @@ test('commerce API uses the public storefront, order receipt and tenant-scoped m
       () => module.commerceApi.publicOrder('random-token-123'),
       () => module.commerceApi.merchantOrders(7),
       () => module.commerceApi.updateOrder(7, 41, 'CONFIRMED'),
+      () => module.commerceApi.featuredListing(),
     ]) await call()
     assert.deepEqual(calls.map(call => decodeURIComponent(new URL(call.url, 'http://local').pathname)), [
       '/api/public/stores/7', '/api/public/stores/7/products', '/api/public/assets/11/download-url',
       '/api/public/orders', '/api/public/orders/random-token-123', '/api/stores/7/orders',
       '/api/stores/7/orders/41',
+      '/shop/featured.json',
     ])
     assert.equal(JSON.parse(calls[3].options.body).items[0].productId, 2)
     assert.equal(JSON.parse(calls[6].options.body).status, 'CONFIRMED')

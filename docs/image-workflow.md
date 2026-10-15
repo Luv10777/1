@@ -1,14 +1,13 @@
 # AI 图片创作工作流
 
-版本：1.4 · 更新：2026-09-29
+版本：1.5 · 更新：2026-10-14
 
-营销海报与产品套图共用“DeepSeek Flash 需求理解、方案规划与最终提示词 → 图片生成”的技术流程，但不共用创作指令。
-营销海报使用 `poster-single-text-v2`：聚焦本地商家的传播主题、图文层级、投放场景和历次版式差异；
-产品套图使用 `product-set-single-text-v2`：聚焦商品身份保真、镜头分工、材质表现、使用场景和整组一致性，默认不叠加海报标题或促销装饰。
-两者只共享图片身份保真、尺寸校验、参考图角色和安全限制等基础规则。
-DeepSeek Flash 一次调用同时输出结构化方案和每张图的最终视觉指令并保留中文事实，
-图片模型按工作流的成片要求生成，服务端校验尺寸并保存作品，不再叠加固定文字框。
-未配置文本或图片模型时拒绝提交；图片渲染阶段不再追加文本模型调用。
+营销海报与产品套图先调用同一文本模型理解用户要求，再使用各自的创作规则规划方案和润色最终提示词，最后调用图片模型生成。
+需求理解先列出用户要求修改、保留和避免的内容；润色阶段接收理解结果，生成每张图完整提示词。明确的增删、替换和保留要求优先于用途建议、工作流和参考图的默认保真规则。
+营销海报使用 `poster-intent-first-v4`；产品套图使用 `product-set-intent-first-v4`。默认摄影方式、品牌保留、画面完整度和文字规则均不得覆盖用户明确要求。
+图片模型直接接收已持久化的最终提示词；渲染阶段不再追加有冲突的创作要求。
+产品图片类型保留商品主图、详情图和场景套图，不再提供“白底图”类型；用户仍可在描述里指定白色背景。
+未配置文本或图片模型时拒绝提交；需求理解与提示词润色各调用一次文本模型，图片渲染阶段不再追加文本模型调用。
 
 ## 本地启动
 
@@ -75,7 +74,7 @@ npm run dev
 
 - `common/gateway/ImageModelProperties.java`：服务端配置。
 - `common/gateway/ImageModelHttpAdapter.java`：目前的 HTTP 传输与协议适配。
-- `creative/image/ImagePlanner.java`：唯一文本层，完成需求理解、整组规划和每张图的最终 prompt；图片渲染阶段不再发起文本模型调用。
+- `creative/image/ImagePlanner.java`：IMAGE_PLAN 中依次执行需求理解和提示词润色两个文本阶段，完成整组规划与每张图的最终 prompt；图片渲染阶段不再发起文本模型调用。
 - `creative/image/ImageRenderHandler.java`：按工作流分流最终生图指令，提交、查单、保存与渲染。
 - 新供应商可以替换 HTTP 适配器，保持能力别名与业务服务不变。
   当前每种能力只应启用一个真实适配器，未实现动态供应商选型。
@@ -87,13 +86,21 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
 用户消息包含需求 JSON、参考图片的角色说明与 `image_url` 数据 URL。
 商品主体与风格参考分别使用 `SUBJECT` 和 `STYLE`；也支持只提供版式的 `LAYOUT` 和只提供环境的 `BACKGROUND`。
 
-读取响应 `choices[0].message.content`，内容必须为 JSON 字符串：
+需求理解阶段读取 `choices[0].message.content`，内容必须为 JSON 字符串：
+
+```json
+{"summary":"移除商品表面的 Logo，其余商品部分保持原样","question":"","mustChange":["移除商品表面的 Logo"],"mustPreserve":["商品其余包装文字和形状"],"mustAvoid":[]}
+```
+
+有关键歧义时不进入润色和生图，直接等待用户补充。没有歧义时，第二次文本调用会把理解结果连同原始需求发送给对应海报或产品套图规则，再返回整组结构化方案。该调用示例中的 Logo 保留是可选的理解结果内容，只有用户没有要求修改 Logo 时才可列入 `mustPreserve`。
+
+提示词润色阶段输出结构如下，内容须与 `understanding` 一致：
 
 ```json
 {
-  "summary": "使用清爽的夏日色彩，突出商品主体。",
+  "summary": "移除商品表面的 Logo，其余商品部分保持原样。",
   "question": "",
-  "visualDirection": "Visual concept: 清爽夏日新品；Focal point: 商品包装与饮品质感；Hierarchy: subject first, message second, environment third；Palette: pale green, warm cream, dark brown accents；Lighting: soft diffused daylight from upper left；Material language: ceramic, paper and natural liquid highlights；Camera language: 50mm eye-level product photography；Composition language: asymmetric rule of thirds with controlled negative space；Typography direction: crisp editorial Chinese typography；Brand guardrails: preserve package geometry, logo and colors.",
+  "visualDirection": "Product identity: reference product with the surface logo removed; Series concept: faithful product photography; Palette: original product colors; Lighting: soft diffused daylight; Camera language: 50mm product photography.",
   "items": [
     {
       "role": "商品主图",
@@ -101,9 +108,9 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
       "focalPoint": "商品包装与饮品质感",
       "materialLanguage": "陶瓷、纸张和自然液体高光",
       "cameraLanguage": "50mm eye-level product photography",
-      "mustPreserve": ["包装外形", "Logo", "品牌色"],
-      "mustAvoid": ["额外配料", "虚构标签", "随机文字"],
-      "prompt": "保留参考图商品包装与外形，建立完整可发布的商业成片。",
+      "mustPreserve": ["商品其余包装文字", "商品外形", "原有颜色"],
+      "mustAvoid": [],
+      "prompt": "移除商品表面的 Logo，保留商品其余包装文字和形状。",
       "headline": "",
       "caption": ""
     }
@@ -299,17 +306,17 @@ retry 使用当前查询结果中的 `{taskId}`，重复点击不会重复排队
 
 测试中的模型响应是受控测试数据；测试通过不代表真实供应商已配置或模型效果已验收。
 
-## 单层文本模型配置
+## 文本模型阶段配置
 
-规划与最终提示词合并为一层 `TEXT_CREATIVE` 文本调用，当前模型配置为 `deepseek-flash`；
-图片渲染只读取该阶段保存的最终 prompt，不再逐张调用文本模型。整组图片只调用一次 `deepseek-flash` 文本模型。
+需求理解和提示词润色使用同一 `TEXT_CREATIVE` 模型配置，当前模型配置为 `deepseek-flash`；
+每组图片先调用一次理解，再调用一次润色，图片渲染只读取已保存的最终 prompt，不再逐张调用文本模型。
 省略地址时从 `NEW_API_BASE_URL` 推导，省略密钥时使用 `NEW_API_API_KEY`。
 文本端点默认使用 0.5 温度、6000 最大令牌和 300 秒超时；令牌上限以 `max_completion_tokens` 发送。
-模型一次返回整组结构化方案，`items[].prompt` 已是交给图片模型的最终 prompt；服务端只补充必要的文字约束，不会再调用第二个文本模型。
+第一阶段只返回结构化的 `understanding`；第二阶段返回整组结构化方案，`items[].prompt` 已是交给图片模型的最终 prompt。服务端验证每条明确修改均出现在最终 prompt，并在生图请求中提供理解结果作为修改优先级依据。
 `8K` 是提示词质感引导，实际图片分辨率仍按所选档位校验。
 
-无需新增数据库列：规划模型、版本与用量保存在 `image_creations.plan.planning`；
-最终提示词和拍摄职责直接保存在 `image_items.spec.prompt` 及其结构化字段中。
+无需新增数据库列：规划模型、版本与两阶段用量保存在 `image_creations.plan.planning`；
+需求理解保存在 `image_creations.plan.understanding`，最终提示词和拍摄职责保存在 `image_items.spec.prompt` 及其结构化字段中。
 持久化受现有 RLS、任务租约与执行轮次保护；已有 JSON 数据缺失这些字段时仍可读取。
 
 DEBUG 日志包含 Original visualDirection 与最终图片 prompt。
@@ -318,7 +325,7 @@ DEBUG 日志包含 Original visualDirection 与最终图片 prompt。
 不把未提供费用视为免费，不按预期百分比或固定人民币金额伪造实测结果。
 这些指标不带租户标签，详细单图追踪仍受租户隔离约束；指标为进程级，重启会重置。
 
-升级后重启 API 和 worker，新任务固定由唯一的 `deepseek-flash` 文本层完成需求理解、整组规划和最终 prompt。
+升级后重启 API 和 worker。新任务先由 `deepseek-flash` 理解明确要求，再以该理解结果规划整组图片并润色最终 prompt。
 已持久化的图片提示词继续复用；缺少文本方案的旧任务需要重新规划。
 
 [image-guide]: https://developers.openai.com/api/docs/guides/image-generation
