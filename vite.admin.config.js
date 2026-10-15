@@ -9,7 +9,8 @@ export default defineConfig(({ mode }) => {
   const proxy = {
     '/api': {
       target: process.env.VITE_DEV_API_TARGET || env.VITE_DEV_API_TARGET || 'http://127.0.0.1:18080',
-      changeOrigin: true,
+      // 保留页面 Host，让同源请求通过后端的 Origin 校验。
+      changeOrigin: false,
     },
   }
   return {
