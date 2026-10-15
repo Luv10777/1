@@ -7,7 +7,9 @@ import { selectedStoreId, stores } from '../stores/merchantContext'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import VoiceLibraryPanel from '../components/VoiceLibraryPanel.vue'
 import LiveAudioControl from '../components/LiveAudioControl.vue'
-import { desktopBridge, inDesktop } from '../utils/desktop'
+import { desktopBridge, desktopLink, inDesktop } from '../utils/desktop'
+import { launchApp, onPhone } from '../utils/appLaunch'
+import { findDesktopDownloads } from '../services/desktopDownload'
 import { productApi } from '../services/productApi'
 import { knowledgeApi } from '../services/knowledgeApi'
 import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSessionName, pickCurrentSession, describeSession, sessionStatusLabel, isActiveSession, startBlockers, toCommentFeedItem, answeringCohostId } from '../services/liveApi'
@@ -15,9 +17,12 @@ import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSe
 /* ---------------- 场次配置 ---------------- */
 const route = useRoute()
 const stage = ref('setup')
+// 开播只在一方志软件（桌面端、安卓 App）里进行：网页读不到直播间弹幕。所以浏览器里没有直播工作台，
+// 只管配置和复盘。本地开发时在地址后面加 ?workbench 可以照旧打开，用来发模拟弹幕测试回复。
+const hasWorkbench = inDesktop || (import.meta.env.DEV && route.query.workbench !== undefined)
 const stageTabs = [
   { key: 'setup', label: '直播配置' },
-  { key: 'live', label: '直播工作台' },
+  ...(hasWorkbench ? [{ key: 'live', label: '直播工作台' }] : []),
   { key: 'review', label: '场次复盘' },
 ]
 const sessionTools = ref(null)
@@ -471,7 +476,34 @@ const transitionSession = async (action) => {
     if (isCurrent(ticket, storeId)) apiBusy.value = false
   }
 }
-const startSession = () => transitionSession('start')
+/* ---------------- 浏览器里点开始本场：保存配置，唤起一方志软件 ---------------- */
+const phone = onPhone()
+const onMacDesktop = /Macintosh|Mac OS X/.test(globalThis.navigator?.userAgent || '')
+const launchingApp = ref(false)
+const appPromptOpen = ref(false)
+const appDownloads = ref({ windows: '', mac: '', android: '' })
+const launchFromBrowser = async () => {
+  if (!auth.requireLogin()) return
+  if (launchingApp.value) return
+  launchingApp.value = true
+  draftError.value = ''
+  draftNotice.value = ''
+  try {
+    // 软件里看到的是服务器上保存的配置，所以先存下来。
+    await ensureAudioSession()
+    // 手机上没有桌面端，安卓 App 也还不能被网页唤起，直接给下载入口。
+    const launched = !phone && await launchApp(desktopLink(selectedStoreId.value))
+    if (launched) {
+      appPromptOpen.value = false
+      draftNotice.value = '配置已保存，已在一方志软件里打开这一场，请在软件里开始直播。'
+    } else appPromptOpen.value = true
+  } catch (error) {
+    draftError.value = `配置还没有保存，所以没有打开一方志软件：${error.message || '请重试'}`
+  } finally {
+    launchingApp.value = false
+  }
+}
+const startSession = () => (hasWorkbench ? transitionSession('start') : launchFromBrowser())
 const pauseSession = () => transitionSession('pause')
 const resumeSession = () => transitionSession('resume')
 const endSession = () => transitionSession('end')
@@ -525,7 +557,7 @@ watch(() => [stage.value, activeSessionId.value], ([nextStage, id]) => {
 }, { immediate: true })
 onBeforeUnmount(() => clearInterval(realtimePoll))
 // 桌面端是用来开播的：只要这一场还没结束，打开就是直播工作台；配置在旁边的页签里。
-const stageFor = (status) => (status === 'ENDED' ? 'review' : isActiveSession({ status }) || inDesktop ? 'live' : 'setup')
+const stageFor = (status) => (status === 'ENDED' ? 'review' : hasWorkbench && (isActiveSession({ status }) || inDesktop) ? 'live' : 'setup')
 const loadSessionCore = async (id, ticket, storeId) => {
   const [session, rows] = await Promise.all([liveApi.get(id), liveApi.listQa(id)])
   if (!isCurrent(ticket, storeId)) return
@@ -684,6 +716,7 @@ const followDesktopLink = async () => {
   await loadStore()
 }
 onMounted(() => {
+  if (!inDesktop) findDesktopDownloads().then(found => { appDownloads.value = found })
   if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) {
     manualProduct.value = { points: route.query.prompt }
     manualProductOpen.value = true
@@ -731,10 +764,10 @@ onBeforeUnmount(() => {
         <span class="ls-save-state" :class="{ dirty: currentStatus === 'DRAFT' && draftDirty, live: currentStatus === 'LIVE' }" role="status">{{ sessionBadge }}</span>
         <template v-if="currentStatus === 'DRAFT'">
           <button class="ls-ghost compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || (!!activeSessionId && !draftDirty)" @click="saveDraft">保存配置</button>
-          <button class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0" :title="blockers.length ? '还需要：' + blockers.map(item => item.label).join('、') : ''" @click="startSession">开始本场</button>
+          <button class="primary-button compact" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" :title="blockers.length ? '还需要：' + blockers.map(item => item.label).join('、') : ''" @click="startSession">开始本场</button>
         </template>
-        <button v-if="currentStatus === 'LIVE'" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="pauseSession">暂停本场</button>
-        <button v-if="currentStatus === 'PAUSED'" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="resumeSession">继续本场</button>
+        <button v-if="hasWorkbench && currentStatus === 'LIVE'" class="ls-ghost compact" type="button" :disabled="loadBusy || apiBusy" @click="pauseSession">暂停本场</button>
+        <button v-if="hasWorkbench && currentStatus === 'PAUSED'" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="resumeSession">继续本场</button>
         <button v-if="['LIVE', 'PAUSED'].includes(currentStatus)" class="ls-danger compact" type="button" :disabled="loadBusy || apiBusy" @click="endSession">结束本场</button>
         <template v-if="currentStatus === 'ENDED'">
           <button v-if="runningSession || pendingSession" class="primary-button compact" type="button" :disabled="loadBusy || apiBusy" @click="openSession((runningSession || pendingSession).id)">{{ runningSession ? '回到直播中的场次' : '回到未开始的场次' }}</button>
@@ -912,6 +945,7 @@ onBeforeUnmount(() => {
         :ensure-session="ensureAudioSession"
         :host-voice="hostVoice"
         :products="productQueue"
+        :workbench="hasWorkbench"
         @open-workspace="setStage('live')"
         @start-session="startSession"
         @edit-step="editStep"
@@ -931,8 +965,9 @@ onBeforeUnmount(() => {
           <div><dt>节奏</dt><dd>{{ urgencyLabel.split(' · ')[0] }}</dd></div>
           <div><dt>问答</dt><dd>{{ qaPairs.length }} 条</dd></div>
         </dl>
-        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场<ArrowRight :size="15" aria-hidden="true" /></button>
-        <button v-else-if="currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台<ArrowRight :size="15" aria-hidden="true" /></button>
+        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场<ArrowRight :size="15" aria-hidden="true" /></button>
+        <button v-else-if="hasWorkbench && currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台<ArrowRight :size="15" aria-hidden="true" /></button>
+        <p v-else-if="currentStatus !== 'ENDED'" class="ls-precheck-live">本场正在一方志软件里直播。</p>
       </aside>
     </div>
 
@@ -982,9 +1017,29 @@ onBeforeUnmount(() => {
           </ul>
           <p v-else class="ls-section-note">这一场没有答不上的提问。</p>
         </div>
-        <div class="ls-review-actions"><button v-if="currentStatus !== 'ENDED'" type="button" class="ls-ghost compact" @click="setStage('live')">返回直播工作台</button><button v-if="currentStatus === 'ENDED' && !runningSession && !pendingSession" type="button" class="primary-button compact" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId" @click="newSession">新建场次（沿用这一场的配置）</button></div>
+        <div class="ls-review-actions"><button v-if="hasWorkbench && currentStatus !== 'ENDED'" type="button" class="ls-ghost compact" @click="setStage('live')">返回直播工作台</button><button v-if="currentStatus === 'ENDED' && !runningSession && !pendingSession" type="button" class="primary-button compact" :disabled="loadBusy || loadFailed || apiBusy || !selectedStoreId" @click="newSession">新建场次（沿用这一场的配置）</button></div>
       </section>
     </template>
+
+    <div v-if="appPromptOpen" class="ls-modal-backdrop" role="presentation" @click.self="appPromptOpen = false">
+      <section class="ls-modal panel-dark ls-app-modal" role="dialog" aria-modal="true" aria-labelledby="ls-app-title">
+        <h3 id="ls-app-title">{{ phone ? '用一方志 App 开播' : '没有打开一方志软件' }}</h3>
+        <p v-if="phone" class="ls-modal-copy">开播要在一方志 App 里进行，网页读不到直播间弹幕。配置已经保存，装好 App、登录同一个账号，打开就是这一场。目前只有安卓版。</p>
+        <p v-else class="ls-modal-copy">开播要在一方志软件里进行，网页读不到直播间弹幕。这台电脑可能还没安装：下载安装、登录同一个账号后，回到这里再点一次「开始本场」。已经装好的话，点「重新打开」。</p>
+        <div class="ls-app-downloads">
+          <template v-if="!phone">
+            <a v-if="appDownloads.windows" :class="onMacDesktop && appDownloads.mac ? 'ls-ghost compact' : 'primary-button compact'" :href="appDownloads.windows" download>下载 Windows 版</a>
+            <a v-if="appDownloads.mac" :class="onMacDesktop || !appDownloads.windows ? 'primary-button compact' : 'ls-ghost compact'" :href="appDownloads.mac" download>下载 Mac 版</a>
+          </template>
+          <a v-if="appDownloads.android" :class="phone ? 'primary-button compact' : 'ls-ghost compact'" href="/app" target="_blank" rel="noopener">安卓 App 下载页</a>
+        </div>
+        <p v-if="!appDownloads.android && (phone || (!appDownloads.windows && !appDownloads.mac))" class="ls-modal-copy">安装包暂时还没有放出来，请联系我们获取。</p>
+        <div class="ls-modal-actions">
+          <button type="button" class="ls-ghost compact" @click="appPromptOpen = false">关闭</button>
+          <button v-if="!phone" type="button" class="primary-button compact" :disabled="launchingApp" @click="launchFromBrowser">{{ launchingApp ? '正在打开…' : '重新打开' }}</button>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
