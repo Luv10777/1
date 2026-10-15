@@ -54,6 +54,7 @@ public class CommunityService {
     public CommunityDtos.InformationView update(Long id, CommunityDtos.InformationRequest request) {
         var value = publications.findByIdAndTenantId(id, TenantContext.require())
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
+        if (value.isPlatformBlocked()) throw BizException.of(ErrorCode.FORBIDDEN, "该信息已由平台下线，请联系平台处理");
         apply(value, request);
         value.setStatus("PUBLISHED");
         value.setUpdatedAt(Instant.now());

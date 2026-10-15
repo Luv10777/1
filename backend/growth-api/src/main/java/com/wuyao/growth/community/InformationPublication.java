@@ -43,6 +43,8 @@ public class InformationPublication {
     private LocalDate validUntil;
     @Column(nullable = false, length = 20)
     private String status = "PUBLISHED";
+    @Column(name = "platform_blocked", nullable = false)
+    private boolean platformBlocked = false;
     @Column(name = "published_at", nullable = false)
     private Instant publishedAt = Instant.now();
     @Column(name = "created_at", nullable = false, updatable = false)

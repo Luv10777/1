@@ -53,6 +53,10 @@ server:
 
 # ---- 平台自有配置 ----
 growth:
+  platform:
+    operator-user-ids: ${PLATFORM_OPERATOR_USER_IDS:}
+  identity:
+    encryption-key: ${REAL_NAME_ENCRYPTION_KEY:}
   video-analysis:
     base-url: ${VIDEO_ANALYSIS_BASE_URL:https://api.onlyrouter.ai/v1}
     api-key: ${VIDEO_ANALYSIS_API_KEY:}

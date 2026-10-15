@@ -3,8 +3,9 @@
  * 避免两边各存一份、键名对不上。
  */
 
-const TOKEN_KEY = 'wuyao-ai-token'
-const USER_KEY = 'wuyao-ai-auth'
+export const SESSION_NAMESPACE = import.meta.env?.VITE_APP_CONTEXT === 'admin' ? 'wuyao-admin' : 'wuyao-ai'
+const TOKEN_KEY = `${SESSION_NAMESPACE}-token`
+const USER_KEY = `${SESSION_NAMESPACE}-auth`
 
 export function readTokens() {
   try {

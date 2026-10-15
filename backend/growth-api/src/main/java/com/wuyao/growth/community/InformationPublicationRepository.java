@@ -13,6 +13,9 @@ import java.util.Optional;
 public interface InformationPublicationRepository extends JpaRepository<InformationPublication, Long> {
     List<InformationPublication> findAllByTenantIdOrderByCreatedAtDescIdDesc(Long tenantId);
 
+    List<InformationPublication> findAllByTenantIdOrderByPublishedAtDescIdDesc(Long tenantId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     Optional<InformationPublication> findByIdAndTenantId(Long id, Long tenantId);
 
     @Query("select i from InformationPublication i where i.status = 'PUBLISHED' " +

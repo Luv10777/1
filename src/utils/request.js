@@ -11,7 +11,7 @@
  *   3. 遇到 1401 自动用 refresh token 换一次，再重放原请求
  */
 
-import { accessToken, readTokens, writeTokens, clearAll } from './tokenStore.js'
+import { accessToken, readTokens, writeTokens, clearAll, SESSION_NAMESPACE } from './tokenStore.js'
 
 class ApiError extends Error {
   constructor(message, code, status) {
@@ -39,7 +39,7 @@ let authExpiredNotified = false
  */
 function withRefreshLock(task) {
   const locks = globalThis.navigator?.locks
-  return locks ? locks.request('wuyao-ai-token-refresh', task) : task()
+  return locks ? locks.request(`${SESSION_NAMESPACE}-token-refresh`, task) : task()
 }
 
 /**

@@ -133,6 +133,7 @@ const navGroups = [
     items: [
       { name: 'tasks', label: '任务中心', path: '/tasks' },
       { name: 'team', label: '员工管理', path: '/team', ownerOnly: true },
+      { name: 'identity', label: '用户实名', path: '/identity' },
       { name: 'settings', label: '系统设置', path: '/settings' },
     ],
   },

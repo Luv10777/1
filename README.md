@@ -9,6 +9,7 @@
 | 目录 | 说明 |
 |------|------|
 | `src/` | 前端 Vue 3 + Vite |
+| `admin/` | 独立管理员前端，单独登录、构建和部署 |
 | `backend/growth-api/` | **后端主干**，Java 21 + Spring Boot 3.5.16 |
 | `docs/` | 设计文档，`adr/` 记录架构决策 |
 | `deploy/` | 测试服务器部署配置 |
@@ -40,6 +41,22 @@ Java 21、Maven 和 Docker 为后端前置依赖。Linux/macOS 启动方法、�
 
 前端 <http://localhost:4173>，`/api` 默认代理到后端 `18080`。如使用其他端口，
 在根目录 `.env` 配置 `VITE_DEV_API_TARGET` 后重启 Vite。
+
+管理员后台从仓库根目录单独启动：
+
+```bash
+npm run dev:admin
+```
+
+本地入口为 `http://127.0.0.1:4177/login`，只在本机监听。信息管理、商家管理和用户实名审核
+属于这个独立应用，商家平台不提供后台菜单或管理路由。后台使用独立会话存储；验证码和密码
+均通过真实认证接口校验，后端 `PLATFORM_OPERATOR_USER_IDS` 配置的账号才可访问管理数据。
+缺少管理员权限或无法确认权限时不加载管理页面。本人提交实名资料的 `/identity` 仍属于用户端。
+
+`npm run build:admin` 输出独立的 `dist-admin/`，`npm run preview:admin` 本地预览构建结果。
+测试服务器可用 `docker compose --env-file deploy/.env -f deploy/docker-compose.yml --profile admin up -d --build admin`
+启动独立后台服务，默认仅映射 `127.0.0.1:18081`。外部访问时给它配置独立 HTTPS 域名反代，
+或通过 SSH 隧道连接；不要将后台静态文件混入商家站点的 `dist/`。
 
 商品库、FAQ 知识库、直播配置已使用真实 API。首次登录后从顶部「＋」创建门店；
 门店选择按账号保存，商品、知识集和直播草稿按门店隔离。

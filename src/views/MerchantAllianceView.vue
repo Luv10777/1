@@ -13,7 +13,7 @@ const { form, editor, submitting, receipt, error, reset, submit, clearFieldError
 const applications = ref([])
 const applicationsLoading = ref(false)
 const applicationsError = ref('')
-const statusLabel = { PENDING_REVIEW: '审核中', APPROVED: '已通过', REJECTED: '需补充资料' }
+const statusLabel = { PENDING_REVIEW: '审核中', APPROVED: '已通过', REJECTED: '需补充资料', SUSPENDED: '入驻已暂停' }
 
 async function loadApplications() {
   applicationsLoading.value = true

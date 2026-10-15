@@ -21,7 +21,7 @@ test('business pages remain visible without membership while login and owner per
     const { default: router } = await vite.ssrLoadModule('/src/router.js')
     auth.state.user = { id: 1, tenantId: 7 }
     auth.state.token = { accessToken: 'test-only' }
-    for (const route of router.getRoutes().filter(route => route.name && !route.redirect && !route.meta.public && !route.meta.ownerOnly)) {
+    for (const route of router.getRoutes().filter(route => route.name && !route.redirect && !route.meta.public && !route.meta.ownerOnly && !route.meta.platformOnly)) {
       await router.push(route.path)
       assert.equal(router.currentRoute.value.name, route.name, route.path)
     }
