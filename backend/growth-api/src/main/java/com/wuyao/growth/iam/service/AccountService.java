@@ -54,6 +54,24 @@ public class AccountService {
         if (!isOwner(userId)) throw BizException.of(ErrorCode.FORBIDDEN, "只有管理员可以执行这个操作");
     }
 
+    /** 登录者自己的资料，系统设置里展示用。 */
+    @Transactional(readOnly = true)
+    public AccountDtos.Profile profile(Long userId) {
+        return AccountDtos.Profile.of(active(userId));
+    }
+
+    /** 每个人都能改自己的显示名字，管理员和店员一样。 */
+    @Transactional
+    public AccountDtos.Profile renameSelf(Long userId, String name) {
+        Long tenantId = TenantContext.require();
+        User user = users.findForUpdate(userId)
+                .filter(candidate -> tenantId.equals(candidate.getTenantId()) && ACTIVE.equals(candidate.getStatus()))
+                .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "账号不可用或不属于当前商户"));
+        user.setName(name.trim());
+        user.setUpdatedAt(Instant.now());
+        return AccountDtos.Profile.of(user);
+    }
+
     /** 当前商户未移除的账号，管理员在前。 */
     @Transactional(readOnly = true)
     public List<AccountDtos.Account> members() {

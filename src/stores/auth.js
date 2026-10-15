@@ -139,6 +139,18 @@ export const auth = {
     }
   },
 
+  /** 系统设置里改了名字，右上角和侧栏要跟着变。 */
+  rename(name) {
+    if (!state.user) return
+    state.user = { ...state.user, name }
+    writeUser(state.user)
+  },
+
+  /** 改密码后服务端让旧令牌全部失效，并给这台设备发了一套新的，换上即可继续使用。 */
+  replaceSession(tokenPair) {
+    return persistSession(tokenPair)
+  },
+
   async logout() {
     try {
       await authService.logout()
