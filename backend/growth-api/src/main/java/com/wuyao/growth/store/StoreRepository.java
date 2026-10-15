@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
-    List<Store> findAllByStatusOrderByIdAsc(String status);
+    List<Store> findAllByTenantIdAndStatusOrderByIdAsc(Long tenantId, String status);
+    Optional<Store> findByIdAndTenantIdAndStatus(Long id, Long tenantId, String status);
     Optional<Store> findByIdAndStatus(Long id, String status);
     long countByBrandIdAndStatus(Long brandId, String status);
 

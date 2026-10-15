@@ -31,10 +31,10 @@ public class StoreService {
     @Transactional(readOnly = true)
     public List<StoreDtos.StoreView> list(Long userId) {
         if (accounts.isOwner(userId)) {
-            return storeRepository.findAllByStatusOrderByIdAsc("ACTIVE").stream().map(StoreDtos.StoreView::of).toList();
+            return storeRepository.findAllByTenantIdAndStatusOrderByIdAsc(TenantContext.require(), "ACTIVE").stream().map(StoreDtos.StoreView::of).toList();
         }
         return memberRepository.findAllByUserIdAndStatusOrderByStoreIdAsc(userId, "ACTIVE").stream()
-                .map(member -> storeRepository.findByIdAndStatus(member.getStoreId(), "ACTIVE"))
+                .map(member -> storeRepository.findByIdAndTenantIdAndStatus(member.getStoreId(), TenantContext.require(), "ACTIVE"))
                 .flatMap(java.util.Optional::stream)
                 .map(StoreDtos.StoreView::of)
                 .toList();
@@ -115,7 +115,7 @@ public class StoreService {
     /** 供生成内容的模块使用：营业中门店的事实资料。只在当前商户内可见，不另做成员校验。 */
     @Transactional(readOnly = true)
     public Optional<StoreDtos.Profile> profile(Long storeId) {
-        return storeRepository.findByIdAndStatus(storeId, "ACTIVE").map(StoreDtos.Profile::of);
+        return storeRepository.findByIdAndTenantIdAndStatus(storeId, TenantContext.require(), "ACTIVE").map(StoreDtos.Profile::of);
     }
 
     /** Public storefront data is filtered by the stores RLS policy to stores with published content. */

@@ -21,7 +21,7 @@ public class StoreAccessService {
 
     @Transactional(readOnly = true)
     public Store requireAccess(Long storeId, Long userId) {
-        Store store = storeRepository.findByIdAndStatus(storeId, "ACTIVE")
+        Store store = storeRepository.findByIdAndTenantIdAndStatus(storeId, TenantContext.require(), "ACTIVE")
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "门店不存在或已停用"));
         if (!allowed(storeId, userId)) throw BizException.of(ErrorCode.FORBIDDEN, "没有访问该门店的权限");
         return store;
@@ -30,7 +30,7 @@ public class StoreAccessService {
     /** 与 {@link #requireAccess} 同一条规则，只回答是或否；门店不存在或已停用时为否。 */
     @Transactional(readOnly = true)
     public boolean hasAccess(Long storeId, Long userId) {
-        return storeRepository.findByIdAndStatus(storeId, "ACTIVE").isPresent() && allowed(storeId, userId);
+        return storeRepository.findByIdAndTenantIdAndStatus(storeId, TenantContext.require(), "ACTIVE").isPresent() && allowed(storeId, userId);
     }
 
     public Long requireTenant() {

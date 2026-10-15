@@ -59,6 +59,6 @@ public class StoreMembershipService {
     }
 
     private Set<Long> openStoreIds() {
-        return storeRepository.findAllByStatusOrderByIdAsc("ACTIVE").stream().map(Store::getId).collect(Collectors.toSet());
+        return storeRepository.findAllByTenantIdAndStatusOrderByIdAsc(TenantContext.require(), "ACTIVE").stream().map(Store::getId).collect(Collectors.toSet());
     }
 }

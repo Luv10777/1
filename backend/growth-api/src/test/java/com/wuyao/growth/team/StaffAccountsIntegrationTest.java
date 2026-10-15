@@ -239,6 +239,8 @@ class StaffAccountsIntegrationTest {
         assertThat(fresh.path("user").path("role").asText()).isEqualTo("OWNER");
         assertThat(fresh.path("user").path("tenantId").asLong()).isNotIn(tenantA, tenantB);
         assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
+        refused(get("/api/stores/" + west), fresh.path("accessToken").asText(), null, 404, 1404);
+        refused(get("/api/products/" + honey), fresh.path("accessToken").asText(), null, 404, 1404);
         refused(post("/api/stores"), fresh.path("accessToken").asText(), Map.of("name", "未开通会员门店"), 400, 9001);
         com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, fresh.path("user").path("tenantId").asLong());
         assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
