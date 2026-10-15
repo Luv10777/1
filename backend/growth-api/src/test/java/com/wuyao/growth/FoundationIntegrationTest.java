@@ -1759,7 +1759,7 @@ class FoundationIntegrationTest {
         long store = apiData(post("/api/stores"), token, Map.of("name", "联调门店")).path("id").asLong();
         long product = apiData(post("/api/stores/" + store + "/products"), token, Map.of(
                 "name", "蜂蜜", "type", "PHYSICAL", "category", "食品",
-                "price", 69, "saleUnit", "罐",
+                "price", 69, "saleUnit", "罐", "onlineStatus", "PUBLISHED",
                 "faqs", List.of(Map.of("question", "保质期多久", "answer", "12 个月"))))
                 .path("id").asLong();
         assertThat(apiData(get("/api/stores/" + store + "/products?keyword=69"), token, null)
@@ -1855,7 +1855,7 @@ class FoundationIntegrationTest {
         long store = apiData(post("/api/stores"), token, Map.of("name", "第一家店")).path("id").asLong();
         long otherStore = apiData(post("/api/stores"), token, Map.of("name", "第二家店")).path("id").asLong();
         long product = apiData(post("/api/stores/" + store + "/products"), token, Map.of(
-                "name", "团购券", "type", "VOUCHER", "category", "餐饮", "price", 19.9, "saleUnit", "张"))
+                "name", "团购券", "type", "VOUCHER", "category", "餐饮", "price", 19.9, "saleUnit", "张", "onlineStatus", "PUBLISHED"))
                 .path("id").asLong();
         long session = apiData(post("/api/stores/" + store + "/live-sessions"), token,
                 Map.of("name", "场次", "productIds", List.of(product))).path("id").asLong();

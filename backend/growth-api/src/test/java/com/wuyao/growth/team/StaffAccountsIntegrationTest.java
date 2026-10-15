@@ -459,7 +459,7 @@ class StaffAccountsIntegrationTest {
     }
 
     private static Map<String, Object> product(String name) {
-        return Map.of("name", name, "type", "PHYSICAL", "category", "食品", "price", 69, "saleUnit", "罐");
+        return Map.of("name", name, "type", "PHYSICAL", "category", "食品", "price", 69, "saleUnit", "罐", "onlineStatus", "PUBLISHED");
     }
 
     private static Map<String, Object> liveSession(long product, String hostVoice) {

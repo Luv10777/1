@@ -186,7 +186,7 @@ class LiveSpeechPipelineIntegrationTest {
         store = api(post("/api/stores"), Map.of("name", "蜂蜜小店")).path("id").asLong();
         product = api(post("/api/stores/" + store + "/products"), Map.of("name", "椴树蜂蜜", "type", "PHYSICAL",
                 "category", "食品", "price", 69, "saleUnit", "罐", "specification", "500 克",
-                "coreSellingPoints", "东北椴树蜜，结晶细腻")).path("id").asLong();
+                "coreSellingPoints", "东北椴树蜜，结晶细腻", "onlineStatus", "PUBLISHED")).path("id").asLong();
         session = api(post("/api/stores/" + store + "/live-sessions"), Map.of("name", "晚间场", "roomId", "room-1",
                 "productIds", List.of(product), "config", Map.of("rotateRoles", true,
                         "rotationSelection", List.of("builtin:voice-a", "builtin:voice-b"),
