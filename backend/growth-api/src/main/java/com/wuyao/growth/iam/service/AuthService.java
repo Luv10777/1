@@ -169,6 +169,48 @@ public class AuthService {
         });
     }
 
+    /**
+     * 设置或修改自己的密码。有验证码就核对发到本人手机的验证码，否则核对当前密码；
+     * 从没设过密码的人只能走验证码，免得拿到别人登录态的人顺手给账号加一个密码。
+     *
+     * 改完让所有设备上的登录失效，再给当前这台发一套新令牌，本人不用重新登录。
+     */
+    public AuthDtos.TokenPair changePassword(Long userId, String currentPassword, String code, String newPassword,
+                                             String ip, String userAgent, String deviceId) {
+        if (!PasswordLoginVerifier.acceptable(newPassword)) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "密码长度需为 8–64 位");
+        }
+        User account = userRepository.findById(userId)
+                .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+        if (code != null && !code.isBlank()) {
+            if (account.getPhone() == null) {
+                throw BizException.of(ErrorCode.BAD_REQUEST, "这个账号没有绑定手机号，请用当前密码修改");
+            }
+            codeVerifier.verifyAndConsume(account.getPhone(), code);
+        } else if (account.getPasswordHash() != null) {
+            if (currentPassword == null || currentPassword.isEmpty()) {
+                throw BizException.of(ErrorCode.BAD_REQUEST, "请输入当前密码");
+            }
+            passwordVerifier.verifyCurrent(userId, currentPassword);
+        } else {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "第一次设置密码需要短信验证码");
+        }
+        return transactions.execute(status -> {
+            User user = userRepository.findForUpdate(userId)
+                    .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                    .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+            user.setPasswordHash(PasswordLoginVerifier.hashPassword(newPassword));
+            user.setPasswordFailedAttempts(0);
+            user.setPasswordLockedUntil(null);
+            user.setTokenVersion(user.getTokenVersion() + 1);
+            user.setUpdatedAt(Instant.now());
+            int revoked = refreshTokenRepository.revokeAllForUser(userId);
+            log.info("修改密码: userId={} 作废 {} 个 refresh token", userId, revoked);
+            return issueTokens(user, ip, userAgent, deviceId);
+        });
+    }
+
     @Transactional(readOnly = true)
     public AuthDtos.UserInfo currentUser(Long userId) {
         User user = userRepository.findById(userId)

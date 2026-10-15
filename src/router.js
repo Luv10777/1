@@ -29,6 +29,7 @@ import PublishingView from './views/PublishingView.vue'
 import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
 import TeamView from './views/TeamView.vue'
+const SettingsView = () => import('./views/SettingsView.vue')
 import { inDesktop } from './utils/desktop'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
@@ -95,7 +96,7 @@ const routes = [
   { path: '/notifications', name: 'notifications', redirect: '/image/create' },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
-  { path: '/settings', name: 'settings', component: PlaceholderView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '管理成员、角色、通知和平台连接配置。' } },
+  { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '查看和修改自己的账号资料与登录密码。' } },
   { path: '/help', name: 'help', redirect: '/image/create' },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },
   { path: '/404', name: 'not-found', component: NotFoundView, meta: { title: '页面不存在', public: true } },
