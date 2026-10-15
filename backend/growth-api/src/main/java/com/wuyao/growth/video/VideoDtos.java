@@ -23,10 +23,16 @@ public final class VideoDtos {
             @NotBlank @Pattern(regexp = "auto|16:9|4:3|1:1|3:4|9:16|21:9") String ratio,
             @Min(5) @Max(30) int durationSeconds,
             @NotBlank @Pattern(regexp = "480p|720p|1080p|4K") String resolution,
-            @Pattern(regexp = "[a-f0-9]{64}") String quoteId) {
+            @Pattern(regexp = "[a-f0-9]{64}") String quoteId,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @Pattern(regexp = "VIDEO|DIGITAL_HUMAN") String sourceModule) {
+        public Create(String requestKey, String prompt, List<Long> references, Long videoReference,
+                      String model, String ratio, int seconds, String resolution, String quoteId) {
+            this(requestKey, prompt, references, videoReference, model, ratio, seconds, resolution, quoteId, null);
+        }
         public Create(String requestKey, String prompt, List<Long> references, Long videoReference,
                       String model, String ratio, int seconds, String resolution) {
-            this(requestKey, prompt, references, videoReference, model, ratio, seconds, resolution, null);
+            this(requestKey, prompt, references, videoReference, model, ratio, seconds, resolution, null, null);
         }
     }
 

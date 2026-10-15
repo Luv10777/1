@@ -8,7 +8,8 @@ const input = () => ({ prompt: '生成数字人口播视频', images: [{ assetId
 const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
 const approved = () => ({ quote: { available: true, quoteId: 'server-test-quote', credits: 17 }, requestKey: `video-${crypto.randomUUID()}`,
   signature: JSON.stringify({ prompt: input().prompt, referenceImageAssetIds: [11], referenceVideoAssetId: null,
-    model: input().model, ratio: input().ratio, durationSeconds: input().durationSeconds, resolution: input().resolution }) })
+    model: input().model, ratio: input().ratio, durationSeconds: input().durationSeconds, resolution: input().resolution,
+    sourceModule: 'DIGITAL_HUMAN' }) })
 
 test('digital human task lifecycle follows the real video API', async t => {
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-dh-tests',
@@ -48,6 +49,7 @@ test('digital human task lifecycle follows the real video API', async t => {
         await new Promise(resolve => setImmediate(resolve))
         assert.equal(posts.length, 1)
         assert.deepEqual(posts[0].referenceImageAssetIds, [11])
+        assert.equal(posts[0].sourceModule, 'DIGITAL_HUMAN')
         resolveCreate(response({ id: 71, status: 'RUNNING', stage: 'POLL' }))
         await pending
         assert.equal(studio.stageLabel.value, '画面渲染中')

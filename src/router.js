@@ -95,7 +95,7 @@ const routes = [
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
   { path: '/identity', alias: '/real-name', name: 'identity', component: IdentityView, meta: { title: '用户实名', navGroup: 'system' } },
   { path: '/notifications', name: 'notifications', redirect: '/image/create' },
-  { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
+  { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '按时间查看创作任务、生成结果与实际烟火消耗。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: PlaceholderView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '管理成员、角色、通知和平台连接配置。' } },
   { path: '/help', name: 'help', redirect: '/image/create' },
