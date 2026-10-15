@@ -473,6 +473,11 @@
 .ls-precheck-facts dt{flex:none;color:var(--ink-muted)}
 .ls-precheck-facts dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}
 .ls-page .ls-precheck .primary-button{width:100%;min-height:42px;gap:6px}
+.ls-precheck-live{margin:0;padding:11px 12px;border-radius:8px;color:var(--color-success);background:color-mix(in srgb,var(--color-success) 8%,transparent);font-size:12px;text-align:center}
+.ls-app-modal{width:min(460px,100%)}
+.ls-app-modal h3{margin-top:0}
+.ls-app-downloads{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.ls-app-downloads a{display:inline-flex;align-items:center}
 @media(max-width:1100px){
   .ls-setup-layout.split{grid-template-columns:1fr}
   .ls-setup-layout.split>.ls-precheck{grid-column:1;grid-row:auto;position:static;margin-top:16px}
