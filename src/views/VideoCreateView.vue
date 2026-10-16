@@ -1,19 +1,5 @@
 <script setup>
-import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { auth } from '../stores/auth'
-
-const recentTasks = [
-  { id: 'v_1001', title: '双十一美妆大促混剪.mp4', type: '生成视频', status: 'completed', time: '10分钟前', cover: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=300&q=80' },
-  { id: 'v_1002', title: 'CEO 年度寄语数字人.mp4', type: '数字人', status: 'rendering', time: '正在渲染 · 68%', cover: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&q=80' },
-  { id: 'v_1003', title: '秋季新品全景展示.mp4', type: '生成视频', status: 'completed', time: '昨天 15:30', cover: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300&q=80' },
-]
-
-const selectedTask = ref(null)
-
-const openTask = (task) => {
-  selectedTask.value = task
-}
 </script>
 
 <template>
@@ -53,39 +39,6 @@ const openTask = (task) => {
           </div>
           <span class="video-entry-cta">进入录影棚 <span aria-hidden="true">→</span></span>
         </RouterLink>
-      </section>
-
-      <section v-if="auth.isAuthenticated" class="recent-video-section" aria-labelledby="recent-video-title">
-        <div class="recent-video-heading">
-          <div>
-            <p class="video-create-kicker">ACTIVITY STREAM <span>·</span> LAST 7 DAYS</p>
-            <h2 id="recent-video-title">最近创作</h2>
-          </div>
-          <RouterLink to="/tasks" class="recent-video-view-all">查看全部任务 <span aria-hidden="true">↗</span></RouterLink>
-        </div>
-
-        <div class="recent-video-list">
-          <button v-for="task in recentTasks" :key="task.id" class="recent-video-row" type="button" @click="openTask(task)">
-            <img class="recent-video-cover" :src="task.cover" :alt="`${task.title} 封面`" loading="lazy">
-            <span class="recent-video-play" aria-hidden="true"><span class="material-symbols-outlined">play_arrow</span></span>
-            <span class="recent-video-details">
-              <strong>{{ task.title }}</strong>
-              <span>{{ task.type }} <i>·</i> {{ task.id }}</span>
-            </span>
-            <span class="recent-video-status" :class="`is-${task.status}`">
-              <span class="recent-video-status-icon material-symbols-outlined">{{ task.status === 'completed' ? 'check_circle' : 'progress_activity' }}</span>
-              {{ task.status === 'completed' ? '已完成' : '渲染中' }}
-            </span>
-            <span class="recent-video-time">{{ task.time }}</span>
-            <span class="recent-video-arrow" aria-hidden="true">→</span>
-          </button>
-        </div>
-
-        <div v-if="selectedTask" class="recent-video-toast" role="status">
-          <span class="material-symbols-outlined">task_alt</span>
-          <span>已打开「{{ selectedTask.title }}」的任务详情</span>
-          <button type="button" aria-label="关闭提示" @click="selectedTask = null">×</button>
-        </div>
       </section>
     </main>
   </div>

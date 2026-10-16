@@ -1,0 +1,51 @@
+# Seedance 2.0 price table supplied by the operator (USD / 1M tokens).
+#
+# This is an intentionally disabled template. The screenshot provides the
+# provider token prices, but it does not establish the provider's token-count
+# formula, USD/CNY settlement rate, platform markup, or evidence expiry. A
+# rate remains unavailable until all of those fields are verified and filled.
+# Copy the required rows into the private billing-rates.yml loaded by both the
+# API and video worker. Never commit that private file or API credentials.
+growth:
+  billing:
+    video:
+      rates:
+        - &seedance20-common
+          provider-base-url: https://haomaotoken.com
+          provider-model: seedance-2.0
+          resolution: 480p
+          video-input: t2v
+          usd-per-million-tokens: 6.0882
+          cny-per-usd: null
+          selling-multiplier: null
+          max-output-pixels: 0
+          frames-per-second: 0
+          token-area-divisor: 0
+          reference-video-billed: null
+          source-url: null
+          verified-at: null
+          valid-until: null
+        - <<: *seedance20-common
+          video-input: v2v
+          usd-per-million-tokens: 3.7059
+        - <<: *seedance20-common
+          resolution: 720p
+          usd-per-million-tokens: 6.0882
+        - <<: *seedance20-common
+          resolution: 720p
+          video-input: v2v
+          usd-per-million-tokens: 3.7059
+        - <<: *seedance20-common
+          resolution: 1080p
+          usd-per-million-tokens: 6.75
+        - <<: *seedance20-common
+          resolution: 1080p
+          video-input: v2v
+          usd-per-million-tokens: 4.1029
+        - <<: *seedance20-common
+          resolution: 4K
+          usd-per-million-tokens: 3.4412
+        - <<: *seedance20-common
+          resolution: 4K
+          video-input: v2v
+          usd-per-million-tokens: 2.1176

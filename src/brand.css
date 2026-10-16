@@ -107,7 +107,7 @@
 .paper-app .page-scroll-workspace > .image-create-page { display: flex; }
 .paper-app .video-workbench-page { width: 100%; min-height: 0; height: 100%; margin: 0; padding: 0; border: 0; }
 .paper-app :is(.video-create-page,.studio-page,.digital-human-page) { width: 100%; margin: 0; padding: 0; min-height: 100%; background: var(--night); }
-.paper-app :is(.video-create-header,.video-entry-grid,.recent-video-section,.studio-header,.studio-workspace,.dh-page-header,.dh-workspace) { width: 100%; max-width: none; }
+.paper-app :is(.video-create-header,.video-entry-grid,.studio-header,.studio-workspace,.dh-page-header,.dh-workspace) { width: 100%; max-width: none; }
 .paper-app .poster-studio-page { min-height: 100%; background: var(--night); }
 .paper-app:has(.poster-studio-page) .main-area { position: relative; }
 .paper-app .floating-prompt-shell { position: absolute; left: 50%; width: min(820px, calc(100% - 48px)); bottom: 24px; }
@@ -126,8 +126,8 @@
   --an-ink:var(--ink); --an-muted:var(--ink-muted); --an-line:var(--line); --an-cinnabar:var(--color-accent-text);
 }
 /* Specialist tools share the same type hierarchy and paper surfaces. */
-.paper-app :is(.image-heading h1,.workflow-card-copy h3,.poster-studio-header h1,.library-heading h2,.video-create-title-row h1,.video-entry-copy h2,.recent-video-heading h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
-.paper-app :is(.workflow-card,.video-entry-card,.recent-video-list,.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
+.paper-app :is(.image-heading h1,.workflow-card-copy h3,.poster-studio-header h1,.library-heading h2,.video-create-title-row h1,.video-entry-copy h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
+.paper-app :is(.workflow-card,.video-entry-card,.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
 .paper-app :is(.workflow-card,.video-entry-card):hover { border-color: var(--color-brand-muted); transform: translateY(-2px); }
 .paper-app :is(.workflow-card-cyan,.workflow-card-cinnabar) { background: var(--night-panel); }
 .paper-app :is(.workflow-card::before,.video-entry-orb) { display: none; }

@@ -64,3 +64,6 @@ backend/growth-api/target/
 deploy/.env
 # Payment private keys and verified commercial pricing remain outside version control.
 deploy/billing-config/
+
+# Local commercial pricing used for development trials.
+backend/growth-api/billing-rates.local.yml

@@ -173,6 +173,25 @@ class VideoProviderGatewayTest {
     }
 
     @Test
+    void pollAcceptsVideoUsageAliasesFromProviderResponse() throws Exception {
+        var http = mock(HttpClient.class);
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
+                .thenAnswer(invocation -> {
+                    var response = mock(ClassicHttpResponse.class);
+                    when(response.getCode()).thenReturn(200);
+                    when(response.getEntity()).thenReturn(new StringEntity(
+                            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://haomaotoken.com/video.mp4\"},\"usage\":{\"video_tokens\":\"4321\"}}",
+                            ContentType.APPLICATION_JSON));
+                    return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+                });
+
+        var result = volcengineGateway(mock(AssetService.class), http)
+                .poll("job-1", "SEEDANCE_2_0", "poll-key");
+
+        assertThat(result.billingTokens()).isEqualTo(4321L);
+    }
+
+    @Test
     void volcengineBuildsMultimodalContentAndUsesDurationAndRatioFields() {
         var assets = mock(AssetService.class);
         when(assets.presignedReference(7L, "IMAGE")).thenReturn("https://storage.example/image.png");
