@@ -148,11 +148,43 @@ public class VideoProviderGateway {
         String status = normalizeStatus(firstText(response, "status", "state"));
         String url = "SUCCEEDED".equals(status)
                 ? (volcengine() ? resultVideoUrl(response) : resolveContentUrl(jobId, key)) : null;
-        JsonNode usage=response.path("usage");
-        if(usage.isMissingNode()) usage=response.path("data").path("usage");
-        Long tokens=usage.path("completion_tokens").asLong(0)>0?usage.path("completion_tokens").asLong():null;
-        if(tokens==null && usage.path("total_tokens").asLong(0)>0) tokens=usage.path("total_tokens").asLong();
+        Long tokens = billingTokens(response);
         return new PollResult(status, url, errorMessage(response),tokens);
+    }
+
+    /**
+     * Providers have used several names for video usage. Keep the raw provider
+     * response out of the billing contract and accept only a positive integer.
+     * When no usage is returned, VideoPricingService deliberately falls back to
+     * the verified output-media formula.
+     */
+    private Long billingTokens(JsonNode response) {
+        JsonNode usage = response.path("usage");
+        if (usage.isMissingNode()) usage = response.path("data").path("usage");
+        Long tokens = firstPositiveLong(usage, "video_tokens", "output_tokens", "completion_tokens",
+                "total_tokens", "tokens");
+        if (tokens == null) tokens = firstPositiveLong(response, "video_tokens", "output_tokens", "completion_tokens",
+                "total_tokens", "tokens");
+        if (tokens == null) tokens = firstPositiveLong(response.path("data"), "video_tokens", "output_tokens",
+                "completion_tokens", "total_tokens", "tokens");
+        return tokens;
+    }
+
+    private Long firstPositiveLong(JsonNode node, String... fields) {
+        if (node == null || node.isMissingNode() || node.isNull()) return null;
+        for (String field : fields) {
+            JsonNode value = node.path(field);
+            if (value.isIntegralNumber() && value.asLong() > 0) return value.asLong();
+            if (value.isTextual()) {
+                try {
+                    long parsed = Long.parseLong(value.asText().trim());
+                    if (parsed > 0) return parsed;
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed provider usage and continue with the next field.
+                }
+            }
+        }
+        return null;
     }
 
     public String providerName() { return providerName; }
