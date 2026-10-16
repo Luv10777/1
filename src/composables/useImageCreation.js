@@ -1,6 +1,6 @@
 import { computed, reactive, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { imageApi, uploadImageReference, uploadLibraryImageReference, saveGeneratedImageToLibrary, downloadImage } from '../services/imageCreation'
+import { imageApi, uploadImageReference, downloadImage } from '../services/imageCreation'
 import { IMAGE_QUALITIES, POSTER_PURPOSE_GROUPS, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
 import { billing, refreshBilling, requireMembership } from '../stores/billing'
@@ -38,7 +38,6 @@ export function useImageCreation(workflow) {
   const lastPrompt = ref('')
   const optimistic = ref(false)
   const optimisticBrief = ref('')
-  const assetSaving = ref(new Set())
   let pollTimer
   let alive = true
   let refreshSequence = 0
@@ -149,13 +148,6 @@ export function useImageCreation(workflow) {
     } catch (e) { error.value = e.message }
     if (event.target?.value) event.target.value = ''
   }
-  function addLibraryAsset(asset) {
-    if (locked.value || files.value.some(file => file.libraryId === asset.id)) return
-    error.value = ''
-    if (files.value.length >= 6) { error.value = '最多添加 6 张参考图片'; return }
-    files.value.push({ file: null, name: asset.name, role: 'SUBJECT', preview: asset.preview,
-      assetId: typeof asset.id === 'number' ? asset.id : null, libraryId: asset.id, libraryUrl: asset.preview })
-  }
   function removeFile(index) {
     if (locked.value) return
     if (files.value[index].file) URL.revokeObjectURL(files.value[index].preview)
@@ -208,8 +200,7 @@ export function useImageCreation(workflow) {
         files.value = []
       }
       try {
-        for (const file of submittedFiles) if (!file.assetId) file.assetId = file.file
-          ? await uploadImageReference(file.file) : await uploadLibraryImageReference(file.libraryUrl, file.name)
+        for (const file of submittedFiles) if (!file.assetId) file.assetId = await uploadImageReference(file.file)
         await deliver({ kind: 'create', data: {
           requestKey: crypto.randomUUID(), workflow: workflow, brief: submittedBrief,
           references: submittedFiles.map(f => ({ assetId: f.assetId, role: f.role })),
@@ -274,18 +265,6 @@ export function useImageCreation(workflow) {
     if (!canUseAsset(item)) return
     run(() => downloadImage(latestItem(item).url, '一方志-' + current.value.id + '-' + (item.ordinal + 1) + '.png'))
   }
-  function saveToLibrary(item) {
-    if (!item?.url || !canUseAsset(item) || assetSaving.value.has(item.id)) return
-    assetSaving.value = new Set(assetSaving.value).add(item.id)
-    run(async () => {
-      await saveGeneratedImageToLibrary(latestItem(item).url, '一方志-' + current.value.id + '-' + (item.ordinal + 1))
-      item.assetSaved = true
-    }).finally(() => {
-      const next = new Set(assetSaving.value)
-      next.delete(item.id)
-      assetSaving.value = next
-    })
-  }
   function regenerate(item, variation = null) {
     run(() => deliver({ kind: 'regenerate', id: current.value.id, itemId: item.id,
       data: { requestKey: crypto.randomUUID(), variation } }), true)
@@ -347,8 +326,8 @@ export function useImageCreation(workflow) {
     product, brief, ratio, quality, count, platform, imageType, purpose, style, files, busy, error,
     capabilities, capabilityState, capabilityError, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
-    refreshHistory, load, openCreation, renameCreation, addFiles, addLibraryAsset, removeFile, generate, revise,
-    retry, cancel, editText, saveText, download, saveToLibrary, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
+    refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
+    retry, cancel, editText, saveText, download, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
     supportsQuality, loadCapabilities, billing, estimatedCredits, requiresLogin,
   })
 }

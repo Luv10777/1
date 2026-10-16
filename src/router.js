@@ -13,7 +13,6 @@ import BillingView from './views/BillingView.vue'
 import EcosystemView from './views/EcosystemView.vue'
 import TaskCenterView from './views/TaskCenterView.vue'
 import BrandsView from './views/BrandsView.vue'
-import AssetsView from './views/AssetsView.vue'
 const ProductsView = () => import('./views/ProductsView.vue')
 import KnowledgeView from './views/KnowledgeView.vue'
 import WorksView from './views/WorksView.vue'
@@ -41,7 +40,6 @@ const PublicOrderView = () => import('./views/PublicOrderView.vue')
 const MerchantOrdersView = () => import('./views/MerchantOrdersView.vue')
 const PublicInformationView = () => import('./views/PublicInformationView.vue')
 const PublicInformationDetailView = () => import('./views/PublicInformationDetailView.vue')
-const IdentityView = () => import('./views/IdentityView.vue')
 
 const routes = [
   { path: '/', redirect: '/image/create' },
@@ -72,9 +70,9 @@ const routes = [
   { path: '/digital-human/studio', name: 'digital-human-studio', component: DigitalHumanStudioView, meta: { guest: true, title: '数字人摄影棚', eyebrow: 'CONTENT TOOLS', icon: 'record_voice_over', description: '选定专属出镜人，输入文案或语音，生成真人级数字人播报视频。' } },
   { path: '/merchants', name: 'merchants', component: StoresView, meta: { title: '门店库', eyebrow: 'ASSET CENTER', icon: '⌂', description: '查看和管理本商户的门店。' } },
   { path: '/brands', name: 'brands', component: BrandsView, meta: { title: '品牌库', eyebrow: 'ASSETS', icon: '◈', description: '沉淀品牌定位、语言风格和视觉识别资产。' } },
-  { path: '/assets', name: 'assets', component: AssetsView, meta: { title: '素材库', eyebrow: 'ASSETS', icon: '□', description: '统一管理图片、视频、文案与门店可用素材。' } },
+  { path: '/assets', name: 'assets', redirect: '/works' },
   { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', eyebrow: 'ASSET CENTER', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。' } },
-  { path: '/orders', name: 'merchant-orders', component: MerchantOrdersView, meta: { title: '订单管理', eyebrow: 'MERCHANT COMMERCE', navGroup: 'assets' } },
+  { path: '/orders', name: 'merchant-orders', component: MerchantOrdersView, meta: { title: '订单管理', eyebrow: 'MERCHANT COMMERCE', navGroup: 'mall' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
   { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
   { path: '/reviews', name: 'reviews', component: ReviewsView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },
@@ -92,13 +90,14 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', eyebrow: 'GEO GROWTH', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', eyebrow: 'GEO GROWTH', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', eyebrow: 'GEO GROWTH', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商家入驻', navGroup: 'billing' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商家入驻', navGroup: 'mall' } },
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
-  { path: '/identity', alias: '/real-name', name: 'identity', component: IdentityView, meta: { title: '用户实名', navGroup: 'system' } },
+  // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
+  { path: '/identity', alias: '/real-name', name: 'identity', redirect: { name: 'settings', hash: '#identity' } },
   { path: '/notifications', name: 'notifications', redirect: '/image/create' },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
-  { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '查看和修改自己的账号资料与登录密码。' } },
+  { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '查看和修改自己的账号资料、登录密码和实名认证。' } },
   { path: '/help', name: 'help', redirect: '/image/create' },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },
   { path: '/404', name: 'not-found', component: NotFoundView, meta: { title: '页面不存在', public: true } },
