@@ -1,7 +1,12 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { accountApi } from '../services/accountApi'
+import { platformManagementApi as identityApi } from '../services/platformManagement'
+import { identityValidation, managementDate } from '../domain/platformManagement'
 import { auth } from '../stores/auth'
+
+const route = useRoute()
 
 const profile = ref(null)
 const loading = ref(true)
@@ -28,11 +33,90 @@ const codeOnly = computed(() => !profile.value?.passwordSet)
 const canUseCode = computed(() => Boolean(profile.value?.phone))
 const maskedPhone = computed(() => profile.value?.phone?.replace(/^(\d{3})\d{4}(\d{4})$/, '$1 **** $2') || '')
 
+// 实名：本人提交姓名和身份证号，平台人员在管理后台人工审核。资料在服务端加密保存，这里只拿到脱敏后的结果。
+const identity = ref(null)
+const identityLoading = ref(true)
+const identityError = ref('')
+const identityOpen = ref(false)
+const identitySubmitting = ref(false)
+const identityFormError = ref('')
+const identityNotice = ref('')
+const identityForm = reactive({ legalName: '', idNumber: '', declarationAccepted: false })
+const identityStates = {
+  NONE: { label: '未实名', tone: '', text: '还没有提交实名资料。提交后由平台人工审核，结果会显示在这里。' },
+  PENDING_REVIEW: { label: '审核中', tone: 'wait', text: '资料已提交，正在等待平台人工审核，请勿重复提交。' },
+  VERIFIED: { label: '已通过', tone: 'on', text: '你的实名资料已通过平台人工审核。' },
+  REJECTED: { label: '未通过', tone: 'off', text: '审核没有通过。请根据下面的审核意见核对资料，再重新提交。' },
+}
+const identityState = computed(() => identityStates[identity.value?.status] || identityStates.NONE)
+const canSubmitIdentity = computed(() => !identityLoading.value && !identityError.value && (!identity.value || identity.value.status === 'REJECTED'))
+
 onMounted(async () => {
   document.querySelector('.page-scroll')?.classList.add('settings-scroll')
-  await load()
+  await Promise.all([load(), loadIdentity()])
+  // 旧的“用户实名”链接会带着 #identity 跳过来，直接定位到实名这一块。
+  if (route.hash === '#identity') {
+    await nextTick()
+    document.getElementById('identity')?.scrollIntoView({ block: 'start' })
+  }
 })
-onBeforeUnmount(() => document.querySelector('.page-scroll')?.classList.remove('settings-scroll'))
+onBeforeUnmount(() => {
+  document.querySelector('.page-scroll')?.classList.remove('settings-scroll')
+  clearIdentityForm()
+})
+
+function clearIdentityForm() {
+  Object.assign(identityForm, { legalName: '', idNumber: '', declarationAccepted: false })
+}
+
+async function loadIdentity() {
+  identityLoading.value = true
+  identityError.value = ''
+  identityNotice.value = ''
+  try {
+    identity.value = await identityApi.myIdentity()
+  } catch (error) {
+    identityError.value = error.message || '实名状态暂时无法读取，请稍后重试'
+  } finally {
+    identityLoading.value = false
+  }
+}
+
+function openIdentity() {
+  clearIdentityForm()
+  identityFormError.value = ''
+  identityNotice.value = ''
+  identityOpen.value = true
+}
+function closeIdentity() {
+  if (identitySubmitting.value) return
+  clearIdentityForm()
+  identityOpen.value = false
+}
+
+async function submitIdentity() {
+  if (identitySubmitting.value || !canSubmitIdentity.value) return
+  identityFormError.value = identityValidation(identityForm)
+  if (identityFormError.value) return
+  identitySubmitting.value = true
+  try {
+    identity.value = await identityApi.submitIdentity({
+      legalName: identityForm.legalName.trim(),
+      idNumber: identityForm.idNumber.trim().toUpperCase(),
+      declarationAccepted: identityForm.declarationAccepted,
+    })
+    clearIdentityForm()
+    identityOpen.value = false
+    identityNotice.value = '实名资料已提交，平台会人工审核。审核进度可以随时在这里查看。'
+  } catch (error) {
+    // 网络断开或服务端出错时，申请可能其实已经保存了；先刷新状态再决定要不要重交。
+    identityFormError.value = error.status === 0 || error.status >= 500
+      ? `${error.message || '提交没有完成'}。请先点“刷新状态”确认结果，再决定是否重新提交。`
+      : error.message || '提交失败，请检查资料后重试'
+  } finally {
+    identitySubmitting.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -118,7 +202,7 @@ async function savePassword() {
     <header class="settings-header">
       <p class="eyebrow">SYSTEM / SETTINGS</p>
       <h1>系统设置</h1>
-      <p class="header-desc">查看和修改你自己的账号资料与登录密码。只影响当前登录的这个账号。</p>
+      <p class="header-desc">查看和修改你自己的账号资料、登录密码和实名认证。只影响当前登录的这个账号。</p>
     </header>
 
     <div v-if="loading" class="loading-state">正在加载账号资料…</div>
@@ -202,6 +286,60 @@ async function savePassword() {
           </div>
         </form>
       </section>
+
+      <section id="identity" class="settings-card" aria-labelledby="identity-title">
+        <header class="card-header">
+          <div>
+            <h2 id="identity-title">实名认证</h2>
+            <p>{{ identityLoading ? '正在查询实名状态…' : identityError ? '实名状态暂时无法确认。' : identityState.text }}</p>
+          </div>
+          <span v-if="!identityLoading && !identityError" class="state-badge" :class="identityState.tone">{{ identityState.label }}</span>
+        </header>
+        <p v-if="identityNotice" class="inline-message" role="status">{{ identityNotice }}</p>
+        <p v-if="identityError" class="inline-message error" role="alert">{{ identityError }}</p>
+
+        <template v-if="identity">
+          <dl class="facts">
+            <div><dt>姓名</dt><dd>{{ identity.legalNameMasked }}</dd></div>
+            <div><dt>身份证号</dt><dd>{{ identity.idNumberMasked }}</dd></div>
+            <div><dt>提交时间</dt><dd>{{ managementDate(identity.submittedAt) }}</dd></div>
+            <div v-if="identity.reviewedAt"><dt>审核时间</dt><dd>{{ managementDate(identity.reviewedAt) }}</dd></div>
+          </dl>
+          <div v-if="identity.reviewNote" class="review-note">
+            <strong>平台审核意见</strong>
+            <p>{{ identity.reviewNote }}</p>
+          </div>
+        </template>
+
+        <div v-if="!identityOpen" class="card-actions">
+          <button v-if="canSubmitIdentity" class="ghost-button" @click="openIdentity">{{ identity ? '重新提交实名资料' : '去实名' }}</button>
+          <button class="link-button" :disabled="identityLoading" @click="loadIdentity">刷新状态</button>
+        </div>
+
+        <form v-else class="password-form" autocomplete="off" @submit.prevent="submitIdentity">
+          <label class="field">
+            <span>真实姓名</span>
+            <input v-model="identityForm.legalName" name="legal-name" autocomplete="off" maxlength="40" placeholder="与身份证上的姓名一致" :disabled="identitySubmitting" />
+          </label>
+          <label class="field">
+            <span>居民身份证号码</span>
+            <input v-model="identityForm.idNumber" name="id-number" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="18" placeholder="18 位身份证号码" :disabled="identitySubmitting" />
+            <small>只用于平台核对身份，提交后这里只显示打码后的号码。</small>
+          </label>
+          <label class="consent">
+            <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
+            <span>我确认以上是本人真实、准确的身份信息，并同意平台用于本次实名审核。不能替别人提交。</span>
+          </label>
+          <p class="hint">姓名和身份证号在服务端加密保存，只有平台审核人员能查看完整资料，每次查看都会留下记录。目前由平台人工审核，还没有接入公安等第三方核验。</p>
+          <div class="form-footer">
+            <p v-if="identityFormError" class="form-notice" role="alert">{{ identityFormError }}</p>
+            <div>
+              <button type="button" class="ghost-button" :disabled="identitySubmitting" @click="closeIdentity">取消</button>
+              <button type="submit" class="primary-button" :disabled="identitySubmitting">{{ identitySubmitting ? '提交中…' : '提交实名' }}</button>
+            </div>
+          </div>
+        </form>
+      </section>
     </template>
   </div>
 </template>
@@ -256,6 +394,16 @@ async function savePassword() {
 .form-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 4px; }
 .form-footer > div { display: flex; gap: 9px; margin-left: auto; }
 .form-notice { margin: 0; color: var(--color-error); font-size: 12px; line-height: 1.6; }
+
+.state-badge.wait { color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 10%, var(--color-bg-surface)); }
+.state-badge.off { color: var(--color-error); background: color-mix(in srgb, var(--color-error) 8%, var(--color-bg-surface)); }
+.card-actions { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+.review-note { margin-top: 16px; padding: 12px 14px; border-radius: 4px; background: var(--color-bg-subtle); font-size: 12px; line-height: 1.7; }
+.review-note p { margin: 4px 0 0; color: var(--color-text-muted); white-space: pre-wrap; }
+.consent { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; cursor: pointer; }
+.consent input { margin-top: 4px; accent-color: var(--color-accent); }
+.hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
+#identity { scroll-margin-top: 20px; }
 
 @media (max-width: 640px) {
   .settings-page { padding: 22px 16px 58px; }

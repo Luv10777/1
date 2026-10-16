@@ -30,7 +30,7 @@ const userInitial = computed(() => userName.value.slice(0, 1))
 // Reviews is a long-form feed and must use the shell's normal page scrolling.
 // Keeping it in the edge-workspace list applies overflow:hidden and prevents
 // the review stream from being scrolled once it exceeds the viewport.
-const edgeWorkspace = computed(() => ['image-create-poster', 'image-create-product-set', 'video-workbench', 'assets', 'messages'].includes(route.name))
+const edgeWorkspace = computed(() => ['image-create-poster', 'image-create-product-set', 'video-workbench', 'messages'].includes(route.name))
 const keyboard = (event) => {
   if (event.key === 'Escape') { menuOpen.value = false; accountOpen.value = false }
 }
@@ -39,7 +39,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keyboard))
 watch(() => route.fullPath, () => { expandActiveGroup(); closeMenu(); pageScroll.value?.scrollTo({ top: 0 }); refreshBilling() })
 
 const NAV_STORAGE_KEY = 'wuyao-sidebar-groups-v2'
-const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'edit_note', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', billing: 'card_membership', system: 'settings' }
+const navIcons = { workspace: 'dashboard', analytics: 'monitoring', acquisition: 'person_search', content: 'edit_note', publishing: 'publish', 'customer-service': 'support_agent', geo: 'location_on', assets: 'folder', mall: 'storefront', billing: 'card_membership', system: 'settings' }
 
 const navGroups = [
   {
@@ -111,10 +111,18 @@ const navGroups = [
       { name: 'brands', label: '品牌库', path: '/brands' },
       { name: 'merchants', label: '门店库', path: '/merchants' },
       { name: 'products', label: '商品库', path: '/assets/products' },
-      { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'knowledge', label: '知识库', path: '/knowledge' },
-      { name: 'assets', label: '素材库', path: '/assets' },
       { name: 'works', label: '作品库', path: '/works' },
+    ],
+  },
+  {
+    key: 'mall',
+    label: '商城',
+    items: [
+      { name: 'merchant-alliance', label: '商家入驻', path: '/merchant-alliance' },
+      { name: 'merchant-orders', label: '订单管理', path: '/orders' },
+      { name: 'public-information', label: '信息广场', path: '/information' },
+      { name: 'information-publishing', label: '我的发布', path: '/information-publishing' },
     ],
   },
   {
@@ -122,9 +130,6 @@ const navGroups = [
     label: '套餐与权益',
     items: [
       { name: 'billing', label: '套餐与权益', path: '/billing' },
-      { name: 'merchant-alliance', label: '商家联盟', path: '/merchant-alliance' },
-      { name: 'public-information', label: '信息广场', path: '/information' },
-      { name: 'information-publishing', label: '我的发布', path: '/information-publishing' },
     ],
   },
   {
@@ -133,7 +138,6 @@ const navGroups = [
     items: [
       { name: 'tasks', label: '任务中心', path: '/tasks' },
       { name: 'team', label: '员工管理', path: '/team', ownerOnly: true },
-      { name: 'identity', label: '用户实名', path: '/identity' },
       { name: 'settings', label: '系统设置', path: '/settings' },
     ],
   },

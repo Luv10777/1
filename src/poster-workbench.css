@@ -78,25 +78,6 @@
 .poster-add-reference span { margin-right: 3px; font-size: 15px; vertical-align: -1px; }
 .poster-reference-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .poster-reference-actions .poster-add-reference.active { border-color: #E9D5CC; background: #FAF2EF; color: var(--poster-ink); }
-.poster-reference-library { margin-top: 10px; padding: 12px; border: 1px solid var(--poster-line); border-radius: 12px; background: #fff; box-shadow: 0 4px 18px rgba(45,40,38,.04); }
-.poster-library-head { display: flex; justify-content: space-between; gap: 8px; align-items: start; margin-bottom: 11px; }
-.poster-library-head strong { display: block; color: var(--poster-ink); font-size: 12px; }
-.poster-library-head small { display: block; margin-top: 3px; color: var(--poster-muted); font-size: 10px; }
-.poster-library-head button { display: grid; place-items: center; width: 25px; height: 25px; padding: 0; border: 1px solid var(--poster-line); border-radius: 7px; background: #fff; color: var(--poster-muted); font-size: 18px; line-height: 1; }
-.poster-library-head button:hover { background: var(--poster-paper); color: var(--poster-ink); }
-.poster-reference-library > input { width: 100%; height: 34px; margin-bottom: 10px; padding: 0 10px; border: 1px solid var(--poster-line); border-radius: 8px; background: #FEFDFC; color: var(--poster-ink); font-size: 11px; }
-.poster-library-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; max-height: 255px; overflow-y: auto; scrollbar-width: thin; }
-.poster-library-card { position: relative; min-width: 0; overflow: hidden; padding: 4px; border: 1px solid var(--poster-line); border-radius: 9px; background: #fff; text-align: left; transition: border-color .18s, background .18s, transform .18s; }
-.poster-library-card:hover:not(:disabled) { border-color: #D9C6BB; background: #FAF8F5; transform: translateY(-1px); }
-.poster-library-card.selected { border-color: #D9B9AD; background: #FAF2EF; }
-.poster-library-card > img { display: block; width: 100%; height: 76px; border-radius: 6px; object-fit: cover; }
-.poster-library-card-copy { display: block; min-width: 0; padding: 6px 2px 2px; }
-.poster-library-card-copy strong, .poster-library-card-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.poster-library-card-copy strong { color: var(--poster-ink); font-size: 10px; }
-.poster-library-card-copy small { margin-top: 3px; color: var(--poster-muted); font-size: 9px; }
-.poster-library-check { position: absolute; top: 9px; right: 9px; display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%; background: var(--poster-red); color: #fff; font-size: 12px; }
-.poster-library-empty { margin: 0; padding: 24px 5px; color: var(--poster-muted); font-size: 11px; text-align: center; }
-.poster-library-count { margin: 9px 0 0; color: var(--poster-muted); font-size: 10px; text-align: right; }
 .poster-field-note { margin: 8px 0 0; color: #9A908A; font-size: 11px; line-height: 1.65; }
 .poster-ratio-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
 .poster-ratio-grid button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 6px; border: 1px solid var(--poster-line); border-radius: 9px; background: #fff; color: var(--poster-muted); font-size: 12px; font-weight: 500; transition: background .18s, transform .18s; }

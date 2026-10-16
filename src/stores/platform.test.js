@@ -34,7 +34,8 @@ test('standalone admin routes require explicit operator access and do not exist 
       assert.equal(router.currentRoute.value.name, 'admin-forbidden', 'merchant ownership grants no platform rights')
     }
     await publicRouter.push('/identity')
-    assert.equal(publicRouter.currentRoute.value.name, 'identity', 'own identity submission remains available')
+    assert.equal(publicRouter.currentRoute.value.name, 'settings', 'own identity submission now lives in the account settings')
+    assert.equal(publicRouter.currentRoute.value.hash, '#identity')
     operator = true
     auth.state.user = { id: 1, tenantId: 1, roles: ['owner'] }
     await router.push('/admin/information')

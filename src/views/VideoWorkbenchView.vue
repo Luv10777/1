@@ -3,7 +3,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import { get, post } from '../utils/request'
-import { assetSource, assets as platformAssets } from '../stores/assetLibrary'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 import { billing, dateTime, number, refreshBilling, requireMembership } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
@@ -18,11 +17,6 @@ const referenceImages = ref([])
 const referenceVideo = ref(null)
 const imageInput = ref(null)
 const videoInput = ref(null)
-const libraryOpen = ref(false)
-const libraryLoading = ref(false)
-const libraryError = ref('')
-const libraryQuery = ref('')
-const libraryAssets = ref([])
 const capabilities = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
@@ -193,38 +187,6 @@ const addImageFiles = (fileList) => {
   referenceImages.value = [...referenceImages.value, ...images.slice(0, remaining).map(file => ({ id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }))]
 }
 const previewUrl = file => { const url = URL.createObjectURL(file); objectUrls.add(url); return url }
-const openImageLibrary = async () => {
-  if (!auth.requireLogin()) return
-  libraryOpen.value = true
-  libraryLoading.value = true
-  libraryError.value = ''
-  libraryQuery.value = ''
-  try {
-    const page = await get('/api/assets', { page: 0, size: 100 })
-    libraryAssets.value = (page.items || []).filter(asset => asset.type === 'IMAGE').map(asset => ({
-      id: asset.id,
-      assetId: asset.id,
-      name: asset.name,
-      url: asset.previewUrl || asset.mediaUrl || assetSource(asset),
-      file: null,
-    }))
-  } catch (error) {
-    libraryAssets.value = platformAssets.value.filter(asset => asset.kind === 'image').map(asset => ({ id: asset.id, assetId: null, name: asset.name, url: assetSource(asset), file: null }))
-    if (!libraryAssets.value.length) libraryError.value = error.message || '素材库暂时无法加载'
-  } finally {
-    libraryLoading.value = false
-  }
-}
-const visibleLibraryAssets = computed(() => {
-  const query = libraryQuery.value.trim().toLowerCase()
-  return libraryAssets.value.filter(asset => !query || asset.name.toLowerCase().includes(query))
-})
-const selectLibraryImage = asset => {
-  const remaining = Math.max(0, 6 - referenceImages.value.length)
-  if (!remaining) { activeConversation.value.notice = '最多添加 6 张参考图。'; return }
-  referenceImages.value = [...referenceImages.value, { ...asset, id: `library-${asset.assetId || asset.id}` }]
-  libraryOpen.value = false
-}
 const addVideoFile = (fileList) => {
   const file = Array.from(fileList || []).find(item => item.type.startsWith('video/'))
   if (!file) return
@@ -420,7 +382,6 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
           </div>
           <div class="video-upload-actions">
             <button class="video-upload-source" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleImageDrop"><span class="material-symbols-outlined">upload</span><strong>从本地上传</strong><small>JPG、PNG · 可拖拽上传</small></button>
-            <button class="video-upload-source" type="button" @click="openImageLibrary"><span class="material-symbols-outlined">photo_library</span><strong>从素材库上传</strong><small>选择平台已有素材</small></button>
           </div>
           <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleImageChange">
           <div v-if="referenceImages.length" class="video-asset-strip flex overflow-x-auto gap-2 mt-3">
@@ -522,17 +483,5 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
     <dialog ref="quoteDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="video-price-title" @cancel.prevent="closeQuote">
       <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount">{{ number(quoted.quote.credits) }}<small> 烟火</small></p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !member || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="!member || (billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值 →</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
     </dialog>
-    <Transition name="video-library-fade">
-      <div v-if="libraryOpen" class="video-library-modal" role="dialog" aria-modal="true" aria-label="选择平台素材" @click.self="libraryOpen = false">
-        <section class="video-library-card">
-          <header class="video-library-header"><div><span>YIFANGZHI LIBRARY</span><h2>选择参考图</h2><small>从一方志素材库中选择已上传图片</small></div><button type="button" aria-label="关闭素材库" @click="libraryOpen = false">×</button></header>
-          <label class="video-library-search"><span class="material-symbols-outlined">search</span><input v-model="libraryQuery" autofocus type="search" placeholder="搜索素材名称" /></label>
-          <div v-if="libraryLoading" class="video-library-state" role="status">正在读取素材库…</div>
-          <div v-else-if="libraryError" class="video-library-state is-error" role="status">{{ libraryError }}</div>
-          <div v-else-if="!visibleLibraryAssets.length" class="video-library-state">素材库中暂时没有可用图片。</div>
-          <div v-else class="video-library-grid"><button v-for="asset in visibleLibraryAssets" :key="asset.id" type="button" class="video-library-item" @click="selectLibraryImage(asset)"><span class="video-library-thumb"><img :src="asset.url" :alt="asset.name"></span><span><strong>{{ asset.name }}</strong><small>图片素材</small></span><span class="material-symbols-outlined">arrow_forward</span></button></div>
-        </section>
-      </div>
-    </Transition>
   </div>
 </template>

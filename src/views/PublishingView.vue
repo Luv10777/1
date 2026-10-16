@@ -4,9 +4,7 @@ import { useRoute } from 'vue-router';
 import { usePlatformAccounts } from '../stores/platformAccounts';
 import { usePublishingVideo } from "../composables/usePublishingVideo";
 import { usePublishingAttachments, IMAGE_LIMIT } from "../composables/usePublishingAttachments";
-import { assetSource } from "../stores/assetLibrary";
 import PublishingPhone from "../components/publishing/PublishingPhone.vue";
-import PublishingAssetPicker from "../components/publishing/PublishingAssetPicker.vue";
 import PublishingCommerce from "../components/publishing/PublishingCommerce.vue";
 import PublishingSelect from "../components/publishing/PublishingSelect.vue";
 import '../publishing-media.css';
@@ -31,7 +29,6 @@ import {
   ZoomIn,
   X,
   LoaderCircle,
-  FolderOpen,
   Music2,
   Play,
   Pause,
@@ -80,33 +77,22 @@ const coverDialog = ref(null);
 const videoInput = ref(null);
 const imageInput = ref(null);
 const musicInput = ref(null);
-const assetPicker = ref(null);
 const mediaType = ref('video');
-const pickerKind = ref('video');
-const libraryBusy = ref(false);
-const libraryError = ref('');
 const { pictures, music, busy: attachmentsBusy, error: attachmentsError, addPictures, selectMusic, removePicture, movePicture, removeMusic } = usePublishingAttachments();
 const musicVolume = ref(35);
 const originalVolume = ref(100);
 const musicStart = ref(0);
 const musicPlaying = ref(false);
 const activePicture = ref(0);
-const libraryAbort = new AbortController();
 const phonePreview = ref(null);
 const { videoUrl, videoInfo, videoBusy, videoError, selectVideo, removeVideo } = usePublishingVideo();
-const mediaBusy = computed(() => videoBusy.value || attachmentsBusy.value || libraryBusy.value);
+const mediaBusy = computed(() => videoBusy.value || attachmentsBusy.value);
 const hasMedia = computed(() => mediaType.value === 'video' ? !!videoUrl.value : pictures.value.length > 0);
-const pickerLimit = computed(() => pickerKind.value === 'image' ? IMAGE_LIMIT - pictures.value.length : 1);
 watch(music, () => { musicStart.value = 0; musicPlaying.value = false });
 watch(() => pictures.value.length, length => { activePicture.value = Math.min(activePicture.value, Math.max(0, length - 1)) });
 function uploadLocal() {
   if (mediaBusy.value) return;
   (mediaType.value === 'video' ? videoInput : imageInput).value?.click();
-}
-function openLibrary(kind = mediaType.value === 'video' ? 'video' : 'image') {
-  pickerKind.value = kind;
-  libraryError.value = '';
-  assetPicker.value.open();
 }
 async function uploadPictures(event) {
   const files = Array.from(event.target.files || []);
@@ -117,33 +103,6 @@ async function uploadMusic(event) {
   const file = event.target.files?.[0];
   event.target.value = '';
   await selectMusic(file);
-}
-async function chooseLibrary(items) {
-  if (mediaBusy.value) return;
-  libraryBusy.value = true;
-  libraryError.value = '';
-  try {
-    const files = [];
-    for (const item of items) {
-      const source = assetSource(item);
-      if (!source) throw new Error('此素材缺少源文件，请选择其他素材');
-      const response = await fetch(source, { signal: AbortSignal.any([libraryAbort.signal, AbortSignal.timeout(15000)]) });
-      if (!response.ok) throw new Error(`读取 ${item.name} 失败，请重试`);
-      const blob = await response.blob();
-      const extension = new URL(source, window.location.href).pathname.split('.').pop();
-      const name = `${item.name.replace(/\.[^.]+$/, '')}.${extension}`;
-      files.push(new File([blob], name, { type: blob.type }));
-    }
-    let success;
-    if (pickerKind.value === 'image') success = await addPictures(files);
-    else if (pickerKind.value === 'audio') success = await selectMusic(files[0]);
-    else { success = await selectVideo(files[0]); if (success) cover.value = ''; }
-    if (success) assetPicker.value.close();
-    else libraryError.value = pickerKind.value === 'video' ? videoError.value : attachmentsError.value;
-  } catch (error) {
-    if (error.name !== 'AbortError') libraryError.value = error.name === 'TimeoutError' ? '素材读取超时，请重试。' : error.message;
-  }
-  finally { libraryBusy.value = false; }
 }
 const durationLabel = computed(() => {
   const seconds = Math.floor(videoInfo.value?.duration || 0);
@@ -420,7 +379,6 @@ watch(activePlatform, (value) => {
 });
 onBeforeUnmount(() => {
   clearInterval(accountClock);
-  libraryAbort.abort();
   clearTimeout(noticeTimer);
   clearTimeout(actionTimer);
 });
@@ -454,7 +412,6 @@ onBeforeUnmount(() => {
     <input ref="videoInput" type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm" hidden @change="uploadVideo" />
     <input ref="imageInput" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden @change="uploadPictures" />
     <input ref="musicInput" type="file" accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/aac,.mp3,.wav,.m4a,.ogg,.aac" hidden @change="uploadMusic" />
-    <PublishingAssetPicker ref="assetPicker" :kind="pickerKind" :limit="pickerLimit" :busy="libraryBusy" :error="libraryError" @select="chooseLibrary" />
     <nav class="studio-mobile-steps" aria-label="刊印步骤"><button v-for="(label, index) in ['素材', '文案与挂载', '预览']" :key="label" :aria-current="studioStep === index ? 'step' : undefined" @click="studioStep = index">0{{ index + 1 }} {{ label }}</button></nav>
     <main class="pub-grid">
       <section class="studio-upload-column" tabindex="0" aria-label="素材上传区">
@@ -470,7 +427,6 @@ onBeforeUnmount(() => {
                 <LoaderCircle v-if="mediaBusy" class="pub-loading" :size="14" /><Upload v-else :size="14" />
                 {{ mediaBusy ? '正在读取…' : '本地上传' }}
               </button>
-              <button :disabled="mediaBusy || publishing || (mediaType === 'image' && pictures.length >= IMAGE_LIMIT)" @click="openLibrary()"><FolderOpen :size="14" />从素材库选择</button>
             </div>
           </div>
           <div class="pub-media-tabs" role="group" aria-label="作品类型">
@@ -511,7 +467,7 @@ onBeforeUnmount(() => {
 
         <div v-show="mediaPanel === 'music'" class="pub-section pub-music-section">
           <div class="section-heading"><div><h2 class="flex items-center gap-2"><Music2 :size="18" />背景音乐</h2><p>视频与图文均可配乐</p></div><span class="selection-count">可选</span></div>
-          <div class="asset-actions"><button :disabled="mediaBusy" @click="musicInput?.click()"><Upload :size="14" />上传音乐</button><button :disabled="mediaBusy" @click="openLibrary('audio')"><FolderOpen :size="14" />素材库音乐</button></div>
+          <div class="asset-actions"><button :disabled="mediaBusy" @click="musicInput?.click()"><Upload :size="14" />上传音乐</button></div>
           <p v-if="attachmentsError" class="pub-error" role="alert">{{ attachmentsError }}</p>
           <div v-if="music" class="pub-music-editor">
             <div class="pub-music-track"><Music2 :size="22" /><div><b>{{ music.name }}</b><small>{{ Math.floor(music.duration / 60) }}:{{ String(Math.floor(music.duration % 60)).padStart(2, '0') }}</small></div><button class="pub-icon-button" :aria-label="musicPlaying ? '暂停配乐试听' : '试听配乐'" :title="musicPlaying ? '暂停试听' : '试听配乐'" @click="phonePreview?.toggleMusic()"><Pause v-if="musicPlaying" :size="17" /><Play v-else :size="17" /></button><button class="pub-icon-button" aria-label="移除背景音乐" title="移除音乐" :disabled="mediaBusy" @click="removeMusic"><X :size="17" /></button></div>
@@ -749,7 +705,6 @@ onBeforeUnmount(() => {
             :poi="poi"
             :current-account="currentAccount"
             @upload="uploadLocal"
-            @library="openLibrary()"
             @picture-change="activePicture = $event"
             @music-playing="musicPlaying = $event"
             @playback-error="announce"

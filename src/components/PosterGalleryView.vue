@@ -397,13 +397,6 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   >
                     下载图片</button
                   ><button
-                    v-if="item.url"
-                    type="button"
-                    :disabled="studio.busy || !!studio.pending || item.assetSaved || !studio.canUseAsset(item)"
-                    @click="studio.saveToLibrary(item)"
-                  >
-                    {{ item.assetSaved ? "已保存到素材库" : "保存到素材库" }}</button
-                  ><button
                     v-if="['FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN'].includes(item.status)"
                     type="button"
                     :disabled="studio.busy || !!studio.pending"
@@ -471,13 +464,6 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             @click="studio.download(preview)"
           >
             下载原图 ↓</button
-          ><button
-            type="button"
-            class="poster-lightbox-download"
-            :disabled="studio.busy || preview.assetSaved || !studio.canUseAsset(preview)"
-            @click="studio.saveToLibrary(preview)"
-          >
-            {{ preview.assetSaved ? "已保存到素材库" : "保存到素材库" }}</button
           ><button
             type="button"
             class="poster-lightbox-close"
