@@ -3,11 +3,13 @@ package com.wuyao.growth.community;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.time.Instant;
 import java.util.Optional;
 
 public interface InformationPublicationRepository extends JpaRepository<InformationPublication, Long> {
@@ -33,4 +35,9 @@ public interface InformationPublicationRepository extends JpaRepository<Informat
     @Query("select i from InformationPublication i where i.id = :id and i.status = 'PUBLISHED' " +
             "and (i.validUntil is null or i.validUntil >= :today)")
     Optional<InformationPublication> findPublicById(@Param("id") Long id, @Param("today") LocalDate today);
+
+    /** 商户关闭时下线它发布的全部信息。 */
+    @Modifying(flushAutomatically = true)
+    @Query("update InformationPublication i set i.status = 'OFFLINE', i.updatedAt = :now where i.tenantId = :tenantId and i.status = 'PUBLISHED'")
+    int takeDownAll(@Param("tenantId") Long tenantId, @Param("now") Instant now);
 }

@@ -2,6 +2,7 @@ package com.wuyao.growth.iam.repository;
 
 import com.wuyao.growth.iam.entity.WechatAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,4 +13,9 @@ public interface WechatAccountRepository extends JpaRepository<WechatAccount, Lo
 
     @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:identity, 0))", nativeQuery = true)
     int lockIdentity(@Param("identity") String identity);
+
+    /** 注销时解除微信绑定，这个微信以后可以重新注册或绑定别的账号。 */
+    @Modifying
+    @Query("delete from WechatAccount w where w.userId = :userId")
+    int deleteByUser(@Param("userId") Long userId);
 }
