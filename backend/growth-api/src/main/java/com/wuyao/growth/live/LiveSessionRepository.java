@@ -18,6 +18,8 @@ public interface LiveSessionRepository extends JpaRepository<LiveSession, Long> 
 
     List<LiveSession> findByStoreIdAndStatusIn(Long storeId, Collection<String> statuses);
 
+    List<LiveSession> findByTenantIdAndStatusIn(Long tenantId, Collection<String> statuses);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from LiveSession s where s.id = :id")
     Optional<LiveSession> findForUpdate(@Param("id") Long id);

@@ -28,6 +28,19 @@ export function passwordPayload(values, byCode) {
   return { currentPassword, newPassword }
 }
 
+/** 确认注销。绑了手机号的用验证码，没绑的用当前密码；还要本人勾选"已了解后果"。 */
+export function closurePayload(values, byCode) {
+  if (!values.confirmed) throw new Error('请先勾选确认已了解注销的后果')
+  if (byCode) {
+    const code = String(values.code ?? '').trim()
+    if (!CODE.test(code)) throw new Error('请输入 6 位验证码')
+    return { code, confirmed: true }
+  }
+  const currentPassword = String(values.currentPassword ?? '')
+  if (!currentPassword) throw new Error('请输入当前密码')
+  return { currentPassword, confirmed: true }
+}
+
 export function createAccountApi({ request = defaultRequest } = {}) {
   const put = (endpoint, body) => request(endpoint, { method: 'PUT', body: JSON.stringify(body) })
   return {
@@ -35,6 +48,11 @@ export function createAccountApi({ request = defaultRequest } = {}) {
     rename: name => put('/api/auth/account/name', namePayload(name)),
     /** 成功后返回新的一套令牌：其他设备的登录已失效，这台要换上新的才能继续用。 */
     changePassword: (values, byCode) => put('/api/auth/account/password', passwordPayload(values, byCode)),
+    /** 注销前的说明：只注销自己还是连商户一起关闭、会作废什么、现在能不能注销。 */
+    closurePreview: () => request('/api/auth/account/closure', { method: 'GET' }),
+    /** 立即生效、不能恢复；成功后这台设备的令牌也已失效，调用方要清掉本地登录。 */
+    close: (values, byCode) => request('/api/auth/account/closure',
+      { method: 'POST', body: JSON.stringify(closurePayload(values, byCode)) }),
   }
 }
 

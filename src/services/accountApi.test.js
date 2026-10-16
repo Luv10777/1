@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createAccountApi, namePayload, passwordPayload } from './accountApi.js'
+import { closurePayload, createAccountApi, namePayload, passwordPayload } from './accountApi.js'
 
 test('a name is trimmed and must not be empty or too long', () => {
   assert.deepEqual(namePayload('  王老板 '), { name: '王老板' })
@@ -36,4 +36,24 @@ test('each action goes to the signed-in person’s own account, and an invalid f
   assert.deepEqual(calls[2].body, { code: '123456', newPassword: 'new-secret' })
   assert.throws(() => api.rename(''), /姓名/)
   assert.equal(calls.length, 3)
+})
+
+test('closing an account needs the box ticked and only the chosen proof is sent', async () => {
+  assert.deepEqual(closurePayload({ code: ' 123456 ', currentPassword: 'secret', confirmed: true }, true), { code: '123456', confirmed: true })
+  assert.deepEqual(closurePayload({ code: '123456', currentPassword: 'secret', confirmed: true }, false), { currentPassword: 'secret', confirmed: true })
+  assert.throws(() => closurePayload({ code: '123456', confirmed: false }, true), /勾选/)
+  assert.throws(() => closurePayload({ code: '12', confirmed: true }, true), /验证码/)
+  assert.throws(() => closurePayload({ currentPassword: '', confirmed: true }, false), /当前密码/)
+
+  const calls = []
+  const api = createAccountApi({ request: async (endpoint, options) => {
+    calls.push({ line: `${options.method} ${endpoint}`, body: options.body && JSON.parse(options.body) })
+    return {}
+  } })
+  await api.closurePreview()
+  await api.close({ code: '123456', confirmed: true }, true)
+  assert.deepEqual(calls.map(call => call.line), ['GET /api/auth/account/closure', 'POST /api/auth/account/closure'])
+  assert.deepEqual(calls[1].body, { code: '123456', confirmed: true })
+  assert.throws(() => api.close({ code: '123456', confirmed: false }, true), /勾选/)
+  assert.equal(calls.length, 2)
 })

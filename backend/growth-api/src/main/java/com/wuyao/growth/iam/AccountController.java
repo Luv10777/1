@@ -5,6 +5,7 @@ import com.wuyao.growth.common.security.ClientIpResolver;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.iam.dto.AccountDtos;
 import com.wuyao.growth.iam.dto.AuthDtos;
+import com.wuyao.growth.iam.service.AccountClosureService;
 import com.wuyao.growth.iam.service.AccountService;
 import com.wuyao.growth.iam.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,7 @@ public class AccountController {
 
     private final AccountService accounts;
     private final AuthService authService;
+    private final AccountClosureService closures;
     private final ClientIpResolver clientIps;
 
     @GetMapping
@@ -41,5 +43,19 @@ public class AccountController {
                                                           HttpServletRequest http) {
         return ApiResponse.ok(authService.changePassword(me.userId(), req.currentPassword(), req.code(),
                 req.newPassword(), clientIps.resolve(http), http.getHeader("User-Agent"), http.getHeader("X-Device-Id")));
+    }
+
+    /** 注销前的说明：只注销自己还是连商户一起关闭、会作废什么、现在能不能注销。 */
+    @GetMapping("/closure")
+    public ApiResponse<AccountDtos.ClosurePreview> closurePreview(@AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(closures.preview(me.userId()));
+    }
+
+    /** 注销立即生效，所有设备上的登录随之失效，不能恢复。 */
+    @PostMapping("/closure")
+    public ApiResponse<Void> close(@AuthenticationPrincipal AuthPrincipal me,
+                                   @Valid @RequestBody AccountDtos.ClosureRequest req) {
+        closures.close(me.userId(), req.code(), req.currentPassword());
+        return ApiResponse.ok();
     }
 }

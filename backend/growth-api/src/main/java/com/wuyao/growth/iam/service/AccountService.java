@@ -6,6 +6,7 @@ import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.iam.dto.AccountDtos;
 import com.wuyao.growth.iam.entity.User;
 import com.wuyao.growth.iam.repository.RefreshTokenRepository;
+import com.wuyao.growth.iam.repository.TenantRepository;
 import com.wuyao.growth.iam.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class AccountService {
 
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
+    private final TenantRepository tenants;
 
     /** 当前商户里这个可用账号的角色。停用、移除或不属于当前商户的账号一律拒绝。 */
     @Transactional(readOnly = true)
@@ -87,6 +89,9 @@ public class AccountService {
     @Transactional
     public AccountDtos.Account createStaff(String phone, String name) {
         Long tenantId = TenantContext.require();
+        // 和注销关闭商户互斥：商户正在关闭或已关闭时不能再加人。
+        tenants.findForUpdate(tenantId).filter(tenant -> ACTIVE.equals(tenant.getStatus()))
+                .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "商户已关闭"));
         String number = phone == null ? "" : phone.trim();
         if (!PHONE.matcher(number).matches()) throw BizException.of(ErrorCode.PHONE_INVALID, "手机号格式不正确");
         users.findByPhone(number).ifPresent(existing -> {

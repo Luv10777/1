@@ -27,4 +27,8 @@ public interface VoiceSampleRepository extends JpaRepository<VoiceSample, Long> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select v from VoiceSample v where v.id = :id")
     Optional<VoiceSample> lockById(Long id);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from VoiceSample v where v.tenantId = :tenantId and v.status <> :status order by v.id")
+    List<VoiceSample> lockAllByTenantIdAndStatusNot(Long tenantId, String status);
+    long countByTenantIdAndStatusNot(Long tenantId, String status);
 }

@@ -1,12 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { accountApi } from '../services/accountApi'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
 import { identityValidation, managementDate } from '../domain/platformManagement'
 import { auth } from '../stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 
 const profile = ref(null)
 const loading = ref(true)
@@ -162,19 +163,61 @@ function switchProof(useCode) {
   passwordNotice.value = ''
 }
 
-async function sendCode() {
+/** 验证码发到本人手机；改密码和注销共用，提示写到各自表单下面。 */
+async function sendCode(form = 'password') {
+  const [notice, failure] = form === 'closure' ? [closureNotice, closureError] : [passwordNotice, passwordError]
   if (sendingCode.value || auth.state.cooldown > 0) return
-  passwordError.value = ''
+  failure.value = ''
   sendingCode.value = true
   try {
     const result = await auth.sendCode(profile.value.phone)
-    passwordNotice.value = result?.developmentMode
+    notice.value = result?.developmentMode
       ? '当前为本地调试模式，不会发送短信。验证码请在后端控制台查看。'
       : `验证码已发送到 ${maskedPhone.value}，5 分钟内有效。`
   } catch (error) {
-    passwordError.value = error.message || '验证码发送失败，请稍后重试'
+    failure.value = error.message || '验证码发送失败，请稍后重试'
   } finally {
     sendingCode.value = false
+  }
+}
+
+// 注销：先看服务端给的说明（只注销自己还是连商户一起关、会作废什么、现在能不能注销），再用验证码或当前密码确认。
+const closureOpen = ref(false)
+const closureLoading = ref(false)
+const closure = ref(null)
+const closing = ref(false)
+const closureError = ref('')
+const closureNotice = ref('')
+const closureForm = reactive({ code: '', currentPassword: '', confirmed: false })
+
+async function openClosure() {
+  Object.assign(closureForm, { code: '', currentPassword: '', confirmed: false })
+  closureError.value = ''
+  closureNotice.value = ''
+  closure.value = null
+  closureOpen.value = true
+  closureLoading.value = true
+  try {
+    closure.value = await accountApi.closurePreview()
+  } catch (error) {
+    closureError.value = error.message || '注销说明加载失败，请重试'
+  } finally {
+    closureLoading.value = false
+  }
+}
+function closeClosure() { if (!closing.value) closureOpen.value = false }
+
+async function confirmClosure() {
+  if (closing.value || !closure.value || closure.value.blockedReason) return
+  closureError.value = ''
+  closing.value = true
+  try {
+    await accountApi.close(closureForm, closure.value.byCode)
+    auth.clearSession()
+    router.replace({ name: 'login' })
+  } catch (error) {
+    closureError.value = error.message || '注销没有完成，请重试'
+    closing.value = false
   }
 }
 
@@ -256,7 +299,7 @@ async function savePassword() {
             <label for="settings-code">短信验证码</label>
             <div class="code-row">
               <input id="settings-code" v-model="passwordForm.code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码" :disabled="savingPassword" />
-              <button type="button" class="ghost-button" :disabled="savingPassword || sendingCode || auth.state.cooldown > 0" @click="sendCode">
+              <button type="button" class="ghost-button" :disabled="savingPassword || sendingCode || auth.state.cooldown > 0" @click="sendCode('password')">
                 {{ sendingCode ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}
               </button>
             </div>
@@ -340,6 +383,71 @@ async function savePassword() {
           </div>
         </form>
       </section>
+
+      <section class="settings-card danger-card" aria-labelledby="closure-title">
+        <header class="card-header">
+          <div>
+            <h2 id="closure-title">注销账号</h2>
+            <p>注销后这个账号立即停用，所有设备上的登录退出，不能恢复。{{ profile.role === 'STAFF' ? '只影响你自己，商户和其他成员不受影响。' : '如果你是商户里最后一位管理员，整个商户会一起关闭。' }}</p>
+          </div>
+        </header>
+        <button v-if="!closureOpen" class="danger-button" @click="openClosure">注销账号</button>
+
+        <div v-else class="closure-panel">
+          <p v-if="closureLoading" class="hint">正在确认注销会影响什么…</p>
+          <template v-else-if="closure">
+            <div class="consequences">
+              <strong v-if="closure.wholeTenant">你是商户里最后一位管理员，注销后整个商户会一起关闭：</strong>
+              <strong v-else>只注销你自己的账号，商户和其他成员不受影响：</strong>
+              <ul>
+                <template v-if="closure.wholeTenant">
+                  <li v-if="closure.otherMembers > 0">商户里另外 {{ closure.otherMembers }} 位成员的账号也会一起注销，并立即退出登录</li>
+                  <li>所有门店关闭，对外的店铺页、商品和信息发布全部下线</li>
+                  <li>商户里的商品、知识库、作品等资料都无法再查看</li>
+                </template>
+                <li v-for="loss in closure.losses" :key="loss">{{ loss }}</li>
+                <li>{{ profile.phone ? '手机号会被释放，以后用它登录会注册成一个全新的商户' : '登录账号和密码会被清除' }}</li>
+                <li>立即生效，不能撤销，也不能恢复</li>
+              </ul>
+            </div>
+            <p v-if="closure.blockedReason" class="form-notice" role="alert">现在还不能注销：{{ closure.blockedReason }}</p>
+
+            <form v-else class="password-form" @submit.prevent="confirmClosure">
+              <div v-if="closure.byCode" class="field">
+                <label for="closure-code">短信验证码</label>
+                <div class="code-row">
+                  <input id="closure-code" v-model="closureForm.code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码" :disabled="closing" />
+                  <button type="button" class="ghost-button" :disabled="closing || sendingCode || auth.state.cooldown > 0" @click="sendCode('closure')">
+                    {{ sendingCode ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}
+                  </button>
+                </div>
+                <small>验证码会发到 {{ maskedPhone }}，用来确认是你本人在操作。</small>
+              </div>
+              <label v-else class="field">
+                <span>当前密码</span>
+                <input v-model="closureForm.currentPassword" type="password" autocomplete="current-password" maxlength="64" :disabled="closing" />
+              </label>
+              <label class="consent">
+                <input v-model="closureForm.confirmed" type="checkbox" :disabled="closing" />
+                <span>我已了解上面的后果，确认注销{{ closure.wholeTenant ? '账号并关闭整个商户' : '我的账号' }}。</span>
+              </label>
+              <p v-if="closureNotice" class="inline-message" role="status">{{ closureNotice }}</p>
+              <div class="form-footer">
+                <p v-if="closureError" class="form-notice" role="alert">{{ closureError }}</p>
+                <div>
+                  <button type="button" class="ghost-button" :disabled="closing" @click="closeClosure">取消</button>
+                  <button type="submit" class="danger-button solid" :disabled="closing || !closureForm.confirmed">{{ closing ? '注销中…' : '确认注销' }}</button>
+                </div>
+              </div>
+            </form>
+          </template>
+          <p v-if="closureError && !closure" class="form-notice" role="alert">{{ closureError }}</p>
+          <div v-if="!closure || closure.blockedReason" class="card-actions">
+            <button class="ghost-button" @click="closeClosure">收起</button>
+            <button v-if="!closureLoading" class="link-button" @click="openClosure">重新检查</button>
+          </div>
+        </div>
+      </section>
     </template>
   </div>
 </template>
@@ -404,6 +512,16 @@ async function savePassword() {
 .consent input { margin-top: 4px; accent-color: var(--color-accent); }
 .hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
 #identity { scroll-margin-top: 20px; }
+
+.danger-card { border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border-subtle)); }
+.danger-button { flex: none; border: 1px solid var(--color-error); border-radius: 4px; padding: 10px 17px; color: var(--color-error); background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
+.danger-button:hover:not(:disabled) { background: color-mix(in srgb, var(--color-error) 8%, var(--color-bg-surface)); }
+.danger-button.solid { color: var(--color-on-accent); background: var(--color-error); }
+.danger-button.solid:hover:not(:disabled) { background: color-mix(in srgb, var(--color-error) 86%, black); }
+.danger-button:disabled { opacity: .55; cursor: default; }
+.consequences { margin: 0 0 16px; padding: 12px 14px; border-radius: 4px; color: var(--color-primary); background: color-mix(in srgb, var(--color-error) 6%, var(--color-bg-surface)); font-size: 12px; line-height: 1.7; }
+.consequences ul { margin: 6px 0 0; padding-left: 18px; color: var(--color-text-muted); }
+.closure-panel > .form-notice { margin-bottom: 4px; }
 
 @media (max-width: 640px) {
   .settings-page { padding: 22px 16px 58px; }

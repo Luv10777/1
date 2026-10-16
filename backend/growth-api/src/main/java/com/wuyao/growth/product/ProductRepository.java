@@ -4,10 +4,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.List;
 
@@ -44,4 +46,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Product p where p.id = :id and p.deletedAt is null")
     Optional<Product> findForUpdate(@Param("id") Long id);
+
+    /** 商户关闭时把所有在线商品撤回草稿，对外的店铺页和商品图随之不可见。 */
+    @Modifying(flushAutomatically = true)
+    @Query("update Product p set p.onlineStatus = 'DRAFT', p.updatedAt = :now where p.tenantId = :tenantId and p.onlineStatus = 'PUBLISHED'")
+    int withdrawAll(@Param("tenantId") Long tenantId, @Param("now") Instant now);
 }
