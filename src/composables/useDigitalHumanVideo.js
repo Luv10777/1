@@ -48,7 +48,8 @@ export function useDigitalHumanVideo() {
       const imageIds = await Promise.all(input.images.map(entry => uploadVideoReference(entry, 'IMAGE')))
       const videoId = input.video ? await uploadVideoReference(input.video, 'VIDEO') : null
       const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetId: videoId,
-        model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution }
+        model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution,
+        sourceModule: 'DIGITAL_HUMAN' }
       const signature = JSON.stringify(payload)
       if (!requestKey || payloadSignature !== signature || workflow.value) requestKey = `video-${crypto.randomUUID()}`
       payloadSignature = signature
@@ -72,7 +73,8 @@ export function useDigitalHumanVideo() {
       const videoId = input.video ? await uploadVideoReference(input.video, 'VIDEO') : null
       if (disposed) return
       const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetId: videoId,
-        model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution }
+        model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution,
+        sourceModule: 'DIGITAL_HUMAN' }
       const signature = JSON.stringify(payload)
       // The approved key is also reused after an uncertain submission.
       if (approval.signature !== signature) throw new Error('配置已变化，请重新预估费用')

@@ -95,7 +95,7 @@ const routes = [
   // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
   { path: '/identity', alias: '/real-name', name: 'identity', redirect: { name: 'settings', hash: '#identity' } },
   { path: '/notifications', name: 'notifications', redirect: '/image/create' },
-  { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '跟踪生成、审核、发布等异步任务的进度。' } },
+  { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', eyebrow: 'SYSTEM', icon: '✓', description: '按时间查看创作任务、生成结果与实际烟火消耗。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', eyebrow: 'SYSTEM', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置', eyebrow: 'SYSTEM', icon: '⌘', description: '查看和修改自己的账号资料、登录密码和实名认证。' } },
   { path: '/help', name: 'help', redirect: '/image/create' },
