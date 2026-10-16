@@ -6,6 +6,7 @@ import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from 
 import { LivePlayerSession } from '../services/livePlayerSession'
 import { desktopLink, inDesktop } from '../utils/desktop'
 import { findDesktopDownloads } from '../services/desktopDownload'
+import AppDownloadPanel from './AppDownloadPanel.vue'
 
 const props = defineProps({
   sessionId: { type: Number, default: null },
@@ -28,6 +29,8 @@ const isDevelopment = import.meta.env.DEV
 const desktopDownloads = ref({ windows: '', mac: '', android: '' })
 // 两个系统的安装包都有时，把正在用的这台电脑的那个放在显眼的位置。
 const onMac = /Macintosh|Mac OS X/.test(navigator.userAgent)
+// 安卓版的下载入口在当前页弹出来（电脑上是二维码），不再新开下载页。
+const androidDialogOpen = ref(false)
 const openingDesktop = ref(false)
 const desktopError = ref('')
 // 桌面端里看到的是服务器上保存的配置，所以先把这边还没保存的修改存下来，再带着当前门店把软件唤起来。
@@ -228,7 +231,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
           <p>开启抖音直播后，将分享链接粘贴到手机 App，即可一键开播。</p>
           <small>暂只支持安卓。少数机型可能不支持，有问题请联系售后。</small>
           <div class="audio-way-actions">
-            <a v-if="desktopDownloads.android" class="ls-outline-button" href="/app" target="_blank" rel="noopener">下载安卓版</a>
+            <button v-if="desktopDownloads.android" type="button" class="ls-outline-button" @click="androidDialogOpen = true">下载安卓版</button>
             <small v-else>安装包暂未提供</small>
           </div>
         </article>
@@ -244,6 +247,17 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         </article>
       </div>
       <p class="audio-help">请按抖音当前规则，在抖音 App 中标识合成语音。</p>
+      <Teleport to="body">
+        <div v-if="androidDialogOpen" class="ls-modal-backdrop" role="presentation" @click.self="androidDialogOpen = false">
+          <section class="ls-modal panel-dark audio-android-modal" role="dialog" aria-modal="true" aria-labelledby="audio-android-title">
+            <h3 id="audio-android-title">下载一方志 App（安卓版）</h3>
+            <p class="ls-modal-copy">只用一台手机开播：抖音在前台直播，一方志在后台读弹幕、用声音回答。目前只有安卓版。</p>
+            <AppDownloadPanel class="audio-android-panel" />
+            <p class="ls-modal-copy audio-android-tips">装好后用同一个账号登录。第一次打开会问能否在后台运行，请选允许，否则切到抖音后会没有声音。</p>
+            <div class="ls-modal-actions"><button type="button" class="ls-ghost compact" @click="androidDialogOpen = false">关闭</button></div>
+          </section>
+        </div>
+      </Teleport>
     </template>
     <template v-else-if="view === 'setup'">
       <div class="panel-heading"><div><p class="eyebrow">STEP 03</p><h3>启动直播</h3></div></div>
@@ -335,6 +349,10 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 </template>
 
 <style scoped>
+.audio-android-modal { width: min(460px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; }
+.audio-android-modal h3 { margin-top: 0; }
+.audio-android-panel { margin-top: 16px; }
+.audio-android-tips { margin-top: 14px; }
 .audio-control { margin-top: 20px; }
 .audio-control .panel-heading { align-items: flex-start; }
 .audio-status { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-muted); font-size: 12px; white-space: nowrap; }
@@ -354,7 +372,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-way > p { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.7; }
 .audio-way small { color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
 .audio-way-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
-.audio-way-actions a { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; font-size: 13px; text-decoration: none; }
+.audio-way-actions a, .audio-way-actions button { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; font-size: 13px; text-decoration: none; }
 .audio-desktop { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; }
 .audio-desktop-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .audio-desktop-head > div:first-child { min-width: 0; }
