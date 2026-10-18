@@ -316,7 +316,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <button v-else-if="!storeLoading" class="secondary-button compact" @click="loadStores">刷新</button>
         </section>
         <slot v-else />
-        <SiteFooter />
+        <SiteFooter v-if="route.matched.length" />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
       <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>入驻</small></RouterLink></nav>
