@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { ArrowRight, Check, Minus, Package, Plus, RefreshCw, ShoppingBag, Store, X } from 'lucide-vue-next'
 import { commerceApi } from '../services/commerceApi'
+import CommerceAlipayPayment from './CommerceAlipayPayment.vue'
 
 const router = useRouter()
 const product = ref(null)
@@ -86,7 +87,7 @@ async function submitOrder() {
     })
     if (!receipt?.lookupToken) throw new Error('未收到订单查询凭证，请联系商家确认提交结果。')
     orderReceipt.value = receipt
-    await goToOrder()
+    if (!receipt.payment) await goToOrder()
   } catch (failure) {
     orderError.value = failure.message || '订单提交未完成，请稍后重试。'
   } finally {
@@ -115,7 +116,7 @@ onMounted(loadProduct)
         <div class="merchant-product-price"><span>¥</span><strong>{{ formatMoney(product.price) }}</strong><small>/ {{ product.saleUnit }}</small></div>
         <dl class="merchant-product-facts"><div><dt>销售商家</dt><dd><Store :size="14" aria-hidden="true" />{{ store.name }}</dd></div><div><dt>交付方式</dt><dd>实物交付，商家确认订单后安排</dd></div><div><dt>商品状态</dt><dd>{{ available ? '可提交订单' : '暂时售罄' }}</dd></div></dl>
         <div class="merchant-product-purchase"><div class="merchant-quantity" aria-label="购买数量"><button type="button" aria-label="减少购买数量" :disabled="quantity <= 1 || !available || !!orderReceipt" @click="quantity--"><Minus :size="15" /></button><output aria-live="polite">{{ quantity }}</output><button type="button" aria-label="增加购买数量" :disabled="quantity >= maxQuantity || !available || !!orderReceipt" @click="quantity++"><Plus :size="15" /></button></div><button type="button" class="business-button business-button-primary merchant-buy-button" :disabled="!available && !orderReceipt" @click="openCheckout"><ShoppingBag :size="17" aria-hidden="true" />{{ orderReceipt ? '查看本次订单' : available ? '立即购买' : '暂时售罄' }}<ArrowRight :size="16" aria-hidden="true" /></button></div>
-        <p class="merchant-product-order-note"><Check :size="14" aria-hidden="true" />填写收货信息 · 提交订单 · 商家确认</p>
+        <p class="merchant-product-order-note"><Check :size="14" aria-hidden="true" />填写收货信息 · 提交订单 · 按订单指引付款</p>
         <RouterLink :to="`/store/${store.id}`" class="business-link merchant-shop-link">进入店铺<ArrowRight :size="14" aria-hidden="true" /></RouterLink>
       </div>
     </article>
@@ -125,10 +126,15 @@ onMounted(loadProduct)
     <div class="merchant-checkout-backdrop" aria-hidden="true" />
     <div class="merchant-checkout-position">
       <DialogPanel class="merchant-checkout-panel">
-        <header><div><span class="merchant-section-index">{{ orderReceipt ? '等待商家确认' : '填写收货信息' }}</span><DialogTitle as="h2">{{ orderReceipt ? '订单已提交' : '确认商品订单' }}</DialogTitle></div><button type="button" aria-label="关闭订单窗口" :disabled="submitting" @click="checkoutOpen = false"><X :size="20" /></button></header>
-        <DialogDescription class="merchant-checkout-description">提交后由商家确认供货与交付安排，当前不收取线上付款。</DialogDescription>
-        <div v-if="product" class="merchant-checkout-item"><img v-if="images.length" :src="images[0]" :alt="product.name" width="64" height="64" /><div><strong>{{ product.name }}</strong><span>¥{{ formatMoney(product.price) }} × {{ quantity }} {{ product.saleUnit }}</span></div><strong>¥{{ formatMoney(product.price * quantity) }}</strong></div>
-        <div v-if="orderReceipt" class="merchant-checkout-result" role="status"><p>订单编号：{{ orderReceipt.orderNumber }}</p><button type="button" class="business-button business-button-primary" @click="goToOrder">查看订单进度<ArrowRight :size="16" aria-hidden="true" /></button><p>订单已保存，可处理尚未提交的入驻资料后再查看。</p></div>
+        <header><div><span class="merchant-section-index">{{ orderReceipt?.payment ? '订单已保存 · 扫码付款' : orderReceipt ? '等待商家确认' : '填写收货信息' }}</span><DialogTitle as="h2">{{ orderReceipt?.payment ? '完成订单付款' : orderReceipt ? '订单已提交' : '确认商品订单' }}</DialogTitle></div><button type="button" aria-label="关闭订单窗口" :disabled="submitting" @click="checkoutOpen = false"><X :size="20" /></button></header>
+        <DialogDescription class="merchant-checkout-description">{{ orderReceipt?.payment ? '请按本单金额向企业支付宝付款，商家核实到账后确认订单。' : '填写收货信息并提交后，按订单页面的指引完成交易。' }}</DialogDescription>
+        <div v-if="product && !orderReceipt" class="merchant-checkout-item"><img v-if="images.length" :src="images[0]" :alt="product.name" width="64" height="64" /><div><strong>{{ product.name }}</strong><span>¥{{ formatMoney(product.price) }} × {{ quantity }} {{ product.saleUnit }}</span></div><strong>¥{{ formatMoney(product.price * quantity) }}</strong></div>
+        <div v-if="orderReceipt" class="merchant-checkout-result">
+          <CommerceAlipayPayment v-if="orderReceipt.payment" :order="orderReceipt" />
+          <p v-else role="status">订单编号：{{ orderReceipt.orderNumber }}</p>
+          <button type="button" class="business-button business-button-primary" @click="goToOrder">查看订单进度<ArrowRight :size="16" aria-hidden="true" /></button>
+          <p>请保存订单查询链接，方便继续付款、查询确认结果与物流进度。</p>
+        </div>
         <form v-else ref="orderEditor" :aria-busy="submitting" @submit.prevent="submitOrder" @input="$event.target.setCustomValidity?.('')">
           <fieldset :disabled="submitting" class="business-form-fields">
             <div class="business-field-grid"><label class="business-field"><span>收货人<b>*</b></span><input v-model.trim="buyer.name" name="buyer-name" required maxlength="80" autocomplete="name" pattern=".*\S.*" placeholder="填写收货人姓名" /></label><label class="business-field"><span>联系电话<b>*</b></span><input v-model.trim="buyer.phone" name="buyer-phone" required type="tel" inputmode="tel" autocomplete="tel" maxlength="20" pattern="[0-9+\(\)\- ]{6,20}" placeholder="填写可联系的电话" /></label></div>

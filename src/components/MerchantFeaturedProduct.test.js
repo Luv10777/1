@@ -6,13 +6,14 @@ import { createRenderer, nextTick } from 'vue'
 import { compileScript, parse } from '@vue/compiler-sfc'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createServer } from 'vite'
+import vue from '@vitejs/plugin-vue'
 
 test('featured physical goods use persisted product facts and preserve checkout details on failure', async () => {
   const filename = resolve('src/components/MerchantFeaturedProduct.vue')
   const moduleId = filename.replaceAll('\\', '/').replace('.vue', '.interaction.js')
   const vite = await createServer({ configFile: false, optimizeDeps: { noDiscovery: true, entries: [] },
     server: { middlewareMode: true, hmr: false }, appType: 'custom',
-    plugins: [{ name: 'featured-checkout-test',
+    plugins: [vue(), { name: 'featured-checkout-test',
       resolveId(id) { if (id === '/featured-under-test') return moduleId },
       load(id) {
         if (id !== moduleId) return
@@ -83,10 +84,16 @@ test('featured physical goods use persisted product facts and preserve checkout 
     let blocked = true
     let committedOrders = 0
     router.beforeEach(() => !blocked)
-    commerceApi.placeOrder = async () => { committedOrders++; return { orderNumber: 'TEST-ORDER', lookupToken: 'test-receipt-token' } }
+    const payment = { method: 'ALIPAY_MANUAL', recipient: '嘉兴市梧曜科技有限公司', qrCodeUrl: '/images/payments/company-alipay-qr.png' }
+    commerceApi.placeOrder = async () => { committedOrders++; return { orderNumber: 'TEST-ORDER', lookupToken: 'test-receipt-token',
+      status: 'PENDING_CONFIRMATION', totalAmount: 197.5, payment } }
     await view.submitOrder()
     assert.equal(view.orderReceipt.lookupToken, 'test-receipt-token')
+    assert.equal(view.orderReceipt.totalAmount, 197.5, 'payment uses the server receipt amount rather than the product preview')
+    assert.deepEqual(view.orderReceipt.payment, payment)
     assert.equal(router.currentRoute.value.path, '/')
+    assert.equal(view.checkoutOpen, true, 'a successful submission opens payment within the purchase dialog')
+    await view.goToOrder()
     assert.equal(view.checkoutOpen, true, 'an enrollment draft may prevent leaving but must not hide the saved order')
     await view.submitOrder()
     assert.equal(committedOrders, 1, 'a saved receipt prevents resubmitting an already committed order')

@@ -23,7 +23,7 @@ const filters = computed(() => [
 ].map(item => ({ ...item, count: counts.value[item.value] })))
 const money = value => Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const nextActions = order => ({
-  PENDING_CONFIRMATION: [{ status: 'CONFIRMED', label: '确认订单', icon: Check }, { status: 'CANCELLED', label: '取消并恢复库存', icon: X }],
+  PENDING_CONFIRMATION: [{ status: 'CONFIRMED', label: order.payment ? '核实收款并确认订单' : '确认订单', icon: Check }, { status: 'CANCELLED', label: '取消并恢复库存', icon: X }],
   CONFIRMED: [{ status: 'CANCELLED', label: '取消并恢复库存', icon: X }],
   SHIPPED: [{ status: 'COMPLETED', label: '标记完成', icon: CircleCheck }],
 }[order.status] || [])
@@ -41,7 +41,8 @@ async function loadOrders() {
 
 async function changeStatus(order, status, shipping = {}) {
   if (busyId.value) return
-  if (status === 'CANCELLED' && !window.confirm('取消后将恢复对应商品库存，确定继续吗？')) return
+  if (status === 'CONFIRMED' && order.payment && !window.confirm('请先在企业支付宝中核对实际到账金额及订单号。确认已收到本单款项并可安排交付吗？')) return
+  if (status === 'CANCELLED' && !window.confirm('取消后将恢复对应商品库存，但不会自动退款。如顾客已付款，请另行核实并办理退款。确定继续吗？')) return
   busyId.value = order.id
   error.value = ''
   notice.value = ''
@@ -65,7 +66,7 @@ watch(selectedStoreId, loadOrders, { immediate: true })
     <p v-else-if="!selectedStoreId" class="merchant-orders-state" role="status">{{ storeError || '请先选择门店。' }}</p>
     <template v-else>
       <nav class="merchant-order-filters" aria-label="订单状态筛选"><button v-for="item in filters" :key="item.value" type="button" :class="{ active: filter === item.value }" :aria-pressed="filter === item.value" @click="filter = item.value">{{ item.label }}<span>{{ item.count }}</span></button></nav>
-      <p class="merchant-payment-note">顾客订单尚未在线收款。确认后填写承运方和运单号，再标记发货；取消订单会恢复有限库存。</p>
+      <p class="merchant-payment-note">企业支付宝扫码付款需人工核实到账金额及订单号，再确认订单并安排发货。取消订单会恢复有限库存，已收款项需另行办理退款。</p>
       <div v-if="filteredOrders.length" class="merchant-order-list">
         <article v-for="order in filteredOrders" :key="order.id" class="merchant-order-row">
           <header><div><strong>{{ order.orderNumber }}</strong><time>{{ new Date(order.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</time></div><span :class="`status-${order.status.toLowerCase()}`">{{ orderStatuses[order.status] }}</span></header>

@@ -180,6 +180,11 @@ growth:
       seedance-2-0-mini: ${VIDEO_MODEL_SEEDANCE_2_0_MINI:seedance-2.0-mini}
       seedance-2-0-fast: ${VIDEO_MODEL_SEEDANCE_2_0_FAST:seedance-2.0-fast}
     poll-seconds: ${VIDEO_POLL_SECONDS:15}
+  commerce:
+    alipay:
+      store-id: ${COMMERCE_ALIPAY_STORE_ID:5}
+      recipient: ${COMMERCE_ALIPAY_RECIPIENT:嘉兴市梧曜科技有限公司}
+      qr-code-url: ${COMMERCE_ALIPAY_QR_CODE_URL:/images/payments/company-alipay-qr.png}
   billing:
     payment-method: WECHAT
     operator-user-ids: ${BILLING_OPERATOR_USER_IDS:}
