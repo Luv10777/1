@@ -132,7 +132,7 @@ async function load() {
   try {
     profile.value = await accountApi.profile()
     nameDraft.value = profile.value.name || ''
-    auth.updateAvatar(profile.value.avatarUrl)
+    auth.updateAvatar(profile.value.avatarUrl, profile.value.id)
   } catch (error) {
     loadError.value = error.message || '账号资料加载失败，请重试'
   } finally {
@@ -169,7 +169,7 @@ async function saveAvatar() {
   try {
     const saved = await accountApi.updateAvatar(avatarFile.value)
     profile.value = { ...profile.value, avatarUrl: saved.avatarUrl }
-    auth.updateAvatar(saved.avatarUrl)
+    auth.updateAvatar(saved.avatarUrl, saved.id)
     clearAvatarDraft()
     avatarMessage.value = { text: '头像已更新', error: false }
   } catch (error) {

@@ -9,6 +9,7 @@ import com.wuyao.growth.iam.entity.User;
 import com.wuyao.growth.iam.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.imageio.ImageIO;
@@ -31,15 +32,19 @@ public class AccountAvatarService {
     private static final Duration UPLOAD_TTL = Duration.ofMinutes(15);
     private final UserRepository users;
     private final ObjectStorage storage;
+    @Value("${growth.account.avatar-storage:minio}")
+    private String avatarStorage = "minio";
 
     public String url(String key) {
-        return key == null ? null : storage.presignGet(key, Duration.ofDays(7));
+        return key == null ? null : storage.presignGet(key, Duration.ofHours(1));
     }
 
     @Transactional
     public AccountDtos.AvatarUploadTicket presign(Long userId) {
         User user = activeForUpdate(userId);
-        String key = "t%d/avatars/%d/upload-%s".formatted(user.getTenantId(), userId, UUID.randomUUID());
+        if (!Set.of("minio", "cos").contains(avatarStorage)) throw invalid("头像存储配置必须为 minio 或 cos");
+        String key = ("cos".equals(avatarStorage) ? "cos/" : "")
+                + "t%d/avatars/%d/upload-%s".formatted(user.getTenantId(), userId, UUID.randomUUID());
         Instant expires = Instant.now().plus(UPLOAD_TTL);
         String uploadUrl = storage.presignPut(key, UPLOAD_TTL);
         user.setAvatarUploadKey(key);
@@ -57,7 +62,8 @@ public class AccountAvatarService {
         var object = storage.stat(uploadKey).orElseThrow(() -> invalid("头像尚未上传完成，请重试"));
         if (object.sizeBytes() <= 0 || object.sizeBytes() > MAX_BYTES) throw invalid("头像图片不能超过 2 MB");
         byte[] normalized = normalize(storage.read(uploadKey, MAX_BYTES));
-        String key = "t%d/avatars/%d/%s.png".formatted(user.getTenantId(), userId, UUID.randomUUID());
+        String key = (uploadKey.startsWith("cos/") ? "cos/" : "")
+                + "t%d/avatars/%d/%s.png".formatted(user.getTenantId(), userId, UUID.randomUUID());
         storage.put(key, normalized, "image/png");
         String avatarUrl = url(key);
         user.setAvatarKey(key);

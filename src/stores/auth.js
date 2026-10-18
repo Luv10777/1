@@ -11,6 +11,9 @@ const state = reactive({
 })
 
 let timer
+let avatarRefresh
+let avatarRefreshUser
+let avatarRefreshAt = 0
 
 // 后端的角色只有 OWNER（管理员）和 STAFF（店员）。这里只决定显示哪些入口，真正的限制在服务端。
 const rolesOf = role => [String(role || 'OWNER').toLowerCase()]
@@ -147,10 +150,24 @@ export const auth = {
     writeUser(state.user)
   },
 
-  updateAvatar(avatarUrl) {
-    if (!state.user) return
+  updateAvatar(avatarUrl, userId = state.user?.id) {
+    if (!state.user || state.user.id !== userId) return
     state.user = { ...state.user, avatarUrl: avatarUrl || '' }
     writeUser(state.user)
+  },
+
+  /** 图片链接过期时重新签发；合并顶部/侧栏的请求，并限制失败重试频率。 */
+  async refreshAvatar() {
+    const userId = state.user?.id
+    if (!userId || !state.user.avatarUrl) return
+    if (avatarRefresh) return avatarRefresh
+    if (avatarRefreshUser === userId && Date.now() - avatarRefreshAt < 30000) return
+    avatarRefreshUser = userId
+    avatarRefreshAt = Date.now()
+    avatarRefresh = authService.getCurrentUser().then(me => {
+      if (state.user?.id === userId && me.userId === userId) auth.updateAvatar(me.avatarUrl)
+    }).catch(() => { /* 暂时不可用时保留名字首字。 */ }).finally(() => { avatarRefresh = null })
+    return avatarRefresh
   },
 
   /** 改密码后服务端让旧令牌全部失效，并给这台设备发了一套新的，换上即可继续使用。 */

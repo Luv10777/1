@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -37,7 +38,7 @@ class AccountAvatarServiceTest {
         user.setAvatarUploadKey("pending");
         user.setAvatarUploadExpiresAt(Instant.now().plusSeconds(60));
         when(users.findForUpdate(1L)).thenReturn(Optional.of(user));
-        when(storage.presignGet(anyString(), eq(Duration.ofDays(7)))).thenAnswer(call -> "https://test/" + call.getArgument(0));
+        when(storage.presignGet(anyString(), eq(Duration.ofHours(1)))).thenAnswer(call -> "https://test/" + call.getArgument(0));
     }
 
     @AfterEach void clearTenant() { TenantContext.clear(); }
@@ -62,6 +63,19 @@ class AccountAvatarServiceTest {
         assertThatThrownBy(() -> avatars.presign(1L)).isInstanceOf(BizException.class);
         assertThatThrownBy(() -> avatars.save(1L, "pending")).isInstanceOf(BizException.class);
         verifyNoInteractions(storage);
+    }
+
+    @Test void usesCosWhenConfiguredAndKeepsThatDestinationDuringConfirmation() throws Exception {
+        ReflectionTestUtils.setField(avatars, "avatarStorage", "cos");
+        var ticket = avatars.presign(1L);
+        assertThat(ticket.uploadKey()).startsWith("cos/t2/avatars/1/upload-");
+        byte[] data = image(10, 10, "png");
+        when(storage.stat(ticket.uploadKey())).thenReturn(Optional.of(new ObjectStorage.StoredObject(data.length, "image/png")));
+        when(storage.read(ticket.uploadKey(), AccountAvatarService.MAX_BYTES)).thenReturn(data);
+        // 已发的凭证沿用自己的目标，期间切换配置也不会把文件写进另一个存储。
+        ReflectionTestUtils.setField(avatars, "avatarStorage", "minio");
+        avatars.save(1L, ticket.uploadKey());
+        assertThat(user.getAvatarKey()).startsWith("cos/t2/avatars/1/").endsWith(".png");
     }
 
     @Test void rejectsMissingOversizedCorruptAndExcessiveDimensionFilesWithoutReplacingAvatar() throws Exception {

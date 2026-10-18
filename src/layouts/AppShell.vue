@@ -286,7 +286,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <Wallet :size="18" class="sidebar-yanhuo-icon" />
           <div class="sidebar-yanhuo-copy"><div><span>可用烟火</span><ArrowUpRight :size="14" /></div><strong>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong><p>{{ billing.error ? '账户暂不可读' : billing.summary?.memberActive ? billing.summary.plan?.name : billing.summary?.plan ? '会员已到期' : '尚未开通会员' }}<span v-if="billing.summary?.held"> · 预占 {{ number(billing.summary.held) }}</span></p><span class="sidebar-yanhuo-action">套餐与充值</span></div>
         </RouterLink>
-        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" /><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
       </div>
     </aside>
@@ -302,7 +302,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
-            <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><UserAvatar v-if="auth.isAuthenticated" class="small" :src="auth.user?.avatarUrl" :name="userName" /><span v-else class="user-avatar small"><UserRound :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
+            <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><UserAvatar v-if="auth.isAuthenticated" class="small" :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span v-else class="user-avatar small"><UserRound :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
           </div>
         </div>
       </header>
