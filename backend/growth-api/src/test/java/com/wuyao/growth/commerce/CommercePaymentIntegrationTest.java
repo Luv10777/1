@@ -92,18 +92,18 @@ class CommercePaymentIntegrationTest {
         mvc.perform(patch("/api/stores/5/orders/{id}", receipt.path("id").asLong())
                         .header("Authorization", "Bearer " + token).contentType("application/json")
                         .content("{\"status\":\"CONFIRMED\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment").isEmpty());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment").doesNotExist());
         mvc.perform(get("/api/public/orders/{token}", receipt.path("lookupToken").asText()))
                 .andExpect(jsonPath("$.data.status").value("CONFIRMED"))
-                .andExpect(jsonPath("$.data.payment").isEmpty());
+                .andExpect(jsonPath("$.data.payment").doesNotExist());
     }
 
     @Test
     void otherStoreOrdersNeverReceiveTheOfficialStoreQr() throws Exception {
         JsonNode receipt = place(4);
-        assertThat(receipt.path("payment").isNull()).isTrue();
+        assertThat(receipt.hasNonNull("payment")).isFalse();
         mvc.perform(get("/api/public/orders/{token}", receipt.path("lookupToken").asText()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment").isEmpty());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment").doesNotExist());
     }
 
     @Test
@@ -113,10 +113,10 @@ class CommercePaymentIntegrationTest {
         mvc.perform(patch("/api/stores/5/orders/{id}", receipt.path("id").asLong())
                         .header("Authorization", "Bearer " + token).contentType("application/json")
                         .content("{\"status\":\"CANCELLED\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment").isEmpty());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.payment").doesNotExist());
         mvc.perform(get("/api/public/orders/{token}", receipt.path("lookupToken").asText()))
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"))
-                .andExpect(jsonPath("$.data.payment").isEmpty());
+                .andExpect(jsonPath("$.data.payment").doesNotExist());
         assertThat(owner.queryForObject("SELECT inventory FROM products WHERE id=3", Integer.class)).isEqualTo(9);
     }
 
