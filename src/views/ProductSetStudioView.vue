@@ -1,21 +1,15 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import ImageWorkspaceSwitch from '../components/ImageWorkspaceSwitch.vue'
 import ImageCreationWorkspace from '../components/ImageCreationWorkspace.vue'
 import ImageReferenceList from '../components/ImageReferenceList.vue'
-import PosterReferenceLibrary from '../components/PosterReferenceLibrary.vue'
 import { useImageCreation } from '../composables/useImageCreation'
 import { IMAGE_QUALITIES, IMAGE_RATIOS, imageDimensions } from '../domain/imageCreation'
-import { assetApi } from '../services/imageCreation'
-import { assets, assetSource } from '../stores/assetLibrary'
-import { auth } from '../stores/auth'
 import '../image-workflow.css'
 
 const studio = useImageCreation('PRODUCT_SET')
 const fileInput = ref(null)
 const workspace = ref(null)
-const libraryOpen = ref(false)
-const libraryAssets = ref([])
 const qualityDimensions = quality => {
   try { return imageDimensions(quality, studio.ratio) }
   catch { return { width: 0, height: 0 } }
@@ -90,16 +84,6 @@ watch([selectedPlatform, imageType], () => {
   studio.imageType = imageType.value
   studio.purpose = selectedPlatform.value + ' / ' + imageTypes.value.find(type => type.value === imageType.value)?.label
 }, { immediate: true })
-onMounted(async () => {
-  if (!auth.isAuthenticated) return
-  try {
-    const result = await assetApi.images()
-    libraryAssets.value = (result?.items || []).filter(asset => asset.type === 'IMAGE' && asset.status === 'READY' && asset.previewUrl)
-      .map(asset => ({ ...asset, kind: 'image', preview: asset.previewUrl, folder: '我的素材' }))
-  } catch {
-    libraryAssets.value = assets.value.filter(asset => asset.kind === 'image' && assetSource(asset))
-  }
-})
 </script>
 
 <template>
@@ -113,8 +97,6 @@ onMounted(async () => {
             <input ref="fileInput" type="file" accept="image/jpeg,image/png" multiple @change="studio.addFiles" />
             <span class="product-upload-icon material-symbols-outlined" aria-hidden="true">add_photo_alternate</span><strong>上传清晰的商品图</strong><small>JPG、PNG · 每张不超过 20 MB</small><span class="product-upload-action">从本地选择</span>
           </label>
-          <button type="button" class="product-library-action" :disabled="studio.locked" @click="auth.requireLogin() && (libraryOpen = !libraryOpen)"><span class="material-symbols-outlined" aria-hidden="true">photo_library</span>{{ libraryOpen ? '收起素材库' : '从素材库选择' }}</button>
-          <PosterReferenceLibrary v-if="libraryOpen" :files="studio.files" :disabled="studio.locked" :source-assets="libraryAssets" @choose="studio.addLibraryAsset" @close="libraryOpen = false" />
           <ImageReferenceList :files="studio.files" :disabled="studio.locked" @remove="studio.removeFile" @role="(index, role) => studio.files[index].role = role" />
           <p class="creation-field-hint">上传同一商品的不同角度，第一张主体照为主参考。</p>
         </section>

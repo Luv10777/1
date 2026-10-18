@@ -1,17 +1,13 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { IMAGE_QUALITIES, IMAGE_RATIOS, POSTER_PURPOSE_GROUPS, imageDimensions } from '../domain/imageCreation'
 import { POSTER_SCENARIOS } from '../domain/posterScenarios'
-import { assetSource } from '../stores/assetLibrary'
-import { auth } from '../stores/auth'
-import PosterReferenceLibrary from './PosterReferenceLibrary.vue'
 
 const props = defineProps({ studio: { type: Object, required: true }, prompted: Boolean })
 const studio = computed(() => props.studio)
 const promptInput = ref(null)
 const fileInput = ref(null)
 const dragging = ref(false)
-const libraryOpen = ref(false)
 const purposeGroup = ref(POSTER_PURPOSE_GROUPS.findIndex(group => group.options.some(option => option.label === studio.value.purpose)))
 const currentPurposes = computed(() => POSTER_PURPOSE_GROUPS[Math.max(0, purposeGroup.value)].options)
 const qualityDimensions = quality => {
@@ -19,7 +15,6 @@ const qualityDimensions = quality => {
   catch { return { width: 0, height: 0 } }
 }
 defineExpose({ focus: () => promptInput.value?.focus() })
-watch(() => studio.value.optimistic, value => { if (value) libraryOpen.value = false })
 
 function hasFiles(event) { return Array.from(event.dataTransfer?.types || []).includes('Files') }
 function onDragOver(event) {
@@ -40,11 +35,6 @@ function onPaste(event) {
   if (!images.length) return
   event.preventDefault()
   studio.value.addFiles({ dataTransfer: { files: images } })
-}
-function chooseLibraryAsset(asset) {
-  const index = studio.value.files.findIndex(file => file.libraryId === asset.id)
-  if (index >= 0) studio.value.removeFile(index)
-  else studio.value.addLibraryAsset({ id: asset.id, name: asset.name, preview: assetSource(asset) })
 }
 onMounted(() => {
   window.addEventListener('dragover', onDragOver)
@@ -70,11 +60,10 @@ onBeforeUnmount(() => {
         <div class="poster-section-heading"><label for="poster-brief"><strong>画面描述</strong></label><button v-if="studio.lastPrompt" type="button" class="poster-recall" :disabled="studio.locked" title="填入上一条提示词" @click="studio.recallLastPrompt(); promptInput?.focus()">↶ 填入上一条</button></div>
         <div class="poster-composer" :class="{ 'is-prompted': prompted }">
           <textarea id="poster-brief" ref="promptInput" v-model="studio.brief" :disabled="studio.locked" rows="5" maxlength="2000" placeholder="例如：为门店的招牌桂花乌龙做一张秋日海报，突出真实茶饮与到店氛围…" @keydown.meta.enter.prevent="studio.generate" @keydown.ctrl.enter.prevent="studio.generate" />
-          <div class="poster-inline-references"><div v-for="(file, index) in studio.files" :key="file.preview" class="poster-reference-chip"><img :src="file.preview" :alt="file.name" /><button type="button" class="poster-reference-remove" :disabled="studio.locked" :aria-label="`移除 ${file.name}`" @click="studio.removeFile(index)">×</button><div class="poster-reference-preview"><img :src="file.preview" :alt="file.name" /><span>{{ file.name }}</span></div><select :value="file.role" :disabled="studio.locked" :aria-label="`${file.name}的参考用途`" @change="studio.files[index].role = $event.target.value"><option value="SUBJECT">主体</option><option value="STYLE">风格</option></select></div><div class="poster-reference-actions"><button type="button" class="poster-add-reference" :disabled="studio.locked || studio.files.length >= 6" @click="fileInput?.click()"><span aria-hidden="true">＋</span> 从本地添加</button><button type="button" class="poster-add-reference" :class="{ active: libraryOpen }" :aria-expanded="libraryOpen" :disabled="studio.locked" @click="auth.requireLogin() && (libraryOpen = !libraryOpen)"><span aria-hidden="true">▦</span> 从素材库选取</button></div></div>
+          <div class="poster-inline-references"><div v-for="(file, index) in studio.files" :key="file.preview" class="poster-reference-chip"><img :src="file.preview" :alt="file.name" /><button type="button" class="poster-reference-remove" :disabled="studio.locked" :aria-label="`移除 ${file.name}`" @click="studio.removeFile(index)">×</button><div class="poster-reference-preview"><img :src="file.preview" :alt="file.name" /><span>{{ file.name }}</span></div><select :value="file.role" :disabled="studio.locked" :aria-label="`${file.name}的参考用途`" @change="studio.files[index].role = $event.target.value"><option value="SUBJECT">主体</option><option value="STYLE">风格</option></select></div><div class="poster-reference-actions"><button type="button" class="poster-add-reference" :disabled="studio.locked || studio.files.length >= 6" @click="fileInput?.click()"><span aria-hidden="true">＋</span> 从本地添加</button></div></div>
         </div>
-        <Transition name="poster-fade"><PosterReferenceLibrary v-if="libraryOpen" :files="studio.files" :disabled="studio.locked" @choose="chooseLibraryAsset" @close="libraryOpen = false" /></Transition>
         <input ref="fileInput" class="sr-only" type="file" accept="image/jpeg,image/png" multiple :disabled="studio.locked" @change="studio.addFiles" />
-        <p class="poster-field-note">可拖入图片或粘贴截图 · 本地与素材库合计最多 6 张 JPG/PNG</p>
+        <p class="poster-field-note">可拖入图片或粘贴截图 · 最多 6 张 JPG/PNG</p>
       </section>
 
       <section class="poster-control-section"><div class="poster-section-heading"><strong>海报比例</strong></div><div class="poster-ratio-grid" role="group" aria-label="海报比例"><button v-for="ratio in IMAGE_RATIOS" :key="ratio" type="button" :disabled="studio.locked || !studio.supportsRatio(ratio)" :aria-pressed="studio.ratio === ratio" :class="{ active: studio.ratio === ratio }" @click="studio.ratio = ratio"><span class="poster-ratio-icon" :style="{ aspectRatio: ratio.replace(':', ' / ') }" />{{ ratio }}</button></div></section>

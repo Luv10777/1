@@ -20,8 +20,6 @@
 .product-upload-zone strong { font-size: 13px; font-weight: 500; }
 .product-upload-zone small { color: var(--ink-muted); font-size: 11px; line-height: 1.6; }
 .product-upload-action { padding: 6px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); font-size: 12px; }
-.product-library-action { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; padding: 5px 0; border: 0; color: var(--color-accent-text); background: transparent; font-size: 12px; }
-.product-library-action .material-symbols-outlined { font-size: 17px; }
 .product-type-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .product-type-tabs.local { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .product-type-tabs button, .product-option-row button { min-height: 38px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--night-panel); font-size: 12px; }

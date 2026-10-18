@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { Upload, Video, Images, FolderOpen, Heart, MessageCircle, MapPin, ChevronLeft, ChevronRight, Music2 } from 'lucide-vue-next'
+import { Upload, Video, Images, Heart, MessageCircle, MapPin, ChevronLeft, ChevronRight, Music2 } from 'lucide-vue-next'
 const props = defineProps({
   previewPlatform: { type: String, required: true },
   title: { type: String, default: '' },
@@ -17,7 +17,7 @@ const props = defineProps({
   originalVolume: { type: Number, default: 100 },
   musicStart: { type: Number, default: 0 },
 })
-const emit = defineEmits(['upload', 'library', 'playback-error', 'picture-change', 'music-playing'])
+const emit = defineEmits(['upload', 'playback-error', 'picture-change', 'music-playing'])
 const soundtrack = ref(null)
 const musicActive = ref(false)
 const hasMedia = computed(() => !!props.videoUrl || props.pictures.length > 0)
@@ -99,7 +99,6 @@ defineExpose({ captureFrame, toggleMusic })
               <strong>{{ playbackError ? '视频暂时无法播放' : '在这里预览你的作品' }}</strong>
               <p>{{ mediaType === 'image' ? '添加图片，预览图文效果。' : '添加视频，预览完整画面。' }}</p>
               <button type="button" :disabled="uploading" @click="emit('upload')"><Upload :size="15" />{{ uploading ? '正在读取…' : '本地上传' }}</button>
-              <button type="button" class="pub-phone-library" :disabled="uploading" @click="emit('library')"><FolderOpen :size="15" />从素材库选择</button>
             </div>
             <div v-if="hasMedia && !playbackError && showOverlay" class="pub-platform-overlay" aria-label="平台发布效果示意">
               <div class="pub-overlay-copy">

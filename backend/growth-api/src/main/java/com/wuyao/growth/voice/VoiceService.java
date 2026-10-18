@@ -88,6 +88,24 @@ public class VoiceService {
         samples.finishDelete(id, userId);
     }
     /**
+     * 商户关闭后由删除任务调用，没有操作人。先删本地文件（最敏感，也不依赖供应商），再删远端音色；
+     * 每一步都可以重复执行，任何一步失败整体重试即可。
+     */
+    public void purge(Long id) {
+        var input = samples.purgeInput(id).orElse(null);
+        if (input == null) return;
+        storage.delete(previewKey(input.key()));
+        storage.delete(input.key());
+        if (storage.stat(input.key()).isPresent()) throw new IllegalStateException("声音样本文件仍未删除: sampleId=" + id);
+        if (input.voiceId() != null) {
+            if (!provider.code().equals(input.providerCode()) || !provider.configured())
+                throw new IllegalStateException("需要配置原语音供应商才能删除远端音色: sampleId=" + id);
+            provider.deleteVoice(input.voiceId());
+            samples.finishProviderPurge(id, input.voiceId());
+        }
+        samples.finishPurge(id);
+    }
+    /**
      * Checks that the requested voice can be used by this store right now and returns the provider's
      * voice ID. No provider request is made, so callers can validate before queueing paid synthesis.
      */

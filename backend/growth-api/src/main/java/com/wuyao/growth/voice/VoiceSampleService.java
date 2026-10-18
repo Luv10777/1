@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -187,6 +188,39 @@ public class VoiceSampleService {
         // Keep consent audit and original storage key; object bytes are deleted separately.
         // A deleted voice is open to no store.
         grants.deleteAll(grants.findBySampleIdOrderByStoreIdAsc(id));
+    }
+    /**
+     * 商户关闭：本商户还没删的样本立即进入删除中、不再开放给任何门店，这之后谁都用不了。
+     * 文件和远端音色由 {@link VoiceSamplePurgeHandler} 在事务外删除。
+     * @return 需要排队删除的样本
+     */
+    @Transactional
+    public List<Long> withdrawAllForClosure(Long tenantId) {
+        List<VoiceSample> remaining = samples.lockAllByTenantIdAndStatusNot(tenantId, "DELETED");
+        for (VoiceSample sample : remaining) {
+            sample.setStatus("DELETING"); sample.setUpdatedAt(Instant.now());
+            grants.deleteAll(grants.findBySampleIdOrderByStoreIdAsc(sample.getId()));
+        }
+        return remaining.stream().map(VoiceSample::getId).toList();
+    }
+    /** 商户关闭后的删除没有操作人：只认"删除中"的样本，已删完的返回空。 */
+    @Transactional
+    public Optional<DeleteInput> purgeInput(Long id) {
+        return purging(id).map(sample -> new DeleteInput(sample.getStorageKey(), sample.getProviderVoiceId(), sample.getProviderCode()));
+    }
+    @Transactional
+    public void finishProviderPurge(Long id, String voiceId) {
+        purging(id).filter(sample -> voiceId.equals(sample.getProviderVoiceId()))
+                .ifPresent(sample -> { sample.setProviderVoiceId(null); sample.setUpdatedAt(Instant.now()); });
+    }
+    @Transactional
+    public void finishPurge(Long id) {
+        purging(id).filter(sample -> sample.getProviderVoiceId() == null)
+                .ifPresent(sample -> { sample.setStatus("DELETED"); sample.setUpdatedAt(Instant.now()); });
+    }
+    private Optional<VoiceSample> purging(Long id) {
+        return samples.lockById(id)
+                .filter(sample -> TenantContext.require().equals(sample.getTenantId()) && "DELETING".equals(sample.getStatus()));
     }
     /** For changing the sample itself or where it may be used: the owner only. */
     private VoiceSample manage(Long id, Long userId) {

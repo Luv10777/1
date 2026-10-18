@@ -49,6 +49,10 @@ public class BillingStore {
         return em.createQuery("select count(o) from BillingOrder o where o.tenantId=:tenant and o.kind='MEMBERSHIP' and o.state in ('PENDING_PAYMENT','EXPIRED')",Long.class)
             .setParameter("tenant",TenantContext.require()).getSingleResult()>0;
     }
+    public boolean awaitingPayment() {
+        return em.createQuery("select count(o) from BillingOrder o where o.tenantId=:tenant and o.state='PENDING_PAYMENT'",Long.class)
+            .setParameter("tenant",TenantContext.require()).getSingleResult()>0;
+    }
     public List<String> reconciliationOrders() {
         return em.createQuery("select o.id from BillingOrder o where o.tenantId=:tenant and o.paymentMethod='WECHAT' and o.state in ('PENDING_PAYMENT','EXPIRED') order by o.createdAt",String.class)
             .setParameter("tenant",TenantContext.require()).setMaxResults(20).getResultList();
