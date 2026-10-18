@@ -18,7 +18,9 @@
 .business-record-main>.business-category-tag { justify-self:start; }
 .business-record-status { flex:0 0 auto; padding:4px 7px; border-radius:3px; background:var(--color-bg-subtle); color:var(--ink-muted); font-size:10px; }
 .business-record-status.is-published,.business-record-status.status-approved { background:color-mix(in srgb,var(--color-success) 12%,transparent); color:var(--color-success); }
-.business-record-status.is-offline,.business-record-status.status-rejected,.business-record-status.status-suspended { background:color-mix(in srgb,var(--color-error) 10%,transparent); color:var(--color-error); }
+.business-record-status.is-offline,.business-record-status.is-rejected,.business-record-status.status-rejected,.business-record-status.status-suspended { background:color-mix(in srgb,var(--color-error) 10%,transparent); color:var(--color-error); }
+.business-record-status.is-pending { background:color-mix(in srgb,var(--color-warning) 12%,transparent); color:var(--color-warning); }
+.business-record-main>.business-review-note { margin:0; color:var(--ink-muted); font-size:11px; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
 .business-record-actions { display:flex; gap:6px; }
 .business-record-icon { width:30px; height:30px; cursor:pointer; }
 .business-record-empty { margin:0; padding:14px 0 0; color:var(--ink-muted); font-size:11px; line-height:1.7; }

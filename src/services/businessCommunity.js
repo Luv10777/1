@@ -1,9 +1,9 @@
 import { del, get, post, put } from '../utils/request.js'
 
-async function submit(endpoint, values, expectedStatus) {
+async function submit(endpoint, values, expectedStatus, request = post) {
   let receipt
   try {
-    receipt = await post(endpoint, values)
+    receipt = await request(endpoint, values)
   } catch (failure) {
     if ([404, 405, 501].includes(failure.status)) {
       throw new Error('提交服务尚未接通，当前资料未提交。请稍后重试。')
@@ -20,11 +20,11 @@ async function submit(endpoint, values, expectedStatus) {
 }
 
 export const businessCommunityService = {
-  submitInformation: values => submit('/api/information-publications', values, 'PUBLISHED'),
+  submitInformation: values => submit('/api/information-publications', values, 'PENDING_REVIEW'),
   applyForAlliance: values => submit('/api/merchant-alliance/applications', values, 'PENDING_REVIEW'),
   applications: () => get('/api/merchant-alliance/applications'),
   publications: () => get('/api/information-publications'),
-  updatePublication: (id, values) => put(`/api/information-publications/${id}`, values),
+  updatePublication: (id, values) => submit(`/api/information-publications/${id}`, values, 'PENDING_REVIEW', put),
   takePublicationOffline: id => del(`/api/information-publications/${id}`),
   publicFeed: params => get('/api/public/information', Object.fromEntries(Object.entries(params || {}).filter(([, value]) => value != null && value !== ''))),
   publicInformation: id => get(`/api/public/information/${id}`),

@@ -19,6 +19,8 @@ test('information filters preserve a safe public return location and show dates 
   assert.equal(informationDate('2026-10-14T18:00:00Z'), '2026/10/15')
   assert.equal(informationDate(null), '—')
   assert.equal(publicationState({ status: 'OFFLINE' }).visible, false)
+  assert.deepEqual(publicationState({ status: 'PENDING_REVIEW' }), { label: '待审核', className: 'is-pending', visible: false })
+  assert.deepEqual(publicationState({ status: 'REJECTED' }), { label: '已驳回', className: 'is-rejected', visible: false })
   assert.equal(publicationState({ status: 'PUBLISHED', validUntil: '2000-01-01' }).label, '已过期')
   assert.equal(publicationState({ status: 'PUBLISHED', validUntil: null }).visible, true)
 })

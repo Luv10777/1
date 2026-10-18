@@ -123,10 +123,13 @@ class PlatformManagementIntegrationTest {
     }
 
     @Test void platformModerationPersistsAndCannotBeBypassedByThePublisher() throws Exception {
-        Long id = owner.queryForObject("INSERT INTO information_publications(tenant_id,submitted_by,category,title,merchant_name,region,content) VALUES (?,?,'notice','测试公告','测试商家','测试地区','测试正文') RETURNING id", Long.class, merchantTenant, merchantUser);
+        Long id = owner.queryForObject("INSERT INTO information_publications(tenant_id,submitted_by,category,title,merchant_name,region,content,status,published_at) VALUES (?,?,'notice','测试公告','测试商家','测试地区','测试正文','PUBLISHED',now()) RETURNING id", Long.class, merchantTenant, merchantUser);
+        String updatedAt = owner.queryForObject("SELECT updated_at FROM information_publications WHERE id=?",
+                (rs, row) -> rs.getTimestamp(1).toInstant().toString(), id);
         mvc.perform(get("/api/platform/information").header("Authorization", "Bearer " + operatorToken)).andExpect(jsonPath("$.data.total").value(1));
         mvc.perform(post("/api/platform/tenants/{t}/information/{id}/status", merchantTenant, id).header("Authorization", "Bearer " + operatorToken)
-                .contentType("application/json").content("{\"status\":\"OFFLINE\",\"note\":\"测试下线，等待平台复核\"}")).andExpect(status().isOk());
+                .contentType("application/json").content(json.writeValueAsBytes(Map.of("status", "OFFLINE",
+                        "note", "测试下线，等待平台复核", "updatedAt", updatedAt)))).andExpect(status().isOk());
         mvc.perform(get("/api/public/information/{id}", id)).andExpect(status().isNotFound());
         mvc.perform(put("/api/information-publications/{id}", id).header("Authorization", "Bearer " + merchantToken)
                 .contentType("application/json").content("{\"category\":\"notice\",\"title\":\"试图重新发布\",\"merchantName\":\"商家\",\"region\":\"地区\",\"content\":\"内容\",\"declarationAccepted\":true}"))

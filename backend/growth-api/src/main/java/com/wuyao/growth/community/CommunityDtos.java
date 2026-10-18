@@ -49,11 +49,21 @@ public final class CommunityDtos {
 
     public record InformationView(Long id, String category, String title, String merchantName, String region,
                                   String summary, String content, String contactName, String contactPhone,
-                                  LocalDate validUntil, String status, Instant publishedAt, Instant createdAt) {
+                                  LocalDate validUntil, String status, Instant publishedAt, Instant createdAt, String reviewNote,
+                                  boolean platformBlocked) {
         static InformationView of(InformationPublication value) {
+            return of(value, value.getReviewNote());
+        }
+
+        static InformationView publicOf(InformationPublication value) {
+            return of(value, null);
+        }
+
+        private static InformationView of(InformationPublication value, String reviewNote) {
             return new InformationView(value.getId(), value.getCategory(), value.getTitle(), value.getMerchantName(),
                     value.getRegion(), value.getSummary(), value.getContent(), value.getContactName(),
-                    value.getContactPhone(), value.getValidUntil(), value.getStatus(), value.getPublishedAt(), value.getCreatedAt());
+                    value.getContactPhone(), value.getValidUntil(), value.getStatus(), value.getPublishedAt(), value.getCreatedAt(),
+                    reviewNote, value.isPlatformBlocked());
         }
     }
 }

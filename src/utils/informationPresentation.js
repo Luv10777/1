@@ -33,6 +33,8 @@ export function informationDate(value, detailed = false) {
 }
 
 export function publicationState(item) {
+  if (item.status === 'PENDING_REVIEW') return { label: '待审核', className: 'is-pending', visible: false }
+  if (item.status === 'REJECTED') return { label: '已驳回', className: 'is-rejected', visible: false }
   if (item.status !== 'PUBLISHED') return { label: '已下架', className: 'is-offline', visible: false }
   const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
   const date = Object.fromEntries(parts.map(part => [part.type, part.value]))

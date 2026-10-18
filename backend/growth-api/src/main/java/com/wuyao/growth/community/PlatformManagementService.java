@@ -39,7 +39,7 @@ public class PlatformManagementService {
     public PageResult<PlatformDtos.InformationView> information(AuthPrincipal me, int page, int size, String status, String category, String keyword) {
         requireOperator(me);
         checkPaging(page, size);
-        checkFilter(status, Set.of("PUBLISHED", "OFFLINE", "EXPIRED"));
+        checkFilter(status, Set.of("PENDING_REVIEW", "PUBLISHED", "REJECTED", "OFFLINE", "EXPIRED"));
         checkFilter(category, Set.of("activity", "cooperation", "supply", "notice"));
         var result = new ArrayList<PlatformDtos.InformationView>();
         for (var scope : directory.scopes()) {
@@ -84,7 +84,7 @@ public class PlatformManagementService {
 
     public PlatformDtos.Summary summary(AuthPrincipal me) {
         requireOperator(me);
-        long[] counts = new long[5];
+        long[] counts = new long[6];
         for (var scope : directory.scopes()) {
             long[] current = inScope(scope.id(), true, () -> {
                 var info = publications.findAllByTenantIdOrderByPublishedAtDescIdDesc(scope.id());
@@ -93,11 +93,12 @@ public class PlatformManagementService {
                         info.stream().filter(v -> "OFFLINE".equals(v.getStatus())).count(),
                         applications.stream().filter(v -> "PENDING_REVIEW".equals(v.getStatus())).count(),
                         applications.stream().filter(v -> "APPROVED".equals(v.getStatus())).count(),
-                        identities.countByTenantIdAndStatus(scope.id(), "PENDING_REVIEW")};
+                        identities.countByTenantIdAndStatus(scope.id(), "PENDING_REVIEW"),
+                        info.stream().filter(v -> "PENDING_REVIEW".equals(v.getStatus())).count()};
             });
             for (int i = 0; i < counts.length; i++) counts[i] += current[i];
         }
-        return new PlatformDtos.Summary(counts[0], counts[1], counts[2], counts[3], counts[4]);
+        return new PlatformDtos.Summary(counts[0], counts[1], counts[2], counts[3], counts[4], counts[5]);
     }
 
     public void reviewInformation(AuthPrincipal me, Long tenantId, Long id, PlatformDtos.ReviewRequest request) {
@@ -105,12 +106,23 @@ public class PlatformManagementService {
         requireNote(request.note());
         inScope(tenantId, false, () -> {
             var value = publications.findByIdAndTenantId(id, tenantId).orElseThrow(() -> missing("信息"));
+            if (!value.getUpdatedAt().equals(request.updatedAt())) {
+                throw BizException.of(ErrorCode.CONFLICT, "信息已修改或处理，请刷新后重新核对内容");
+            }
+            boolean allowed = switch (value.getStatus()) {
+                case "PENDING_REVIEW" -> Set.of("PUBLISHED", "REJECTED").contains(request.status());
+                case "PUBLISHED" -> "OFFLINE".equals(request.status());
+                case "OFFLINE" -> "PUBLISHED".equals(request.status()) && value.getPublishedAt() != null;
+                default -> false;
+            };
+            if (!allowed) throw BizException.of(ErrorCode.CONFLICT, "信息状态已变化或不支持该操作，请刷新后重试");
             if ("PUBLISHED".equals(request.status()) && value.getValidUntil() != null && value.getValidUntil().isBefore(LocalDate.now())) {
                 throw BizException.of(ErrorCode.CONFLICT, "该信息已过期，不能恢复上线；请发布者提交新的有效信息");
             }
-            if (request.status().equals(value.getStatus())) throw BizException.of(ErrorCode.CONFLICT, "信息状态已变化，请刷新列表");
+            if ("PUBLISHED".equals(request.status())) value.setPublishedAt(Instant.now());
             value.setStatus(request.status());
             value.setPlatformBlocked("OFFLINE".equals(request.status()));
+            value.setReviewNote(request.note().trim());
             value.setUpdatedAt(Instant.now());
             audit(me.userId(), "INFORMATION", id, request.status(), request.note());
             return null;
@@ -206,7 +218,7 @@ public class PlatformManagementService {
     private static PlatformDtos.InformationView informationView(InformationPublication v, String tenantName) {
         return new PlatformDtos.InformationView(v.getId(), v.getTenantId(), tenantName, v.getCategory(), v.getTitle(), v.getMerchantName(),
                 v.getRegion(), v.getSummary(), v.getContent(), v.getContactName(), maskPhone(v.getContactPhone()), v.getValidUntil(),
-                informationStatus(v), v.getPublishedAt(), v.getCreatedAt());
+                informationStatus(v), v.getPublishedAt(), v.getCreatedAt(), v.getReviewNote(), v.getUpdatedAt());
     }
 
     private static PlatformDtos.MerchantView merchantView(MerchantApplication v, String tenantName) {

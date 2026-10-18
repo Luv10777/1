@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -55,18 +56,57 @@ class CommunityServiceTest {
     }
 
     @Test
+    void newlySubmittedInformationWaitsForReviewWithoutAPublicationTime() {
+        when(publications.saveAndFlush(any())).thenAnswer(call -> call.getArgument(0));
+        var result = service.publish(content(), 5L);
+        assertThat(result.status()).isEqualTo("PENDING_REVIEW");
+        assertThat(result.publishedAt()).isNull();
+        assertThat(result.reviewNote()).isNull();
+    }
+
+    @Test
     void aMerchantCanUpdateAndTakeOfflineItsOwnArticle() {
         var mine = new InformationPublication();
         mine.setId(7L);
         mine.setTenantId(2L);
+        mine.setStatus("PUBLISHED");
+        mine.setPublishedAt(Instant.parse("2026-10-14T08:00:00Z"));
+        mine.setReviewNote("原内容已审核通过");
         when(publications.findByIdAndTenantId(7L, 2L)).thenReturn(Optional.of(mine));
         when(publications.saveAndFlush(mine)).thenReturn(mine);
         var result = service.update(7L, content());
         assertThat(result.title()).isEqualTo("已更新的公告");
         assertThat(result.content()).isEqualTo("已保存的详细内容");
-        assertThat(result.status()).isEqualTo("PUBLISHED");
+        assertThat(result.status()).isEqualTo("PENDING_REVIEW");
+        assertThat(result.publishedAt()).isNull();
+        assertThat(result.reviewNote()).isNull();
         service.takeOffline(7L);
         assertThat(mine.getStatus()).isEqualTo("OFFLINE");
         assertThat(mine.getTenantId()).isEqualTo(2L);
+    }
+
+    @Test
+    void rejectedInformationCanBeCorrectedButPlatformBlockedInformationCannot() {
+        var mine = new InformationPublication();
+        mine.setStatus("REJECTED");
+        mine.setReviewNote("请补充活动的时间和地点");
+        when(publications.findByIdAndTenantId(7L, 2L)).thenReturn(Optional.of(mine));
+        when(publications.saveAndFlush(mine)).thenReturn(mine);
+        var result = service.update(7L, content());
+        assertThat(result.status()).isEqualTo("PENDING_REVIEW");
+        assertThat(result.reviewNote()).isNull();
+        mine.setStatus("OFFLINE");
+        mine.setPlatformBlocked(true);
+        assertThatThrownBy(() -> service.update(7L, content())).isInstanceOfSatisfying(BizException.class,
+                failure -> assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThat(mine.getStatus()).isEqualTo("OFFLINE");
+    }
+
+    @Test
+    void platformReviewNotesAreVisibleToTheMerchantButExcludedFromPublicResponses() {
+        var value = new InformationPublication();
+        value.setReviewNote("内部审核依据与需要补充的资料");
+        assertThat(CommunityDtos.InformationView.of(value).reviewNote()).isEqualTo(value.getReviewNote());
+        assertThat(CommunityDtos.InformationView.publicOf(value).reviewNote()).isNull();
     }
 }
