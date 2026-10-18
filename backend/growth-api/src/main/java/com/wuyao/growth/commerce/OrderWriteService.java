@@ -24,6 +24,7 @@ public class OrderWriteService {
     private final ProductService products;
     private final SalesOrderRepository orders;
     private final SalesOrderItemRepository items;
+    private final CommercePaymentProperties payment;
 
     @Transactional
     public CommerceDtos.Receipt place(Long storeId, CommerceDtos.PlaceOrderRequest request,
@@ -73,7 +74,8 @@ public class OrderWriteService {
             item.setLineTotal(product.price().multiply(BigDecimal.valueOf(quantity)));
             items.save(item);
         }
-        return CommerceDtos.Receipt.of(saved, items.findAllByOrderIdOrderByIdAsc(saved.getId()), true);
+        return CommerceDtos.Receipt.of(saved, items.findAllByOrderIdOrderByIdAsc(saved.getId()), true,
+                payment.forOrder(saved));
     }
 
     @Transactional
@@ -104,7 +106,7 @@ public class OrderWriteService {
         order.setStatus(next);
         order.setUpdatedAt(Instant.now());
         orders.saveAndFlush(order);
-        return CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(id));
+        return CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(id), payment.forOrder(order));
     }
 
     private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }

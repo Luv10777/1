@@ -28,7 +28,7 @@ class OrderWriteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderWriteService(products, orders, items);
+        service = new OrderWriteService(products, orders, items, new CommercePaymentProperties());
     }
 
     @Test

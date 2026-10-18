@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { LEGAL_ENTITY, LEGAL_POLICY_UPDATED_AT, LEGAL_REFERENCES, LEGAL_POLICY_NAVIGATION, legalPolicies } from './legalPolicies.js'
 
 test('each published policy is substantive, dated, navigable, and cites official legal sources', () => {
-  assert.equal(LEGAL_POLICY_UPDATED_AT, '2026-10-16')
+  assert.equal(LEGAL_POLICY_UPDATED_AT, '2026-10-18')
   assert.equal(LEGAL_ENTITY.name, '嘉兴市梧曜科技有限公司')
   assert.equal(LEGAL_ENTITY.creditCode, '91330483MAKMYJHC7U')
   assert.equal(LEGAL_ENTITY.address, '浙江省嘉兴市桐乡市濮院镇园区大道799号7楼704')
@@ -24,7 +24,7 @@ test('each published policy is substantive, dated, navigable, and cites official
 
   assert.ok(LEGAL_REFERENCES.every(({ title, organization, url }) => title.length > 5 && organization.length > 5 && new URL(url).protocol === 'https:'), 'official references should include the law, issuing agency, and HTTPS source')
   assert.ok(legalPolicies.privacy.sections.some(section => section.paragraphs.some(text => text.includes('AES-256-GCM'))), 'identity security claims must match the implementation')
-  assert.ok(legalPolicies.aftersales.sections.some(section => section.paragraphs.some(text => text.includes('未接入这些实体商品订单的在线收款'))), 'the physical-goods refund policy must describe actual payment status')
+  assert.ok(legalPolicies.aftersales.sections.some(section => section.paragraphs.some(text => text.includes('收款码付款由商家人工核实到账'))), 'the physical-goods refund policy must describe actual payment status')
   assert.ok(Object.values(legalPolicies).every(policy => policy.citations.every(reference => LEGAL_REFERENCES.includes(reference))), 'every policy must reference an existing source')
 })
 
