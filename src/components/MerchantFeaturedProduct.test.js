@@ -52,6 +52,11 @@ test('featured physical goods use persisted product facts and preserve checkout 
     const field = { value: '   ', validityMessage: '', setCustomValidity(message) { this.validityMessage = message } }
     view.orderEditor = { querySelectorAll: () => [field], reportValidity: () => valid }
     const requests = []
+    commerceApi.placeOrder = values => { requests.push(values); throw new Error('未经同意不得提交') }
+    await view.submitOrder()
+    assert.equal(requests.length, 0, 'a physical-goods order must not be submitted without explicit rules consent')
+    assert.match(view.orderError, /交易与售后规则/)
+    view.purchaseConsent = true
     let completeOrder
     commerceApi.placeOrder = values => { requests.push(values); return new Promise(resolve => { completeOrder = resolve }) }
     await view.submitOrder()

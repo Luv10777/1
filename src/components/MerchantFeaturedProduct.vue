@@ -14,6 +14,7 @@ const loading = ref(true)
 const loadError = ref('')
 const checkoutOpen = ref(false)
 const quantity = ref(1)
+const purchaseConsent = ref(false)
 const submitting = ref(false)
 const orderError = ref('')
 const orderEditor = ref(null)
@@ -56,6 +57,7 @@ function openCheckout() {
   if (!available.value && !orderReceipt.value) return
   if (!orderReceipt.value) quantity.value = Math.max(1, Math.min(quantity.value, maxQuantity.value))
   orderError.value = ''
+  if (!orderReceipt.value) purchaseConsent.value = false
   checkoutOpen.value = true
 }
 
@@ -66,6 +68,10 @@ async function goToOrder() {
 
 async function submitOrder() {
   if (submitting.value || !available.value || orderReceipt.value) return
+  if (!purchaseConsent.value) {
+    orderError.value = '提交订单前请阅读并同意商品交易与售后规则。'
+    return
+  }
   for (const field of orderEditor.value?.querySelectorAll('input[required], textarea[required]') || []) {
     field.setCustomValidity(field.value.trim() ? '' : '请填写此项。')
   }
@@ -129,6 +135,7 @@ onMounted(loadProduct)
             <label class="business-field"><span>收货地址<b>*</b></span><textarea v-model.trim="buyer.address" name="shipping-address" required autocomplete="street-address" maxlength="500" rows="2" placeholder="省、市、区、街道及门牌号" /></label>
             <label class="business-field"><span>订单备注</span><textarea v-model.trim="buyer.note" name="buyer-note" maxlength="500" rows="2" placeholder="选填，可说明设备型号或交付需求" /></label>
           </fieldset>
+          <label class="merchant-checkout-terms"><input v-model="purchaseConsent" type="checkbox" required :disabled="submitting" /><span>我已阅读并同意<a href="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册与服务协议》</a>、<a href="/policies/aftersales" target="_blank" rel="noopener noreferrer">《售后与退款规则》</a>及<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>，同意将本订单的收货人、电话、地址与备注提供给本次选择的店铺，用于履约及售后。</span></label>
           <p v-if="orderError" class="business-message-error merchant-checkout-error" role="alert">{{ orderError }}</p>
           <footer><span>商品合计<strong v-if="product">¥{{ formatMoney(product.price * quantity) }}</strong></span><button type="submit" class="business-button business-button-primary" :disabled="submitting"><ShoppingBag :size="16" aria-hidden="true" />{{ submitting ? '正在提交…' : '提交订单' }}</button></footer>
         </form>

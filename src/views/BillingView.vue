@@ -1,10 +1,11 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDownLeft, ArrowUpRight, Check, CircleHelp, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
 import BillingPlanManager from '../components/BillingPlanManager.vue'
+import { auth } from '../stores/auth'
 
 const route = useRoute()
 const account = computed(() => billing.summary)
@@ -12,6 +13,9 @@ const returnTo = computed(() => typeof route.query.redirect === 'string'
   && route.query.redirect.startsWith('/') && !route.query.redirect.startsWith('//')
   ? route.query.redirect : '/dashboard')
 const amount = ref(50)
+const purchaseConsent = ref(false)
+const purchaseConsentInput = ref(null)
+watch(() => [auth.user?.id, auth.tenantId], () => { purchaseConsent.value = false }, { flush: 'sync' })
 const preset = [10, 50, 100, 300]
 const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= 1 && amount.value <= 100000)
 const topupCredits = computed(() => validAmount.value ? amount.value * (account.value?.creditsPerYuan || 10) : 0)
@@ -107,8 +111,15 @@ const openPayment = async (order) => {
   await applyPayment(order)
   if (order.state === 'PENDING_PAYMENT') paymentTimer = setTimeout(pollPayment, 4000)
 }
+const checkPurchaseConsent = (message) => {
+  if (purchaseConsent.value) return true
+  error.value = message
+  nextTick(() => purchaseConsentInput.value?.focus())
+  return false
+}
 const topUp = async () => {
   if (!validAmount.value || !canPay.value) return
+  if (!checkPurchaseConsent('充值前请阅读并同意用户协议、隐私协议和售后服务规则。')) return
   busy.value = true; error.value = ''
   try { await openPayment(await billingApi.topUp({ requestKey: keyFor('topup:' + amount.value), amountMinor: amount.value * 100 })); await loadRecords() }
   catch (e) { error.value = e.message || '充值订单创建失败'; await loadRecords() }
@@ -116,12 +127,14 @@ const topUp = async () => {
 }
 const subscribe = async (plan) => {
   if (!canPay.value) return
+  if (!checkPurchaseConsent('订阅前请阅读并同意用户协议、隐私协议和售后服务规则。')) return
   busy.value = true; error.value = ''
   try { await openPayment(await billingApi.subscribe({ requestKey: keyFor('plan:' + plan.id), planId: plan.id })); await loadRecords() }
   catch (e) { error.value = e.message || '订阅订单创建失败'; await loadRecords() }
   finally { busy.value = false }
 }
 const resumeOrder = async (order) => {
+  if (order.state === 'PENDING_PAYMENT' && !checkPurchaseConsent('继续支付前请阅读并同意用户协议、隐私协议和售后服务规则。')) return
   error.value = ''; busy.value = true
   try { await openPayment(await billingApi.refresh(order.id)) }
   catch (e) { error.value = e.message || '支付订单暂时无法读取' }
@@ -178,6 +191,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <section id="topup" class="yanhuo-topup">
         <div class="yanhuo-section-title"><h2>添一份烟火</h2><p>充值烟火</p></div>
         <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
+        <label class="yanhuo-legal-consent"><input ref="purchaseConsentInput" v-model="purchaseConsent" type="checkbox" :disabled="busy" :aria-invalid="Boolean(error && !purchaseConsent)" /><span>我已阅读并同意<a href="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册协议》</a>、<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>和<a href="/policies/aftersales" target="_blank" rel="noopener noreferrer">《售后与退款规则》</a>，确认按所选金额、套餐期限、权益和订单信息购买。</span></label>
         <form @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small>{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
           <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : paymentLabel }}</button></div>

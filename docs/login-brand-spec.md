@@ -17,5 +17,7 @@
 微信内网页授权、生成与验证 state、回调以及与当前 tokenStore 兼容的会话交接。
 仓库尚无该服务端流程，本次不把前端跳转视为完整 OAuth 登录已接通。
 
-忘记密码提供短信登录替代路径。协议入口读取 `VITE_TERMS_URL` 和
-`VITE_PRIVACY_URL`，未配置时明确提示全文未发布，不编造法律文本。
+忘记密码提供短信登录替代路径。注册及登录页通过新标签页打开
+`/policies/terms` 和 `/policies/privacy` 的本地完整协议，保留原表单。
+协议框默认不勾选，发送验证码、密码登录及发起微信授权前均需主动确认。
+运营主体、正文与法规来源集中在 `src/domain/legalPolicies.js`，维护方式见 `docs/legal-policies.md`。

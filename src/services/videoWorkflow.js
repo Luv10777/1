@@ -5,6 +5,7 @@ export const submitVideoQuote = (data, quoteId) => post('/api/video/workflows', 
 export const videoApi = {
   create: data => post('/api/video/workflows', data),
   get: id => get(`/api/video/workflows/${id}`),
+  works: (page = 0) => get('/api/video/works', { page, size: 20 }),
 }
 
 export async function uploadVideoReference(entry, type) {

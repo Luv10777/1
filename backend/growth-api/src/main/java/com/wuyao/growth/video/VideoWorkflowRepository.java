@@ -14,6 +14,8 @@ public interface VideoWorkflowRepository extends JpaRepository<VideoWorkflow, Lo
     @Query("select w.taskId from VideoWorkflow w where w.billingReservationId in :reservations and w.status<>'SUCCEEDED' and w.taskId is not null")
     java.util.List<Long> billingRecoveryTaskIds(java.util.List<String> reservations);
     Page<VideoWorkflow> findAllByOrderByIdDesc(Pageable pageable);
+    Page<VideoWorkflow> findByCreatedByAndStatusAndOutputStorageKeyIsNotNullOrderByIdDesc(
+            Long createdBy, String status, Pageable pageable);
 
     Optional<VideoWorkflow> findByRequestKey(String requestKey);
 

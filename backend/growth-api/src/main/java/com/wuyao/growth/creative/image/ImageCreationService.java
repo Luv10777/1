@@ -178,9 +178,9 @@ public class ImageCreationService {
    return versions.stream().max(Comparator.comparing(ImageCreation::getId)).orElse(creation);
  }
  @Transactional(readOnly=true)
- public PageResult<ImageDtos.Work> works(int page,int size) {
+ public PageResult<ImageDtos.Work> works(int page,int size,Long userId) {
    checkPage(page,size);
-   var result=items.findByStatusAndOutputKeyIsNotNullOrderByIdDesc("SUCCEEDED",PageRequest.of(page,size));
+   var result=items.findWorksByCreator(userId,PageRequest.of(page,size));
    return PageResult.of(result,result.stream().map(i->{
      var c=find(i.getCreationId());var d=ImageQuality.dimensions(c.getRequest().quality(),c.getRequest().ratio());
      return new ImageDtos.Work(i.getId(),c.getId(),c.getRequest().workflow(),title(root(c)),

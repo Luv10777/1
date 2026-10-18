@@ -18,14 +18,11 @@ const showPassword = ref(false)
 const notice = ref('')
 const error = ref('')
 const dialog = ref(null)
-const dialogKind = ref('')
-const dialogTitle = computed(() => ({ forgot: '找回账号访问权限', terms: '用户协议', privacy: '隐私政策' })[dialogKind.value])
 const smsTab = ref(null)
 const passwordTab = ref(null)
 const pageForm = ref(null)
 const agreedInput = ref(null)
 const actionBusy = computed(() => busy.value || sending.value || wechatBusy.value || wechatVerifying.value)
-const legalUrls = { terms: import.meta.env.VITE_TERMS_URL, privacy: import.meta.env.VITE_PRIVACY_URL }
 const wechatTicket = ref('')
 const wechatBinding = ref(false)
 const wechatNickname = ref('')
@@ -105,7 +102,7 @@ async function focusInvalid() {
 }
 
 function checkAgreement() {
-  errors.agreed = form.agreed ? '' : '请先阅读并勾选用户协议与隐私政策'
+  errors.agreed = form.agreed ? '' : '请先阅读并同意用户注册协议与隐私协议'
   if (errors.agreed) nextTick(() => agreedInput.value?.focus())
   return !errors.agreed
 }
@@ -213,7 +210,7 @@ async function submit() {
     errors.account = accountError(form.account)
     errors.password = passwordError(form.password)
   }
-  errors.agreed = form.agreed ? '' : '请先阅读并勾选用户协议与隐私政策'
+  errors.agreed = form.agreed ? '' : '请先阅读并同意用户注册协议与隐私协议'
   if (Object.values(errors).some(Boolean)) return focusInvalid()
   busy.value = true
   try {
@@ -250,15 +247,7 @@ function loginWithWechat() {
   window.location.assign(loginUrl.href)
 }
 
-function openDialog(kind) {
-  if (legalUrls[kind]) {
-    const url = trustedLink(legalUrls[kind])
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer')
-      return
-    }
-  }
-  dialogKind.value = kind
+function openDialog() {
   dialog.value?.showModal()
 }
 
@@ -379,7 +368,7 @@ function useSmsInstead() {
         <div v-if="!wechatVerifying" class="access-consent">
           <div class="access-consent-row">
             <input id="login-agreed" ref="agreedInput" v-model="form.agreed" type="checkbox" :disabled="actionBusy" :aria-invalid="Boolean(errors.agreed)" :aria-describedby="errors.agreed ? 'agreement-error' : undefined" @change="errors.agreed = ''" />
-            <div><label for="login-agreed">我已阅读并同意</label><button type="button" @click="openDialog('terms')">《用户协议》</button><span>和</span><button type="button" @click="openDialog('privacy')">《隐私政策》</button></div>
+            <div><label for="login-agreed">我已阅读并同意</label><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册协议》</RouterLink><span>和</span><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</RouterLink></div>
           </div>
           <p v-if="errors.agreed" id="agreement-error" class="access-field-error" role="alert">{{ errors.agreed }}</p>
         </div>
@@ -394,12 +383,9 @@ function useSmsInstead() {
     <dialog ref="dialog" class="access-dialog" aria-labelledby="access-dialog-title" @click="event => event.target === dialog && dialog.close()">
       <button class="access-dialog-close" type="button" aria-label="关闭" @click="dialog.close()"><X :size="20" /></button>
       <LockKeyhole :size="25" class="access-dialog-icon" aria-hidden="true" />
-      <h2 id="access-dialog-title">{{ dialogTitle }}</h2>
-      <template v-if="dialogKind === 'forgot'">
-        <p>忘记密码也可以通过已绑定的手机号登录。若手机号已停用，请联系平台管理员协助处理。</p>
-        <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录<ArrowRight :size="18" /></button>
-      </template>
-      <template v-else><p>{{ dialogTitle }}全文暂未发布，请联系平台管理员获取并阅读后再继续。</p><button class="access-submit w-full" type="button" @click="dialog.close()">我知道了</button></template>
+      <h2 id="access-dialog-title">找回账号访问权限</h2>
+      <p>忘记密码也可以通过已绑定的手机号登录。若手机号已停用，请联系平台管理员协助处理。</p>
+      <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录<ArrowRight :size="18" /></button>
     </dialog>
   </main>
 </template>

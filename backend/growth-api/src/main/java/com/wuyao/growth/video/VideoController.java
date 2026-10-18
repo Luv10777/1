@@ -54,4 +54,11 @@ public class VideoController {
                                                             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(service.history(page, size));
     }
+
+    @GetMapping("/works")
+    public ApiResponse<PageResult<VideoDtos.History>> works(@RequestParam(defaultValue = "0") int page,
+                                                           @RequestParam(defaultValue = "20") int size,
+                                                           @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.works(page, size, me.userId()));
+    }
 }

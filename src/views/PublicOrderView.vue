@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, Check, Clock3, PackageCheck, RefreshCw, Store, Truck } from 'lucide-vue-next'
 import { commerceApi, orderStatuses } from '../services/commerceApi'
+import { LEGAL_ENTITY } from '../domain/legalPolicies'
 import '../public-commerce.css'
 
 const route = useRoute()
@@ -52,6 +53,7 @@ watch(() => route.params.token, loadOrder, { immediate: true })
           <dl><div><dt>提交时间</dt><dd>{{ new Date(order.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</dd></div><div><dt>订单状态</dt><dd>{{ orderStatuses[order.status] || order.status }}</dd></div></dl>
           <dl v-if="order.shippingCompany || order.trackingNumber"><div v-if="order.shippingCompany"><dt>承运方 / 配送方式</dt><dd>{{ order.shippingCompany }}</dd></div><div v-if="order.trackingNumber"><dt>运单号</dt><dd>{{ order.trackingNumber }}</dd></div></dl>
           <p class="public-payment-note">当前未接入线上收款，订单提交不会产生付款。请等待商家确认后按商家指引完成交易。</p>
+          <p class="public-payment-note">取消、退换货或退款争议，请先联系实际销售商家；需要平台协助时，可拨打<a :href="`tel:${LEGAL_ENTITY.phone}`">{{ LEGAL_ENTITY.phone }}</a>并提供订单号。<RouterLink to="/policies/aftersales" target="_blank" rel="noopener noreferrer">查看售后与退款规则</RouterLink></p>
         </section>
         <RouterLink to="/information" class="public-store-footer-link"><Store :size="15" />回到一方志商家信息<ArrowLeft :size="14" /></RouterLink>
       </template>

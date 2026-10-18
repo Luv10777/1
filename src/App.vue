@@ -5,6 +5,7 @@ import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui
 import AppShell from './layouts/AppShell.vue'
 import DesktopShell from './layouts/DesktopShell.vue'
 import { inDesktop } from './utils/desktop'
+import { LEGAL_ENTITY } from './domain/legalPolicies'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,7 +21,7 @@ function openMembership() {
 </script>
 
 <template>
-  <div class="site-layout">
+  <div class="site-layout" :class="{ 'site-layout-legal': route.name === 'legal-policy' }">
     <div class="site-content">
       <RouterView v-if="isPublic" />
       <!-- 桌面端只做直播，不带平台的导航。 -->
@@ -33,7 +34,8 @@ function openMembership() {
     </div>
     <footer v-if="!inDesktop" class="site-footer" aria-label="网站备案信息">
       <span>ICP备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026081720号</a></span>
-      <span>主办单位名称：嘉兴市梧曜科技有限公司</span>
+      <span>运营主体：{{ LEGAL_ENTITY.name }}</span>
+      <nav class="site-legal-links" aria-label="协议、售后与客服"><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">用户注册协议</RouterLink><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">隐私协议</RouterLink><RouterLink to="/policies/merchant" target="_blank" rel="noopener noreferrer">商家入驻</RouterLink><RouterLink to="/policies/aftersales" target="_blank" rel="noopener noreferrer">售后与退款</RouterLink><a :href="`tel:${LEGAL_ENTITY.phone}`">客服 {{ LEGAL_ENTITY.phone }}</a></nav>
     </footer>
   </div>
   <Dialog :open="membershipOpen" class="membership-dialog" @close="membershipOpen = false">
@@ -57,6 +59,9 @@ function openMembership() {
 .site-content :deep(.app-frame), .site-content :deep(.access-page) { height: 100%; }
 .site-content :deep(.mobile-bottom-nav) { position: absolute; }
 .site-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 20px; padding: 8px 16px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--night); color: var(--ink-muted); font-size: 12px; line-height: 1.8; text-align: center; }
+.site-legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; }
+.site-legal-links a { white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.site-legal-links a:hover, .site-legal-links a:focus-visible { color: var(--color-accent-text); }
 .site-footer a { white-space: nowrap; }
 .site-footer a:hover, .site-footer a:focus-visible { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 :global(.membership-dialog) { position: fixed; inset: 0; z-index: 1100; }
@@ -66,4 +71,9 @@ function openMembership() {
 .membership-panel h2 { margin: 0 0 12px; font-size: 20px; font-weight: 500; }
 .membership-panel p { margin: 0; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
 .membership-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+@media print {
+  .site-layout-legal { display:block; height:auto; min-height:0; overflow:visible; }
+  .site-layout-legal > .site-content { display:block; height:auto; min-height:0; overflow:visible; }
+  .site-layout-legal > .site-footer { display:none; }
+}
 </style>

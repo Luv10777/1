@@ -371,7 +371,7 @@ async function savePassword() {
           </label>
           <label class="consent">
             <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
-            <span>我确认以上是本人真实、准确的身份信息，并同意平台用于本次实名审核。不能替别人提交。</span>
+            <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
           </label>
           <p class="hint">姓名和身份证号在服务端加密保存，只有平台审核人员能查看完整资料，每次查看都会留下记录。目前由平台人工审核，还没有接入公安等第三方核验。</p>
           <div class="form-footer">
@@ -510,6 +510,7 @@ async function savePassword() {
 .review-note p { margin: 4px 0 0; color: var(--color-text-muted); white-space: pre-wrap; }
 .consent { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; cursor: pointer; }
 .consent input { margin-top: 4px; accent-color: var(--color-accent); }
+.consent a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 2px; }
 .hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
 #identity { scroll-margin-top: 20px; }
 
