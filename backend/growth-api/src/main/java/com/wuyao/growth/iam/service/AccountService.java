@@ -39,6 +39,7 @@ public class AccountService {
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
     private final TenantRepository tenants;
+    private final AccountAvatarService avatars;
 
     /** 当前商户里这个可用账号的角色。停用、移除或不属于当前商户的账号一律拒绝。 */
     @Transactional(readOnly = true)
@@ -59,7 +60,8 @@ public class AccountService {
     /** 登录者自己的资料，系统设置里展示用。 */
     @Transactional(readOnly = true)
     public AccountDtos.Profile profile(Long userId) {
-        return AccountDtos.Profile.of(active(userId));
+        User user = active(userId);
+        return AccountDtos.Profile.of(user, avatars.url(user.getAvatarKey()));
     }
 
     /** 每个人都能改自己的显示名字，管理员和店员一样。 */
@@ -71,7 +73,7 @@ public class AccountService {
                 .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "账号不可用或不属于当前商户"));
         user.setName(name.trim());
         user.setUpdatedAt(Instant.now());
-        return AccountDtos.Profile.of(user);
+        return AccountDtos.Profile.of(user, avatars.url(user.getAvatarKey()));
     }
 
     /** 当前商户未移除的账号，管理员在前。 */

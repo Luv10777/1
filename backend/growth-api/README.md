@@ -367,6 +367,11 @@ Gauge 按采集时拉取，不放在视频业务请求路径上。工作流统�
 连续输错五次后锁定 15 分钟，失败计数独立提交；登录成功后沿用现有 JWT 和刷新令牌流程。
 V5 只添加账号字段，不包含任何默认账号或密码；实际凭证必须单独配置到服务器数据库。
 
+个人头像使用 `ACCOUNT_AVATAR_STORAGE=minio`（默认）或 `cos`，沿用对应对象存储凭证。
+`/api/auth/account/avatar/upload-url` 发放本人直传凭证，`PUT /api/auth/account/avatar`
+校验不超过 2 MB 的 JPG/PNG 并生成独立的 256×256 PNG；这些账号接口不要求付费会员。
+头像下载链接有效 1 小时，前端加载失效链接时自动重新获取账号资料。
+
 ### 素材参考模块
 
 `asset/` 展示预签名上传、确认、分页和任务提交。新模块可参考其分层，
@@ -419,8 +424,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V43 | 门店档案：`stores.profile`（交通指引、配套服务、特殊营业安排） | `feat/store-library` |
 | V50 | 商家申请、信息公开发布、实物商品上架、订单与公开店铺 RLS 策略 | `codex/guest-creation-browsing` |
 | V52 | 信息发布审核、驳回意见与审核后发布时间 | `codex/information-review` |
+| V53 | 个人头像及待确认头像上传凭证 | `codex/scroll-footer-account-avatar` |
 
-下一个可用编号：V53。
+下一个可用编号：V54。
 
 后端检查：
 

@@ -22,7 +22,8 @@ class AuthSecurityTest {
     final StringRedisTemplate redis = mock(StringRedisTemplate.class);
     final JwtService jwt = new JwtService("test-only-random-signing-secret-0123456789abcdef", Duration.ofHours(1), Duration.ofDays(30));
     final AuthService auth = new AuthService(mock(TenantRepository.class), users, refresh, codes, sender, jwt,
-            mock(LoginCodeVerifier.class), mock(PasswordLoginVerifier.class), mock(TransactionTemplate.class), redis);
+            mock(LoginCodeVerifier.class), mock(PasswordLoginVerifier.class), mock(TransactionTemplate.class), redis,
+            mock(AccountAvatarService.class));
 
     @Test void logoutAdvancesVersionAndRevokesAllRefreshTokens() {
         User user = new User(); user.setId(1L); user.setTenantId(2L); user.setTokenVersion(9);

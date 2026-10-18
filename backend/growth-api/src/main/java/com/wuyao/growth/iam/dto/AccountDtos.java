@@ -30,12 +30,22 @@ public final class AccountDtos {
 
     /** 登录者自己的资料。只说明有没有设过密码，不带任何凭证内容。 */
     public record Profile(Long id, String name, String phone, String username, String role,
-                          boolean passwordSet, Instant createdAt) {
+                          boolean passwordSet, Instant createdAt, String avatarUrl) {
 
-        public static Profile of(User user) {
+        public static Profile of(User user, String avatarUrl) {
             return new Profile(user.getId(), user.getName(), user.getPhone(), user.getUsername(), user.getRole(),
-                    user.getPasswordHash() != null, user.getCreatedAt());
+                    user.getPasswordHash() != null, user.getCreatedAt(), avatarUrl);
         }
+    }
+
+    public record AvatarUploadRequest(
+            @NotBlank @Pattern(regexp = "image/(jpeg|png)", message = "请选择 JPG 或 PNG 格式的图片") String mimeType) {
+    }
+
+    public record AvatarUploadTicket(String uploadKey, String uploadUrl, Instant expiresAt) {
+    }
+
+    public record AvatarRequest(@NotBlank @Size(max = 300) String uploadKey) {
     }
 
     public record RenameRequest(@NotBlank(message = "姓名不能为空") @Size(max = 80, message = "姓名最多 80 个字") String name) {

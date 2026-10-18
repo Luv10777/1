@@ -11,6 +11,9 @@ const state = reactive({
 })
 
 let timer
+let avatarRefresh
+let avatarRefreshUser
+let avatarRefreshAt = 0
 
 // 后端的角色只有 OWNER（管理员）和 STAFF（店员）。这里只决定显示哪些入口，真正的限制在服务端。
 const rolesOf = role => [String(role || 'OWNER').toLowerCase()]
@@ -33,6 +36,7 @@ function persistSession(data) {
     name: data.user.name || (data.user.phone ? `用户${data.user.phone.slice(-4)}` : '用户'),
     roles: rolesOf(data.user.role),
     role: roleLabel(data.user.role),
+    avatarUrl: data.user.avatarUrl || '',
   }
   state.user = user
   writeUser(user)
@@ -127,7 +131,7 @@ export const auth = {
     if (!state.token?.accessToken) return false
     try {
       const me = await authService.getCurrentUser()
-      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role) }
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role), avatarUrl: me.avatarUrl || '' }
       writeUser(state.user)
       // 校验过程中 request.js 可能已经换过 token，内存里的那份要跟上。
       state.token = readTokens()
@@ -144,6 +148,26 @@ export const auth = {
     if (!state.user) return
     state.user = { ...state.user, name }
     writeUser(state.user)
+  },
+
+  updateAvatar(avatarUrl, userId = state.user?.id) {
+    if (!state.user || state.user.id !== userId) return
+    state.user = { ...state.user, avatarUrl: avatarUrl || '' }
+    writeUser(state.user)
+  },
+
+  /** 图片链接过期时重新签发；合并顶部/侧栏的请求，并限制失败重试频率。 */
+  async refreshAvatar() {
+    const userId = state.user?.id
+    if (!userId || !state.user.avatarUrl) return
+    if (avatarRefresh) return avatarRefresh
+    if (avatarRefreshUser === userId && Date.now() - avatarRefreshAt < 30000) return
+    avatarRefreshUser = userId
+    avatarRefreshAt = Date.now()
+    avatarRefresh = authService.getCurrentUser().then(me => {
+      if (state.user?.id === userId && me.userId === userId) auth.updateAvatar(me.avatarUrl)
+    }).catch(() => { /* 暂时不可用时保留名字首字。 */ }).finally(() => { avatarRefresh = null })
+    return avatarRefresh
   },
 
   /** 改密码后服务端让旧令牌全部失效，并给这台设备发了一套新的，换上即可继续使用。 */

@@ -1,7 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { accountApi } from '../services/accountApi'
+import { accountApi, validateAvatar } from '../services/accountApi'
+import UserAvatar from '../components/UserAvatar.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
 import { identityValidation, managementDate } from '../domain/platformManagement'
 import { auth } from '../stores/auth'
@@ -16,6 +17,11 @@ const loadError = ref('')
 const nameDraft = ref('')
 const savingName = ref(false)
 const nameMessage = ref({ text: '', error: false })
+const avatarInput = ref(null)
+const avatarFile = ref(null)
+const avatarPreview = ref('')
+const savingAvatar = ref(false)
+const avatarMessage = ref({ text: '', error: false })
 
 const passwordOpen = ref(false)
 const byCode = ref(false)
@@ -64,6 +70,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.querySelector('.page-scroll')?.classList.remove('settings-scroll')
   clearIdentityForm()
+  clearAvatarDraft()
 })
 
 function clearIdentityForm() {
@@ -125,10 +132,50 @@ async function load() {
   try {
     profile.value = await accountApi.profile()
     nameDraft.value = profile.value.name || ''
+    auth.updateAvatar(profile.value.avatarUrl, profile.value.id)
   } catch (error) {
     loadError.value = error.message || '账号资料加载失败，请重试'
   } finally {
     loading.value = false
+  }
+}
+
+function clearAvatarDraft() {
+  if (avatarPreview.value) URL.revokeObjectURL(avatarPreview.value)
+  avatarPreview.value = ''
+  avatarFile.value = null
+  if (avatarInput.value) avatarInput.value.value = ''
+}
+
+function selectAvatar(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  avatarMessage.value = { text: '', error: false }
+  try {
+    validateAvatar(file)
+    clearAvatarDraft()
+    avatarFile.value = file
+    avatarPreview.value = URL.createObjectURL(file)
+  } catch (error) {
+    event.target.value = ''
+    avatarMessage.value = { text: error.message, error: true }
+  }
+}
+
+async function saveAvatar() {
+  if (!avatarFile.value || savingAvatar.value) return
+  savingAvatar.value = true
+  avatarMessage.value = { text: '', error: false }
+  try {
+    const saved = await accountApi.updateAvatar(avatarFile.value)
+    profile.value = { ...profile.value, avatarUrl: saved.avatarUrl }
+    auth.updateAvatar(saved.avatarUrl, saved.id)
+    clearAvatarDraft()
+    avatarMessage.value = { text: '头像已更新', error: false }
+  } catch (error) {
+    avatarMessage.value = { text: error.message || '头像保存失败，请重试', error: true }
+  } finally {
+    savingAvatar.value = false
   }
 }
 
@@ -257,10 +304,26 @@ async function savePassword() {
         <header class="card-header">
           <div>
             <h2 id="profile-title">个人资料</h2>
-            <p>名字会显示在右上角，以及管理员的员工列表里。</p>
+            <p>头像和名字用于识别你的账号。名字也会显示在管理员的员工列表里。</p>
           </div>
           <span class="role-badge" :class="{ owner: profile.role !== 'STAFF' }">{{ roleText }}</span>
         </header>
+        <div class="avatar-section" :aria-busy="savingAvatar">
+          <UserAvatar class="profile-avatar" :src="avatarPreview || profile.avatarUrl" :name="profile.name" />
+          <div class="avatar-details">
+            <h3>个人头像</h3>
+            <p id="avatar-help">支持 JPG、PNG，最大 2 MB。头像将居中裁剪，保存后显示在顶部和侧栏。</p>
+            <input ref="avatarInput" class="avatar-file-input" type="file" accept="image/jpeg,image/png" aria-label="选择头像图片" aria-describedby="avatar-help" :disabled="savingAvatar" @change="selectAvatar" />
+            <div class="avatar-actions">
+              <button type="button" class="ghost-button" :disabled="savingAvatar" @click="avatarInput?.click()">{{ avatarFile ? '重新选择' : '更换头像' }}</button>
+              <template v-if="avatarFile">
+                <button type="button" class="primary-button" :disabled="savingAvatar" @click="saveAvatar">{{ savingAvatar ? '保存中…' : '保存头像' }}</button>
+                <button type="button" class="link-button" :disabled="savingAvatar" @click="clearAvatarDraft">取消</button>
+              </template>
+            </div>
+            <p v-if="avatarMessage.text" class="inline-message" :class="{ error: avatarMessage.error }" :role="avatarMessage.error ? 'alert' : 'status'">{{ avatarMessage.text }}</p>
+          </div>
+        </div>
         <form class="name-row" @submit.prevent="saveName">
           <label class="field">
             <span>姓名</span>
@@ -478,6 +541,13 @@ async function savePassword() {
 .state-badge.on { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
 
 .name-row { display: flex; align-items: flex-end; gap: 10px; }
+.avatar-section { display: flex; align-items: flex-start; gap: 18px; padding-bottom: 22px; margin-bottom: 20px; border-bottom: 1px solid var(--color-border-subtle); }
+.profile-avatar { width: 72px; height: 72px; font-size: 28px; }
+.avatar-details { min-width: 0; }
+.avatar-details h3 { margin: 0 0 4px; font-size: 13px; }
+.avatar-details > p:not(.inline-message) { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
+.avatar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.avatar-file-input { display: none; }
 .name-row .field { flex: 1; margin: 0; }
 .field { display: grid; gap: 7px; margin: 0 0 16px; }
 .field > span, .field > label { color: var(--color-primary); font-size: 12px; font-weight: 700; }
@@ -525,6 +595,8 @@ async function savePassword() {
 .closure-panel > .form-notice { margin-bottom: 4px; }
 
 @media (max-width: 640px) {
+  .avatar-section { gap: 12px; }
+  .profile-avatar { width: 56px; height: 56px; font-size: 24px; }
   .settings-page { padding: 22px 16px 58px; }
   .settings-header h1 { font-size: 30px; }
   .settings-card { padding: 18px 16px; }

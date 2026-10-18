@@ -1,6 +1,49 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { closurePayload, createAccountApi, namePayload, passwordPayload } from './accountApi.js'
+import { closurePayload, createAccountApi, namePayload, passwordPayload, validateAvatar } from './accountApi.js'
+
+test('avatars upload actual bytes directly, then save only the server-issued upload key to the current account', async () => {
+  const file = new File(['image bytes'], 'portrait.png', { type: 'image/png' })
+  const events = []
+  const profile = { id: 7, avatarUrl: 'https://storage.test/saved.png' }
+  const api = createAccountApi({
+    request: async (path, options) => {
+      events.push({ path, method: options.method, body: JSON.parse(options.body) })
+      return path.endsWith('upload-url') ? { uploadKey: 'server-key', uploadUrl: 'https://storage.test/upload' } : profile
+    },
+    fetch: async (url, options) => {
+      assert.equal(url, 'https://storage.test/upload')
+      assert.equal(options.body, file)
+      assert.deepEqual(options.headers, { 'Content-Type': 'image/png' })
+      events.push({ upload: true })
+      return { ok: true }
+    },
+  })
+  assert.equal(await api.updateAvatar(file), profile)
+  assert.deepEqual(events, [
+    { path: '/api/auth/account/avatar/upload-url', method: 'POST', body: { mimeType: 'image/png' } },
+    { upload: true },
+    { path: '/api/auth/account/avatar', method: 'PUT', body: { uploadKey: 'server-key' } },
+  ])
+})
+
+test('invalid avatars and failed uploads never save a profile', async () => {
+  assert.throws(() => validateAvatar(new File(['svg'], 'x.svg', { type: 'image/svg+xml' })), /JPG/)
+  assert.throws(() => validateAvatar({ type: 'image/png', size: 0 }), /2 MB/)
+  assert.throws(() => validateAvatar({ type: 'image/png', size: 2 * 1024 * 1024 + 1 }), /2 MB/)
+  const file = new File(['png'], 'avatar.png', { type: 'image/png' })
+  for (const uploadFetch of [async () => ({ ok: false }), async () => { throw new Error('offline') }]) {
+    const calls = []
+    const api = createAccountApi({ request: async path => {
+      calls.push(path)
+      return { uploadKey: 'key', uploadUrl: 'https://storage.test/upload' }
+    }, fetch: uploadFetch })
+    await assert.rejects(api.updateAvatar(file), /上传失败/)
+    assert.deepEqual(calls, ['/api/auth/account/avatar/upload-url'])
+    await assert.rejects(api.updateAvatar({ type: 'image/png', size: 3 * 1024 * 1024 }), /2 MB/)
+    assert.equal(calls.length, 1)
+  }
+})
 
 test('a name is trimmed and must not be empty or too long', () => {
   assert.deepEqual(namePayload('  王老板 '), { name: '王老板' })
