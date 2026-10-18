@@ -10,10 +10,11 @@ const router = useRouter()
 const store = ref(null)
 const products = ref([])
 const quantities = reactive({})
-const buyer = reactive({ name: '', phone: '', address: '', note: '' })
+const buyer = reactive({ name: '', phone: '', address: '', note: '', legalAccepted: false })
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
+const orderError = ref('')
 let generation = 0
 
 const storeId = computed(() => Number(route.params.storeId))
@@ -27,6 +28,8 @@ async function loadStorefront() {
   const current = ++generation
   loading.value = true
   error.value = ''
+  orderError.value = ''
+  buyer.legalAccepted = false
   store.value = null
   products.value = []
   Object.keys(quantities).forEach(id => delete quantities[id])
@@ -58,7 +61,11 @@ function setQuantity(product, amount) {
 
 async function submitOrder() {
   if (submitting.value || cartItems.value.length === 0) return
-  error.value = ''
+  if (!buyer.legalAccepted) {
+    orderError.value = '提交前请阅读并同意交易与售后规则及订单信息处理说明。'
+    return
+  }
+  orderError.value = ''
   submitting.value = true
   try {
     const receipt = await commerceApi.placeOrder({
@@ -70,7 +77,7 @@ async function submitOrder() {
     })
     await router.push({ name: 'public-order', params: { token: receipt.lookupToken } })
   } catch (failure) {
-    error.value = failure.message || '订单尚未提交，请稍后重试。'
+    orderError.value = failure.message || '订单尚未提交，请稍后重试。'
   } finally {
     submitting.value = false
   }
@@ -123,7 +130,8 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
               <label><span>联系电话</span><input v-model.trim="buyer.phone" required maxlength="20" type="tel" inputmode="tel" autocomplete="tel" pattern="[0-9+()\- ]{6,20}" placeholder="可联系到您的电话" /></label>
               <label><span>收货地址</span><textarea v-model.trim="buyer.address" required maxlength="500" autocomplete="street-address" rows="2" placeholder="省市区、街道和门牌号" /></label>
               <label><span>备注</span><textarea v-model.trim="buyer.note" maxlength="500" rows="2" placeholder="选填" /></label>
-              <p v-if="error" class="public-error" role="alert">{{ error }}</p>
+              <label class="public-order-terms"><input v-model="buyer.legalAccepted" type="checkbox" required :disabled="submitting" /><span>我已阅读并同意<a href="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册与服务协议》</a>、<a href="/policies/aftersales" target="_blank" rel="noopener noreferrer">《售后与退款规则》</a>及<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>，同意将本订单的收货人、电话、地址与备注提供给{{ store.name }}，用于履约及售后。</span></label>
+              <p v-if="orderError" class="public-error" role="alert">{{ orderError }}</p>
               <button class="public-button public-button-primary" type="submit" :disabled="submitting || !cartItems.length"><ShoppingBag :size="16" />{{ submitting ? '正在提交…' : '提交订单' }}</button>
               <p class="public-payment-note">订单提交后由商家确认，当前不收取线上付款。</p>
             </form>

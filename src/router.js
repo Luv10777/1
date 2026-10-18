@@ -45,6 +45,8 @@ const IdentityView = () => import('./views/IdentityView.vue')
 const routes = [
   { path: '/', redirect: '/image/create' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
+  { path: '/policies', redirect: '/policies/terms' },
+  { path: '/policies/:policy(terms|privacy|merchant|aftersales|identity|publishing)', name: 'legal-policy', component: () => import('./views/LegalPoliciesView.vue'), meta: { public: true, title: '协议中心' } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/store/:storeId(\\d+)', name: 'public-storefront', component: PublicStorefrontView, meta: { public: true, title: '店铺商品' } },
   { path: '/order/:token', name: 'public-order', component: PublicOrderView, meta: { public: true, title: '订单查询' } },
@@ -75,7 +77,7 @@ const routes = [
   { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', eyebrow: 'ASSET CENTER', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。' } },
   { path: '/orders', name: 'merchant-orders', component: MerchantOrdersView, meta: { title: '订单管理', eyebrow: 'MERCHANT COMMERCE', navGroup: 'assets' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', eyebrow: 'ASSETS', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
-  { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看已生成、审核中和已发布的内容作品。' } },
+  { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', eyebrow: 'ASSETS', icon: '⌁', description: '查看当前账号实际生成的图片与视频作品。' } },
   { path: '/reviews', name: 'reviews', component: ReviewsView, meta: { title: '评论 / 差评自动回复', eyebrow: 'CUSTOMER SERVICE', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },
   { path: '/publishing', name: 'publishing', component: PublishingView, meta: { title: '内容发布', eyebrow: 'OPERATIONS', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/publishing/matrix', name: 'matrix-publishing', component: PlaceholderView, meta: { title: '矩阵发布', eyebrow: 'OMNICHANNEL PUBLISHING', icon: '▦', description: '统一编排多个平台和账号的内容发布任务。' } },

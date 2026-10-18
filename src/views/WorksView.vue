@@ -1,151 +1,364 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { imageApi, downloadImage } from '../services/imageCreation'
-import { ArrowUpRight, Check, Clock3, Download, Edit3, FileText, Image as ImageIcon, LayoutGrid, List, MapPin, Plus, Search, SlidersHorizontal, Video, X } from 'lucide-vue-next'
+import { videoApi } from '../services/videoWorkflow'
+import { ArrowUpRight, Check, Clock3, Download, Edit3, Image as ImageIcon, LayoutGrid, List, Play, Plus, Search, X } from 'lucide-vue-next'
 
 const router = useRouter()
-const mockWorks = [
-  { id: 'chronicle-01', title: '城市夜游 · 光影叙事短片', date: '2026-08-30', type: 'video', typeLabel: '生成视频', status: 'generating', statusLabel: '方志编撰中', tags: ['城市文旅', '60s 竖屏'], summary: '让城市灯火成为主角，穿行于夜色与人群之间。', tone: 'cinnabar', progress: 68, prompt: '夜幕下的城市文旅宣传片，镜头从街巷灯火缓慢推进，穿过人群与灯火，最后停在江边的城市天际线。电影感，克制高级，竖屏 9:16。', references: ['城市夜景参考.jpg', '品牌色板.png'], model: 'Video 2.1', size: '1080 × 1920 px', duration: '00:12', seed: '842193' },
-  { id: 'chronicle-03', title: '小红书探店笔记 · 叙事版', date: '2026-08-28', type: 'copy', typeLabel: '营销文案', status: 'completed', statusLabel: '已完成', tags: ['小红书', '第一人称'], summary: '把一次普通的探店，写成值得收藏的周末路线。', tone: 'blue' },
-  { id: 'chronicle-04', title: '门店经营体检 · 八月诊断报告', date: '2026-08-27', type: 'diagnosis', typeLabel: '探店诊断', status: 'completed', statusLabel: '已完成', tags: ['经营分析', '行动建议'], summary: '从客流、内容与转化三条链路，找到本月最值得投入的动作。', tone: 'green', diagnosis: { score: '78', level: '稳步增长', summary: '门店自然客流保持增长，但内容发布与到店转化之间仍有明显断层。建议优先补齐“周末场景 + 真实顾客反馈”两类内容。', metrics: [{ label: '内容活跃度', value: '86', change: '+12%' }, { label: '到店转化', value: '64', change: '+4%' }, { label: '复购意向', value: '71', change: '+8%' }], actions: ['每周发布 2 条真实探店内容', '将会员权益前置到短视频前三秒', '为高意向顾客配置到店提醒'] } },
-  { id: 'chronicle-06', title: '三分钟读懂 · 门店会员权益', date: '2026-08-24', type: 'video', typeLabel: '数字人视频', status: 'generating', statusLabel: '方志编撰中', tags: ['会员运营', '口播动画'], summary: '将复杂的权益说明，转译成清晰、轻量、可分享的内容。', tone: 'cyan', progress: 34, editorPath: '/digital-human/studio', prompt: '请用亲和、可信的店长口吻，介绍门店会员权益，突出首次到店礼、积分兑换和生日礼遇。', references: ['店长形象参考.png', '会员权益卡.png'], model: 'Digital Human Studio', size: '1080 × 1920 px', duration: '00:30', seed: '619204' },
+const filters = [
+  { key: 'all', label: '全部' },
+  { key: 'image', label: '图片' },
+  { key: 'video', label: '视频' },
 ]
-const filters = [{ key: 'all', label: '全部作品' }, { key: 'video', label: '生成视频' }, { key: 'image', label: '图片生成' }, { key: 'copy', label: '营销文案' }, { key: 'diagnosis', label: '探店诊断' }]
-const activeFilter = ref('all'); const searchQuery = ref(''); const layout = ref('grid')
-const imageWorks = ref([])
+const activeFilter = ref('all')
+const searchQuery = ref('')
+const layout = ref('grid')
+const works = ref([])
 const worksPage = ref(0)
-const worksTotalPages = ref(0)
+const imageTotalPages = ref(0)
+const videoTotalPages = ref(0)
 const worksLoading = ref(false)
 const worksError = ref('')
-const allWorks = computed(() => [...imageWorks.value, ...mockWorks])
-const filteredWorks = computed(() => { const query = searchQuery.value.trim().toLowerCase(); return allWorks.value.filter((work) => (activeFilter.value === 'all' || work.type === activeFilter.value) && (!query || `${work.title} ${work.summary} ${work.tags.join(' ')}`.toLowerCase().includes(query))) })
-async function loadImageWorks(page = 0) {
-  if (worksLoading.value) return
-  worksLoading.value = true; worksError.value = ''
-  try {
-    const data = await imageApi.works(page)
-    const mapped = data.items.map(row => ({
-      id: `image-${row.id}`, creationId: row.creationId, realImage: true,
-      title: row.title || '图片作品', date: new Date(row.createdAt).toLocaleDateString('zh-CN'),
-      type: 'image', typeLabel: '图片生成', status: 'completed', statusLabel: '已完成',
-      tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '营销海报', row.quality],
-      summary: row.title || '图片作品', tone: 'amber', url: row.url,
-      workflow: row.workflow, size: `${row.width} × ${row.height} px`, references: [],
-    }))
-    imageWorks.value = page === 0 ? mapped : [...imageWorks.value, ...mapped]
-    worksPage.value = page; worksTotalPages.value = data.totalPages
-  } catch (error) { worksError.value = error.message }
-  finally { worksLoading.value = false }
-}
-async function downloadWork(work) {
-  if (!work.url) return
-  try { await downloadImage(work.url, `一方志作品-${work.creationId}.png`) }
-  catch (error) { worksError.value = error.message }
-}
-const typeIcon = { video: Video, image: ImageIcon, copy: FileText, diagnosis: MapPin }
-const toneClasses = { cinnabar: 'tone-cinnabar', amber: 'tone-amber', blue: 'tone-blue', green: 'tone-green', rose: 'tone-rose', cyan: 'tone-cyan' }
-const reEdit = () => router.push('/image/create')
 const selectedWork = ref(null)
-const openDetails = (work) => { selectedWork.value = work }
-const closeDetails = () => { selectedWork.value = null }
-const workEditorPath = (work) => work.type === 'copy' ? null : work.editorPath || (work.type === 'digital-human' ? '/digital-human/studio' : work.type === 'video' ? '/video/workbench' : work.type === 'image' ? '/image/create/poster' : work.type === 'diagnosis' ? '/analytics/diagnosis' : null)
-const editWork = async (work) => {
-  const path = workEditorPath(work)
-  if (!path) return
-  if (work.realImage) {
-    closeDetails()
-    return router.push({ path: work.workflow === 'PRODUCT_SET' ? '/image/create/product-set' : '/image/create/poster', query: { creation: work.creationId } })
-  }
-  const query = { workId: work.id, prompt: work.prompt || work.summary, assets: work.references?.join('|') || '', ratio: work.size?.includes('1920') ? '9:16' : undefined, duration: work.duration?.replace('00:', '') || undefined }
-  closeDetails()
-  await nextTick()
-  const navigate = () => router.push({ path, query })
-  if (typeof document.startViewTransition === 'function') {
-    document.startViewTransition(navigate)
-  } else {
-    document.documentElement.classList.add('route-transitioning')
-    window.setTimeout(() => {
-      navigate()
-      window.setTimeout(() => document.documentElement.classList.remove('route-transitioning'), 380)
-    }, 90)
+
+const filteredWorks = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  return works.value.filter(work => (activeFilter.value === 'all' || work.type === activeFilter.value)
+    && (!query || `${work.title} ${work.tags.join(' ')}`.toLocaleLowerCase().includes(query)))
+})
+const hasMoreWorks = computed(() => {
+  const totalPages = activeFilter.value === 'image' ? imageTotalPages.value
+    : activeFilter.value === 'video' ? videoTotalPages.value
+      : Math.max(imageTotalPages.value, videoTotalPages.value)
+  return worksPage.value + 1 < totalPages
+})
+
+function formatDate(value) {
+  return new Date(value).toLocaleDateString('zh-CN')
+}
+
+function videoTitle(prompt) {
+  const text = (prompt || '').trim().split(/\r?\n/)[0]
+  return text.length > 54 ? `${text.slice(0, 54)}…` : text || '视频作品'
+}
+
+function mapImage(row) {
+  if (!row.url) return null
+  return {
+    id: `image-${row.id}`,
+    creationId: row.creationId,
+    type: 'image',
+    typeLabel: '图片',
+    title: row.title || '图片作品',
+    createdAt: row.createdAt,
+    tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '图片海报', row.quality],
+    url: row.url,
+    quality: row.quality,
+    dimensions: row.width && row.height ? `${row.width} × ${row.height} px` : '未记录尺寸',
+    workflow: row.workflow,
   }
 }
-const handleModalKeydown = (event) => { if (event.key === 'Escape') closeDetails() }
-onMounted(() => { window.addEventListener('keydown', handleModalKeydown); loadImageWorks() })
+
+function mapVideo(row) {
+  if (!row.outputUrl) return null
+  const duration = row.actualDurationMs ? `${Math.round(row.actualDurationMs / 1000)} 秒` : `${row.durationSeconds} 秒`
+  const dimensions = row.actualWidth && row.actualHeight
+    ? `${row.actualWidth} × ${row.actualHeight} px`
+    : `${row.resolution} · ${row.ratio}`
+  return {
+    id: `video-${row.id}`,
+    workflowId: row.id,
+    type: 'video',
+    typeLabel: '视频',
+    title: videoTitle(row.prompt),
+    createdAt: row.createdAt,
+    tags: [row.model, `${row.resolution} · ${row.ratio}`, duration],
+    url: row.outputUrl,
+    model: row.model,
+    dimensions,
+    duration,
+    prompt: row.prompt,
+    ratio: row.ratio,
+    durationSeconds: row.durationSeconds,
+  }
+}
+
+async function loadWorks(page = 0) {
+  if (worksLoading.value) return
+  worksLoading.value = true
+  worksError.value = ''
+  try {
+    const [images, videos] = await Promise.all([imageApi.works(page), videoApi.works(page)])
+    const pageWorks = [
+      ...(images.items || []).map(mapImage),
+      ...(videos.items || []).map(mapVideo),
+    ].filter(Boolean)
+    works.value = [...(page === 0 ? [] : works.value), ...pageWorks]
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    imageTotalPages.value = images.totalPages || 0
+    videoTotalPages.value = videos.totalPages || 0
+    worksPage.value = page
+  } catch (error) {
+    worksError.value = error.message || '作品暂时无法加载'
+  } finally {
+    worksLoading.value = false
+  }
+}
+
+async function downloadWork(work) {
+  if (work.type !== 'image' || !work.url) return
+  try {
+    await downloadImage(work.url, `一方志作品-${work.creationId}.png`)
+  } catch (error) {
+    worksError.value = error.message || '下载失败'
+  }
+}
+
+function editWork(work) {
+  closeDetails()
+  if (work.type === 'image') {
+    router.push({
+      path: work.workflow === 'PRODUCT_SET' ? '/image/create/product-set' : '/image/create/poster',
+      query: { creation: work.creationId },
+    })
+    return
+  }
+  router.push({
+    path: '/video/workbench',
+    query: { prompt: work.prompt, ratio: work.ratio, duration: work.durationSeconds },
+  })
+}
+
+function closeDetails() {
+  selectedWork.value = null
+}
+
+function handleModalKeydown(event) {
+  if (event.key === 'Escape') closeDetails()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleModalKeydown)
+  loadWorks()
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 </script>
 
 <template>
-  <div>
-      <div class="works-library">
-        <header class="works-header">
-          <div class="works-heading">
-            <div class="works-title-copy"><h1>数字方志库</h1><p class="works-subtitle">每一次生成，都是一颗可追溯、可复用的内容篇章。</p></div>
-            <button class="new-work-button" type="button" @click="reEdit"><Plus :size="16" stroke-width="1.8" /> 新建创作</button>
+  <section class="works-library">
+    <header class="works-header">
+      <div class="works-heading">
+        <div class="works-title-copy">
+          <h1>数字方志库</h1>
+        </div>
+        <button class="new-work-button" type="button" @click="router.push('/image/create')">
+          <Plus :size="16" stroke-width="1.8" /> 新建创作
+        </button>
+      </div>
+      <div class="works-toolbar">
+        <div class="filter-tabs" role="tablist" aria-label="作品类型筛选">
+          <button
+            v-for="filter in filters"
+            :key="filter.key"
+            class="filter-tab"
+            :class="{ active: activeFilter === filter.key }"
+            type="button"
+            role="tab"
+            :aria-selected="activeFilter === filter.key"
+            @click="activeFilter = filter.key"
+          >
+            {{ filter.label }}
+          </button>
+        </div>
+        <div class="toolbar-actions">
+          <label class="search-field">
+            <Search :size="16" stroke-width="1.8" aria-hidden="true" />
+            <input v-model="searchQuery" type="search" placeholder="搜索作品" aria-label="搜索作品" />
+          </label>
+          <div class="layout-switch" role="group" aria-label="切换布局">
+            <button :class="{ active: layout === 'grid' }" type="button" aria-label="网格布局" @click="layout = 'grid'"><LayoutGrid :size="16" /></button>
+            <button :class="{ active: layout === 'list' }" type="button" aria-label="列表布局" @click="layout = 'list'"><List :size="17" /></button>
           </div>
-          <div class="works-toolbar">
-            <div class="filter-tabs" role="tablist" aria-label="作品类型筛选"><button v-for="filter in filters" :key="filter.key" class="filter-tab" :class="{ active: activeFilter === filter.key }" type="button" role="tab" :aria-selected="activeFilter === filter.key" @click="activeFilter = filter.key">{{ filter.label }}</button></div>
-            <div class="toolbar-actions"><label class="search-field"><Search :size="16" stroke-width="1.8" aria-hidden="true" /><input v-model="searchQuery" type="search" placeholder="搜索作品标题或标签" aria-label="搜索作品" /></label><button class="icon-control" type="button" aria-label="筛选设置"><SlidersHorizontal :size="17" stroke-width="1.8" /></button><div class="layout-switch" role="group" aria-label="切换布局"><button :class="{ active: layout === 'grid' }" type="button" aria-label="网格布局" @click="layout = 'grid'"><LayoutGrid :size="16" /></button><button :class="{ active: layout === 'list' }" type="button" aria-label="列表布局" @click="layout = 'list'"><List :size="17" /></button></div></div>
-          </div>
-        </header>
-        <div class="library-meta"><span>共 {{ filteredWorks.length }} 件作品</span><span class="meta-divider" /><span><span class="live-dot" /> {{ mockWorks.filter(work => work.status === 'generating').length }} 个任务正在生成</span></div>
-        <p v-if="worksError" class="works-error" role="alert">{{ worksError }} <button type="button" @click="loadImageWorks(worksPage)">重试</button></p>
-        <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
-          <article v-for="(work, index) in filteredWorks" :key="work.id" class="work-card" :class="`card-${work.tone}`" :style="{ '--stagger': `${index * 55}ms` }" tabindex="0" @click="openDetails(work)" @keydown.enter="openDetails(work)">
-            <div class="work-thumb" :class="toneClasses[work.tone]"><img v-if="work.url" class="work-real-image" :src="work.url" :alt="work.title" loading="lazy" /><template v-else><div class="thumb-noise" /><div class="thumb-content"><component :is="typeIcon[work.type]" :size="21" stroke-width="1.5" /><span>{{ work.typeLabel }}</span><strong>{{ work.summary }}</strong></div><div v-if="work.type === 'video'" class="thumb-timeline"><span /><span /><span /><span /><span /></div><div v-else-if="work.type === 'image'" class="thumb-shape" /><div v-else class="thumb-lines"><i /><i /><i /></div></template><div class="thumb-overlay"><button v-if="work.url" class="download-button" type="button" aria-label="下载作品" @click.stop="downloadWork(work)"><Download :size="17" stroke-width="1.8" /></button></div><div class="status-pill" :class="work.status"><span v-if="work.status === 'generating'" class="status-pulse" /><Check v-else :size="12" stroke-width="2.2" /> {{ work.statusLabel }}</div></div>
-            <div class="work-body"><div class="work-title-row"><h2>{{ work.title }}</h2><button class="more-button" type="button" aria-label="查看详情" @click.stop="openDetails(work)"><ArrowUpRight :size="16" stroke-width="1.7" /></button></div><div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ work.date }}</div><div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div><div v-if="work.status === 'generating'" class="generation-progress"><div><span>生成中</span><strong>{{ work.progress }}%</strong></div><div class="progress-track"><span :style="{ width: `${work.progress}%` }" /></div></div></div>
-          </article>
-        </section>
-        <div v-if="!filteredWorks.length" class="empty-state"><strong>没有找到匹配的作品</strong><span>试试其他关键词，或切换到全部作品。</span></div>
-        <button v-if="worksPage + 1 < worksTotalPages" class="works-load-more" type="button" :disabled="worksLoading" @click="loadImageWorks(worksPage + 1)">{{ worksLoading ? '正在读取…' : '加载更多图片' }}</button>
-
-        <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
-          <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
-            <header class="detail-header"><div><p class="detail-eyebrow"> {{ selectedWork.typeLabel }} / HISTORY</p><h2>{{ selectedWork.title }}</h2><p class="detail-date">生成于 {{ selectedWork.date }} · {{ selectedWork.statusLabel }}</p></div><button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button></header>
-            <div v-if="selectedWork.type === 'diagnosis'" class="diagnosis-detail"><div class="diagnosis-score"><span>本次诊断评分</span><strong>{{ selectedWork.diagnosis.score }}</strong><em>{{ selectedWork.diagnosis.level }}</em></div><div class="diagnosis-summary">{{ selectedWork.diagnosis.summary }}</div><div class="diagnosis-metrics"><div v-for="metric in selectedWork.diagnosis.metrics" :key="metric.label"><span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><em>{{ metric.change }}</em></div></div><div class="detail-block"><h3>建议行动</h3><ul><li v-for="action in selectedWork.diagnosis.actions" :key="action">{{ action }}</li></ul></div></div>
-            <div v-else-if="selectedWork.realImage" class="generation-detail"><img class="detail-real-image" :src="selectedWork.url" :alt="selectedWork.title" /><div class="parameter-grid"><div><span>类型</span><strong>{{ selectedWork.tags[0] }}</strong></div><div><span>画质</span><strong>{{ selectedWork.tags[1] }}</strong></div><div><span>画布尺寸</span><strong>{{ selectedWork.size }}</strong></div></div></div>
-            <div v-else class="generation-detail"><div class="detail-preview" :class="toneClasses[selectedWork.tone]"><component :is="typeIcon[selectedWork.type]" :size="30" stroke-width="1.4" /><span>{{ selectedWork.typeLabel }}</span><strong>{{ selectedWork.summary }}</strong></div><div class="detail-block"><h3>生成输入</h3><p class="prompt-copy">{{ selectedWork.prompt }}</p></div><div class="detail-block"><h3>参考素材 <small>{{ selectedWork.references?.length || 0 }} 个文件</small></h3><div class="reference-list"><span v-for="reference in selectedWork.references" :key="reference"><ImageIcon :size="14" /> {{ reference }}</span></div></div><div class="parameter-grid"><div><span>模型</span><strong>{{ selectedWork.model }}</strong></div><div><span>画布尺寸</span><strong>{{ selectedWork.size }}</strong></div><div><span>时长</span><strong>{{ selectedWork.duration }}</strong></div><div><span>随机种子</span><strong>{{ selectedWork.seed }}</strong></div></div></div>
-            <footer class="detail-footer"><span>作品 ID · {{ selectedWork.id }}</span><div><button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button><button v-if="workEditorPath(selectedWork)" class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 编辑</button></div></footer>
-          </section>
         </div>
       </div>
-  </div>
+    </header>
+
+    <div class="library-meta"><span>已载入 {{ filteredWorks.length }} 件作品</span></div>
+    <p v-if="worksError" class="works-error" role="alert">
+      {{ worksError }} <button type="button" @click="loadWorks(worksPage)">重试</button>
+    </p>
+
+    <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
+      <article
+        v-for="work in filteredWorks"
+        :key="work.id"
+        class="work-card"
+        tabindex="0"
+        @click="selectedWork = work"
+        @keydown.enter="selectedWork = work"
+      >
+        <div class="work-thumb">
+          <img v-if="work.type === 'image'" class="work-media" :src="work.url" :alt="work.title" loading="lazy" />
+          <video v-else class="work-media" :src="work.url" :aria-label="work.title" muted playsinline preload="metadata" />
+          <span v-if="work.type === 'video'" class="video-play-icon" aria-hidden="true"><Play :size="20" fill="currentColor" /></span>
+          <div class="thumb-overlay">
+            <button v-if="work.type === 'image'" class="download-button" type="button" aria-label="下载图片" @click.stop="downloadWork(work)">
+              <Download :size="17" stroke-width="1.8" />
+            </button>
+          </div>
+          <span class="status-pill"><Check :size="12" stroke-width="2.2" /> 已完成</span>
+        </div>
+        <div class="work-body">
+          <div class="work-title-row">
+            <h2>{{ work.title }}</h2>
+            <button class="more-button" type="button" aria-label="查看详情" @click.stop="selectedWork = work"><ArrowUpRight :size="16" stroke-width="1.7" /></button>
+          </div>
+          <div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ formatDate(work.createdAt) }}</div>
+          <div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div>
+        </div>
+      </article>
+    </section>
+
+    <div v-if="!worksLoading && !worksError && !filteredWorks.length" class="empty-state">
+      <ImageIcon :size="22" stroke-width="1.5" />
+      <strong>{{ works.length ? '没有找到匹配的作品' : '暂无作品' }}</strong>
+    </div>
+    <p v-if="worksLoading && !works.length" class="loading-state">正在读取作品…</p>
+    <button v-if="hasMoreWorks" class="works-load-more" type="button" :disabled="worksLoading" @click="loadWorks(worksPage + 1)">
+      {{ worksLoading ? '正在读取…' : '加载更多' }}
+    </button>
+
+    <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
+      <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
+        <header class="detail-header">
+          <div>
+            <p class="detail-eyebrow">{{ selectedWork.typeLabel }} / HISTORY</p>
+            <h2>{{ selectedWork.title }}</h2>
+            <p class="detail-date">生成于 {{ formatDate(selectedWork.createdAt) }} · 已完成</p>
+          </div>
+          <button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button>
+        </header>
+        <div class="generation-detail">
+          <div class="detail-media">
+            <img v-if="selectedWork.type === 'image'" :src="selectedWork.url" :alt="selectedWork.title" />
+            <video v-else :src="selectedWork.url" controls playsinline preload="metadata" />
+          </div>
+          <p v-if="selectedWork.type === 'video' && selectedWork.prompt" class="detail-prompt">{{ selectedWork.prompt }}</p>
+          <div class="parameter-grid">
+            <div><span>类型</span><strong>{{ selectedWork.typeLabel }}</strong></div>
+            <div><span>{{ selectedWork.type === 'image' ? '画质' : '模型' }}</span><strong>{{ selectedWork.quality || selectedWork.model }}</strong></div>
+            <div><span>尺寸</span><strong>{{ selectedWork.dimensions }}</strong></div>
+            <div v-if="selectedWork.duration"><span>时长</span><strong>{{ selectedWork.duration }}</strong></div>
+          </div>
+        </div>
+        <footer class="detail-footer">
+          <span>作品 ID · {{ selectedWork.id }}</span>
+          <div>
+            <button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button>
+            <button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 继续创作</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.works-library{--paper:var(--color-bg-canvas);--surface:var(--color-bg-surface);--ink:var(--color-primary);--muted:var(--color-text-muted);--line:var(--color-border-subtle);min-height:100%;padding:10px 0 40px;color:var(--ink);background:var(--color-bg-canvas)}.works-header{margin-bottom:22px}.works-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:12px 2px 24px;border-bottom:1px solid var(--line)}.works-kicker{display:flex;align-items:center;gap:8px;margin:0 0 15px;color:var(--color-text-muted);font:600 10px/1 var(--font-mono);letter-spacing:.14em}.kicker-dot,.live-dot{width:6px;height:6px;border-radius:50%;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.works-heading h1{margin:0;font:700 clamp(30px,4vw,44px)/1.1 var(--font-serif);letter-spacing:.01em}.works-subtitle{margin:11px 0 0;color:var(--muted);font-size:13px}.new-work-button{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 15px;border:1px solid var(--color-accent);border-radius:4px;color:var(--color-on-accent);background:var(--color-accent);font-size:12px;transition:transform .2s ease,background .2s ease}.new-work-button:hover{transform:translateY(-1px);background:var(--color-accent-hover)}.works-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0 0}.filter-tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap}.filter-tab{min-height:32px;padding:0 11px;border:1px solid transparent;border-radius:7px;color:var(--color-text-muted);background:transparent;font-size:12px;transition:all .18s ease}.filter-tab:hover{color:var(--color-primary);background:var(--color-bg-subtle)}.filter-tab.active{color:var(--color-accent-text);border-color:var(--color-accent);background:color-mix(in srgb, var(--color-accent-text) 7%, var(--color-bg-surface));box-shadow:var(--shadow-paper)}.toolbar-actions{display:flex;align-items:center;gap:8px}.search-field{display:flex;align-items:center;gap:8px;width:min(240px,27vw);height:34px;padding:0 10px;border:1px solid var(--line);border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface)}.search-field:focus-within{border-color:var(--color-accent);box-shadow:var(--shadow-paper)}.search-field input{width:100%;border:0;outline:0;color:var(--color-primary);background:transparent;font-size:11px}.search-field input::placeholder{color:var(--color-text-muted)}.icon-control,.layout-switch button{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:4px;color:var(--color-text-muted);background:var(--color-bg-surface);transition:all .18s ease}.icon-control:hover,.layout-switch button:hover{color:var(--color-primary);border-color:var(--color-border-subtle)}.layout-switch{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:8px;background:var(--color-bg-surface)}.layout-switch button{width:29px;height:27px;border:0;background:transparent}.layout-switch button.active{color:var(--color-accent-text);background:color-mix(in srgb, var(--color-accent-text) 7%, var(--color-bg-surface));box-shadow:var(--shadow-paper)}.library-meta{display:flex;align-items:center;gap:10px;margin:0 0 14px;color:var(--color-text-muted);font:500 10px var(--font-mono)}.meta-divider{width:1px;height:12px;background:var(--color-bg-subtle)}.library-meta .live-dot{display:inline-block;margin:0 5px 1px 0;width:5px;height:5px;background:var(--color-bg-canvas);box-shadow:var(--shadow-paper)}.works-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.work-card{overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:var(--shadow-paper);opacity:0;animation:card-in .55s cubic-bezier(.22,1,.36,1) var(--stagger) forwards;transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}.work-card:hover{transform:translateY(-4px);border-color:var(--color-border-subtle);box-shadow:var(--shadow-paper)}.work-thumb{position:relative;min-height:210px;overflow:hidden;isolation:isolate}.tone-cinnabar{background:#eee5e2;color:#603428}.tone-amber{background:#eee2c9;color:#5d481f}.tone-blue{background:#d6e6ef;color:#254c62}.tone-green{background:#dbe8de;color:#315b43}.tone-rose{background:#efd9dc;color:#633a40}.tone-cyan{background:#d1e5e2;color:#245853}.thumb-noise{position:absolute;inset:0;opacity:.18;background-image:radial-gradient(rgba(255,255,255,.95) .6px,transparent .6px);background-size:7px 7px;mix-blend-mode:soft-light}.thumb-content{position:absolute;inset:32px 26px auto;display:grid;gap:12px;max-width:210px;z-index:1}.thumb-content span{font:600 10px var(--font-mono);text-transform:uppercase;letter-spacing:.08em;opacity:.65}.thumb-content strong{font:600 16px/1.45 var(--font-sans);letter-spacing:.01em}.thumb-timeline{position:absolute;left:24px;right:24px;bottom:24px;display:flex;align-items:flex-end;gap:5px;height:32px;opacity:.45}.thumb-timeline span{flex:1;border-radius:3px 3px 0 0;background:currentColor}.thumb-timeline span:nth-child(1){height:35%}.thumb-timeline span:nth-child(2){height:65%}.thumb-timeline span:nth-child(3){height:48%}.thumb-timeline span:nth-child(4){height:90%}.thumb-timeline span:nth-child(5){height:72%}.thumb-shape{position:absolute;right:-25px;bottom:-45px;width:190px;height:190px;border:1px solid currentColor;border-radius:50%;opacity:.22;box-shadow:var(--shadow-paper)}.thumb-lines{position:absolute;right:26px;bottom:28px;display:grid;gap:7px;width:90px;opacity:.38}.thumb-lines i{display:block;height:5px;border-radius:8px;background:currentColor}.thumb-lines i:nth-child(2){width:68%}.thumb-lines i:nth-child(3){width:82%}.status-pill{position:absolute;top:14px;right:14px;display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-text-muted);background:var(--color-bg-surface);backdrop-filter:blur(10px);font-size:10px;z-index:3}.status-pill.generating{color:var(--color-accent-text)}.status-pulse{width:6px;height:6px;border-radius:50%;background:var(--color-bg-surface);box-shadow:var(--shadow-paper);animation:pulse 1.8s ease-out infinite}.thumb-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:rgba(31,31,31,.16);opacity:0;backdrop-filter:blur(3px);transition:opacity .22s ease}.work-card:hover .thumb-overlay{opacity:1}.reedit-button{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 13px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-primary);background:var(--color-bg-surface);font-size:11px;box-shadow:var(--shadow-paper);transition:transform .18s ease}.reedit-button:hover{transform:translateY(-1px)}.download-button{position:absolute;top:14px;left:14px;display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-primary);background:var(--color-bg-surface)}.work-body{padding:16px 17px 17px}.work-title-row{display:flex;align-items:flex-start;gap:8px}.work-title-row h2{flex:1;min-width:0;margin:0;font:600 14px/1.45 var(--font-serif);letter-spacing:.01em}.more-button{display:grid;place-items:center;flex:0 0 auto;width:26px;height:26px;margin-top:-4px;border:0;color:var(--color-text-muted);background:transparent}.more-button:hover{color:var(--color-primary)}.work-date{display:flex;align-items:center;gap:5px;margin-top:9px;color:var(--color-text-muted);font:10px var(--font-mono)}.work-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:13px}.work-tags span{padding:4px 7px;border:1px solid var(--color-border-subtle);border-radius:5px;color:var(--color-text-muted);background:var(--color-bg-surface);font-size:10px}.generation-progress{margin-top:14px}.generation-progress>div:first-child{display:flex;justify-content:space-between;margin-bottom:6px;color:var(--color-text-muted);font:10px var(--font-mono)}.generation-progress strong{color:var(--color-text-muted);font-weight:500}.progress-track{height:3px;overflow:hidden;border-radius:8px;background:var(--color-bg-subtle)}.progress-track span{display:block;height:100%;border-radius:inherit;background:var(--color-accent);transition:width .3s ease}.list-layout{grid-template-columns:1fr}.list-layout .work-card{display:grid;grid-template-columns:260px 1fr}.list-layout .work-thumb{min-height:160px}.list-layout .work-body{display:flex;flex-direction:column;justify-content:center}.empty-state{display:grid;place-items:center;gap:8px;padding:84px 20px;border:1px dashed var(--color-border-subtle);border-radius:8px;color:var(--color-text-muted);text-align:center}.empty-state strong{color:var(--color-primary);font-size:14px}.empty-state span{font-size:12px}@keyframes card-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%{box-shadow:var(--shadow-paper)}70%{box-shadow:var(--shadow-paper)}100%{box-shadow:var(--shadow-paper)}}
-.detail-scrim{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:24px;background:rgba(18,18,18,.38);backdrop-filter:blur(8px);animation:modal-fade .18s ease-out}.detail-modal{width:min(720px,100%);max-height:min(760px,calc(100vh - 48px));overflow:auto;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper);animation:modal-rise .24s cubic-bezier(.22,1,.36,1)}.detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:24px 26px 20px;border-bottom:1px solid var(--color-border-subtle)}.detail-eyebrow{display:flex;align-items:center;gap:6px;margin:0 0 10px;color:var(--color-text-muted);font:600 10px var(--font-mono);letter-spacing:.1em}.detail-header h2{margin:0;color:var(--color-primary);font:650 21px/1.3 var(--font-serif);letter-spacing:.01em}.detail-date{margin:8px 0 0;color:var(--color-text-muted);font:10px var(--font-mono)}.close-modal{display:grid;place-items:center;width:32px;height:32px;border:1px solid var(--color-border-subtle);border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface)}.generation-detail,.diagnosis-detail{padding:22px 26px 24px}.detail-preview{display:grid;gap:10px;min-height:150px;padding:22px;border-radius:8px;overflow:hidden}.detail-preview span{font:600 10px var(--font-mono);letter-spacing:.1em;opacity:.66}.detail-preview strong{max-width:440px;font:600 18px/1.45 var(--font-sans)}.detail-block{margin-top:22px}.detail-block h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:var(--color-primary);font-size:12px}.detail-block h3 small{color:var(--color-text-muted);font:500 10px var(--font-serif)}.prompt-copy{margin:0;padding:13px 14px;border:1px solid var(--color-border-subtle);border-radius:8px;color:var(--color-primary);background:var(--color-bg-surface);font-size:12px;line-height:1.7}.reference-list{display:flex;flex-wrap:wrap;gap:8px}.reference-list span{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--color-border-subtle);border-radius:8px;color:var(--color-primary);background:var(--color-bg-surface);font-size:11px}.parameter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:22px}.parameter-grid div,.diagnosis-metrics>div{display:grid;gap:7px;padding:12px;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface)}.parameter-grid span,.diagnosis-metrics span{color:var(--color-text-muted);font:10px var(--font-mono)}.parameter-grid strong{overflow:hidden;color:var(--color-primary);font-size:11px;text-overflow:ellipsis;white-space:nowrap}.diagnosis-score{display:flex;align-items:center;gap:14px;padding:17px 18px;border:1px solid var(--color-border-subtle);border-radius:8px;background:color-mix(in srgb, var(--color-success) 7%, var(--color-bg-surface))}.diagnosis-score span{color:var(--color-success);font-size:11px}.diagnosis-score strong{color:var(--color-success);font:700 34px/1 var(--font-sans)}.diagnosis-score em{padding:5px 8px;border-radius:8px;color:var(--color-success);background:color-mix(in srgb, var(--color-success) 7%, var(--color-bg-surface));font-size:10px;font-style:normal}.diagnosis-summary{margin-top:16px;color:var(--color-primary);font-size:13px;line-height:1.8}.diagnosis-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.diagnosis-metrics strong{color:var(--color-primary);font:650 22px var(--font-sans)}.diagnosis-metrics em{color:var(--color-success);font:500 10px var(--font-mono);font-style:normal}.detail-block ul{display:grid;gap:8px;margin:0;padding:0;list-style:none}.detail-block li{position:relative;padding-left:17px;color:var(--color-primary);font-size:12px}.detail-block li:before{content:'→';position:absolute;left:0;color:var(--color-text-muted)}.detail-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 26px;border-top:1px solid var(--color-border-subtle);color:var(--color-text-muted);font:10px var(--font-mono)}.detail-footer>div{display:flex;gap:8px}.secondary-modal-button,.primary-modal-button{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;border-radius:7px;font-size:11px}.secondary-modal-button{border:1px solid var(--color-border-subtle);color:var(--color-text-muted);background:var(--color-bg-surface)}.primary-modal-button{border:1px solid var(--color-accent);color:var(--color-on-accent);background:var(--color-accent)}@keyframes modal-fade{from{opacity:0}to{opacity:1}}@keyframes modal-rise{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
-@media (max-width:1100px){.works-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:720px){.works-heading,.works-toolbar{align-items:flex-start;flex-direction:column}.new-work-button{align-self:flex-start}.toolbar-actions{width:100%}.search-field{width:100%;flex:1}.works-grid{grid-template-columns:1fr}.works-library{padding-top:0}.list-layout .work-card{display:block}.list-layout .work-thumb{min-height:210px}.detail-scrim{padding:12px}.detail-modal{max-height:calc(100vh - 24px);border-radius:8px}.detail-header,.generation-detail,.diagnosis-detail{padding-left:18px;padding-right:18px}.parameter-grid{grid-template-columns:repeat(2,1fr)}.diagnosis-metrics{grid-template-columns:1fr}.detail-footer{padding-left:18px;padding-right:18px;align-items:flex-start;flex-direction:column}.detail-footer>div{width:100%}.detail-footer button{flex:1}}@media (prefers-reduced-motion:reduce){.work-card,.status-pulse,.detail-scrim,.detail-modal{animation:none}.work-card{opacity:1}.work-card:hover,.new-work-button:hover,.reedit-button:hover{transform:none}}
-.filter-tab.active{color:var(--color-accent-text);border-color:transparent;background:transparent;box-shadow:var(--shadow-paper);font-weight:600}
-.works-heading{padding-top:4px;padding-bottom:20px;align-items:center}
-.works-title-copy{display:grid;gap:8px}
-.works-title-copy h1{font-size:clamp(32px,3.4vw,42px);line-height:1.08}
-.works-title-copy .works-subtitle{margin:0;font-size:12px;line-height:1.55}
-.new-work-button{align-self:center}
-.works-header{margin-bottom:18px}
-.works-toolbar{padding-top:13px}
-.library-meta{margin-bottom:12px}
-.works-library{view-transition-name:works-library}
-:global(::view-transition-old(root)){animation:works-page-out .22s ease both}
-:global(::view-transition-new(root)){animation:works-page-in .36s cubic-bezier(.22,1,.36,1) both}
-:global(::view-transition-old(works-library)){animation:works-page-out .22s ease both}
-:global(::view-transition-new(works-library)){animation:works-page-in .36s cubic-bezier(.22,1,.36,1) both}
-:global(html.route-transitioning .main-area){opacity:.08;transform:translateY(-4px);transition:opacity .18s ease,transform .18s ease}
- :global(html:not(.route-transitioning) .main-area){transition:opacity .28s ease,transform .28s ease}
-@keyframes works-page-out{to{opacity:0;transform:translateY(-5px)}}@keyframes works-page-in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
-.work-card{border-color:var(--color-border-subtle);background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}
-.work-card .work-body{background:var(--color-bg-surface);}
-.work-card.card-cinnabar .work-body{background:var(--color-bg-surface)}.work-card.card-amber .work-body{background:var(--color-bg-surface)}.work-card.card-blue .work-body{background:var(--color-bg-surface)}.work-card.card-green .work-body{background:var(--color-bg-surface)}.work-card.card-rose .work-body{background:var(--color-bg-surface)}.work-card.card-cyan .work-body{background:var(--color-bg-surface)}
-.work-card:hover{border-color:var(--color-border-subtle);box-shadow:var(--shadow-paper)}
-.works-library{background:transparent;box-shadow:var(--shadow-paper)}.filter-tab:hover{color:var(--color-text-muted);background:var(--color-bg-subtle)}
-</style>
-
-<style scoped>
-.work-real-image{display:block;width:100%;height:210px;object-fit:contain;background:var(--color-bg-subtle)}
-.detail-real-image{display:block;max-width:100%;max-height:48vh;margin:0 auto;object-fit:contain}
-.works-error{margin:0 0 16px;color:var(--color-accent-text);font-size:12px}
-.works-error button{border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer}
-.works-load-more{display:block;margin:24px auto 0;padding:9px 18px;border:1px solid var(--color-border-subtle);border-radius:6px;background:var(--color-bg-surface);color:var(--color-primary);cursor:pointer}
-.works-load-more:disabled{opacity:.5;cursor:default}
+.works-library {
+  --surface: var(--color-bg-surface);
+  --ink: var(--color-primary);
+  --muted: var(--color-text-muted);
+  --line: var(--color-border-subtle);
+  min-height: 100%;
+  padding: 8px 0 40px;
+  color: var(--ink);
+  background: var(--color-bg-canvas);
+  view-transition-name: works-library;
+}
+.works-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 8px 2px 18px; border-bottom: 1px solid var(--line); }
+.works-title-copy h1 { margin: 0; font: 650 30px/1.15 var(--font-serif); }
+.new-work-button { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 13px; border: 1px solid var(--color-accent); border-radius: 4px; color: var(--color-on-accent); background: var(--color-accent); font-size: 12px; }
+.new-work-button:hover { background: var(--color-accent-hover); }
+.works-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0 12px; }
+.filter-tabs { display: flex; align-items: center; gap: 3px; }
+.filter-tab { min-width: 52px; min-height: 32px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; font-size: 12px; }
+.filter-tab:hover { color: var(--ink); }
+.filter-tab.active { border-bottom-color: var(--color-accent); color: var(--color-accent-text); font-weight: 600; }
+.toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.search-field { display: flex; align-items: center; gap: 8px; width: min(230px, 28vw); height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface); }
+.search-field:focus-within { border-color: var(--color-accent); }
+.search-field input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 11px; }
+.search-field input::placeholder { color: var(--muted); }
+.layout-switch { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.layout-switch button { display: grid; place-items: center; width: 29px; height: 28px; border: 0; color: var(--muted); background: transparent; }
+.layout-switch button.active { color: var(--color-accent-text); background: var(--color-bg-subtle); }
+.library-meta { margin: 0 0 10px; color: var(--muted); font: 500 10px var(--font-mono); }
+.works-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); align-items: start; gap: 14px; }
+.work-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); transition: border-color .16s ease, transform .16s ease; cursor: pointer; }
+.work-card:hover { transform: translateY(-2px); border-color: var(--color-accent); }
+.work-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.work-thumb { position: relative; overflow: hidden; aspect-ratio: 4 / 3; background: var(--color-bg-subtle); }
+.work-media { display: block; width: 100%; height: 100%; object-fit: cover; }
+.work-thumb video { background: #202020; }
+.video-play-icon { position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255, 255, 255, .78); border-radius: 50%; color: #fff; background: rgba(20, 20, 20, .48); transform: translate(-50%, -50%); pointer-events: none; }
+.thumb-overlay { position: absolute; inset: 0; display: flex; justify-content: flex-end; padding: 10px; background: rgba(20, 20, 20, .12); opacity: 0; transition: opacity .16s ease; }
+.work-card:hover .thumb-overlay, .work-card:focus-within .thumb-overlay { opacity: 1; }
+.download-button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
+.status-pill { position: absolute; left: 9px; bottom: 9px; display: inline-flex; align-items: center; gap: 5px; min-height: 23px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); font-size: 10px; }
+.work-body { padding: 11px 12px 12px; }
+.work-title-row { display: flex; align-items: flex-start; gap: 6px; }
+.work-title-row h2 { display: -webkit-box; flex: 1; min-width: 0; overflow: hidden; margin: 0; font: 600 13px/1.45 var(--font-serif); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.more-button { display: grid; place-items: center; flex: 0 0 auto; width: 24px; height: 24px; margin-top: -3px; border: 0; color: var(--muted); background: transparent; cursor: pointer; }
+.more-button:hover { color: var(--ink); }
+.work-date { display: flex; align-items: center; gap: 5px; margin-top: 7px; color: var(--muted); font: 10px var(--font-mono); }
+.work-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.work-tags span { max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.list-layout { grid-template-columns: 1fr; }
+.list-layout .work-card { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); }
+.list-layout .work-body { display: flex; flex-direction: column; justify-content: center; padding: 14px 16px; }
+.empty-state { display: grid; justify-items: center; gap: 9px; padding: 72px 16px; color: var(--muted); }
+.empty-state strong { color: var(--ink); font-size: 13px; font-weight: 500; }
+.loading-state { padding: 28px 0; color: var(--muted); font-size: 12px; text-align: center; }
+.works-error { margin: 0 0 12px; color: var(--color-accent-text); font-size: 12px; }
+.works-error button { padding: 0; border: 0; color: inherit; background: transparent; text-decoration: underline; cursor: pointer; }
+.works-load-more { display: block; margin: 20px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
+.works-load-more:disabled { opacity: .55; cursor: default; }
+.detail-scrim { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; background: rgba(18, 18, 18, .42); backdrop-filter: blur(5px); }
+.detail-modal { width: min(760px, 100%); max-height: min(820px, calc(100vh - 40px)); overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+.detail-eyebrow { margin: 0 0 7px; color: var(--muted); font: 600 10px var(--font-mono); }
+.detail-header h2 { margin: 0; color: var(--ink); font: 600 19px/1.35 var(--font-serif); }
+.detail-date { margin: 7px 0 0; color: var(--muted); font: 10px var(--font-mono); }
+.close-modal { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.generation-detail { padding: 18px 22px 20px; }
+.detail-media { display: grid; place-items: center; min-height: 160px; max-height: 54vh; overflow: hidden; background: var(--color-bg-subtle); }
+.detail-media img, .detail-media video { display: block; max-width: 100%; max-height: 54vh; object-fit: contain; }
+.detail-prompt { margin: 14px 0 0; color: var(--ink); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+.parameter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 14px; }
+.parameter-grid div { display: grid; gap: 6px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 4px; }
+.parameter-grid span { color: var(--muted); font: 10px var(--font-mono); }
+.parameter-grid strong { overflow: hidden; color: var(--ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.detail-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 22px; border-top: 1px solid var(--line); color: var(--muted); font: 10px var(--font-mono); }
+.detail-footer > div { display: flex; gap: 7px; }
+.secondary-modal-button, .primary-modal-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 10px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.secondary-modal-button { border: 1px solid var(--line); color: var(--muted); background: var(--surface); }
+.primary-modal-button { border: 1px solid var(--color-accent); color: var(--color-on-accent); background: var(--color-accent); }
+@media (max-width: 640px) {
+  .works-heading, .works-toolbar { align-items: flex-start; flex-direction: column; }
+  .new-work-button { align-self: flex-start; }
+  .toolbar-actions { width: 100%; }
+  .search-field { width: auto; flex: 1; }
+  .list-layout .work-card { display: block; }
+  .detail-scrim { padding: 10px; }
+  .detail-modal { max-height: calc(100vh - 20px); }
+  .detail-header, .generation-detail { padding-right: 15px; padding-left: 15px; }
+  .detail-footer { align-items: flex-start; flex-direction: column; padding-right: 15px; padding-left: 15px; }
+  .detail-footer > div { width: 100%; }
+  .detail-footer button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-card, .thumb-overlay { transition: none; }
+  .work-card:hover { transform: none; }
+}
 </style>

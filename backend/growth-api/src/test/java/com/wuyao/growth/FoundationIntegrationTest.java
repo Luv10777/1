@@ -2479,7 +2479,7 @@ class FoundationIntegrationTest {
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
                 .thenReturn(new ProviderResult(true, "TEST", "remote-job", Map.of("status", "RUNNING"), null, null))
                 .thenReturn(imageResult());
-        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("image-roundtrip", "POSTER", 1, List.of()), null));
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("image-roundtrip", "POSTER", 1, List.of()), -1L));
         runImageTask("DEFAULT", imagePlanHandler);
         runImageTask("IMAGE", imageRenderHandler);
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).status())).isEqualTo("GENERATING");
@@ -2491,8 +2491,9 @@ class FoundationIntegrationTest {
                 .isEqualTo("SUCCEEDED");
         assertThat(done.items().getFirst().url()).contains("work.png");
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.history("POSTER", 0, 20).items().getFirst().previewUrl())).contains("work.png");
-        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20).total())).isEqualTo(1);
-        assertThat(TenantContext.runAs(tenantB, () -> imageCreations.works(0, 20).total())).isZero();
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20, -1L).total())).isEqualTo(1);
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20, -2L).total())).isZero();
+        assertThat(TenantContext.runAs(tenantB, () -> imageCreations.works(0, 20, -1L).total())).isZero();
         var calls = ArgumentCaptor.forClass(ProviderRequest.class);
         verify(imageGateway, times(4)).invokeReal(calls.capture());
         assertThat(calls.getAllValues().get(2).idempotencyKey()).isEqualTo(calls.getAllValues().get(3).idempotencyKey());
@@ -2511,6 +2512,67 @@ class FoundationIntegrationTest {
         assertThat(((Map<?, ?>) references.getFirst()).get("dataUrl").toString()).startsWith("data:image/png;base64,");
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.itemSnapshot(edit.items().getFirst().id()).getSpec().editSourceItemId()))
                 .isEqualTo(done.items().getFirst().id());
+    }
+
+    @Test
+    void videoWorksOnlyReturnCompletedOutputForCreatingUser() {
+        String storageKey = "t" + tenantA + "/generated-video/history-output.mp4";
+        Long assetId = TenantContext.runAs(tenantA, () -> {
+            var asset = new Asset();
+            asset.setTenantId(tenantA);
+            asset.setCreatedBy(-1L);
+            asset.setName("history-output.mp4");
+            asset.setType("VIDEO");
+            asset.setMimeType("video/mp4");
+            asset.setStatus("READY");
+            asset.setStorageKey(storageKey);
+            asset.setWidth(1280);
+            asset.setHeight(720);
+            asset.setDurationMs(5000);
+            return assetRepository.saveAndFlush(asset).getId();
+        });
+
+        TenantContext.runAs(tenantA, () -> {
+            var completed = new VideoWorkflow();
+            completed.setTenantId(tenantA);
+            completed.setCreatedBy(-1L);
+            completed.setRequestKey("video-work-completed");
+            completed.setRequestHash("a".repeat(64));
+            completed.setRequest(new VideoDtos.Create("video-work-completed", "真实生成的视频", List.of(), null,
+                    "SEEDANCE_2_0", "16:9", 5, "720p", null, "VIDEO"));
+            completed.setModel("SEEDANCE_2_0");
+            completed.setRatio("16:9");
+            completed.setDurationSeconds(5);
+            completed.setResolution("720p");
+            completed.setStatus("SUCCEEDED");
+            completed.setProgress(100);
+            completed.setOutputAssetId(assetId);
+            completed.setOutputStorageKey(storageKey);
+            videoWorkflowRepository.saveAndFlush(completed);
+
+            var unfinished = new VideoWorkflow();
+            unfinished.setTenantId(tenantA);
+            unfinished.setCreatedBy(-1L);
+            unfinished.setRequestKey("video-work-unfinished");
+            unfinished.setRequestHash("b".repeat(64));
+            unfinished.setRequest(new VideoDtos.Create("video-work-unfinished", "未完成的视频", List.of(), null,
+                    "SEEDANCE_2_0", "16:9", 5, "720p", null, "VIDEO"));
+            unfinished.setModel("SEEDANCE_2_0");
+            unfinished.setRatio("16:9");
+            unfinished.setDurationSeconds(5);
+            unfinished.setResolution("720p");
+            unfinished.setStatus("GENERATING");
+            videoWorkflowRepository.saveAndFlush(unfinished);
+            return null;
+        });
+
+        var works = TenantContext.runAs(tenantA, () -> videoWorkflows.works(0, 20, -1L));
+        assertThat(works.total()).isEqualTo(1);
+        assertThat(works.items().getFirst().outputUrl()).contains("history-output.mp4");
+        assertThat(works.items().getFirst().actualWidth()).isEqualTo(1280);
+        assertThat(works.items().getFirst().actualDurationMs()).isEqualTo(5000);
+        assertThat(TenantContext.runAs(tenantA, () -> videoWorkflows.works(0, 20, -2L).total())).isZero();
+        assertThat(TenantContext.runAs(tenantB, () -> videoWorkflows.works(0, 20, -1L).total())).isZero();
     }
 
     @Test
@@ -2561,12 +2623,12 @@ class FoundationIntegrationTest {
         imageConfig.setQualities(List.of("480P"));
         enableImageModels(); planImageCount(1, "夏日新品", "欢迎到店");
         when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY))).thenReturn(imageResult());
-        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("regenerate-source", "POSTER", 1, List.of()), null));
+        var created = TenantContext.runAs(tenantA, () -> imageCreations.create(imageRequest("regenerate-source", "POSTER", 1, List.of()), -1L));
         runImageTask("DEFAULT", imagePlanHandler);runImageTask("IMAGE", imageRenderHandler);
         var original = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()));
         clearInvocations(imageGateway);
-        var revised = TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "LAYOUT", null));
-        var repeated = TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "LAYOUT", null));
+        var revised = TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "LAYOUT", -1L));
+        var repeated = TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "LAYOUT", -1L));
         assertThat(repeated.id()).isEqualTo(revised.id());
         assertThat(code(() -> TenantContext.runAs(tenantA, () -> imageCreations.regenerate(created.id(), original.items().getFirst().id(), "regenerate-once", "SCENE", null)))).isEqualTo(1400);
         assertThat(revised.status()).isEqualTo("QUEUED");
@@ -2581,7 +2643,7 @@ class FoundationIntegrationTest {
         assertThat(thread).allSatisfy(version -> assertThat(version.items().getFirst().url()).contains("work.png"));
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.rename(revised.id(), "  夏日活动海报  "))).isEqualTo("夏日活动海报");
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.history("POSTER", 0, 20).items().getFirst().title())).isEqualTo("夏日活动海报");
-        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20).items())).anyMatch(work -> work.creationId().equals(revised.id()) && work.title().equals("夏日活动海报"));
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.works(0, 20, -1L).items())).anyMatch(work -> work.creationId().equals(revised.id()) && work.title().equals("夏日活动海报"));
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.thread(revised.id())))).isEqualTo(1404);
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> imageCreations.rename(revised.id(), "越权改名")))).isEqualTo(1404);
         verify(imageGateway, times(1)).invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY));

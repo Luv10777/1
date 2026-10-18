@@ -39,6 +39,7 @@ onBeforeUnmount(() => clearInterval(updateTimer))
           <span v-else-if="stores.length" class="desk-store">{{ selectedStore }}</span>
           <span class="desk-user">{{ userName }}</span>
           <RouterLink to="/billing" class="secondary-button compact">会员与烟火</RouterLink>
+          <a href="/policies/terms" class="secondary-button compact" target="_blank" rel="noopener noreferrer">协议与售后</a>
           <button type="button" class="secondary-button compact" @click="logout">退出登录</button>
         </div>
       </div></header>

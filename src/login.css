@@ -82,8 +82,8 @@
 .access-consent-row { display: flex; align-items: flex-start; gap: 8px; color: var(--access-muted); font-size: 11px; line-height: 1.9; }
 .access-consent input { flex: 0 0 auto; width: 14px; height: 14px; margin: 4px 0 0; accent-color: var(--access-primary); cursor: pointer; }
 .access-consent label { cursor: pointer; }
-.access-consent button { display: inline; padding: 0; border: 0; background: none; color: #3d5c89; font-size: inherit; line-height: inherit; }
-.access-consent button:hover { color: var(--access-primary); text-decoration: underline; }
+.access-consent a { display: inline; color: var(--color-primary); font-size: inherit; line-height: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.access-consent a:hover { color: var(--access-primary); }
 .access-footer { display: flex; justify-content: center; align-items: center; gap: 6px; color: #818b9a; font-size: 10px; }
 .access-dialog { width: min(420px, calc(100vw - 40px)); padding: 32px; border: 1px solid #dce2e9; border-radius: 16px; background: #fff; color: var(--access-ink); }
 .access-dialog::backdrop { background: #0c1a3199; backdrop-filter: blur(4px); }

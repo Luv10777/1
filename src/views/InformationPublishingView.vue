@@ -51,7 +51,7 @@ function editPublication(item) {
   Object.assign(form, {
     category: item.category, title: item.title, merchantName: item.merchantName, region: item.region,
     summary: item.summary || '', content: item.content, contactName: item.contactName || '',
-    contactPhone: item.contactPhone || '', validUntil: item.validUntil || '', declarationAccepted: true,
+    contactPhone: item.contactPhone || '', validUntil: item.validUntil || '', declarationAccepted: false,
   })
   nextTick(() => editor.value?.querySelector('input[name="information-title"]')?.focus())
 }
@@ -136,7 +136,7 @@ function startInformation() {
               </div>
               <label class="business-field business-date-field"><span>信息有效期至</span><input v-model="form.validUntil" name="valid-until" type="date" :min="today" /><small>不填写表示长期有效。</small></label>
             </section>
-            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="information-declaration" type="checkbox" required /><span>我确认发布内容真实、合法，已获得所填联系方式的使用授权，并同意提交后立即公开展示。</span></label></div>
+            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="information-declaration" type="checkbox" required /><span>我确认发布内容真实、合法，已获得所填联系方式的公开授权，已阅读<a href="/policies/publishing" target="_blank" rel="noopener">《公开信息发布规则》</a>和<a href="/policies/privacy" target="_blank" rel="noopener">《隐私协议》</a>，并同意提交后按规则公开展示。</span></label></div>
           </fieldset>
           <p v-if="error" class="business-form-feedback business-message-error" role="alert">{{ error }}</p>
           <footer class="business-form-actions"><span>提交后立即公开，可随时编辑或下架</span><div><button class="business-button" type="button" :disabled="submitting" @click="preview"><Eye :size="16" aria-hidden="true" />{{ previewOpen ? '收起完整预览' : '预览信息' }}</button><button class="business-button business-button-primary" type="submit" :disabled="submitting"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在保存…' : editingPublication ? '保存并更新' : '发布信息' }}</button></div></footer>

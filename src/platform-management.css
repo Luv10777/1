@@ -142,6 +142,7 @@
 .identity-account small { display:block; color:var(--mg-muted); font-size:11px; margin-top:5px; }
 .identity-consent { display:flex; gap:9px; align-items:flex-start; color:#6b7683; font-size:12px; max-width:580px; }
 .identity-consent input { margin-top:4px; accent-color:var(--mg-accent); }
+.identity-consent a { color:var(--mg-accent); text-decoration:underline; text-underline-offset:3px; }
 .identity-form footer { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:19px 26px; border-top:1px solid var(--mg-line); }
 .identity-form footer > span { display:flex; align-items:center; gap:6px; color:var(--mg-muted); font-size:11px; }
 .identity-aside > section { border:1px solid var(--mg-line); border-radius:6px; background:#fff; padding:23px; margin-bottom:20px; }

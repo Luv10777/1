@@ -27,7 +27,9 @@ public class ImageCreationController {
    return ApiResponse.ok(service.history(workflow,page,size));
  }
  @GetMapping("/works") public ApiResponse<PageResult<ImageDtos.Work>> works(@RequestParam(defaultValue="0") int page,
-   @RequestParam(defaultValue="20") int size){return ApiResponse.ok(service.works(page,size));}
+   @RequestParam(defaultValue="20") int size,@AuthenticationPrincipal AuthPrincipal me){
+   return ApiResponse.ok(service.works(page,size,me.userId()));
+ }
  @PostMapping("/{id}/revisions") public ApiResponse<ImageDtos.View> revise(@PathVariable Long id,
    @Valid @RequestBody ImageDtos.Revision req,@AuthenticationPrincipal AuthPrincipal me) {
    return ApiResponse.ok(service.revise(id,req,me.userId()));

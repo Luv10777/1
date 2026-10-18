@@ -43,6 +43,18 @@ test('business pages remain visible without membership while login and owner per
     await router.push('/team')
     assert.equal(router.currentRoute.value.name, 'forbidden')
     auth.state.token = null
+    for (const policy of ['terms', 'privacy', 'merchant', 'aftersales', 'identity', 'publishing']) {
+      await router.push('/policies/' + policy)
+      assert.equal(router.currentRoute.value.name, 'legal-policy', policy + ' must be readable without logging in')
+      assert.equal(router.currentRoute.value.params.policy, policy)
+      assert.equal(router.currentRoute.value.meta.public, true)
+    }
+    await router.push('/policies')
+    assert.equal(router.currentRoute.value.fullPath, '/policies/terms')
+    for (const path of ['/policies/unknown', '/policies/ai']) {
+      await router.push(path)
+      assert.equal(router.currentRoute.value.name, 'not-found', 'unknown policies must not silently display a different agreement')
+    }
     for (const path of ['/', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio', '/merchant-alliance', '/information', '/information/7?category=supply']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.path, path === '/' ? '/image/create' : path.split('?')[0], 'guests can browse ' + path)
