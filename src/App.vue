@@ -32,10 +32,15 @@ function openMembership() {
         <RouterView />
       </AppShell>
     </div>
-    <footer v-if="!inDesktop" class="site-footer" aria-label="网站备案信息">
-      <span>ICP备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026081720号</a></span>
-      <span>运营主体：{{ LEGAL_ENTITY.name }}</span>
-      <nav class="site-legal-links" aria-label="协议、售后与客服"><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">用户注册协议</RouterLink><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">隐私协议</RouterLink><RouterLink to="/policies/merchant" target="_blank" rel="noopener noreferrer">商家入驻</RouterLink><RouterLink to="/policies/aftersales" target="_blank" rel="noopener noreferrer">售后与退款</RouterLink><a :href="`tel:${LEGAL_ENTITY.phone}`">客服 {{ LEGAL_ENTITY.phone }}</a></nav>
+    <footer v-if="!inDesktop" class="site-footer" aria-label="网站备案及服务信息">
+      <div class="site-footer-row site-footer-identity">
+        <span>ICP备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026081720号</a></span>
+        <span>运营主体：{{ LEGAL_ENTITY.name }}</span>
+      </div>
+      <div class="site-footer-row site-footer-service">
+        <nav class="site-legal-links" aria-label="平台协议与售后服务"><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">用户注册协议</RouterLink><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">隐私协议</RouterLink><RouterLink to="/policies/merchant" target="_blank" rel="noopener noreferrer">商家入驻</RouterLink><RouterLink to="/policies/aftersales" target="_blank" rel="noopener noreferrer">售后与退款</RouterLink></nav>
+        <a :href="`tel:${LEGAL_ENTITY.phone}`">人工客服：{{ LEGAL_ENTITY.phone }}</a>
+      </div>
     </footer>
   </div>
   <Dialog :open="membershipOpen" class="membership-dialog" @close="membershipOpen = false">
@@ -58,12 +63,13 @@ function openMembership() {
 .site-content { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: auto; }
 .site-content :deep(.app-frame), .site-content :deep(.access-page) { height: 100%; }
 .site-content :deep(.mobile-bottom-nav) { position: absolute; }
-.site-footer { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 20px; padding: 8px 16px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--night); color: var(--ink-muted); font-size: 12px; line-height: 1.8; text-align: center; }
+.site-footer { --site-footer-link: #245fa6; display: flex; flex-shrink: 0; flex-direction: column; justify-content: center; align-items: center; gap: 2px; padding: 6px 16px max(6px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--night); color: var(--ink-muted); font-size: 12px; line-height: 1.8; text-align: center; }
+.site-footer-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px 20px; }
+.site-footer-service { gap: 3px 16px; }
 .site-legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; }
-.site-legal-links a { white-space: nowrap; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
-.site-legal-links a:hover, .site-legal-links a:focus-visible { color: var(--color-accent-text); }
-.site-footer a { white-space: nowrap; }
-.site-footer a:hover, .site-footer a:focus-visible { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.site-footer a { color: var(--site-footer-link); white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+.site-footer a:hover, .site-footer a:focus-visible { text-decoration-thickness: 2px; }
+:global(:root.dark) .site-footer, :global([data-theme='dark']) .site-footer { --site-footer-link: #8dbdff; }
 :global(.membership-dialog) { position: fixed; inset: 0; z-index: 1100; }
 .membership-backdrop { position: fixed; inset: 0; background: rgb(30 27 23 / 38%); }
 .membership-position { position: fixed; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 24px; }
