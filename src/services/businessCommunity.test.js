@@ -14,10 +14,10 @@ test('business applications use authenticated requests and require a review rece
       const calls = []
       globalThis.fetch = async (url, options) => {
         calls.push({ url, options })
-        return response(200, { id: 'application-1', status: url.endsWith('/information-publications') ? 'PUBLISHED' : 'PENDING_REVIEW' })
+        return response(200, { id: 'application-1', status: 'PENDING_REVIEW' })
       }
       const values = { title: '合作信息', declarationAccepted: true }
-      assert.deepEqual(await businessCommunityService.submitInformation(values), { id: 'application-1', status: 'PUBLISHED' })
+      assert.deepEqual(await businessCommunityService.submitInformation(values), { id: 'application-1', status: 'PENDING_REVIEW' })
       await businessCommunityService.applyForAlliance({ companyName: '经营主体', declarationAccepted: true })
       assert.ok(calls[0].url.endsWith('/api/information-publications'))
       assert.ok(calls[1].url.endsWith('/api/merchant-alliance/applications'))
@@ -31,7 +31,7 @@ test('business applications use authenticated requests and require a review rece
       const calls = []
       globalThis.fetch = async (url, options) => {
         calls.push({ url, options })
-        return response(200, options.method === 'GET' ? { items: [] } : { id: 8, status: 'PUBLISHED' })
+        return response(200, options.method === 'GET' ? { items: [] } : { id: 8, status: 'PENDING_REVIEW' })
       }
       await businessCommunityService.applications()
       await businessCommunityService.publications()
@@ -55,9 +55,10 @@ test('business applications use authenticated requests and require a review rece
       await assert.rejects(businessCommunityService.applyForAlliance({}), /尚未接通.*未提交/)
     })
     await t.test('an empty or unexpected success response is not a review receipt', async () => {
-      for (const data of [null, {}, { id: 1 }, { id: 1, status: 'APPROVED' }, { status: 'PUBLISHED' }]) {
+      for (const data of [null, {}, { id: 1 }, { id: 1, status: 'APPROVED' }, { id: 1, status: 'PUBLISHED' }, { status: 'PENDING_REVIEW' }]) {
         globalThis.fetch = async () => response(200, data)
         await assert.rejects(businessCommunityService.submitInformation({}), /未收到有效的业务回执/)
+        await assert.rejects(businessCommunityService.updatePublication(8, {}), /未收到有效的业务回执/)
       }
       globalThis.fetch = async () => response(200, { id: 1, status: 'PUBLISHED' })
       await assert.rejects(businessCommunityService.applyForAlliance({}), /未收到有效的业务回执/)

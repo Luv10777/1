@@ -147,7 +147,7 @@ class AccountClosureIntegrationTest {
         owner.update("INSERT INTO products(tenant_id,store_id,name,type,category,price,sale_unit,online_status) "
                 + "VALUES (?,?,'龙井','PHYSICAL','茶叶',88,'盒','PUBLISHED')", tenant, store);
         Long info = owner.queryForObject("INSERT INTO information_publications(tenant_id,submitted_by,category,title,"
-                + "merchant_name,region,content) VALUES (?,?,'notice','开业','西湖店','杭州','正文') RETURNING id",
+                + "merchant_name,region,content,status,published_at) VALUES (?,?,'notice','开业','西湖店','杭州','正文','PUBLISHED',now()) RETURNING id",
                 Long.class, tenant, bossId);
         owner.update("INSERT INTO billing_accounts(tenant_id,purchased_available) VALUES (?, 50)", tenant);
         assertThat(publicApi("/api/public/stores/" + store + "/products")).hasSize(1);

@@ -13,8 +13,8 @@ const router = useRouter()
 const section = computed(() => route.name === 'admin-identities' ? 'identities' : route.name === 'admin-merchants' || route.query.section === 'merchants' ? 'merchants' : 'information')
 const isIdentity = computed(() => section.value === 'identities')
 const title = computed(() => isIdentity.value ? '用户实名' : section.value === 'merchants' ? '商家管理' : '信息管理')
-const subtitle = computed(() => isIdentity.value ? '核查实名申请，让每一次审核都有依据。' : section.value === 'merchants' ? '维护经营主体档案，审核入驻申请与经营状态。' : '集中查看平台发布内容，处理信息上下线。')
-const statusOptions = computed(() => section.value === 'information' ? ['PUBLISHED', 'OFFLINE', 'EXPIRED'] : section.value === 'merchants' ? ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED'] : ['PENDING_REVIEW', 'VERIFIED', 'REJECTED'])
+const subtitle = computed(() => isIdentity.value ? '核查实名申请，让每一次审核都有依据。' : section.value === 'merchants' ? '维护经营主体档案，审核入驻申请与经营状态。' : '审核商家提交的信息，通过后公开展示，处理信息上下线。')
+const statusOptions = computed(() => section.value === 'information' ? ['PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'OFFLINE', 'EXPIRED'] : section.value === 'merchants' ? ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED'] : ['PENDING_REVIEW', 'VERIFIED', 'REJECTED'])
 const records = ref([])
 const total = ref(null)
 const totalPages = ref(0)
@@ -45,6 +45,10 @@ const stats = computed(() => isIdentity.value ? [
   { label: '待审核实名', value: summary.value?.pendingIdentity, helper: '需要平台人工核查', icon: ShieldCheck },
   { label: '已入驻商家', value: summary.value?.approvedMerchants, helper: '入驻审核通过的商家', icon: Store },
   { label: '待审入驻', value: summary.value?.pendingMerchants, helper: '等待审核的经营主体', icon: ClipboardList },
+] : section.value === 'information' ? [
+  { label: '待审核信息', value: summary.value?.pendingInformation, helper: '审核通过后才会公开展示', icon: ClipboardList },
+  { label: '在线信息', value: summary.value?.publishedInformation, helper: '已发布且在有效期内', icon: FileText },
+  { label: '已下线信息', value: summary.value?.offlineInformation, helper: '公开页面已停止展示', icon: ArrowDownToLine },
 ] : [
   { label: '在线信息', value: summary.value?.publishedInformation, helper: '已发布且在有效期内', icon: FileText },
   { label: '已入驻商家', value: summary.value?.approvedMerchants, helper: '入驻审核通过的商家', icon: Store },
@@ -136,7 +140,7 @@ async function review(nextStatus) {
   busy.value = true
   actionError.value = ''
   try {
-    await api[method](item, { status: nextStatus, note: note.value.trim() })
+    await api[method](item, { status: nextStatus, note: note.value.trim(), ...(section.value === 'information' ? { updatedAt: item.updatedAt } : {}) })
     if (attempt !== detailVersion) return
     success.value = `处理结果已保存：${managementStatuses[nextStatus]}。`
     busy.value = false
@@ -167,7 +171,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
       <div class="management-heading-actions"><span class="management-scope"><span />平台运营工作台</span><button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新数据</button></div>
     </header>
 
-    <div class="management-stats" :class="{ 'three-columns': isIdentity }"><article v-for="stat in stats" :key="stat.label"><div><span>{{ stat.label }}</span><component :is="stat.icon" :size="17" /></div><strong>{{ stat.value == null ? '—' : Number(stat.value).toLocaleString('zh-CN') }}</strong><p>{{ stat.helper }}</p></article></div>
+    <div class="management-stats" :class="{ 'three-columns': stats.length === 3 }"><article v-for="stat in stats" :key="stat.label"><div><span>{{ stat.label }}</span><component :is="stat.icon" :size="17" /></div><strong>{{ stat.value == null ? '—' : Number(stat.value).toLocaleString('zh-CN') }}</strong><p>{{ stat.helper }}</p></article></div>
     <p v-if="summaryError" class="mg-muted" role="status">{{ summaryError }}</p>
     <div v-if="success" class="mg-feedback success" role="status"><Check :size="16" />{{ success }}<button type="button" aria-label="关闭提示" @click="success = ''"><X :size="15" /></button></div>
 
@@ -200,7 +204,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
       </div>
       <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 条记录` }}</span><div><label><span class="sr-only">每页条数</span><select v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></select></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
-    <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '当前为平台人工审核；未接入第三方权威身份核验。查看完整资料及审核操作均留存记录。' : '记录直接来自平台数据库；上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
+    <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '当前为平台人工审核；未接入第三方权威身份核验。查看完整资料及审核操作均留存记录。' : '记录直接来自平台数据库；信息审核、上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
 
     <Dialog :open="Boolean(selected)" class="management-dialog" @close="closeDetail">
       <div class="mg-backdrop" aria-hidden="true" /><div class="mg-drawer-position">
@@ -216,7 +220,25 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
               <section class="mg-detail-section"><h3><ClipboardList :size="17" />处理与查阅依据</h3><label class="mg-note-label" for="management-review-note">{{ isIdentity ? '查阅用途 / 审核意见' : '处理依据' }}<span>必填 · 至少5字</span></label><textarea id="management-review-note" v-model="note" class="mg-note" rows="3" maxlength="500" :disabled="busy" :placeholder="isIdentity ? '填写查阅用途或线下核验依据；驳回时说明需要补充的资料。请勿填写完整证件号。' : '说明审核依据、调整原因，或需要商家补充的资料。'" /><span class="mg-note-count">{{ note.length }}/500</span><p v-if="actionError" class="mg-inline-error" role="alert">{{ actionError }}</p></section>
               <section class="mg-detail-section"><h3>最近处理记录</h3><p v-if="trailLoading" class="mg-muted" role="status">正在读取操作记录…</p><p v-else-if="trailError" class="mg-inline-error" role="alert">{{ trailError }}</p><p v-else-if="!trail.length" class="mg-muted">暂无平台处理记录。</p><ol v-else class="mg-audit"><li v-for="event in trail" :key="event.id"><span class="mg-audit-dot" /><div><strong>{{ auditActions[event.action] || event.action }}<small>运营人员 #{{ event.actorUserId }}</small></strong><p>{{ event.note }}</p><time>{{ managementDate(event.createdAt) }}</time></div></li></ol></section>
             </div>
-            <footer class="mg-drawer-actions"><span v-if="isIdentity && selected.status === 'PENDING_REVIEW'">平台人工审核</span><button class="mg-button" type="button" :disabled="busy" @click="closeDetail">关闭</button><template v-if="section === 'information'"><button v-if="selected.status === 'PUBLISHED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('OFFLINE')"><ArrowDownToLine :size="15" />{{ busy ? '正在保存…' : '下线信息' }}</button><button v-if="selected.status === 'OFFLINE'" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('PUBLISHED')">{{ busy ? '正在保存…' : '重新上线' }}</button></template><template v-else-if="section === 'merchants'"><button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('REJECTED')">驳回申请</button><button v-if="selected.status === 'APPROVED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('SUSPENDED')">暂停入驻</button><button v-if="['PENDING_REVIEW', 'SUSPENDED'].includes(selected.status)" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('APPROVED')">{{ busy ? '正在保存…' : selected.status === 'SUSPENDED' ? '恢复入驻' : '通过入驻' }}</button></template><template v-else-if="selected.status === 'PENDING_REVIEW'"><button class="mg-button mg-danger" type="button" :disabled="busy || selected.userId === auth.user?.id" @click="review('REJECTED')">驳回申请</button><button class="mg-button mg-primary" type="button" :disabled="busy || selected.userId === auth.user?.id" @click="review('VERIFIED')"><Check :size="15" />{{ busy ? '正在保存…' : '人工审核通过' }}</button></template></footer>
+            <footer class="mg-drawer-actions">
+              <span v-if="(isIdentity || section === 'information') && selected.status === 'PENDING_REVIEW'">平台人工审核</span>
+              <button class="mg-button" type="button" :disabled="busy" @click="closeDetail">关闭</button>
+              <template v-if="section === 'information'">
+                <button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('REJECTED')">驳回信息</button>
+                <button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('PUBLISHED')"><Check :size="15" />{{ busy ? '正在保存…' : '审核通过并发布' }}</button>
+                <button v-if="selected.status === 'PUBLISHED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('OFFLINE')"><ArrowDownToLine :size="15" />{{ busy ? '正在保存…' : '下线信息' }}</button>
+                <button v-if="selected.status === 'OFFLINE' && selected.publishedAt" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('PUBLISHED')">{{ busy ? '正在保存…' : '重新上线' }}</button>
+              </template>
+              <template v-else-if="section === 'merchants'">
+                <button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('REJECTED')">驳回申请</button>
+                <button v-if="selected.status === 'APPROVED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('SUSPENDED')">暂停入驻</button>
+                <button v-if="['PENDING_REVIEW', 'SUSPENDED'].includes(selected.status)" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('APPROVED')">{{ busy ? '正在保存…' : selected.status === 'SUSPENDED' ? '恢复入驻' : '通过入驻' }}</button>
+              </template>
+              <template v-else-if="selected.status === 'PENDING_REVIEW'">
+                <button class="mg-button mg-danger" type="button" :disabled="busy || selected.userId === auth.user?.id" @click="review('REJECTED')">驳回申请</button>
+                <button class="mg-button mg-primary" type="button" :disabled="busy || selected.userId === auth.user?.id" @click="review('VERIFIED')"><Check :size="15" />{{ busy ? '正在保存…' : '人工审核通过' }}</button>
+              </template>
+            </footer>
           </template>
         </DialogPanel>
       </div>

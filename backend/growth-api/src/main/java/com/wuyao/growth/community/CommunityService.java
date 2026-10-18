@@ -45,8 +45,7 @@ public class CommunityService {
         value.setTenantId(TenantContext.require());
         value.setSubmittedBy(userId);
         apply(value, request);
-        value.setStatus("PUBLISHED");
-        value.setPublishedAt(Instant.now());
+        value.setStatus("PENDING_REVIEW");
         return CommunityDtos.InformationView.of(publications.saveAndFlush(value));
     }
 
@@ -56,7 +55,9 @@ public class CommunityService {
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
         if (value.isPlatformBlocked()) throw BizException.of(ErrorCode.FORBIDDEN, "该信息已由平台下线，请联系平台处理");
         apply(value, request);
-        value.setStatus("PUBLISHED");
+        value.setStatus("PENDING_REVIEW");
+        value.setPublishedAt(null);
+        value.setReviewNote(null);
         value.setUpdatedAt(Instant.now());
         return CommunityDtos.InformationView.of(publications.saveAndFlush(value));
     }
@@ -81,13 +82,13 @@ public class CommunityService {
         String normalizedCategory = blankToNull(category);
         String normalizedKeyword = blankToNull(keyword);
         var result = publications.publicFeed(LocalDate.now(), normalizedCategory, normalizedKeyword, PageRequest.of(page, size));
-        return PageResult.of(result, result.getContent().stream().map(CommunityDtos.InformationView::of).toList());
+        return PageResult.of(result, result.getContent().stream().map(CommunityDtos.InformationView::publicOf).toList());
     }
 
     @Transactional(readOnly = true)
     public CommunityDtos.InformationView publicInformation(Long id) {
         return publications.findPublicById(id, LocalDate.now())
-                .map(CommunityDtos.InformationView::of)
+                .map(CommunityDtos.InformationView::publicOf)
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "信息不存在或已过期"));
     }
 

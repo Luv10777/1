@@ -57,7 +57,7 @@ function editPublication(item) {
 }
 
 async function takeOffline(item) {
-  if (!window.confirm(`下架「${item.title}」？下架后公开页面将无法查看。`)) return
+  if (!window.confirm(item.status === 'PENDING_REVIEW' ? `撤回「${item.title}」的审核？撤回后可修改并重新提交。` : `下架「${item.title}」？下架后公开页面将无法查看。`)) return
   actionError.value = ''
   try {
     await businessCommunityService.takePublicationOffline(item.id)
@@ -97,7 +97,7 @@ function startInformation() {
 <template>
   <div class="business-page information-page">
     <header class="business-heading">
-      <div><p class="business-overline"><FilePenLine :size="15" aria-hidden="true" />商家信息服务</p><h1>信息发布</h1><p>发布门店活动、商业合作与供求信息，连接本地商家与合作机会。</p></div>
+      <div><p class="business-overline"><FilePenLine :size="15" aria-hidden="true" />商家信息服务</p><h1>信息发布</h1><p>提交门店活动、商业合作与供求信息，经平台审核通过后公开展示。</p></div>
       <div class="business-heading-links"><RouterLink to="/information" class="business-link">查看信息广场<ExternalLink :size="14" aria-hidden="true" /></RouterLink><RouterLink to="/merchant-alliance" class="business-link">商家入驻<ArrowRight :size="15" aria-hidden="true" /></RouterLink></div>
     </header>
 
@@ -105,17 +105,33 @@ function startInformation() {
       <div class="business-records-heading"><div><span>MY PUBLICATIONS</span><h2 id="my-publications-title">我的发布记录</h2></div><button type="button" class="business-record-refresh" :disabled="publicationsLoading" aria-label="刷新发布记录" @click="loadPublications"><RefreshCw :size="15" /></button></div>
       <p v-if="publicationsError" class="business-message-error" role="alert">{{ publicationsError }}</p>
       <p v-else-if="publicationsLoading && !publications.length" class="business-record-empty" role="status">正在读取发布记录…</p>
-      <p v-else-if="!publications.length" class="business-record-empty">已发布的活动、供求和合作信息会显示在这里。</p>
-      <ul v-else class="business-record-list"><li v-for="item in publications" :key="item.id"><div class="business-record-main"><span class="business-category-tag">{{ categories.find(category => category.value === item.category)?.label || '商家信息' }}</span><strong>{{ item.title }}</strong><small>{{ item.merchantName }} · {{ item.region }} · {{ informationDate(item.publishedAt || item.createdAt) }}</small></div><span class="business-record-status" :class="publicationState(item).className">{{ publicationState(item).label }}</span><div class="business-record-actions"><RouterLink v-if="publicationState(item).visible" :to="`/information/${item.id}`" target="_blank" class="business-record-icon" :aria-label="`打开 ${item.title} 的公开页面`" title="打开公开页面"><ExternalLink :size="15" /></RouterLink><button v-if="item.status === 'PUBLISHED'" type="button" class="business-record-icon" :disabled="submitting" :aria-label="`编辑 ${item.title}`" title="编辑" @click="editPublication(item)"><Pencil :size="15" /></button><button v-if="item.status === 'PUBLISHED'" type="button" class="business-record-icon" :disabled="submitting" :aria-label="`下架 ${item.title}`" title="下架" @click="takeOffline(item)"><X :size="16" /></button></div></li></ul>
+      <p v-else-if="!publications.length" class="business-record-empty">提交的信息与审核进度会显示在这里。</p>
+      <ul v-else class="business-record-list">
+        <li v-for="item in publications" :key="item.id">
+          <div class="business-record-main">
+            <span class="business-category-tag">{{ categories.find(category => category.value === item.category)?.label || '商家信息' }}</span>
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.merchantName }} · {{ item.region }} · {{ informationDate(item.publishedAt || item.createdAt) }}</small>
+            <p v-if="item.reviewNote" class="business-review-note">{{ item.status === 'REJECTED' ? '驳回原因' : '平台处理意见' }}：{{ item.reviewNote }}</p>
+            <p v-if="item.platformBlocked" class="business-review-note">该信息已由平台下线，请联系平台处理。</p>
+          </div>
+          <span class="business-record-status" :class="publicationState(item).className">{{ publicationState(item).label }}</span>
+          <div class="business-record-actions">
+            <RouterLink v-if="publicationState(item).visible" :to="`/information/${item.id}`" target="_blank" class="business-record-icon" :aria-label="`打开 ${item.title} 的公开页面`" title="打开公开页面"><ExternalLink :size="15" /></RouterLink>
+            <button v-if="!item.platformBlocked" type="button" class="business-record-icon" :disabled="submitting" :aria-label="`编辑 ${item.title} 并重新提交审核`" title="编辑并重新提交审核" @click="editPublication(item)"><Pencil :size="15" /></button>
+            <button v-if="['PUBLISHED', 'PENDING_REVIEW'].includes(item.status)" type="button" class="business-record-icon" :disabled="submitting" :aria-label="`${item.status === 'PENDING_REVIEW' ? '撤回' : '下架'} ${item.title}`" :title="item.status === 'PENDING_REVIEW' ? '撤回审核' : '下架'" @click="takeOffline(item)"><X :size="16" /></button>
+          </div>
+        </li>
+      </ul>
       <p v-if="actionError" class="business-message-error" role="alert">{{ actionError }}</p>
     </section>
 
     <section v-if="receipt" class="business-submission-result" role="status">
-      <CheckCircle2 :size="36" aria-hidden="true" /><h2>{{ editingPublication ? '发布内容已更新' : '信息已公开发布' }}</h2><p>「{{ receipt.title }}」已保存，并显示在信息广场。</p><span>发布编号：{{ receipt.id }}</span><RouterLink class="business-button" :to="`/information/${receipt.id}`" target="_blank">查看发布后的页面<ExternalLink :size="15" /></RouterLink><RouterLink to="/information" class="business-link">回到信息广场<ArrowRight :size="15" aria-hidden="true" /></RouterLink>
+      <CheckCircle2 :size="36" aria-hidden="true" /><h2>{{ editingPublication ? '修改已提交审核' : '信息已提交审核' }}</h2><p>「{{ receipt.title }}」已保存，正在等待平台审核，通过后才会显示在信息广场。可在上方发布记录中查看审核结果。</p><span>提交编号：{{ receipt.id }}</span><RouterLink to="/information" class="business-link">浏览信息广场<ArrowRight :size="15" aria-hidden="true" /></RouterLink>
       <button class="business-button business-button-primary" type="button" @click="startInformation">继续发布信息<ArrowRight :size="15" aria-hidden="true" /></button>
     </section>
     <template v-else>
-      <ol class="business-process" aria-label="信息发布流程"><li class="is-current"><span>01</span><strong>填写信息</strong></li><li class="is-current"><span>02</span><strong>公开发布</strong></li><li><span>03</span><strong>商家自行维护</strong></li></ol>
+      <ol class="business-process" aria-label="信息发布流程"><li class="is-current" aria-current="step"><span>01</span><strong>填写并提交</strong></li><li><span>02</span><strong>平台审核</strong></li><li><span>03</span><strong>通过后公开</strong></li></ol>
       <div class="business-editor-layout">
         <form ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
           <fieldset class="business-form-fields" :disabled="submitting">
@@ -136,10 +152,10 @@ function startInformation() {
               </div>
               <label class="business-field business-date-field"><span>信息有效期至</span><input v-model="form.validUntil" name="valid-until" type="date" :min="today" /><small>不填写表示长期有效。</small></label>
             </section>
-            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="information-declaration" type="checkbox" required /><span>我确认发布内容真实、合法，已获得所填联系方式的公开授权，已阅读<a href="/policies/publishing" target="_blank" rel="noopener">《公开信息发布规则》</a>和<a href="/policies/privacy" target="_blank" rel="noopener">《隐私协议》</a>，并同意提交后按规则公开展示。</span></label></div>
+            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="information-declaration" type="checkbox" required /><span>我确认发布内容真实、合法，已获得所填联系方式的公开授权，已阅读<a href="/policies/publishing" target="_blank" rel="noopener">《公开信息发布规则》</a>和<a href="/policies/privacy" target="_blank" rel="noopener">《隐私协议》</a>，并同意提交平台审核，通过后按规则公开展示。</span></label></div>
           </fieldset>
           <p v-if="error" class="business-form-feedback business-message-error" role="alert">{{ error }}</p>
-          <footer class="business-form-actions"><span>提交后立即公开，可随时编辑或下架</span><div><button class="business-button" type="button" :disabled="submitting" @click="preview"><Eye :size="16" aria-hidden="true" />{{ previewOpen ? '收起完整预览' : '预览信息' }}</button><button class="business-button business-button-primary" type="submit" :disabled="submitting"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在保存…' : editingPublication ? '保存并更新' : '发布信息' }}</button></div></footer>
+          <footer class="business-form-actions"><span>{{ editingPublication ? '修改后需重新审核，审核期间不公开展示' : '提交后待审核，审核通过才会公开展示' }}</span><div><button class="business-button" type="button" :disabled="submitting" @click="preview"><Eye :size="16" aria-hidden="true" />{{ previewOpen ? '收起完整预览' : '预览信息' }}</button><button class="business-button business-button-primary" type="submit" :disabled="submitting"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在提交…' : editingPublication ? '重新提交审核' : '提交审核' }}</button></div></footer>
         </form>
 
         <aside class="business-preview-column">
@@ -154,7 +170,7 @@ function startInformation() {
               <dl class="business-preview-details"><div><dt>有效期</dt><dd>{{ form.validUntil || '长期有效' }}</dd></div><div v-if="form.contactName.trim()"><dt>联系人</dt><dd>{{ form.contactName.trim() }}</dd></div><div v-if="form.contactPhone.trim()"><dt>联系电话</dt><dd>{{ form.contactPhone.trim() }}</dd></div></dl>
             </article>
           </section>
-          <section class="business-writing-guide"><h3>发布须知</h3><p>写清时间、地点和参与方式；合作信息说明资源与需求；报价、优惠和服务范围应准确。</p><p>提交后信息会立即公开展示。请勿发布虚假信息或填写无关个人资料。</p></section>
+          <section class="business-writing-guide"><h3>发布须知</h3><p>写清时间、地点和参与方式；合作信息说明资源与需求；报价、优惠和服务范围应准确。</p><p>新信息及修改后的内容均须经平台审核，通过后公开展示；被驳回后可根据原因修改并重新提交。请勿发布虚假信息或填写无关个人资料。</p></section>
         </aside>
       </div>
     </template>
