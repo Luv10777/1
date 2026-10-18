@@ -7,6 +7,7 @@ import com.wuyao.growth.iam.dto.AccountDtos;
 import com.wuyao.growth.iam.dto.AuthDtos;
 import com.wuyao.growth.iam.service.AccountClosureService;
 import com.wuyao.growth.iam.service.AccountService;
+import com.wuyao.growth.iam.service.AccountAvatarService;
 import com.wuyao.growth.iam.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 public class AccountController {
 
     private final AccountService accounts;
+    private final AccountAvatarService avatars;
     private final AuthService authService;
     private final AccountClosureService closures;
     private final ClientIpResolver clientIps;
@@ -34,6 +36,18 @@ public class AccountController {
     public ApiResponse<AccountDtos.Profile> rename(@AuthenticationPrincipal AuthPrincipal me,
                                                    @Valid @RequestBody AccountDtos.RenameRequest req) {
         return ApiResponse.ok(accounts.renameSelf(me.userId(), req.name()));
+    }
+
+    @PostMapping("/avatar/upload-url")
+    public ApiResponse<AccountDtos.AvatarUploadTicket> avatarUpload(@AuthenticationPrincipal AuthPrincipal me,
+            @Valid @RequestBody AccountDtos.AvatarUploadRequest req) {
+        return ApiResponse.ok(avatars.presign(me.userId()));
+    }
+
+    @PutMapping("/avatar")
+    public ApiResponse<AccountDtos.Profile> avatar(@AuthenticationPrincipal AuthPrincipal me,
+            @Valid @RequestBody AccountDtos.AvatarRequest req) {
+        return ApiResponse.ok(avatars.save(me.userId(), req.uploadKey()));
     }
 
     /** 成功后其他设备上的登录全部失效；返回给这台设备的新令牌，前端直接换上。 */

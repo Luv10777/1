@@ -419,8 +419,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V43 | 门店档案：`stores.profile`（交通指引、配套服务、特殊营业安排） | `feat/store-library` |
 | V50 | 商家申请、信息公开发布、实物商品上架、订单与公开店铺 RLS 策略 | `codex/guest-creation-browsing` |
 | V52 | 信息发布审核、驳回意见与审核后发布时间 | `codex/information-review` |
+| V53 | 个人头像及待确认头像上传凭证 | `codex/scroll-footer-account-avatar` |
 
-下一个可用编号：V53。
+下一个可用编号：V54。
 
 后端检查：
 

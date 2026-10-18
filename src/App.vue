@@ -5,7 +5,7 @@ import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui
 import AppShell from './layouts/AppShell.vue'
 import DesktopShell from './layouts/DesktopShell.vue'
 import { inDesktop } from './utils/desktop'
-import { LEGAL_ENTITY } from './domain/legalPolicies'
+import SiteFooter from './components/SiteFooter.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +23,10 @@ function openMembership() {
 <template>
   <div class="site-layout" :class="{ 'site-layout-legal': route.name === 'legal-policy' }">
     <div class="site-content">
-      <RouterView v-if="isPublic" />
+      <template v-if="isPublic">
+        <RouterView />
+        <SiteFooter v-if="!inDesktop" />
+      </template>
       <!-- 桌面端只做直播，不带平台的导航。 -->
       <DesktopShell v-else-if="inDesktop">
         <RouterView />
@@ -32,16 +35,6 @@ function openMembership() {
         <RouterView />
       </AppShell>
     </div>
-    <footer v-if="!inDesktop" class="site-footer" aria-label="网站备案及服务信息">
-      <div class="site-footer-row site-footer-identity">
-        <span>ICP备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026081720号</a></span>
-        <span>运营主体：{{ LEGAL_ENTITY.name }}</span>
-      </div>
-      <div class="site-footer-row site-footer-service">
-        <nav class="site-legal-links" aria-label="平台协议与售后服务"><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">用户注册协议</RouterLink><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">隐私协议</RouterLink><RouterLink to="/policies/merchant" target="_blank" rel="noopener noreferrer">商家入驻</RouterLink><RouterLink to="/policies/aftersales" target="_blank" rel="noopener noreferrer">售后与退款</RouterLink></nav>
-        <a :href="`tel:${LEGAL_ENTITY.phone}`">人工客服：{{ LEGAL_ENTITY.phone }}</a>
-      </div>
-    </footer>
   </div>
   <Dialog :open="membershipOpen" class="membership-dialog" @close="membershipOpen = false">
     <div class="membership-backdrop" aria-hidden="true" />
@@ -63,13 +56,6 @@ function openMembership() {
 .site-content { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: auto; }
 .site-content :deep(.app-frame), .site-content :deep(.access-page) { height: 100%; }
 .site-content :deep(.mobile-bottom-nav) { position: absolute; }
-.site-footer { --site-footer-link: #245fa6; display: flex; flex-shrink: 0; flex-direction: column; justify-content: center; align-items: center; gap: 2px; padding: 6px 16px max(6px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--night); color: var(--ink-muted); font-size: 12px; line-height: 1.8; text-align: center; }
-.site-footer-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px 20px; }
-.site-footer-service { gap: 3px 16px; }
-.site-legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; }
-.site-footer a { color: var(--site-footer-link); white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
-.site-footer a:hover, .site-footer a:focus-visible { text-decoration-thickness: 2px; }
-:global(:root.dark) .site-footer, :global([data-theme='dark']) .site-footer { --site-footer-link: #8dbdff; }
 :global(.membership-dialog) { position: fixed; inset: 0; z-index: 1100; }
 .membership-backdrop { position: fixed; inset: 0; background: rgb(30 27 23 / 38%); }
 .membership-position { position: fixed; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 24px; }
@@ -80,6 +66,5 @@ function openMembership() {
 @media print {
   .site-layout-legal { display:block; height:auto; min-height:0; overflow:visible; }
   .site-layout-legal > .site-content { display:block; height:auto; min-height:0; overflow:visible; }
-  .site-layout-legal > .site-footer { display:none; }
 }
 </style>

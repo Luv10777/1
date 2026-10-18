@@ -33,6 +33,7 @@ function persistSession(data) {
     name: data.user.name || (data.user.phone ? `用户${data.user.phone.slice(-4)}` : '用户'),
     roles: rolesOf(data.user.role),
     role: roleLabel(data.user.role),
+    avatarUrl: data.user.avatarUrl || '',
   }
   state.user = user
   writeUser(user)
@@ -127,7 +128,7 @@ export const auth = {
     if (!state.token?.accessToken) return false
     try {
       const me = await authService.getCurrentUser()
-      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role) }
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role), avatarUrl: me.avatarUrl || '' }
       writeUser(state.user)
       // 校验过程中 request.js 可能已经换过 token，内存里的那份要跟上。
       state.token = readTokens()
@@ -143,6 +144,12 @@ export const auth = {
   rename(name) {
     if (!state.user) return
     state.user = { ...state.user, name }
+    writeUser(state.user)
+  },
+
+  updateAvatar(avatarUrl) {
+    if (!state.user) return
+    state.user = { ...state.user, avatarUrl: avatarUrl || '' }
     writeUser(state.user)
   },
 

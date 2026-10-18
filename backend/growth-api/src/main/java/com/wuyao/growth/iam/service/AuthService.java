@@ -67,6 +67,7 @@ public class AuthService {
     private final PasswordLoginVerifier passwordVerifier;
     private final TransactionTemplate transactions;
     private final StringRedisTemplate redis;
+    private final AccountAvatarService avatars;
 
     @Value("${growth.sms.code-length:6}")
     private int codeLength;
@@ -216,7 +217,8 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                 .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "用户不存在"));
-        return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole());
+        return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole(),
+                avatars.url(user.getAvatarKey()));
     }
 
     /** 刷新即轮换：老的立刻作废，防止 refresh token 被重复使用。 */
@@ -301,7 +303,8 @@ public class AuthService {
                 access,
                 refresh,
                 jwtService.getAccessTtl().toSeconds(),
-                new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole()));
+                new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole(),
+                        avatars.url(user.getAvatarKey())));
     }
 
     private String randomCode() {

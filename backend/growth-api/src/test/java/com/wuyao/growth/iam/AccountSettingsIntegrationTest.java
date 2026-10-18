@@ -2,6 +2,7 @@ package com.wuyao.growth.iam;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wuyao.growth.common.storage.ObjectStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -22,8 +24,15 @@ import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.Optional;
+import java.time.Duration;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 import static org.springframework.security.crypto.bcrypt.BCrypt.gensalt;
 import static org.springframework.security.crypto.bcrypt.BCrypt.hashpw;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -62,6 +71,7 @@ class AccountSettingsIntegrationTest {
     }
 
     @Autowired MockMvc mvc;
+    @MockitoBean ObjectStorage storage;
     private final ObjectMapper json = new ObjectMapper();
     JdbcTemplate owner;
 
@@ -70,6 +80,40 @@ class AccountSettingsIntegrationTest {
         owner = new JdbcTemplate(new DriverManagerDataSource(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         owner.execute("TRUNCATE sms_codes, tenants RESTART IDENTITY CASCADE");
+    }
+
+    @Test
+    void avatarsPersistForOnlyTheirOwnerAndSurviveReloadLoginRefreshAndRenameWithoutMembership() throws Exception {
+        JsonNode person = login(PHONE);
+        String token = person.path("accessToken").asText();
+        String other = login("13900000012").path("accessToken").asText();
+        when(storage.presignPut(anyString(), any(Duration.class))).thenReturn("https://storage.test/upload");
+        when(storage.presignGet(anyString(), any(Duration.class))).thenAnswer(call -> "https://storage.test/" + call.getArgument(0));
+        refused(post("/api/auth/account/avatar/upload-url"), null, Map.of("mimeType", "image/png"), 401, 1401);
+        refused(post("/api/auth/account/avatar/upload-url"), token, Map.of("mimeType", "image/svg+xml"), 400, 1400);
+        JsonNode ticket = api(post("/api/auth/account/avatar/upload-url"), token, Map.of("mimeType", "image/png"));
+        String pending = ticket.path("uploadKey").asText();
+        assertThat(pending).contains("/avatars/" + person.path("user").path("userId").asLong() + "/upload-");
+        refused(put("/api/auth/account/avatar"), other, Map.of("uploadKey", pending), 400, 1400);
+        verify(storage, never()).stat(anyString());
+        var image = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(80, 40, BufferedImage.TYPE_INT_RGB), "png", image);
+        when(storage.stat(pending)).thenReturn(Optional.of(new ObjectStorage.StoredObject(image.size(), "image/png")));
+        when(storage.read(pending, 2 * 1024 * 1024)).thenReturn(image.toByteArray());
+        JsonNode saved = api(put("/api/auth/account/avatar"), token, Map.of("uploadKey", pending));
+        String url = saved.path("avatarUrl").asText();
+        assertThat(url).startsWith("https://storage.test/").endsWith(".png").doesNotContain("upload-");
+        Long userId = person.path("user").path("userId").asLong();
+        assertThat(owner.queryForObject("SELECT avatar_key FROM users WHERE id = ?", String.class, userId))
+                .isEqualTo(url.substring("https://storage.test/".length()));
+        assertThat(owner.queryForObject("SELECT avatar_upload_key FROM users WHERE id = ?", String.class, userId)).isNull();
+        assertThat(api(get("/api/auth/account"), token, null).path("avatarUrl").asText()).isEqualTo(url);
+        assertThat(api(get("/api/auth/me"), token, null).path("avatarUrl").asText()).isEqualTo(url);
+        assertThat(api(put("/api/auth/account/name"), token, Map.of("name", "新名字")).path("avatarUrl").asText()).isEqualTo(url);
+        assertThat(api(post("/api/auth/refresh"), null, Map.of("refreshToken", person.path("refreshToken").asText()))
+                .path("user").path("avatarUrl").asText()).isEqualTo(url);
+        assertThat(login(PHONE).path("user").path("avatarUrl").asText()).isEqualTo(url);
+        assertThat(owner.queryForObject("SELECT avatar_key FROM users WHERE phone = '13900000012'", String.class)).isNull();
     }
 
     @Test

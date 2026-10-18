@@ -41,11 +41,30 @@ export function closurePayload(values, byCode) {
   return { currentPassword, confirmed: true }
 }
 
-export function createAccountApi({ request = defaultRequest } = {}) {
+export function validateAvatar(file) {
+  if (!file || !['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 格式的头像')
+  if (!file.size || file.size > 2 * 1024 * 1024) throw new Error('头像图片需大于 0 且不能超过 2 MB')
+}
+
+export function createAccountApi({ request = defaultRequest, fetch: uploadFetch = globalThis.fetch } = {}) {
   const put = (endpoint, body) => request(endpoint, { method: 'PUT', body: JSON.stringify(body) })
   return {
     profile: () => request('/api/auth/account', { method: 'GET' }),
     rename: name => put('/api/auth/account/name', namePayload(name)),
+    async updateAvatar(file) {
+      validateAvatar(file)
+      const ticket = await request('/api/auth/account/avatar/upload-url', {
+        method: 'POST', body: JSON.stringify({ mimeType: file.type }),
+      })
+      let response
+      try {
+        response = await uploadFetch(ticket.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+      } catch {
+        throw new Error('头像上传失败，请检查网络后重试')
+      }
+      if (!response.ok) throw new Error('头像上传失败，请重试')
+      return put('/api/auth/account/avatar', { uploadKey: ticket.uploadKey })
+    },
     /** 成功后返回新的一套令牌：其他设备的登录已失效，这台要换上新的才能继续用。 */
     changePassword: (values, byCode) => put('/api/auth/account/password', passwordPayload(values, byCode)),
     /** 注销前的说明：只注销自己还是连商户一起关闭、会作废什么、现在能不能注销。 */
