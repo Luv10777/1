@@ -1,8 +1,8 @@
 /* Live creation controls sit inside the original poster gallery and product wall. */
 .creation-poster, .creation-product { color: var(--ink); }
 .creation-poster button:disabled, .creation-product button:disabled, .creation-prompt-shell button:disabled { opacity: .48; cursor: not-allowed; }
-.creation-poster :is(button, a, input, textarea, select, label[tabindex]):focus-visible,
-.creation-product :is(button, a, input, textarea, select, label[tabindex]):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.creation-poster :is(button, a, input, textarea, :is(select, .app-select-button), label[tabindex]):focus-visible,
+.creation-product :is(button, a, input, textarea, :is(select, .app-select-button), label[tabindex]):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .creation-poster .image-workspace-switch, .creation-product .image-workspace-switch { position: static; display: flex; flex-shrink: 0; width: 248px; padding: 4px; gap: 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--night-panel); }
 .creation-poster .image-workspace-switch a, .creation-product .image-workspace-switch a { display: flex; align-items: center; justify-content: center; flex: 1; gap: 6px; min-height: 35px; padding: 6px 8px; border-radius: 5px; color: var(--ink-muted); font-size: 12px; white-space: nowrap; }
 .creation-poster .image-workspace-switch a.active, .creation-product .image-workspace-switch a.active { color: var(--color-accent-text); background: var(--color-bg-subtle); font-weight: 600; }
@@ -19,7 +19,7 @@
 .scenario-card > strong { margin-top: 25px; font: 600 19px/1.3 var(--font-serif); }
 .scenario-description { margin-top: 9px; color: var(--ink-muted); font-size: 12px; line-height: 1.65; }
 .scenario-card-action { display: flex; justify-content: space-between; width: 100%; margin-top: auto; padding-top: 16px; color: var(--color-accent-text); font-size: 12px; font-weight: 600; }
-.creation-select-pill.purpose-select-pill select { max-width: 190px; }
+.creation-select-pill.purpose-select-pill :is(select, .app-select-button) { max-width: 190px; }
 @media (max-width: 1050px) { .scenario-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .scenario-grid { grid-template-columns: minmax(0, 1fr); } }
 
@@ -92,7 +92,7 @@
 .creation-prompt-context > button { padding: 0; border: 0; background: transparent; color: var(--color-accent-text); font-size: 12px; }
 .creation-prompt-shell .prompt-tools { border: 0; padding: 0; margin: 0; min-width: 0; }
 .creation-prompt-shell .prompt-pill { display: inline-flex; align-items: center; gap: 4px; height: 33px; padding: 0 10px; font-size: 12px; font-weight: 500; }
-.creation-select-pill select { max-width: 106px; padding: 3px 0; border: 0; background: transparent; color: var(--ink-soft); font: inherit; cursor: pointer; }
+.creation-select-pill :is(select, .app-select-button) { max-width: 106px; padding: 3px 0; border: 0; background: transparent; color: var(--ink-soft); font: inherit; cursor: pointer; }
 .creation-prompt-shell .creation-send { display: inline-flex; justify-content: center; gap: 10px; flex-shrink: 0; width: auto; height: 38px; padding: 0 16px; border-radius: 9px; background: var(--color-accent); color: var(--color-on-accent); font-size: 12px; }
 .creation-prompt-shell .creation-send:hover:not(:disabled) { background: var(--color-accent-hover); transform: none; }
 .creation-prompt-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 10px; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
@@ -105,7 +105,7 @@
 .creation-references img { width: 42px; height: 48px; object-fit: cover; border-radius: 4px; }
 .creation-references article > div { flex: 1; min-width: 0; }
 .creation-references span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
-.creation-references select { width: 100%; margin-top: 5px; padding: 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--night-panel); font-size: 12px; }
+.creation-references :is(select, .app-select-button) { width: 100%; margin-top: 5px; padding: 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--night-panel); font-size: 12px; }
 .creation-references button { padding: 6px; border: 0; color: var(--ink-muted); background: transparent; font-size: 19px; }
 .creation-product .product-form-scroll { border: 0; margin: 0; }
 .creation-product .creation-workspace { flex: 1; min-height: 0; }

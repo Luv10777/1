@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../AppSelect.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { Check, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, ShieldCheck, Smartphone, X } from 'lucide-vue-next'
@@ -110,7 +111,7 @@ onBeforeUnmount(() => { stopTimers(); qrGeneration += 1 })
                       </label>
                     </div><p class="mb-0 mt-2 text-xs text-brand-muted">{{ selectedMeta.provider }}</p>
                   </fieldset>
-                  <label class="block text-sm font-medium">授权身份<select v-model="identity" :disabled="!!account" class="mt-2 block w-full rounded-lg border border-solid border-border-subtle bg-bg-surface px-3 py-2.5 text-sm text-brand-primary focus:text-brand-accent-ink disabled:bg-bg-subtle"><option v-for="item in selectedMeta.identity" :key="item">{{ item }}</option></select></label>
+                  <label class="block text-sm font-medium">授权身份<AppSelect v-model="identity" :disabled="!!account" class="mt-2 block w-full rounded-lg border border-solid border-border-subtle bg-bg-surface px-3 py-2.5 text-sm text-brand-primary focus:text-brand-accent-ink disabled:bg-bg-subtle"><option v-for="item in selectedMeta.identity" :key="item">{{ item }}</option></AppSelect></label>
                   <label class="block text-sm font-medium">{{ account ? '续期账号' : '演示账号昵称' }}<input v-model="name" maxlength="30" :readonly="!!account" placeholder="输入昵称，体验绑定后的账号管理" class="mt-2 block w-full rounded-lg border border-solid border-border-subtle bg-bg-surface px-3 py-2.5 text-sm text-brand-primary text-brand-accent-ink read-only:bg-bg-subtle" /></label>
                 </div>
                 <div v-else-if="step === 2" class="text-center">

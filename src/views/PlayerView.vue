@@ -229,20 +229,20 @@ onBeforeUnmount(() => {
       <div class="player-topbar-meta"><span class="player-live-dot" /> {{ sessionName }}</div>
     </header>
     <main class="player-main">
-      <section class="player-hero"><div><p class="eyebrow">LIVE AUDIO PLAYER</p><h1>直播声音播报</h1><p class="player-lead">此页面仅播放本场直播的音频。请在直播配置页选择声音接法，并由另一台设备进入直播间检查实际收音。</p></div></section>
+      <section class="player-hero"><div><h1>直播声音播报</h1><p class="player-lead">此页面仅播放本场直播的音频。请在直播配置页选择声音接法，并由另一台设备进入直播间检查实际收音。</p></div></section>
       <section class="player-notice warning" role="note"><span class="material-symbols-outlined">screen_lock_portrait</span><span>请保持此页面在前台运行，不要锁屏。切换到抖音或其他应用可能中断声音；同机后台播报与配件兼容性需要实机测试。</span></section>
       <p v-if="!token" class="player-error" role="alert">缺少配对链接。为保护本场访问凭证，刷新后需要从直播配置页重新打开播报页。</p>
       <p v-if="connectionError" class="player-error" role="alert">{{ connectionError }}</p>
       <section class="player-grid">
         <article class="player-card player-status-card">
-          <div class="player-card-heading"><div><p class="eyebrow">CONNECTION</p><h2>播报连接</h2></div><span class="player-status-pill" :class="connectionTone"><i />{{ connectionLabel }}</span></div>
+          <div class="player-card-heading"><div><h2>播报连接</h2></div><span class="player-status-pill" :class="connectionTone"><i />{{ connectionLabel }}</span></div>
           <p class="player-status-copy" role="status">{{ statusMessage }}</p>
           <dl class="player-status-details"><div><dt>本场直播</dt><dd>{{ sessionName }}</dd></div><div><dt>最近服务端心跳</dt><dd>{{ formattedHeartbeat }}</dd></div><div><dt>屏幕状态</dt><dd>{{ wakeLockState }}</dd></div></dl>
           <div class="player-status-actions"><button v-if="status !== 'connected'" type="button" class="player-button primary player-start" :disabled="!token || status === 'connecting' || status === 'invalid'" @click="startPlayer">{{ !started ? '开始播报' : '重新连接' }}</button><button v-else type="button" class="player-button secondary" @click="disconnect">断开连接</button></div>
           <p class="player-footnote">首次播放需要你点击按钮授权。已连接只表示播报页在线，不能证明观众已听到声音。</p>
         </article>
         <article class="player-card player-now-card">
-          <div class="player-card-heading"><div><p class="eyebrow">NOW PLAYING</p><h2>正在播报</h2></div><span class="player-wave" :class="{ active: player.current && !player.paused && !player.loading && player.audioState === 'running' }"><i v-for="n in 5" :key="n" :style="{ animationDelay: `${n * 70}ms` }" /></span></div>
+          <div class="player-card-heading"><div><h2>正在播报</h2></div><span class="player-wave" :class="{ active: player.current && !player.paused && !player.loading && player.audioState === 'running' }"><i v-for="n in 5" :key="n" :style="{ animationDelay: `${n * 70}ms` }" /></span></div>
           <div v-if="player.current" class="player-now-content"><span class="player-now-label">{{ modeLabel(player.current.mode) }}</span><p class="player-current-text">{{ player.current.text || '本场音频' }}</p><div class="player-progress"><div class="player-progress-track" role="progressbar" :aria-valuenow="Math.round(currentPercent)" aria-valuemin="0" aria-valuemax="100" aria-label="音频播放进度"><span :style="{ width: `${currentPercent}%` }" /></div><div><span>{{ currentTimeLabel }}</span><span>{{ player.loading ? '正在缓冲' : player.paused ? '已暂停' : isAudioSuspended ? '浏览器已暂停声音' : '播放中' }}</span></div></div></div>
           <div v-else class="player-empty-state"><span class="material-symbols-outlined">graphic_eq</span><p>{{ started ? '等待本场音频' : '点击开始播报以连接' }}</p><small>收到讲解或互动回复后，将自动加入队列。</small></div>
           <p v-if="player.error" class="player-error" role="alert">{{ player.error }} <button type="button" class="player-text-button" @click="engine.retry()">重新加载音频</button></p>
@@ -250,7 +250,7 @@ onBeforeUnmount(() => {
         </article>
       </section>
       <section class="player-card player-queue-card">
-        <div class="player-card-heading"><div><p class="eyebrow">AUDIO QUEUE</p><h2>待播队列</h2></div><span class="player-queue-count">{{ player.pending.length }} 条待播</span></div>
+        <div class="player-card-heading"><div><h2>待播队列</h2></div><span class="player-queue-count">{{ player.pending.length }} 条待播</span></div>
         <p class="player-footnote">互动回复在可用的安静停顿处插入，播完后继续原讲解；剩余不足 5 秒时，等待当前段结束。</p>
         <ol v-if="player.pending.length" class="player-queue-list"><li v-for="(item, index) in player.pending" :key="item.id"><span class="player-queue-index">{{ String(index + 1).padStart(2, '0') }}</span><span class="player-queue-type">{{ item.offsetMillis > 0 ? '续播' : item.mode === 'INTERRUPT' ? '互动' : '讲解' }}</span><div><p>{{ item.text || '本场音频' }}</p></div><span class="player-queue-duration">{{ formatSeconds(item.durationMillis - item.offsetMillis) }}</span></li></ol>
         <div v-else class="player-queue-empty">暂无待播内容</div>

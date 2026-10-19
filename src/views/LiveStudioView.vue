@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { auth } from '../stores/auth'
@@ -833,7 +834,6 @@ onBeforeUnmount(() => {
 
           <div v-if="productPickerOpen" class="ls-modal-backdrop" role="presentation" @click.self="closeProductDialogs">
             <section class="ls-modal panel-dark ls-product-modal" role="dialog" aria-modal="true" aria-labelledby="ls-product-picker-title">
-              <p class="eyebrow accent">PRODUCT LIBRARY</p>
               <h3 id="ls-product-picker-title">从商品库选择</h3>
               <p class="ls-modal-copy">可多选商品，加入本场清单后调整讲解顺序。</p>
               <input v-model="productSearch" class="ls-product-search" type="search" placeholder="搜索商品名称、分类或价格…">
@@ -926,16 +926,16 @@ onBeforeUnmount(() => {
             <textarea v-model="newA" maxlength="4000" rows="2" aria-label="回复话术" placeholder="希望如何回答" @keyup.ctrl.enter="addQa" />
             <div class="ls-qa-new-foot">
               <label>保存到
-                <select v-model="qaTarget" aria-label="这条问答保存位置">
+                <AppSelect v-model="qaTarget" aria-label="这条问答保存位置">
                   <option value="session">仅本场</option>
                   <option value="store">门店通用</option>
                   <option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option>
-                </select>
+                </AppSelect>
               </label>
-              <select v-if="qaPersistMode === 'STORE_KNOWLEDGE'" v-model="qaKnowledgeSetId" aria-label="目标门店知识集">
+              <AppSelect v-if="qaPersistMode === 'STORE_KNOWLEDGE'" v-model="qaKnowledgeSetId" aria-label="目标门店知识集">
                 <option value="" disabled>选择问答知识集</option>
                 <option v-for="set in knowledgeSets" :key="set.id" :value="set.id">{{ set.name }}</option>
-              </select>
+              </AppSelect>
               <button type="button" class="primary-button compact" @click="addQa">添加</button>
             </div>
             <small v-if="qaPersistMode === 'STORE_KNOWLEDGE'">{{ knowledgeSets.length ? '保存为草稿，需前往知识库启用。' : '请先到资产中心 / 知识库新建问答知识集。' }}</small>
@@ -991,7 +991,7 @@ onBeforeUnmount(() => {
     <section v-if="stage === 'live'" class="ls-live-grid" aria-label="直播工作台">
       <div class="ls-live-main">
         <article class="panel ls-feed-panel">
-          <div class="panel-heading"><div><p class="eyebrow">REALTIME</p><h3>弹幕流与自动回复</h3></div><span class="ls-pending-badge" :class="{ ready: commentFeed.length }">{{ commentFeed.length ? `${commentFeed.length} 条` : '暂无弹幕' }}</span></div>
+          <div class="panel-heading"><div><h3>弹幕流与自动回复</h3></div><span class="ls-pending-badge" :class="{ ready: commentFeed.length }">{{ commentFeed.length ? `${commentFeed.length} 条` : '暂无弹幕' }}</span></div>
           <p v-if="inDesktop" class="ls-card-note">连接直播间后，这里显示从直播间读到的弹幕和自动回复。</p>
           <p v-else class="ls-card-note">真实抖音弹幕尚未接入，这里显示的是下方“模拟弹幕互动”发出的问题与回复。</p>
           <div v-if="commentFeed.length" class="ls-realtime-feed"><article v-for="item in commentFeed" :key="item.id" class="ls-realtime-item" :class="{ attention: item.needsPerson }"><div class="ls-realtime-line"><span class="ls-realtime-kind">{{ item.providerLabel || '观众' }}</span><strong>{{ item.question }}</strong><small class="ls-realtime-state" :class="item.tone">{{ item.stateLabel }}</small></div><div v-if="item.answer" class="ls-realtime-line"><span class="ls-realtime-kind reply">回复</span><p>{{ item.answer }}</p><small v-if="item.sourceLabel">{{ item.sourceLabel }}</small></div><p v-else-if="item.note" class="ls-realtime-note">{{ item.note }}</p></article></div><div v-else class="ls-workspace-empty"><MessageSquare :size="32" :stroke-width="1.4" aria-hidden="true" /><strong>还没有弹幕</strong><p>在“开发测试 · 模拟弹幕互动”里发一条问题：与知识库文字一致的直接用原话回复，其余依据本场问答和商品资料自动回答。</p><button type="button" class="ls-ghost compact" @click="editStep('qa')">查看互动知识库</button></div>
@@ -999,7 +999,7 @@ onBeforeUnmount(() => {
       </div>
       <aside class="ls-live-side">
         <article class="panel ls-selected-products">
-          <div class="panel-heading"><div><p class="eyebrow">PRODUCTS</p><h3>本场商品</h3></div><Package :size="20" aria-hidden="true" /></div>
+          <div class="panel-heading"><div><h3>本场商品</h3></div><Package :size="20" aria-hidden="true" /></div>
           <ol v-if="productQueue.length" class="ls-workspace-products"><li v-for="(product, index) in productQueue" :key="product.id"><span class="ls-product-index">{{ index + 1 }}</span><span><strong>{{ product.name }}</strong><small>{{ product.tag }} · {{ product.price }}</small></span></li></ol>
           <p v-else class="ls-section-note">还没有选择本场商品。</p><button type="button" class="ls-text-action" @click="editStep('script')">{{ readOnlySession ? '查看商品配置' : '管理本场商品' }} →</button>
         </article>
@@ -1009,7 +1009,7 @@ onBeforeUnmount(() => {
 
     <template v-if="stage === 'review'">
       <section class="ls-review panel">
-        <div class="panel-heading"><div><p class="eyebrow">SESSION REPORT</p><h2>场次复盘</h2></div><BarChart3 :size="24" :stroke-width="1.5" aria-hidden="true" /></div>
+        <div class="panel-heading"><div><h2>场次复盘</h2></div><BarChart3 :size="24" :stroke-width="1.5" aria-hidden="true" /></div>
         <p class="ls-review-intro">{{ currentSession ? `「${currentSession.name}」的场次概览。` : '保存本场配置后，可在这里查看场次概览。' }}观看、互动与转化数据尚未接入，暂不能生成运营报告。</p>
         <div class="ls-review-grid"><article v-for="metric in ['观看人数', '弹幕互动', '新增关注', '成交转化']" :key="metric" class="ls-review-card"><p class="eyebrow">{{ metric }}</p><strong>—</strong><small>平台数据未接入</small></article></div>
         <div v-if="currentSession" class="ls-review-details">
@@ -1026,7 +1026,7 @@ onBeforeUnmount(() => {
               <form v-if="gapDraft?.key === row.text" class="ls-gap-form" @submit.prevent="saveGap">
                 <label><span>问题</span><input v-model="gapDraft.question" maxlength="1000"></label>
                 <label><span>回答</span><textarea v-model="gapDraft.answer" rows="2" maxlength="4000" placeholder="像对顾客说话那样写，系统会照这个意思用口语回答" /></label>
-                <label><span>属于哪件商品</span><select v-model="gapDraft.productId"><option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option></select></label>
+                <label><span>属于哪件商品</span><AppSelect v-model="gapDraft.productId"><option v-for="product in productQueue" :key="product.id" :value="product.id">{{ product.name }}</option></AppSelect></label>
                 <p v-if="gapError" class="ls-gap-error" role="alert">{{ gapError }}</p>
                 <div class="ls-gap-actions"><button type="submit" class="primary-button compact" :disabled="gapBusy">{{ gapBusy ? '保存中…' : '保存为商品问答' }}</button><button type="button" class="ls-ghost compact" :disabled="gapBusy" @click="gapDraft = null">取消</button></div>
               </form>
@@ -1092,7 +1092,7 @@ onBeforeUnmount(() => {
 .ls-stage-nav button { display: flex; align-items: center; gap: 8px; padding: 0 2px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-muted); font: 500 14px var(--font-sans); cursor: pointer; white-space: nowrap; }
 .ls-stage-nav button.active { color: var(--color-primary); border-bottom-color: var(--cinnabar); }
 .ls-client-placeholder { display: grid; place-content: center; flex: 0 0 80px; height: 80px; border: 1px dashed var(--line-strong); border-radius: 10px; text-align: center; color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
-.ls-qa-destination select { min-width: 0; max-width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px 10px; color: var(--ink); background: var(--night-panel); }
+.ls-qa-destination :deep(.app-select-button) { min-width: 0; max-width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px 10px; color: var(--ink); background: var(--night-panel); }
 .ls-connection-note { margin: 0 0 18px; font-size: 12px; line-height: 1.8; color: var(--ink-muted); }
 .ls-qa-destination { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--ink-muted); }
 .ls-qa-destination label { display: flex; align-items: center; gap: 8px; }
@@ -1128,7 +1128,7 @@ onBeforeUnmount(() => {
 .ls-gap-row small { flex: none; color: var(--ink-muted); font-size: 12px; }
 .ls-gap-form { display: grid; gap: 10px; margin-top: 12px; }
 .ls-gap-form label { display: grid; gap: 5px; font-size: 12px; color: var(--ink-muted); }
-.ls-gap-form input, .ls-gap-form textarea, .ls-gap-form select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--ink); font: 13px var(--font-sans); }
+.ls-gap-form input, .ls-gap-form textarea, .ls-gap-form :deep(.app-select-button) { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--ink); font: 13px var(--font-sans); }
 .ls-gap-actions { display: flex; gap: 10px; }
 .ls-gap-error { margin: 0; color: var(--red); font-size: 12px; }
 .ls-gap-notice { margin: 12px 0 0; color: var(--green); font-size: 12px; }

@@ -102,7 +102,7 @@ function startInformation() {
     </header>
 
     <section class="business-records" aria-labelledby="my-publications-title">
-      <div class="business-records-heading"><div><span>MY PUBLICATIONS</span><h2 id="my-publications-title">我的发布记录</h2></div><button type="button" class="business-record-refresh" :disabled="publicationsLoading" aria-label="刷新发布记录" @click="loadPublications"><RefreshCw :size="15" /></button></div>
+      <div class="business-records-heading"><div><h2 id="my-publications-title">我的发布记录</h2></div><button type="button" class="business-record-refresh" :disabled="publicationsLoading" aria-label="刷新发布记录" @click="loadPublications"><RefreshCw :size="15" /></button></div>
       <p v-if="publicationsError" class="business-message-error" role="alert">{{ publicationsError }}</p>
       <p v-else-if="publicationsLoading && !publications.length" class="business-record-empty" role="status">正在读取发布记录…</p>
       <p v-else-if="!publications.length" class="business-record-empty">提交的信息与审核进度会显示在这里。</p>

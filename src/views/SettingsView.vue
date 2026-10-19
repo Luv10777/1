@@ -290,7 +290,6 @@ async function savePassword() {
 <template>
   <div class="settings-page">
     <header class="settings-header">
-      <p class="eyebrow">SYSTEM / SETTINGS</p>
       <h1>系统设置</h1>
       <p class="header-desc">查看和修改你自己的账号资料、登录密码和实名认证。只影响当前登录的这个账号。</p>
     </header>

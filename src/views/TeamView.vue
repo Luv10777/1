@@ -83,7 +83,6 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
   <div class="team-page">
     <header class="team-header">
       <div>
-        <p class="eyebrow">TEAM / 01</p>
         <h1>员工管理</h1>
         <p class="header-desc">添加店员并分配门店。店员用登记的手机号和验证码登录，只能进入分配给他的门店。</p>
       </div>

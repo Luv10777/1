@@ -47,7 +47,6 @@ async function closeStore(store) {
   <div class="stores-page">
     <header class="stores-header">
       <div>
-        <p class="eyebrow">ASSET CENTER / STORES</p>
         <h1>门店库</h1>
         <p class="header-desc">{{ auth.isOwner ? '本商户的全部门店。商品、知识库和直播都归属于具体的门店。' : '分配给你的门店。需要进入其他门店，请联系管理员。' }}</p>
       </div>

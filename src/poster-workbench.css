@@ -22,10 +22,10 @@
   letter-spacing: .005em;
 }
 .poster-workbench * { box-sizing: border-box; }
-.poster-workbench button, .poster-workbench input, .poster-workbench textarea, .poster-workbench select { font-family: var(--poster-ui-font); }
+.poster-workbench button, .poster-workbench input, .poster-workbench textarea, .poster-workbench :is(select, .app-select-button) { font-family: var(--poster-ui-font); }
 .poster-workbench button { cursor: pointer; font: inherit; }
 .poster-workbench button:disabled { opacity: .48; cursor: not-allowed; }
-.poster-workbench :is(button, a, textarea, input, select):focus-visible { outline: 2px solid var(--poster-red); outline-offset: 2px; }
+.poster-workbench :is(button, a, textarea, input, :is(select, .app-select-button)):focus-visible { outline: 2px solid var(--poster-red); outline-offset: 2px; }
 .poster-control-panel { container-type: inline-size; position: relative; display: flex; flex: 0 0 clamp(320px, 26vw, 380px); flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; border: 0; border-right: 1px solid var(--poster-line); background: #fff; }
 .poster-control-head { flex: 0 0 auto; padding: 24px 24px 16px; }
 .poster-control-head h1 { margin: 0 0 8px; color: var(--poster-ink); font: 600 26px/1.4 var(--font-serif); }
@@ -67,7 +67,7 @@
 .poster-inline-references { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 54px; padding: 7px 10px 10px; }
 .poster-reference-chip { position: relative; display: flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--poster-line); border-radius: 9px; background: #fff; }
 .poster-reference-chip > img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
-.poster-reference-chip select { max-width: 50px; padding: 2px 0; border: 0; background: transparent; color: var(--poster-muted); font-size: 12px; }
+.poster-reference-chip :is(select, .app-select-button) { max-width: 50px; padding: 2px 0; border: 0; background: transparent; color: var(--poster-muted); font-size: 12px; }
 .poster-reference-remove { position: absolute; top: -7px; right: -7px; display: grid; place-items: center; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%; background: #594F49; color: #fff; font-size: 13px; line-height: 1; }
 .poster-reference-preview { position: absolute; left: 0; bottom: calc(100% + 9px); z-index: 8; display: none; width: 150px; padding: 6px; border: 1px solid var(--poster-line); border-radius: 10px; background: #fff; box-shadow: 0 10px 30px rgba(45,40,38,.12); }
 .poster-reference-preview img { display: block; width: 100%; max-height: 170px; border-radius: 6px; object-fit: contain; }
@@ -254,7 +254,7 @@
 .poster-workbench :is(.poster-showcase-footer, .poster-result-head, .poster-item-meta, .poster-history-copy small, .poster-history-status, .poster-inspiration-top small) { font-size: 12px; line-height: 1.5; }
 .poster-workbench :is(.poster-showcase-footer small, .poster-gallery-tabs small, .poster-item-meta span, .poster-result-placeholder small, .poster-library-card-copy small) { font-size: 12px; }
 .poster-workbench :is(.poster-inspiration-copy > span:not(.poster-inspiration-top), .poster-inspiration-copy em, .poster-history-copy strong, .poster-conversation-heading small, .poster-conversation-copy label, .poster-edit-form label, .poster-edit-form small) { font-size: 12px; line-height: 1.6; }
-.poster-workbench :is(.poster-library-head strong, .poster-library-head small, .poster-library-empty, .poster-library-count, .poster-library-card-copy strong, .poster-reference-preview span, .poster-reference-chip select) { font-size: 12px; line-height: 1.5; }
+.poster-workbench :is(.poster-library-head strong, .poster-library-head small, .poster-library-empty, .poster-library-count, .poster-library-card-copy strong, .poster-reference-preview span, .poster-reference-chip :is(select, .app-select-button)) { font-size: 12px; line-height: 1.5; }
 .poster-workbench :is(.poster-variation > strong, .poster-conversation-heading strong, .poster-history-copy strong) { font-size: 13px; font-weight: 600; }
 .poster-workbench :is(.poster-gallery-tabs button, .poster-works-link, .poster-result-head button, .poster-item-actions button, .poster-result-empty button, .poster-load-more, .poster-add-reference, .poster-recall, .poster-variation-options button, .poster-variation-submit, .poster-conversation-options label, .poster-conversation-submit, .poster-small-primary) { font-size: 12px; font-weight: 500; }
 .poster-workbench :is(.poster-conversation-copy input, .poster-conversation-copy textarea, .poster-conversation-input, .poster-edit-form input, .poster-edit-form textarea, .poster-reference-library > input) { font-size: 13px; line-height: 1.6; }

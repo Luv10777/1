@@ -401,7 +401,6 @@ export default function ReviewsWorkbench() {
               志
             </div>
             <div>
-              <p className="reviews-eyebrow">REPUTATION · 一方口碑</p>
               <h1>全渠口碑视界</h1>
               <p className="reviews-subtitle">
                 让每一条评论，都被认真听见、妥帖回应。
@@ -506,7 +505,6 @@ export default function ReviewsWorkbench() {
             <ShieldCheck size={17} />
           </div>
           <div>
-            <p className="reviews-eyebrow">AUTO-PILOT POLICY</p>
             <h2>策略总控分流</h2>
           </div>
         </div>
@@ -629,7 +627,6 @@ export default function ReviewsWorkbench() {
         <div className="feed-column">
           <div className="feed-section-head">
             <div>
-              <p className="reviews-eyebrow">REVIEW & DECISION</p>
               <h2>
                 评论流席 <span>听见烟火，也照料情绪</span>
               </h2>
@@ -982,7 +979,6 @@ export default function ReviewsWorkbench() {
           >
             <div className="drawer-head">
               <div>
-                <p className="reviews-eyebrow">GLOBAL POLICY · 托管有度</p>
                 <h2 id="policy-title">全局托管策略</h2>
                 <p>把温柔交给灵犀，把分寸留给掌柜。</p>
               </div>
@@ -1138,7 +1134,6 @@ export default function ReviewsWorkbench() {
         <section className="editor-dock" aria-label="精细编辑区">
           <div className="editor-dock-head">
             <div>
-              <p className="reviews-eyebrow">PRECISION EDITOR</p>
               <strong>精细编辑区 · {selectedReview.nickname}</strong>
             </div>
             <button aria-label="关闭精细编辑区" onClick={() => setEditor(null)}>

@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../AppSelect.vue'
 import { ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { Check, Clock3, MapPin, ShieldCheck, X } from 'lucide-vue-next'
@@ -48,7 +49,7 @@ function save() {
                 <section>
                   <h3 class="m-0 mb-4 flex items-center gap-2 text-sm font-semibold"><span class="flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600">1</span>基础信息</h3>
                   <label class="block text-xs font-medium">计划名称 <span class="text-rose-500">*</span><input v-model="form.name" required maxlength="40" placeholder="例如：周末晚市探店冲榜计划" :class="inputClass" /></label>
-                  <label class="mt-4 block text-xs font-medium"><span class="inline-flex items-center gap-1"><MapPin :size="13" />关联门店 POI</span><select v-model="form.store" :class="inputClass"><option v-for="store in stores" :key="store">{{ store }}</option></select></label>
+                  <label class="mt-4 block text-xs font-medium"><span class="inline-flex items-center gap-1"><MapPin :size="13" />关联门店 POI</span><AppSelect v-model="form.store" :class="inputClass"><option v-for="store in stores" :key="store">{{ store }}</option></AppSelect></label>
                 </section>
                 <fieldset class="m-0 border-0 p-0">
                   <legend class="mb-4 flex items-center gap-2 text-sm font-semibold"><span class="flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs text-blue-600">2</span>选择分发账号 <span class="text-xs font-normal text-slate-400">可多选 · 演示账号</span></legend>

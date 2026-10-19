@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, ArrowUpRight, ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
@@ -278,13 +279,12 @@ function useSmsInstead() {
       </header>
       <div class="access-form-area">
         <div v-if="!wechatBinding" class="access-intro">
-          <p class="access-kicker">{{ isRegister ? 'YOUR NEXT CHAPTER' : 'WELCOME BACK' }}<span /></p>
           <h1 id="access-title">{{ isRegister ? '从一方烟火开始' : '欢迎回到一方志' }}</h1>
           <p>{{ isRegister ? '一个账号，记录门店的每一天。' : '记录一方水土，讲述万家故事。' }}</p>
         </div>
         <p v-if="wechatVerifying" class="access-message" role="status"><LoaderCircle class="access-spinner" :size="18" aria-hidden="true" /> 正在确认微信登录…</p>
         <form v-else-if="wechatBinding" ref="wechatForm" class="wechat-binding" novalidate :aria-busy="wechatBusy" aria-labelledby="wechat-title" @submit.prevent="completeWechatBinding">
-          <p class="access-kicker">WECHAT VERIFIED<span /></p>
+          <p class="access-kicker">微信已验证<span /></p>
           <h2 id="wechat-title">{{ wechatPasswordRequired ? '设置登录密码' : '绑定手机号' }}</h2>
           <p>{{ wechatPasswordRequired ? `手机号 ${wechatPhone} 已验证。设置密码后，也可使用手机号和密码登录。` : `已确认微信账号「${wechatNickname}」。验证手机号后，将绑定已有账号或创建新账号。` }}</p>
           <div class="access-fields">
@@ -312,12 +312,12 @@ function useSmsInstead() {
                   <label for="login-phone">手机号</label>
                   <div class="access-input-shell" :class="{ 'has-error': errors.phone }">
                     <div class="access-country">
-                      <select v-model="form.country" aria-label="国家或地区区号" :disabled="actionBusy">
+                      <AppSelect v-model="form.country" aria-label="国家或地区区号" :disabled="actionBusy">
                         <option value="+86">+86 中国大陆</option>
                         <option value="+852" disabled>+852 中国香港（暂未开放）</option>
                         <option value="+853" disabled>+853 中国澳门（暂未开放）</option>
                         <option value="+886" disabled>+886 中国台湾（暂未开放）</option>
-                      </select>
+                      </AppSelect>
                       <span aria-hidden="true">{{ form.country }}<ChevronDown :size="13" /></span>
                     </div>
                     <input id="login-phone" v-model="form.phone" class="focus:ring-2 focus:ring-brand-primary" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="请输入手机号" :disabled="actionBusy" :aria-invalid="Boolean(errors.phone)" :aria-describedby="errors.phone ? 'phone-error' : undefined" @input="errors.phone = ''" @blur="form.phone && (errors.phone = phoneError(form.phone, form.country))" />

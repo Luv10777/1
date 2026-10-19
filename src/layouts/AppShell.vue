@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
@@ -234,9 +235,9 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
         <template v-if="stores.length > 1">
           <span class="chevron" aria-hidden="true">⌄</span>
           <!-- 透明的原生下拉盖在整块上：点哪里都能切换，键盘和读屏也照常可用。 -->
-          <select v-model="selectedStoreId" class="tenant-select" aria-label="切换门店" :disabled="storeLoading">
+          <AppSelect v-model="selectedStoreId" class="tenant-select" aria-label="切换门店" :disabled="storeLoading">
             <option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option>
-          </select>
+          </AppSelect>
         </template>
       </div>
       <nav class="primary-nav paper-nav" aria-label="主导航">
@@ -356,8 +357,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .store-context-state p { margin: 0 0 22px; font-size: 14px; color: var(--muted, #8d8478); }
 .tenant-switcher { position: relative; }
 .tenant-switcher.switchable:hover { border-color: var(--line-strong); }
-.tenant-switcher.switchable:has(.tenant-select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.tenant-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
+:deep(.tenant-select) { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
 .sidebar-footer .account-wrap { margin-top: 14px; }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }

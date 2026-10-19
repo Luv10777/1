@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { onMounted, ref, watch } from 'vue'
 import { Store, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
@@ -36,7 +37,7 @@ watch(() => auth.isAuthenticated, signedIn => {
     <MerchantFeaturedProduct />
     <header id="merchant-application" class="merchant-application-heading"><div><span class="merchant-section-index">02 / 商家入驻</span><h2>成为一方商家</h2><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></header>
     <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
-      <div class="business-records-heading"><div><span>APPLICATION STATUS</span><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
+      <div class="business-records-heading"><div><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>
       <p v-else-if="applicationsLoading && !applications.length" class="business-record-empty" role="status">正在读取申请记录…</p>
       <p v-else-if="!applications.length" class="business-record-empty">提交申请后，可在这里查看平台审核状态和意见。</p>
@@ -54,7 +55,7 @@ watch(() => auth.isAuthenticated, signedIn => {
               <div class="business-field-grid">
                 <label class="business-field"><span>商家名称<b>*</b></span><input v-model="form.merchantName" name="merchant-name" maxlength="80" required placeholder="门店或品牌的对外名称" /></label>
                 <label class="business-field"><span>主体名称<b>*</b></span><input v-model="form.companyName" name="company-name" maxlength="120" required placeholder="营业执照上的企业或个体户名称" /></label>
-                <label class="business-field"><span>经营行业<b>*</b></span><select v-model="form.industry" name="merchant-industry" required><option value="" disabled>请选择经营行业</option><option v-for="industry in industries" :key="industry" :value="industry">{{ industry }}</option></select></label>
+                <label class="business-field"><span>经营行业<b>*</b></span><AppSelect v-model="form.industry" name="merchant-industry" required><option value="" disabled>请选择经营行业</option><option v-for="industry in industries" :key="industry" :value="industry">{{ industry }}</option></AppSelect></label>
                 <label class="business-field"><span>经营地区<b>*</b></span><input v-model="form.region" name="merchant-region" maxlength="80" required placeholder="省、市、区及主要经营范围" /></label>
               </div>
               <label class="business-field"><span>统一社会信用代码<b>*</b></span><input v-model.trim="form.creditCode" name="credit-code" minlength="18" maxlength="18" required pattern="[0-9ABCDEFGHJKLMNPQRTUWXY]{18}" placeholder="填写营业执照上的 18 位代码" title="请输入 18 位统一社会信用代码" @input="form.creditCode = form.creditCode.toUpperCase()" /><small>请与营业执照上的主体名称和统一社会信用代码保持一致。</small></label>

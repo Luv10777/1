@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 const period = ref('7')
@@ -18,7 +19,7 @@ const channels = [
 </script>
 <template>
   <div class="analytics-page paper-page">
-    <header class="page-heading"><div><p class="eyebrow">经营有据 · 方志有声</p><h1>每一次被看见，都有迹可循。</h1><p class="page-intro">从内容曝光到地点引导，再到团购转化，了解门店的每一步。</p></div><label class="analytics-period">统计周期<select v-model="period"><option value="7">近 7 日</option><option value="30">近 30 日</option></select></label></header>
+    <header class="page-heading"><div><p class="eyebrow">经营有据 · 方志有声</p><h1>每一次被看见，都有迹可循。</h1><p class="page-intro">从内容曝光到地点引导，再到团购转化，了解门店的每一步。</p></div><label class="analytics-period">统计周期<AppSelect v-model="period"><option value="7">近 7 日</option><option value="30">近 30 日</option></AppSelect></label></header>
     <p class="demo-data-label">示例数据 · 平台统计接口尚未接入。POI 点击不等于实际到店；团购转化仅作估算。</p>
     <section class="metrics-grid"><article v-for="metric in measures" :key="metric.label" class="metric-card"><div class="metric-header">{{ metric.label }}</div><div class="metric-number">{{ metric.value }}</div><p class="metric-foot">{{ metric.detail }}</p></article></section>
     <div class="analytics-panels"><section class="panel"><div class="panel-heading"><div><p class="eyebrow">内容到店路径</p><h3>POI 引导趋势</h3></div><span class="chart-key">● 到店引导示例</span></div><svg class="analytics-chart" viewBox="0 0 700 280" role="img" :aria-label="`近 ${period} 日到店引导趋势示例：整体上升`"><g v-for="n in [0, 25, 50, 75, 100]" :key="n"><line x1="48" x2="652" :y1="236 - n * 2" :y2="236 - n * 2" stroke="var(--color-border-subtle)" /><text x="8" :y="240 - n * 2" fill="var(--color-text-muted)" font-size="11">{{ n }}</text></g><polyline :points="points" fill="none" stroke="var(--color-accent)" stroke-width="3" stroke-linejoin="round" /><text x="48" y="268" fill="var(--color-text-muted)" font-size="11">周期开始</text><text x="600" y="268" fill="var(--color-text-muted)" font-size="11">周期结束</text></svg></section><section class="panel conversion-note"><p class="eyebrow">不止于流量</p><h2>这不是流量，<br />这是生意。</h2><p>让每一条内容都带上门店位置和可用团购券，给顾客一个明确的到店理由。</p><RouterLink to="/publishing" class="secondary-button">去配置门店挂载 →</RouterLink></section></div>

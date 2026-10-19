@@ -106,7 +106,7 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
 
         <div class="public-store-layout">
           <section class="public-product-section" aria-labelledby="public-products-title">
-            <div class="public-section-heading"><div><p>STORE GOODS</p><h2 id="public-products-title">店铺商品</h2></div><span>{{ products.length }} 件在售</span></div>
+            <div class="public-section-heading"><div><h2 id="public-products-title">店铺商品</h2></div><span>{{ products.length }} 件在售</span></div>
             <p v-if="!products.length" class="public-inline-empty">商家尚未上架实体商品。</p>
             <div v-else class="public-product-list">
               <article v-for="product in products" :key="product.id" class="public-product">
@@ -122,7 +122,7 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
           </section>
 
           <aside class="public-checkout" aria-labelledby="checkout-title">
-            <div class="public-section-heading"><div><p>YOUR ORDER</p><h2 id="checkout-title"><ShoppingBag :size="19" />提交订单</h2></div><span>{{ cartItems.reduce((sum, item) => sum + item.quantity, 0) }} 件</span></div>
+            <div class="public-section-heading"><div><h2 id="checkout-title"><ShoppingBag :size="19" />提交订单</h2></div><span>{{ cartItems.reduce((sum, item) => sum + item.quantity, 0) }} 件</span></div>
             <div v-if="cartItems.length" class="public-cart-lines"><div v-for="item in cartItems" :key="item.id"><span>{{ item.name }} × {{ item.quantity }}</span><strong>¥{{ formatMoney(item.price * item.quantity) }}</strong></div><div class="public-cart-total"><span>合计</span><strong>¥{{ formatMoney(cartTotal) }}</strong></div></div>
             <p v-else class="public-cart-empty">选择商品后填写收货信息。</p>
             <form class="public-order-form" @submit.prevent="submitOrder">

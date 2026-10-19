@@ -49,18 +49,19 @@
 .business-section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
 .business-section-title > span { color: var(--color-accent-text); font: 12px var(--font-mono); }
 .business-section-title h2 { margin: 0; font-size: 15px; font-weight: 600; }
-.business-field { display: grid; gap: 8px; min-width: 0; margin: 0 0 20px; }
+.business-field { display: grid; align-content: start; gap: 8px; min-width: 0; margin: 0 0 20px; }
 .business-field:last-child { margin-bottom: 0; }
 .business-field > span { display: flex; align-items: center; gap: 5px; color: var(--ink); font-size: 12px; }
 .business-field b { color: var(--color-accent-text); font-size: 12px; font-weight: 400; }
 .business-field small { color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
 .business-field > span > small { margin-left: auto; font: 12px var(--font-mono); }
-.business-field input, .business-field textarea, .business-field select { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--night); color: var(--ink); font-size: 13px; line-height: 1.7; }
-.business-field input { min-height: 43px; }
+.business-field input, .business-field textarea, .business-field :is(select, .app-select-button) { width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--night); color: var(--ink); font-size: 13px; line-height: 1.7; }
+.business-field input, .business-field :is(select, .app-select-button) { min-height: 43px; }
 .business-field input::placeholder, .business-field textarea::placeholder { color: var(--ink-muted); opacity: .8; }
 .business-field textarea { resize: vertical; }
-.business-field input:focus, .business-field textarea:focus, .business-field select:focus { border-color: var(--ink-muted); outline: 2px solid color-mix(in srgb, var(--ink) 12%, transparent); outline-offset: 1px; }
-.business-field-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; }
+.business-field input:focus, .business-field textarea:focus, .business-field :is(select, .app-select-button):focus { border-color: var(--ink-muted); outline: 2px solid color-mix(in srgb, var(--ink) 12%, transparent); outline-offset: 1px; }
+.business-field-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 18px; }
+.business-field-grid > .business-field:last-child { margin-bottom: 20px; }
 .business-date-field { max-width: 300px; }
 .business-category-field { min-width: 0; padding: 0; margin: 0 0 22px; border: 0; }
 .business-category-field legend { margin-bottom: 10px; font-size: 12px; }

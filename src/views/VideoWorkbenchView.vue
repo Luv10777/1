@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
@@ -432,9 +433,9 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
           </div>
           <label class="video-ratio-select">
             <span class="video-setting-label">画面比例</span>
-            <select v-model="format" aria-label="选择画面比例">
+            <AppSelect v-model="format" aria-label="选择画面比例">
               <option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
+            </AppSelect>
           </label>
           <div class="video-setting-block">
             <div class="video-duration-label flex items-center justify-between">

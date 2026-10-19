@@ -59,7 +59,7 @@ watch(selectedStoreId, loadOrders, { immediate: true })
 
 <template>
   <section class="merchant-orders-page">
-    <header class="merchant-orders-heading"><div><p>MERCHANT COMMERCE / ORDERS</p><h1>订单管理</h1><span>{{ selectedStore }}</span></div><button type="button" class="public-button" :disabled="loading || !selectedStoreId" @click="loadOrders"><RefreshCw :size="15" />刷新</button></header>
+    <header class="merchant-orders-heading"><div><h1>订单管理</h1><span>{{ selectedStore }}</span></div><button type="button" class="public-button" :disabled="loading || !selectedStoreId" @click="loadOrders"><RefreshCw :size="15" />刷新</button></header>
     <p v-if="notice" class="merchant-order-notice" role="status">{{ notice }}</p>
     <p v-if="error" class="public-error" role="alert">{{ error }}</p>
     <p v-if="loading || storeLoading" class="merchant-orders-state" role="status">正在读取订单…</p>

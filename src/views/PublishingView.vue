@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { useRoute } from 'vue-router';
 import { usePlatformAccounts } from '../stores/platformAccounts';
@@ -716,7 +717,7 @@ onBeforeUnmount(() => {
       </aside>
     </main>
     <div class="publish-bar studio-bottom-bar">
-      <label class="studio-schedule">刊印时间<select v-model="scheduleMode" aria-label="刊印时间"><option value="now">立即发布</option><option value="later">定时发布</option></select><input v-if="scheduleMode === 'later'" v-model="scheduledAt" type="datetime-local" aria-label="定时刊印日期" /></label><button class="draft-btn" @click="runAction('草稿保存')">
+      <label class="studio-schedule">刊印时间<AppSelect v-model="scheduleMode" aria-label="刊印时间"><option value="now">立即发布</option><option value="later">定时发布</option></AppSelect><input v-if="scheduleMode === 'later'" v-model="scheduledAt" type="datetime-local" aria-label="定时刊印日期" /></label><button class="draft-btn" @click="runAction('草稿保存')">
         存为草稿
       </button><button
         class="publish-btn"
