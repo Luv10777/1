@@ -445,7 +445,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .analysis-state p, .analysis-state small { max-width: 380px; font-size: 12px; line-height: 1.8; }
 .analysis-state progress { width: min(300px, 90%); margin: 18px 0; accent-color: var(--an-cinnabar); }
 .analysis-summary { margin: 0 0 8px; font-size: 13px; line-height: 1.8; color: var(--color-primary); }
-.analysis-method { margin: 0 0 20px; font-size: 11px; line-height: 1.7; color: var(--an-muted); }
+.analysis-method { margin: 0 0 20px; font-size: 12px; line-height: 1.7; color: var(--an-muted); }
 .analysis-legacy { padding: 12px 14px; margin: 0 0 18px; border-radius: 8px; background: var(--color-bg-subtle); color: var(--color-text-muted); font-size: 12px; line-height: 1.8; }
 .recreation-tabs { display: flex; gap: 8px; margin: 0 0 12px; }
 .recreation-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); color: var(--color-text-muted); font: inherit; font-size: 12px; cursor: pointer; }
@@ -453,7 +453,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .recreation-tabs .material-symbols-outlined { font-size: 17px; }
 .recreation-plan { margin-bottom: 20px; padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; }
 .recreation-plan article { display: flex; align-items: baseline; gap: 12px; padding-top: 14px; }
-.plan-number { flex-shrink: 0; font-size: 11px; color: var(--an-cinnabar); font-variant-numeric: tabular-nums; }
+.plan-number { flex-shrink: 0; font-size: 12px; color: var(--an-cinnabar); font-variant-numeric: tabular-nums; }
 .recreation-plan h3 { margin: 0 0 5px; font-size: 13px; color: var(--color-primary); }
 .recreation-plan p { margin: 0; font-size: 12px; line-height: 1.9; color: var(--color-primary); white-space: pre-line; overflow-wrap: anywhere; }
 .readable-prompt { margin: 20px 0; padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: var(--color-bg-surface); }
@@ -466,10 +466,10 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .merchant-editor > p { margin: 12px 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.8; }
 .merchant-editor .section-caption button { border: 0; background: transparent; color: var(--an-cinnabar); font: inherit; font-size: 12px; cursor: pointer; }
 .merchant-edit-columns, .merchant-edit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.merchant-edit-columns { padding: 8px 0; color: var(--color-text-muted); font-size: 11px; }
+.merchant-edit-columns { padding: 8px 0; color: var(--color-text-muted); font-size: 12px; }
 .merchant-edit-row { padding: 16px 0; border-top: 1px solid var(--color-border-subtle); }
 .merchant-original strong, .merchant-edit-row label > span { display: block; margin-bottom: 6px; font-size: 12px; color: var(--color-primary); }
-.merchant-original small { color: var(--color-text-muted); font-size: 10px; }
+.merchant-original small { color: var(--color-text-muted); font-size: 12px; }
 .merchant-original p { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--color-primary); font-size: 12px; line-height: 1.8; }
 .merchant-edit-row textarea { width: 100%; min-height: 82px; padding: 10px; border: 1px solid var(--color-border-subtle); border-radius: 6px; background: var(--color-bg-surface); color: var(--color-primary); font: inherit; font-size: 12px; line-height: 1.8; resize: vertical; }
 .merchant-edit-row textarea:focus-visible { outline: 2px solid var(--an-cinnabar); outline-offset: 2px; }
@@ -484,24 +484,24 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .shot-guide-item { padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; }
 .shot-guide-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .shot-guide-head h3 { margin: 0; color: var(--color-primary); font-size: 14px; }
-.shot-guide-head button { padding: 4px 0; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.shot-guide-head button { padding: 4px 0; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 12px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .shot-observation { margin: 14px 0; color: var(--color-primary); font-size: 13px; line-height: 1.9; }
-.shot-observation strong { display: block; margin-bottom: 4px; font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
+.shot-observation strong { display: block; margin-bottom: 4px; font-size: 12px; color: var(--color-text-muted); font-weight: 500; }
 .shot-guide dl { margin: 0; }
 .shot-guide dl > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--color-border-subtle); font-size: 12px; line-height: 1.9; }
 .shot-guide dt { color: var(--color-text-muted); }
 .shot-guide dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; color: var(--color-primary); }
-.shot-mood { margin: 10px 0 0; font-size: 11px; line-height: 1.8; color: var(--color-text-muted); }
+.shot-mood { margin: 10px 0 0; font-size: 12px; line-height: 1.8; color: var(--color-text-muted); }
 .first-frame-prompt { margin-top: 14px; }
-.report-export-hint { margin: 20px 0 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.8; }
+.report-export-hint { margin: 20px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.8; }
 @media (max-width: 720px) { .shot-guide dl > div { grid-template-columns: 1fr; gap: 2px; } .shot-guide-head { flex-wrap: wrap; gap: 4px; } .recreation-tabs button { flex: 1; } }
 .audio-report { margin-top: 20px; padding: 16px; border: 1px solid var(--color-border-subtle); border-radius: 12px; }
 .audio-transcript-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 8px; font-size: 12px; }
-.audio-transcript-head button, .audio-segment button { padding: 4px 6px; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 11px; cursor: pointer; }
+.audio-transcript-head button, .audio-segment button { padding: 4px 6px; border: 0; background: transparent; color: var(--an-cinnabar); font-size: 12px; cursor: pointer; }
 .audio-segment { display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border-subtle); }
 .audio-segment button { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .audio-segment p { margin: 0; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
-.audio-empty, .audio-limitations { font-size: 11px; line-height: 1.7; color: var(--an-muted); }
+.audio-empty, .audio-limitations { font-size: 12px; line-height: 1.7; color: var(--an-muted); }
 .audio-effects-label { display: block; margin-top: 16px; font-size: 12px; }
 @media (max-width: 720px) { .audio-segment { flex-direction: column; gap: 2px; } }
 .analysis-limitations { margin-top: 18px; padding: 14px; border-radius: 10px; background: var(--color-bg-subtle); font-size: 12px; line-height: 1.7; color: var(--color-primary); }
@@ -526,11 +526,11 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
   .live-analysis .need-field { position: relative; margin-top: 8px; }
   .live-analysis .need-field label { margin-bottom: 4px; }
   .live-analysis .need-field > div { position: absolute; top: 0; right: 0; margin-top: 0; }
-  .live-analysis .need-field button { padding: 2px 5px; font-size: 10px; line-height: 1.5; }
+  .live-analysis .need-field button { padding: 2px 5px; font-size: 12px; line-height: 1.5; }
   .live-analysis .need-field textarea { display: block; height: 56px; min-height: 56px; resize: none; }
   .live-analysis .preview-panel { flex: 0 0 auto; }
   .live-analysis .analyze-trigger, .live-analysis .privacy-note, .live-analysis .analysis-error { flex-shrink: 0; }
-  .live-analysis .privacy-note { font-size: 10px; line-height: 1.5; }
+  .live-analysis .privacy-note { font-size: 12px; line-height: 1.5; }
 }
 @media (min-width: 721px) and (max-height: 740px) {
   .live-analysis .premium-panel { padding: 10px; }

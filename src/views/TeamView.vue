@@ -167,7 +167,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
 :global(.page-scroll.team-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
 .team-page { max-width: 1200px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
 .team-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 28px; }
-.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .team-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
 .header-desc { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.75; }
 .primary-button, .ghost-button, .link-button { font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -183,14 +183,14 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
 
 .member-list { border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); overflow: hidden; }
 .member-row { display: grid; grid-template-columns: minmax(180px, 1.5fr) 70px minmax(140px, 1.6fr) 70px 100px 170px; align-items: center; gap: 14px; padding: 15px 20px; border-top: 1px solid var(--color-border-subtle); font-size: 13px; }
-.member-head { border-top: 0; padding-block: 11px; color: var(--color-text-muted); font-size: 11px; font-weight: 700; background: var(--color-bg-subtle); }
+.member-head { border-top: 0; padding-block: 11px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; background: var(--color-bg-subtle); }
 .member-row.disabled .member-who, .member-row.disabled .member-scope { opacity: .55; }
 .member-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .member-avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 8px; color: var(--color-on-accent); background: var(--color-accent); font-weight: 700; }
 .member-who strong { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.member-who em { padding: 2px 6px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 10px; font-style: normal; font-weight: 600; }
+.member-who em { padding: 2px 6px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 12px; font-style: normal; font-weight: 600; }
 .member-who small { display: block; margin-top: 2px; color: var(--color-text-muted); font-size: 12px; }
-.role-badge { justify-self: start; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 11px; font-weight: 700; }
+.role-badge { justify-self: start; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 12px; font-weight: 700; }
 .role-badge.owner { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); }
 .member-scope { line-height: 1.6; }
 .member-scope.empty { color: var(--color-text-muted); }
@@ -214,7 +214,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
 .field input:not([type='checkbox']) { width: 100%; height: 40px; box-sizing: border-box; padding: 10px 11px; border: 1px solid var(--color-border-subtle); border-radius: 4px; outline: 0; color: var(--color-primary); background: var(--color-bg-surface); font: 500 13px/1.5 inherit; }
 .field input:not([type='checkbox']):focus { border-color: var(--color-accent); }
 .field input:disabled { color: var(--color-text-muted); background: var(--color-bg-subtle); }
-.field small { color: var(--color-text-muted); font-size: 11px; line-height: 1.6; }
+.field small { color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 .store-field legend { margin-bottom: 8px; }
 .store-option { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--color-border-subtle); border-radius: 4px; font-size: 13px; cursor: pointer; }
 .store-option input { margin: 0; }

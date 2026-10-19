@@ -15,37 +15,37 @@
 .information-stream { min-width: 0; }
 .information-stream-heading { display: flex; align-items: center; gap: 12px; min-height: 56px; border-bottom: 1px solid var(--color-border-subtle); }
 .information-stream-heading h2 { margin: 0; font: 600 17px/1.5 var(--font-serif); }
-.information-stream-heading > span { color: var(--color-text-muted); font-size: 11px; }
-.information-clear { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin-left: auto; border: 0; background: none; color: var(--color-accent-text); font-size: 11px; cursor: pointer; }
+.information-stream-heading > span { color: var(--color-text-muted); font-size: 12px; }
+.information-clear { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin-left: auto; border: 0; background: none; color: var(--color-accent-text); font-size: 12px; cursor: pointer; }
 .information-feed-entry { min-width: 0; }
 .public-information-page .public-information-item { grid-template-columns: 82px minmax(0, 1fr) 20px; gap: 16px; padding: 26px 0; }
-.public-information-page .public-information-category, .public-information-detail-page .public-information-category { font-size: 11px; white-space: nowrap; }
+.public-information-page .public-information-category, .public-information-detail-page .public-information-category { font-size: 12px; white-space: nowrap; }
 .public-information-page .public-information-item h3 { margin: 0 0 9px; font: 600 18px/1.65 var(--font-serif); overflow-wrap: anywhere; }
 .public-information-page .public-information-item:hover h3 { color: var(--color-accent-text); }
 .public-information-page .public-information-item p { font-size: 13px; line-height: 1.9; overflow-wrap: anywhere; }
-.public-information-page .public-information-meta { gap: 8px 14px; margin-top: 16px; font-size: 11px; line-height: 1.7; }
+.public-information-page .public-information-meta { gap: 8px 14px; margin-top: 16px; font-size: 12px; line-height: 1.7; }
 .public-information-page .public-information-meta strong, .public-information-page .public-information-meta span { overflow-wrap: anywhere; }
 .information-sidebar { border-left: 1px solid var(--color-border-subtle); padding-left: 26px; margin-top: 14px; }
 .information-service-note { padding: 18px 0 28px; }
-.information-note-index { color: var(--color-accent-text); font-size: 11px; letter-spacing: .12em; }
+.information-note-index { color: var(--color-accent-text); font-size: 12px; letter-spacing: .12em; }
 .information-service-note h2 { margin: 18px 0 14px; font: 600 23px/1.65 var(--font-serif); }
 .information-service-note p, .information-reading-note { color: var(--color-text-muted); font-size: 12px; line-height: 1.95; }
 .information-service-note .public-text-link { margin-top: 12px; font-size: 12px; min-height: 36px; }
 .information-service-link { display: flex; align-items: center; gap: 12px; padding: 22px 0; border-block: 1px solid var(--color-border-subtle); color: var(--color-info); }
 .information-service-link div { display: grid; gap: 6px; flex: 1; }
 .information-service-link strong { font-size: 13px; font-weight: 500; }
-.information-service-link span { color: var(--color-text-muted); font-size: 11px; line-height: 1.8; }
-.information-reading-note { margin: 20px 0; font-size: 11px; }
+.information-service-link span { color: var(--color-text-muted); font-size: 12px; line-height: 1.8; }
+.information-reading-note { margin: 20px 0; font-size: 12px; }
 .public-information-detail-page .public-information-detail-content { width: min(816px, 100%); }
 .information-back { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; margin-bottom: 30px; color: var(--color-text-muted); font-size: 12px; }
 .public-information-detail-page .public-information-detail h1 { margin-top: 22px; font-size: clamp(25px, 3vw, 34px); line-height: 1.6; }
 .public-information-detail-page .public-information-detail-summary { margin-top: 18px; font-size: 14px; line-height: 1.9; }
 .public-information-detail-page .public-information-publisher { gap: 12px; padding-block: 22px; margin-top: 26px; }
 .public-information-detail-page .public-information-publisher strong { font-size: 13px; }
-.public-information-detail-page .public-information-publisher span { font-size: 11px; }
+.public-information-detail-page .public-information-publisher span { font-size: 12px; }
 .public-information-detail-page .information-published-time { margin-left: auto; text-align: right; flex-shrink: 0; }
 .public-information-detail-page .information-published-time span { justify-content: flex-end; }
-.information-published-time time { color: var(--color-text-muted); font-size: 11px; line-height: 1.8; }
+.information-published-time time { color: var(--color-text-muted); font-size: 12px; line-height: 1.8; }
 .public-information-detail-page .public-information-contact { padding-block: 22px; gap: 16px; }
 .public-information-detail-page .public-information-contact > div { font-size: 12px; line-height: 1.8; }
 .information-article-footer { padding-top: 22px; }

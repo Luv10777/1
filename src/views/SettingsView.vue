@@ -519,7 +519,7 @@ async function savePassword() {
 :global(.page-scroll.settings-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
 .settings-page { max-width: 760px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
 .settings-header { margin-bottom: 28px; }
-.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .settings-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
 .header-desc { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.75; }
 .primary-button, .ghost-button, .link-button { font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -536,7 +536,7 @@ async function savePassword() {
 .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
 .card-header h2 { margin: 0 0 4px; font-family: var(--font-serif); font-size: 20px; font-weight: 750; }
 .card-header p { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
-.role-badge, .state-badge { flex: none; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 11px; font-weight: 700; }
+.role-badge, .state-badge { flex: none; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 12px; font-weight: 700; }
 .role-badge.owner { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); }
 .state-badge.on { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
 
@@ -554,7 +554,7 @@ async function savePassword() {
 .field input { width: 100%; height: 40px; box-sizing: border-box; padding: 10px 11px; border: 1px solid var(--color-border-subtle); border-radius: 4px; outline: 0; color: var(--color-primary); background: var(--color-bg-surface); font: 500 13px/1.5 inherit; }
 .field input:focus { border-color: var(--color-accent); }
 .field input:disabled { color: var(--color-text-muted); background: var(--color-bg-subtle); }
-.field small { color: var(--color-text-muted); font-size: 11px; line-height: 1.6; }
+.field small { color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 .code-row { display: flex; gap: 10px; }
 .code-row input { flex: 1; }
 .inline-message { margin: 10px 0 0; color: var(--color-success); font-size: 12px; line-height: 1.7; }
@@ -562,9 +562,9 @@ async function savePassword() {
 .settings-card > .inline-message + .ghost-button { margin-top: 14px; }
 
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 20px 0 0; padding: 16px 0 0; border-top: 1px solid var(--color-border-subtle); }
-.facts dt { color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+.facts dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .facts dd { margin: 4px 0 0; font-size: 14px; word-break: break-all; }
-.card-foot { margin: 16px 0 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.6; }
+.card-foot { margin: 16px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 
 .password-form { max-width: 420px; }
 .proof-switch { margin: -6px 0 16px; font-size: 12px; }
@@ -581,7 +581,7 @@ async function savePassword() {
 .consent { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; cursor: pointer; }
 .consent input { margin-top: 4px; accent-color: var(--color-accent); }
 .consent a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 2px; }
-.hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
+.hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
 #identity { scroll-margin-top: 20px; }
 
 .danger-card { border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border-subtle)); }

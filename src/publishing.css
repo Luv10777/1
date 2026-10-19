@@ -368,7 +368,7 @@
 }
 :where(.publishing-page) .account-card small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--pub-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -378,7 +378,7 @@
 }
 :where(.publishing-page) .account-info em {
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--pub-success);
   display: flex;
   align-items: center;
@@ -525,7 +525,7 @@
 }
 :where(.publishing-page) .counter {
   font:
-    10px "IBM Plex Mono",
+    12px "IBM Plex Mono",
     monospace;
   color: var(--pub-muted);
   font-size: 12px;
@@ -542,7 +542,7 @@
   margin: 18px 0 8px;
 }
 :where(.publishing-page) .field-label small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--pub-subtle);
   margin-left: 6px;
 }
@@ -599,7 +599,7 @@
   font-weight: 600;
 }
 :where(.publishing-page) .ai-toolbar-head small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--pub-muted);
 }
 :where(.publishing-page) .ai-actions {
@@ -648,7 +648,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
   color: var(--pub-commerce);
 }
@@ -716,7 +716,7 @@
   font-weight: 600;
 }
 :where(.publishing-page) .bundle-card small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--pub-muted);
 }
 :where(.publishing-page) .bundle-card strong {
@@ -911,7 +911,7 @@
   position: absolute;
   top: 67px;
   left: 25px;
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 4px;
   color: #e5d6bd;
 }
@@ -981,7 +981,7 @@
   max-width: 100%;
   padding: 4px 6px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 4px;
   background: #312719d9;
   color: #fcd34d;
@@ -1315,7 +1315,7 @@
 }
 :where(.publishing-page) .pub-error {
   color: var(--pub-error);
-  font-size: 11px;
+  font-size: 12px;
   margin: 10px 0;
 }
 :where(.publishing-page) .phone-copy.expanded p {
@@ -1361,7 +1361,7 @@
   border-radius: 8px;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px;
   transition:
     border-color 0.2s,
@@ -1612,7 +1612,7 @@
   padding: 3px 5px;
   background: #0009;
   border-radius: 4px;
-  font-size: 9px;
+  font-size: 12px;
   color: #fff;
 }
 :where(.publishing-page) .phone {
@@ -1733,7 +1733,7 @@
   :where(.publishing-page) .preview-sticky > .pub-error {
     grid-row: 3;
     margin: 0;
-    font-size: 10px;
+    font-size: 12px;
   }
   :where(.publishing-page) .publish-bar {
     grid-row: 4;
@@ -1820,7 +1820,7 @@
   bottom: -3px;
   width: 20px;
   height: 20px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   border: 2px solid var(--pub-avatar-ring);
   border-radius: 50%;
@@ -1851,7 +1851,7 @@
 }
 :where(.publishing-page) .pub-fan-count > span {
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--pub-muted);
 }
 :where(.publishing-page) .check-box {
@@ -2023,7 +2023,7 @@
     font-size: 13px;
   }
   :where(.publishing-page) .platform-tab small {
-    font-size: 11px;
+    font-size: 12px;
     white-space: normal;
   }
   :where(.publishing-page) .asset-actions {
@@ -2063,7 +2063,7 @@
     width: 108px;
   }
   :where(.publishing-page) .spec-row span {
-    font-size: 11px;
+    font-size: 12px;
     padding: 4px 6px;
   }
   :where(.publishing-page) .publish-bar {
@@ -2092,20 +2092,20 @@
 @media (max-width:380px){:where(.publishing-page) .platform-tab{flex-direction:column;justify-content:center;gap:6px;min-height:82px}:where(.publishing-page) .pub-platform-icon{width:28px;height:28px}}
 /* Video-first editing: chrome stays outside the unobstructed media canvas. */
 :where(.publishing-page) .pub-video-screen { display: flex; flex-direction: column; background: #0b0909; color: #f4f4f5; }
-:where(.publishing-page) .pub-device-status { display: flex; justify-content: space-between; flex-shrink: 0; padding: 10px 19px 8px; height: 38px; font: 600 11px/20px Inter, sans-serif; }
+:where(.publishing-page) .pub-device-status { display: flex; justify-content: space-between; flex-shrink: 0; padding: 10px 19px 8px; height: 38px; font: 600 12px/20px Inter, sans-serif; }
 :where(.publishing-page) .pub-video-canvas { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #000; }
 :where(.publishing-page) .pub-preview-video { display: block; width: 100%; height: 100%; object-fit: contain; }
 :where(.publishing-page) .pub-video-empty { height: 100%; padding: 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; text-align: center; color: #a1a1aa; }
 :where(.publishing-page) .pub-video-empty strong { color: #f4f4f5; font-size: 15px; line-height: 1.5; }
 :where(.publishing-page) .pub-video-empty p { margin: 0; font-size: 12px; line-height: 1.8; }
 :where(.publishing-page) .pub-video-empty button { display: inline-flex; align-items: center; gap: 8px; background: var(--color-accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 13px; }
-:where(.publishing-page) .pub-device-toolbar { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 8px; padding: 10px 14px 18px; background: #18181b; font-size: 11px; color: #a1a1aa; }
-:where(.publishing-page) .pub-device-toolbar button { border: 1px solid #3f3f46; border-radius: 6px; background: #27272a; color: #f4f4f5; font-size: 11px; padding: 6px 8px; }
+:where(.publishing-page) .pub-device-toolbar { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 8px; padding: 10px 14px 18px; background: #18181b; font-size: 12px; color: #a1a1aa; }
+:where(.publishing-page) .pub-device-toolbar button { border: 1px solid #3f3f46; border-radius: 6px; background: #27272a; color: #f4f4f5; font-size: 12px; padding: 6px 8px; }
 :where(.publishing-page) .pub-device-toolbar button[aria-pressed="true"] { color:var(--color-accent-text); border-color: var(--color-accent); }
 :where(.publishing-page) .pub-platform-overlay { pointer-events: none; position: absolute; bottom: 62px; left: 0; right: 0; display: flex; align-items: end; gap: 12px; padding: 18px 12px 10px; color: #fff; background: linear-gradient(transparent, #000a); text-shadow: 0 1px 3px #000; }
 :where(.publishing-page) .pub-overlay-copy { min-width: 0; flex: 1; font-size: 12px; line-height: 1.6; }
 :where(.publishing-page) .pub-overlay-copy b, :where(.publishing-page) .pub-overlay-copy p { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 3px; }
-:where(.publishing-page) .pub-overlay-copy span { display: flex; align-items: center; gap: 3px; color: #fcd34d; font-size: 11px; }
+:where(.publishing-page) .pub-overlay-copy span { display: flex; align-items: center; gap: 3px; color: #fcd34d; font-size: 12px; }
 :where(.publishing-page) .pub-overlay-actions { display: flex; flex-direction: column; gap: 16px; }
 :where(.publishing-page) .asset-actions .pub-upload-primary { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
 :where(.publishing-page) .asset-actions .pub-upload-primary:hover { background: #ae5d47; }

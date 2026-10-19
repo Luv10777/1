@@ -99,7 +99,7 @@ onBeforeUnmount(() => { mounted = false; relay?.stop(); relay = null })
 .live-danmaku-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .live-danmaku-head > div { min-width: 0; }
 .live-danmaku-head strong { font-size: 13px; font-weight: 600; }
-.live-danmaku-head strong span { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 11px; font-weight: 400; }
+.live-danmaku-head strong span { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 12px; font-weight: 400; }
 .live-danmaku-head p { margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
 .live-danmaku-head button { flex-shrink: 0; }
 .live-danmaku label { display: flex; flex-direction: column; gap: 8px; color: var(--ink); font-size: 12px; }
