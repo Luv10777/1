@@ -7,7 +7,7 @@ public final class BillingTestFixtures {
     public static void activateMembership(org.springframework.jdbc.core.JdbcTemplate owner, Long... tenants) {
         String plan = """
             {"id":1,"code":"TEST","name":"Test member","description":"test-only",
-             "priceMinor":100,"durationDays":1,"giftCredits":0,"imageEnabled":true,"videoEnabled":true}
+             "priceMinor":100,"durationDays":1,"giftCredits":0,"imageEnabled":true,"videoEnabled":true,"liveEnabled":true}
             """;
         for (Long tenant : tenants) owner.update("INSERT INTO billing_accounts(tenant_id,plan_snapshot,member_until) "
                 + "VALUES (?,?::jsonb,now()+interval '1 day')", tenant, plan);

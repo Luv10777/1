@@ -335,7 +335,7 @@ class FoundationIntegrationTest {
         billingConfig.setPaymentMethod("MANUAL");
         billingConfig.setPaymentRecipient("test receipt fixture");
         billingConfig.setPaymentAccount("test-only");
-        var plan=billingService.createPlan(new BillingDtos.NewPlan("TEST", "Test member", "test-only",100,30,1000000,true,true,false,true));
+        var plan=billingService.createPlan(new BillingDtos.NewPlan("TEST", "Test member", "test-only",100,30,1000000,true,true,true,true));
         for(Long tenant:List.of(tenantA,tenantB)) TenantContext.runAs(tenant,()->{
             var order=billingService.subscribe(new BillingDtos.Subscribe("test-member-"+tenant,plan.id()));
             billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(100,"test-receipt-"+tenant),-1L);
