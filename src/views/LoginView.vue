@@ -263,7 +263,7 @@ function useSmsInstead() {
     <section class="access-entry" aria-labelledby="access-title">
       <header class="access-header">
         <a class="access-brand" href="/login" aria-label="一方志首页">
-          <span class="access-mark" aria-hidden="true">志</span>
+          <span class="access-mark" aria-hidden="true" />
           <span><strong>一方志</strong><small>为每一方商家立传</small></span>
         </a>
         <div class="access-header-actions">
@@ -375,10 +375,13 @@ function useSmsInstead() {
       </div>
       <footer class="access-footer"><ShieldCheck :size="14" aria-hidden="true" /><span>一方志 · 为每一方商家立传</span></footer>
     </section>
-    <aside class="access-board" aria-label="记录一方水土，讲述万家故事">
-      <div class="access-board-top"><span>一方志 —— 为每一方商家立传</span><span>商家故事 / 壹</span></div>
-      <div class="access-story"><div class="access-poem"><p>一方水土，一方志。</p><p>为每一方商家立传。</p></div><figure><img src="/images/publishing/restaurant.jpg" alt="暖灯下的街边小店，桌椅静候来客" /><figcaption>市井日常 · 每一间小店，都值得被看见</figcaption></figure></div>
-      <div class="access-board-bottom"><span>记录一方水土，讲述万家故事</span><span class="story-seal">志</span></div>
+    <aside class="access-board" aria-label="一方水土，一方志">
+      <div class="access-board-center">
+        <span class="access-board-logo" role="img" aria-label="一方志 YIFANGZHI" />
+        <span class="access-board-rule" aria-hidden="true" />
+        <p class="access-board-line">一方水土，一方志。</p>
+      </div>
+      <p class="access-board-foot">记录一方水土，讲述万家故事</p>
     </aside>
     <dialog ref="dialog" class="access-dialog" aria-labelledby="access-dialog-title" @click="event => event.target === dialog && dialog.close()">
       <button class="access-dialog-close" type="button" aria-label="关闭" @click="dialog.close()"><X :size="20" /></button>

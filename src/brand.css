@@ -131,7 +131,7 @@
 .paper-app :is(.workflow-card,.video-entry-card):hover { border-color: var(--color-brand-muted); transform: translateY(-2px); }
 .paper-app :is(.workflow-card-cyan,.workflow-card-cinnabar) { background: var(--night-panel); }
 .paper-app :is(.workflow-card::before,.video-entry-orb) { display: none; }
-.paper-app :is(.workflow-tags span,.video-entry-icon,.video-create-status,.image-heading-meta) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night); }
+.paper-app :is(.workflow-tags span,.video-entry-icon) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night); }
 .paper-app :is(.workflow-card-cyan .workflow-arrow,.video-entry-card-cyan .video-entry-cta,.video-entry-icon-cyan) { color: var(--color-accent-text); }
 .paper-app :is(.floating-prompt-bar,.prompt-popover,.history-dropdown,.upload-modal) { border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--night-panel); box-shadow: var(--shadow-paper-elevated); backdrop-filter: none; }
 .paper-app .floating-prompt-bar::after { display: none; }

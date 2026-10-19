@@ -19,7 +19,6 @@ const isLanding = computed(() => !isPoster.value && !isProductSet.value)
         <h1>图片创作</h1>
         <p class="page-intro">从创意方向，到可交付的每一张图。</p>
       </div>
-      <div class="image-heading-meta"><span class="status-pulse" /> <span>2 个创作入口</span></div>
     </div>
 
     <section v-if="isLanding" class="workflow-grid">
