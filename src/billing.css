@@ -1,4 +1,4 @@
-.yanhuo-page { max-width: 1180px; margin: 0 auto; color: var(--ink); font-family: var(--font-sans); letter-spacing: 0; }
+.yanhuo-page { position: relative; max-width: 1180px; margin: 0 auto; color: var(--ink); font-family: var(--font-sans); letter-spacing: 0; }
 .generation-billing-note { font-size: 11px; line-height: 1.8; color: var(--ink-muted); margin: 8px 0; }
 .generation-billing-link { display: inline-flex; align-items: center; border: 0; padding: 5px 0; background: none; color: var(--color-accent-text); font-size: 12px; line-height: 1.7; }
 .video-price-dialog > .yanhuo-primary { width: 100%; }
