@@ -1,5 +1,6 @@
 package com.wuyao.growth.live;
 
+import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
@@ -33,8 +34,10 @@ class LiveSessionServiceTest {
     private final KnowledgeService knowledge = mock(KnowledgeService.class);
     private final StoreAccessService stores = mock(StoreAccessService.class);
     private final VoiceService voices = mock(VoiceService.class);
+    private final BillingService billingService = mock(BillingService.class);
+    private final LiveBilling billing = new LiveBilling(billingService);
     private final LiveSessionService service = new LiveSessionService(
-            sessions, selected, qas, snapshots, products, knowledge, stores, voices);
+            sessions, selected, qas, snapshots, products, knowledge, stores, voices, billing);
     private LiveSession session;
 
     @BeforeEach
@@ -472,6 +475,108 @@ class LiveSessionServiceTest {
         qa.setTargetId(targetId);
         qa.setPersistMode(persistMode);
         return qa;
+    }
+
+    @Test
+    void startReservesTheFirstLiveHourAndAPlanWithoutLiveLeavesTheDraft() {
+        selectProduct(30L);
+        when(knowledge.context(2L, List.of(30L), 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
+                2L, 1, List.of(), Instant.now()));
+        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(35L), anyString()))
+                .thenThrow(BizException.of(ErrorCode.ENTITLEMENT_REQUIRED, "当前套餐不含直播功能"))
+                .thenReturn("reservation-1");
+
+        assertThatThrownBy(() -> service.start(20L, 4L)).isInstanceOf(BizException.class);
+        assertThat(session.getStatus()).isEqualTo("DRAFT");
+
+        assertThat(service.start(20L, 4L).status()).isEqualTo("LIVE");
+        assertThat(session.getBillingReservationId()).isEqualTo("reservation-1");
+        assertThat(session.getBilledHours()).isEqualTo(1);
+        assertThat(session.getLiveSegmentStartedAt()).isNotNull();
+        var order = inOrder(billingService, sessions);
+        order.verify(billingService).lockForGeneration();
+        order.verify(sessions).findForUpdate(20L);
+    }
+
+    @Test
+    void pausedTimeIsFreeAndEndingSettlesByTheMinuteAndReturnsTheRest() {
+        session.setStatus("LIVE");
+        session.setBillingReservationId("reservation-1");
+        session.setBilledHours(1);
+        session.setLiveSegmentStartedAt(Instant.now().minusSeconds(20 * 60 + 5));
+
+        service.pause(20L, 4L);
+        assertThat(session.getLiveSeconds()).isBetween(1205L, 1207L);
+        assertThat(session.getLiveSegmentStartedAt()).isNull();
+
+        service.end(20L, 4L);
+        // 21 started minutes at 35/60 credits each, rounded up once for the whole session.
+        verify(billingService).capture(eq("reservation-1"), eq(13L), eq("live-capture:20"), anyString());
+        verify(billingService).release(eq("reservation-1"), eq("live-release:20"), anyString());
+        assertThat(session.getLiveSeconds()).isBetween(1205L, 1207L);
+    }
+
+    @Test
+    void resumeChecksTheEntitlementAndReservesAnotherHourWhenTheReservedTimeIsNearlyUsed() {
+        session.setStatus("PAUSED");
+        session.setBillingReservationId("reservation-1");
+        session.setBilledHours(1);
+        session.setLiveSeconds(3400);
+
+        assertThat(service.resume(20L, 4L).status()).isEqualTo("LIVE");
+
+        verify(billingService).requireMembership("LIVE");
+        verify(billingService).reserveMore(eq("reservation-1"), eq(35L), eq("live-hour:20:2"), anyString());
+        assertThat(session.getBilledHours()).isEqualTo(2);
+    }
+
+    @Test
+    void meteringRenewsAheadOfTheHourAndPausesOnlyWhenTheReservedTimeIsAboutToRunOut() {
+        session.setStatus("LIVE");
+        session.setBillingReservationId("reservation-1");
+        session.setBilledHours(1);
+        session.setLiveSegmentStartedAt(Instant.now().minusSeconds(56 * 60));
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(true);
+
+        assertThat(service.meter(20L)).isTrue();
+        verify(billingService).reserveMore(eq("reservation-1"), eq(35L), eq("live-hour:20:2"), anyString());
+        assertThat(session.getBilledHours()).isEqualTo(2);
+
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(false);
+        session.setLiveSegmentStartedAt(Instant.now().minusSeconds(116 * 60));
+        assertThat(service.meter(20L)).isTrue();
+        assertThat(session.getStatus()).isEqualTo("LIVE");
+
+        session.setLiveSegmentStartedAt(Instant.now().minusSeconds(119 * 60));
+        assertThat(service.meter(20L)).isFalse();
+        assertThat(session.getStatus()).isEqualTo("PAUSED");
+        assertThat(session.getLiveSeconds()).isBetween(7140L, 7142L);
+        verify(billingService, times(1)).reserveMore(anyString(), anyLong(), anyString(), anyString());
+    }
+
+    @Test
+    void aSessionOnAirBeforeBillingStartsPayingAtItsFirstCheckOrPauses() {
+        session.setStatus("LIVE");
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(false);
+        assertThat(service.meter(20L)).isFalse();
+        assertThat(session.getStatus()).isEqualTo("PAUSED");
+        assertThat(session.getLiveSeconds()).isZero();
+
+        session.setStatus("LIVE");
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(true);
+        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(35L), anyString())).thenReturn("reservation-2");
+        assertThat(service.meter(20L)).isTrue();
+        assertThat(session.getBillingReservationId()).isEqualTo("reservation-2");
+        assertThat(session.getLiveSegmentStartedAt()).isNotNull();
+    }
+
+    @Test
+    void liveChargeIsThirtyFiveCreditsAnHourBilledPerStartedMinute() {
+        assertThat(LiveBilling.charge(0)).isZero();
+        assertThat(LiveBilling.charge(1)).isEqualTo(1);
+        assertThat(LiveBilling.charge(30 * 60)).isEqualTo(18);
+        assertThat(LiveBilling.charge(3600)).isEqualTo(35);
+        assertThat(LiveBilling.charge(3601)).isEqualTo(36);
     }
 
     private void selectProduct(Long id) {

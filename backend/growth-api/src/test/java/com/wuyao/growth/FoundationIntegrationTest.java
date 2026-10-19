@@ -335,7 +335,7 @@ class FoundationIntegrationTest {
         billingConfig.setPaymentMethod("MANUAL");
         billingConfig.setPaymentRecipient("test receipt fixture");
         billingConfig.setPaymentAccount("test-only");
-        var plan=billingService.createPlan(new BillingDtos.NewPlan("TEST", "Test member", "test-only",100,30,1000000,true,true,true));
+        var plan=billingService.createPlan(new BillingDtos.NewPlan("TEST", "Test member", "test-only",100,30,1000000,true,true,false,true));
         for(Long tenant:List.of(tenantA,tenantB)) TenantContext.runAs(tenant,()->{
             var order=billingService.subscribe(new BillingDtos.Subscribe("test-member-"+tenant,plan.id()));
             billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(100,"test-receipt-"+tenant),-1L);
@@ -462,8 +462,8 @@ class FoundationIntegrationTest {
     @Test
     void billingHistoricalPlanVersionsMayShareACodeButOnlyOneMayBePublished() {
         var original=TenantContext.runAs(tenantA,()->billingService.summary(true,false).plan());
-        var draft=billingService.createPlan(new BillingDtos.NewPlan("TEST","New version","test-only",200,30,50,true,false,false));
-        assertThat(code(()->billingService.createPlan(new BillingDtos.NewPlan("TEST","Duplicate offer","test-only",200,30,50,true,false,true)))).isEqualTo(1400);
+        var draft=billingService.createPlan(new BillingDtos.NewPlan("TEST","New version","test-only",200,30,50,true,false,false,false));
+        assertThat(code(()->billingService.createPlan(new BillingDtos.NewPlan("TEST","Duplicate offer","test-only",200,30,50,true,false,false,true)))).isEqualTo(1400);
         assertThat(code(()->{billingService.publish(draft.id(),true);return null;})).isEqualTo(1400);
         billingService.publish(original.id(),false);
         billingService.publish(draft.id(),true);

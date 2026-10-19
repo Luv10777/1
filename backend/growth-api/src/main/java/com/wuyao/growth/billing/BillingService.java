@@ -17,6 +17,8 @@ import java.util.Objects;
 public class BillingService {
     public static final int IMAGE_CREDITS = 3;
     public static final int VIDEO_ANALYSIS_CREDITS = 1;
+    /** Live sessions reserve one hour at a time and settle by the minute. */
+    public static final int LIVE_CREDITS_PER_HOUR = 35;
     public static final int CREDITS_PER_YUAN = 10;
     private final BillingStore store;
     private final BillingProperties config;
@@ -28,7 +30,7 @@ public class BillingService {
     @Transactional(readOnly=true)
     public BillingDtos.Summary summary(boolean canManage,boolean operator) {
         var a=store.account();
-        return new BillingDtos.Summary("烟火",CREDITS_PER_YUAN,IMAGE_CREDITS,VIDEO_ANALYSIS_CREDITS,
+        return new BillingDtos.Summary("烟火",CREDITS_PER_YUAN,IMAGE_CREDITS,VIDEO_ANALYSIS_CREDITS,LIVE_CREDITS_PER_HOUR,
             a==null?0:a.available(),a==null?0:a.getGiftAvailable(),a==null?0:a.getPurchasedAvailable(),
             a==null?0:a.getHeld(),a!=null&&a.active(Instant.now()),a==null?null:a.getMemberUntil(),
             a==null?null:a.getPlanSnapshot(),canManage,operator,payment(),config.getPaymentMethod());
@@ -217,6 +219,16 @@ public class BillingService {
     }
     @Transactional
     public void requireMembership(String capability) { requireEntitlement(store.lockAccount(),capability); }
+    /**
+     * Metered work asks first instead of catching a failed reserve: an exception thrown through
+     * this proxy would mark the caller's transaction rollback-only, losing the caller's own stop.
+     */
+    @Transactional
+    public boolean canReserve(String capability,long amount) {
+        var a=store.lockAccount();
+        try { requireEntitlement(a,capability); } catch(BizException e) { return false; }
+        return a.available()>=amount;
+    }
     @Transactional(readOnly=true)
     public void requirePlatformMembership() { requireActiveMembership(store.account()); }
     private void requireActiveMembership(BillingAccount a) {
@@ -225,8 +237,9 @@ public class BillingService {
     private void requireEntitlement(BillingAccount a,String capability) {
         requireActiveMembership(a);
         var p=a.getPlanSnapshot();
-        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); case "VIDEO_ANALYSIS"->true; default->false; };
-        if(!enabled) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,"当前套餐尚未开放此项创作功能");
+        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); case "LIVE"->p.liveEnabled(); case "VIDEO_ANALYSIS"->true; default->false; };
+        if(!enabled) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,
+            "LIVE".equals(capability)?"当前套餐不含直播功能，请订阅包含直播的套餐":"当前套餐尚未开放此项创作功能");
     }
     private void hold(BillingAccount a,BillingReservation r,long amount,String eventKey,String description) {
         if(amount<=0) throw bad("预占烟火必须大于零");
@@ -286,7 +299,8 @@ public class BillingService {
         if(input.published()) requirePublishable(input.code(),null);
         var p=new BillingPlan(); p.setCode(input.code()); p.setName(input.name().trim()); p.setDescription(input.description().trim());
         p.setPriceMinor(input.priceMinor()); p.setDurationDays(input.durationDays()); p.setGiftCredits(input.giftCredits());
-        p.setImageEnabled(input.imageEnabled()); p.setVideoEnabled(input.videoEnabled()); p.setPublished(input.published());
+        p.setImageEnabled(input.imageEnabled()); p.setVideoEnabled(input.videoEnabled()); p.setLiveEnabled(input.liveEnabled());
+        p.setPublished(input.published());
         store.save(p); store.flush(); return p.snapshot();
     }
     @Transactional
