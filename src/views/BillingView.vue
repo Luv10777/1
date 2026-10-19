@@ -126,7 +126,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
   <div class="yanhuo-page">
     <header class="yanhuo-heading">
       <div>
-        <p class="eyebrow">一方志 · 我的账户</p>
         <h1>套餐与权益</h1>
         <p class="yanhuo-intro">开通会员后即可使用 AI 创作，创作按烟火计费，会员赠送的烟火优先使用。</p>
       </div>

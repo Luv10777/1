@@ -186,7 +186,7 @@
 :root .paper-app :is(.premium-panel,.premium-console,.dh-form-panel,.dh-preview-panel,.dh-avatar-modal-card,.confidence-card,.radar-card,.keyframes-card,.code-editor,.parameter-grid,.reuse-script) { border:1px solid var(--line); border-radius:8px; background:var(--night-panel); color:var(--ink); box-shadow:var(--shadow-paper); }
 :root .paper-app :is(.premium-analyze,.digital-human-page,.video-workbench-page) :is(button,input,textarea,:is(select, .app-select-button),p,label,strong) { font-family:var(--font-sans); }
 :root .paper-app :is(.premium-analyze,.digital-human-page,.video-workbench-page) :is(h1,h2,h3) { font-family:var(--font-serif); color:var(--ink); font-weight:600; }
-:root .paper-app :is(.dh-preview-intro h2 em,.dh-source-button .material-symbols-outlined,.dh-inspiration-heading button,.premium-overline,.editor-bar button,.history-open) { color:var(--color-accent-text); }
+:root .paper-app :is(.dh-preview-intro h2 em,.dh-source-button .material-symbols-outlined,.dh-inspiration-heading button,.editor-bar button,.history-open) { color:var(--color-accent-text); }
 :root .paper-app .dh-preview-intro h2 { font-size:clamp(26px,2.5vw,36px); line-height:1.5; }
 :root .paper-app :is(.dh-preview-intro > p:last-child,.dh-field-hint,.dh-form-footer > small,.video-canvas-hint) { color:var(--ink-muted); }
 :root .paper-app :is(.dh-form-footer,.dh-form-scroll,.dh-textarea-shell,.video-textarea-shell,.editor-bar) { background:var(--night-panel); border-color:var(--line); }
@@ -229,7 +229,7 @@
 :root .paper-app .store-info-page { container:store-content / inline-size; }
 :root .paper-app .digital-human-page { height:auto; overflow:visible; }
 :root .paper-app .digital-human-page .dh-workspace { overflow:visible; }
-:root .paper-app .premium-analyze :is(.premium-header h1 span,.compact-drop .material-symbols-outlined,.mode-hint .material-symbols-outlined,.panel-icon,.premium-overline) { color:var(--color-accent-text); }
+:root .paper-app .premium-analyze :is(.premium-header h1 span,.compact-drop .material-symbols-outlined,.mode-hint .material-symbols-outlined,.panel-icon) { color:var(--color-accent-text); }
 @container store-content (max-width:1050px) {
   :root .paper-app .special-hour-row { grid-template-columns:minmax(0,1fr) auto; }
   :root .paper-app :is(.special-hour-main,.special-hour-time,.special-hour-note) { grid-column:1 / -1; min-width:0; }

@@ -1,7 +1,7 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
 import { onMounted, ref, watch } from 'vue'
-import { Store, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
+import { ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
@@ -33,9 +33,9 @@ watch(() => auth.isAuthenticated, signedIn => {
 
 <template>
   <div class="business-page merchant-alliance-page">
-    <header class="business-heading"><div><p class="business-overline"><Store :size="15" aria-hidden="true" />一方志 · 商家联盟</p><h1>一方好物，一起经营。</h1><p>发现商家实物商品，也让你的好生意被更多人看见。</p></div><RouterLink to="/information" class="business-link">浏览商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
+    <header class="business-heading"><div><h1>一方好物，一起经营。</h1><p>发现商家实物商品，也让你的好生意被更多人看见。</p></div><RouterLink to="/information" class="business-link">浏览商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
     <MerchantFeaturedProduct />
-    <header id="merchant-application" class="merchant-application-heading"><div><span class="merchant-section-index">02 / 商家入驻</span><h2>成为一方商家</h2><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></header>
+    <header id="merchant-application" class="merchant-application-heading"><div><h2>成为一方商家</h2><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></header>
     <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
       <div class="business-records-heading"><div><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>

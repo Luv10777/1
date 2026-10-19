@@ -373,7 +373,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       <p class="video-conversation-footnote">每次生成，记录一段故事。<br>已提交的创作会自动保留。</p>
     </aside>
     <div class="video-workbench-sidebar w-[420px] h-full flex flex-col bg-white border-r border-gray-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
-      <div class="video-editor-heading"><div><span>为每一方商家立传</span><h1>视频创作</h1></div><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
+      <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
       <fieldset class="video-workbench-scroll flex-1 overflow-y-auto p-8 space-y-8" :disabled="isGenerating || activeConversation?.loading">
         <div class="video-form-section">

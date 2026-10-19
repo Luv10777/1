@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { FilePenLine, Eye, MapPin, Store, ArrowRight, Send, Check, CheckCircle2, ExternalLink, Pencil, RefreshCw, X } from 'lucide-vue-next'
+import { Eye, MapPin, Store, ArrowRight, Send, Check, CheckCircle2, ExternalLink, Pencil, RefreshCw, X } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
@@ -97,7 +97,7 @@ function startInformation() {
 <template>
   <div class="business-page information-page">
     <header class="business-heading">
-      <div><p class="business-overline"><FilePenLine :size="15" aria-hidden="true" />商家信息服务</p><h1>信息发布</h1><p>提交门店活动、商业合作与供求信息，经平台审核通过后公开展示。</p></div>
+      <div><h1>信息发布</h1><p>提交门店活动、商业合作与供求信息，经平台审核通过后公开展示。</p></div>
       <div class="business-heading-links"><RouterLink to="/information" class="business-link">查看信息广场<ExternalLink :size="14" aria-hidden="true" /></RouterLink><RouterLink to="/merchant-alliance" class="business-link">商家入驻<ArrowRight :size="15" aria-hidden="true" /></RouterLink></div>
     </header>
 

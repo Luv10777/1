@@ -100,7 +100,7 @@ onMounted(loadProduct)
 
 <template>
   <section id="merchant-goods" class="merchant-goods" aria-labelledby="merchant-goods-title" :aria-busy="loading">
-    <div class="merchant-goods-heading"><div><span class="merchant-section-index">01 / 精选实物</span><h2 id="merchant-goods-title">好生意，从一件好物开始。</h2></div><span class="merchant-goods-caption"><Package :size="15" aria-hidden="true" />实体商品 · 商家直售</span></div>
+    <div class="merchant-goods-heading"><div><h2 id="merchant-goods-title">好生意，从一件好物开始。</h2></div><span class="merchant-goods-caption"><Package :size="15" aria-hidden="true" />实体商品 · 商家直售</span></div>
     <div v-if="loading" class="merchant-goods-state" role="status"><ShoppingBag :size="26" aria-hidden="true" /><p>正在读取商品…</p></div>
     <div v-else-if="loadError" class="merchant-goods-state" role="alert"><Package :size="26" aria-hidden="true" /><p>{{ loadError }}</p><button type="button" class="business-button" @click="loadProduct"><RefreshCw :size="14" aria-hidden="true" />重新加载</button></div>
     <article v-else-if="product" class="merchant-featured-product">
@@ -126,7 +126,7 @@ onMounted(loadProduct)
     <div class="merchant-checkout-backdrop" aria-hidden="true" />
     <div class="merchant-checkout-position">
       <DialogPanel class="merchant-checkout-panel">
-        <header><div><span class="merchant-section-index">{{ orderReceipt?.payment ? '订单已保存 · 扫码付款' : orderReceipt ? '等待商家确认' : '填写收货信息' }}</span><DialogTitle as="h2">{{ orderReceipt?.payment ? '完成订单付款' : orderReceipt ? '订单已提交' : '确认商品订单' }}</DialogTitle></div><button type="button" aria-label="关闭订单窗口" :disabled="submitting" @click="checkoutOpen = false"><X :size="20" /></button></header>
+        <header><div><DialogTitle as="h2">{{ orderReceipt?.payment ? '完成订单付款' : orderReceipt ? '订单已提交' : '确认商品订单' }}</DialogTitle></div><button type="button" aria-label="关闭订单窗口" :disabled="submitting" @click="checkoutOpen = false"><X :size="20" /></button></header>
         <DialogDescription class="merchant-checkout-description">{{ orderReceipt?.payment ? '请按本单金额向企业支付宝付款，商家核实到账后确认订单。' : '填写收货信息并提交后，按订单页面的指引完成交易。' }}</DialogDescription>
         <div v-if="product && !orderReceipt" class="merchant-checkout-item"><img v-if="images.length" :src="images[0]" :alt="product.name" width="64" height="64" /><div><strong>{{ product.name }}</strong><span>¥{{ formatMoney(product.price) }} × {{ quantity }} {{ product.saleUnit }}</span></div><strong>¥{{ formatMoney(product.price * quantity) }}</strong></div>
         <div v-if="orderReceipt" class="merchant-checkout-result">

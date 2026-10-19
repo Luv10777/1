@@ -15,12 +15,13 @@ public final class AccountDtos {
     private AccountDtos() {
     }
 
+    /** @param avatarUrl 本人上传的头像的临时下载地址，没有上传过时为 null */
     public record Account(Long id, String name, String phone, String role, String status,
-                          Instant lastLoginAt, Instant createdAt) {
+                          Instant lastLoginAt, Instant createdAt, String avatarUrl) {
 
-        public static Account of(User user) {
+        public static Account of(User user, String avatarUrl) {
             return new Account(user.getId(), user.getName(), user.getPhone(), user.getRole(), user.getStatus(),
-                    user.getLastLoginAt(), user.getCreatedAt());
+                    user.getLastLoginAt(), user.getCreatedAt(), avatarUrl);
         }
 
         public boolean owner() {

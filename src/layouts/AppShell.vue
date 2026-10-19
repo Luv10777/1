@@ -8,7 +8,7 @@ import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound } from 'lucide-vue-next'
+import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound, ChevronsUpDown } from 'lucide-vue-next'
 import { billing, number, refreshBilling } from '../stores/billing'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
@@ -233,8 +233,8 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
         <span class="tenant-avatar">{{ selectedStoreRecord?.name?.slice(0, 1) || '店' }}</span>
         <span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span>
         <template v-if="stores.length > 1">
-          <span class="chevron" aria-hidden="true">⌄</span>
-          <!-- 透明的原生下拉盖在整块上：点哪里都能切换，键盘和读屏也照常可用。 -->
+          <ChevronsUpDown :size="16" class="tenant-chevron" aria-hidden="true" />
+          <!-- 透明的门店下拉按钮盖在整块上：点哪里都能切换，键盘和读屏也照常可用。 -->
           <AppSelect v-model="selectedStoreId" class="tenant-select" aria-label="切换门店" :disabled="storeLoading">
             <option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option>
           </AppSelect>
@@ -357,6 +357,13 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .store-context-state p { margin: 0 0 22px; font-size: 14px; color: var(--muted, #8d8478); }
 .tenant-switcher { position: relative; }
 .tenant-switcher.switchable:hover { border-color: var(--line-strong); }
+/* 门店卡片：和下方烟火卡片同一套卡片样式，首字头像用朱砂浅底。 */
+.tenant-switcher { gap: 12px; margin: 16px 12px 20px; padding: 10px 12px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); box-shadow: var(--shadow-paper); transition: border-color .18s; }
+.tenant-switcher .tenant-avatar { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 8px; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); font: 600 15px var(--font-serif); }
+.tenant-switcher .tenant-copy { gap: 2px; }
+.tenant-switcher .tenant-copy small { color: var(--color-text-muted); font-size: 12px; letter-spacing: 0; }
+.tenant-switcher .tenant-copy strong { overflow: hidden; color: var(--color-primary); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tenant-chevron { flex: none; color: var(--color-text-muted); }
 :deep(.tenant-select) { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
 .sidebar-footer .account-wrap { margin-top: 14px; }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
