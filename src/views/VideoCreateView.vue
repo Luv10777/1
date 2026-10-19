@@ -10,7 +10,6 @@ import { RouterLink } from 'vue-router'
           <h1>视频创作</h1>
           <p class="video-create-subtitle">把脚本、商品信息和品牌资产组合成高转化短视频，或一键唤醒专属数字人。</p>
         </div>
-        <div class="video-create-status"><span class="video-create-status-dot" /> 云端工作区已就绪</div>
       </div>
     </header>
 

@@ -67,3 +67,6 @@ deploy/billing-config/
 
 # Local commercial pricing used for development trials.
 backend/growth-api/billing-rates.local.yml
+
+# 开发环境页面编辑模式的改动记录（dev/ui-edit）
+.claude/ui-edits.json
