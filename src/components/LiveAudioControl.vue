@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from './AppSelect.vue'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowRight, Volume2 } from 'lucide-vue-next'
 import { auth } from '../stores/auth'
@@ -260,7 +261,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
       </Teleport>
     </template>
     <template v-else-if="view === 'setup'">
-      <div class="panel-heading"><div><p class="eyebrow">STEP 03</p><h3>启动直播</h3></div></div>
+      <div class="panel-heading"><div><p class="eyebrow">第 3 步</p><h3>启动直播</h3></div></div>
       <p class="audio-intro">在抖音 App 内用摄像头开播；播报声音直接在这个网页播放，不需要另外连接设备。</p>
       <p class="audio-help">请按抖音当前规则，在抖音 App 中标识合成语音。</p>
       <ul v-if="sessionStatus === 'DRAFT' && blockers.length" class="audio-blockers" aria-label="开始前还需要完成">
@@ -321,7 +322,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
         <summary>临时播报<span>手动补充一段讲解</span></summary>
         <div class="audio-secondary-body">
           <label class="audio-field"><span>播报内容 · {{ hostVoice?.name || '请先选择主讲音色' }}</span><textarea v-model="script" :disabled="busy || ended" rows="3" maxlength="1000" placeholder="填写经过确认的商品讲解，每次最多 1000 字。" /></label>
-          <div class="speech-actions"><small>{{ script.length }} / 1000</small><select v-model="mode" :disabled="busy || ended" aria-label="播报方式"><option value="APPEND">追加到队尾</option><option value="INTERRUPT">停顿处插播</option><option value="CLEAR_REPLAY">清空后播报本段</option></select><button type="button" class="primary-button compact" :disabled="busy || !online || ended || !script.trim()" @click="send(false)">{{ sending ? '提交中…' : '合成并加入播报' }}</button></div>
+          <div class="speech-actions"><small>{{ script.length }} / 1000</small><AppSelect v-model="mode" :disabled="busy || ended" aria-label="播报方式"><option value="APPEND">追加到队尾</option><option value="INTERRUPT">停顿处插播</option><option value="CLEAR_REPLAY">清空后播报本段</option></AppSelect><button type="button" class="primary-button compact" :disabled="busy || !online || ended || !script.trim()" @click="send(false)">{{ sending ? '提交中…' : '合成并加入播报' }}</button></div>
           <p class="audio-help">插播会等待合适的停顿；剩余不足 5 秒时等当前段落播完。每段合成完成后开始播放。</p>
         </div>
       </details>
@@ -397,12 +398,12 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-field { display: flex; flex-direction: column; gap: 8px; color: var(--ink); font-size: 12px; }
 .audio-field > span { display: flex; align-items: center; gap: 6px; }
 .audio-field > span small { color: var(--ink-muted); font-size: 12px; }
-.audio-field input, .audio-field textarea, .speech-actions select { min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--night-panel); font-size: 12px; line-height: 1.6; }
+.audio-field input, .audio-field textarea, .speech-actions :deep(.app-select-button) { min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--night-panel); font-size: 12px; line-height: 1.6; }
 .audio-field input::placeholder, .audio-field textarea::placeholder { color: var(--ink-muted); opacity: .8; }
 .audio-field textarea { resize: vertical; min-height: 90px; }
 .speech-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .speech-actions small { margin-right: auto; color: var(--ink-muted); font-size: 12px; }
-.speech-actions select { width: auto; padding: 7px 10px; min-height: 36px; }
+.speech-actions :deep(.app-select-button) { width: auto; padding: 7px 10px; min-height: 36px; }
 .audio-help { margin: 8px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.8; }
 .audio-secondary-body > .audio-help:first-child { margin: 0 0 14px; }
 .audio-notice, .audio-error { margin: 14px 0 0; font-size: 12px; line-height: 1.8; }

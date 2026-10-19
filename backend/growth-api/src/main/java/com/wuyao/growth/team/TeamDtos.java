@@ -30,15 +30,16 @@ public final class TeamDtos {
     /**
      * @param storeIds 店员能进的门店；管理员能进全部门店，这里为空，由 allStores 表示
      * @param self     这一行是不是当前登录的人
+     * @param avatarUrl 本人在个人资料里上传的头像，临时地址一小时内有效；没有上传时为 null
      */
     public record MemberView(Long id, String name, String phone, String role, String status,
                              boolean allStores, List<Long> storeIds, boolean self,
-                             Instant lastLoginAt, Instant createdAt) {
+                             Instant lastLoginAt, Instant createdAt, String avatarUrl) {
 
         static MemberView of(AccountDtos.Account account, List<Long> storeIds, Long currentUserId) {
             return new MemberView(account.id(), account.name(), account.phone(), account.role(), account.status(),
                     account.owner(), account.owner() ? List.of() : storeIds, account.id().equals(currentUserId),
-                    account.lastLoginAt(), account.createdAt());
+                    account.lastLoginAt(), account.createdAt(), account.avatarUrl());
         }
     }
 }

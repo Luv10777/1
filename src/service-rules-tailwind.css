@@ -17,7 +17,7 @@
     color: inherit;
   }
 
-  .service-rules-workbench :is(button, input, textarea, select) {
+  .service-rules-workbench :is(button, input, textarea, :is(select, .app-select-button)) {
     margin: 0;
     padding: 0;
     font: inherit;
@@ -33,7 +33,7 @@
 
 /* The Vue shell has unlayered element rules. Let this page's Tailwind
    utilities determine typography, color and accent without changing the shell. */
-.service-rules-workbench :is(button, input, textarea, select) {
+.service-rules-workbench :is(button, input, textarea, :is(select, .app-select-button)) {
   font: revert-layer;
   color: revert-layer;
   accent-color: revert-layer;

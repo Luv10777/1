@@ -30,7 +30,7 @@ public class PlatformAccountDirectory {
     @Transactional(readOnly = true)
     public AccountDtos.Account account(Long userId) {
         return users.findById(userId).filter(u -> TenantContext.require().equals(u.getTenantId()))
-                .map(AccountDtos.Account::of).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "用户不存在"));
+                .map(u -> AccountDtos.Account.of(u, null)).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "用户不存在"));
     }
 
     /** Serialize identity submissions/reviews for the same user, including the initial insert. */

@@ -20,7 +20,7 @@ public class LiveBillingScheduler {
     private final TenantDirectory tenants;
     private final LiveSessionService sessions;
 
-    @Scheduled(fixedDelayString = "${growth.live.billing-interval-ms:60000}")
+    @Scheduled(initialDelayString = "${growth.live.billing-interval-ms:60000}", fixedDelayString = "${growth.live.billing-interval-ms:60000}")
     public void meter() {
         Long after = 0L;
         while (true) {

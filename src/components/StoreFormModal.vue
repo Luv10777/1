@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from './AppSelect.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { saveStore } from '../stores/merchantContext.js'
@@ -65,7 +66,7 @@ async function submit() {
         <p>商品、知识库与直播配置将归属于对应门店。</p>
         <form @submit.prevent="submit">
           <label>门店名称 <span>*</span><input v-model="form.name" required maxlength="120" placeholder="例如：青岚茶事 · 城西店" :disabled="busy" /></label>
-          <label v-if="brands.length > 1">所属品牌<select v-model="brandId" :disabled="busy"><option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}{{ brand.defaultBrand ? '（默认）' : '' }}</option></select></label>
+          <label v-if="brands.length > 1">所属品牌<AppSelect v-model="brandId" :disabled="busy"><option v-for="brand in brands" :key="brand.id" :value="brand.id">{{ brand.name }}{{ brand.defaultBrand ? '（默认）' : '' }}</option></AppSelect></label>
           <label>门店地址<input v-model="form.address" maxlength="300" placeholder="填写详细地址（选填）" :disabled="busy" /></label>
           <div class="store-dialog-row">
             <label>联系电话<input v-model="form.phone" type="tel" maxlength="40" placeholder="选填" :disabled="busy" /></label>
@@ -96,10 +97,10 @@ async function submit() {
               <small class="field-hint">固定店休、节假日休息或某一天调整营业时间。不会改变上面的常规营业时间。</small>
               <div v-for="(rule, index) in profile.specialHours" :key="index" class="rule">
                 <div class="rule-controls">
-                  <select v-model="rule.scope" aria-label="安排范围" :disabled="busy"><option value="WEEKLY">每周</option><option value="DATE">指定日期</option></select>
-                  <select v-if="rule.scope === 'WEEKLY'" v-model.number="rule.weekday" aria-label="星期几" :disabled="busy"><option v-for="(day, at) in WEEKDAYS" :key="day" :value="at + 1">{{ day }}</option></select>
+                  <AppSelect v-model="rule.scope" aria-label="安排范围" :disabled="busy"><option value="WEEKLY">每周</option><option value="DATE">指定日期</option></AppSelect>
+                  <AppSelect v-if="rule.scope === 'WEEKLY'" v-model.number="rule.weekday" aria-label="星期几" :disabled="busy"><option v-for="(day, at) in WEEKDAYS" :key="day" :value="at + 1">{{ day }}</option></AppSelect>
                   <input v-else v-model="rule.date" type="date" aria-label="日期" :disabled="busy" />
-                  <select :value="rule.closed ? 'closed' : 'open'" aria-label="安排类型" :disabled="busy" @change="rule.closed = $event.target.value === 'closed'"><option value="closed">休息</option><option value="open">调整营业时间</option></select>
+                  <AppSelect :value="rule.closed ? 'closed' : 'open'" aria-label="安排类型" :disabled="busy" @change="rule.closed = $event === 'closed'"><option value="closed">休息</option><option value="open">调整营业时间</option></AppSelect>
                   <button type="button" class="rule-remove" aria-label="删除这条安排" :disabled="busy" @click="removeRule(index)">×</button>
                 </div>
                 <div v-if="!rule.closed" class="rule-time"><input v-model="rule.opensAt" type="time" aria-label="开始营业" :disabled="busy" /><span>至</span><input v-model="rule.closesAt" type="time" aria-label="结束营业" :disabled="busy" /></div>
@@ -130,8 +131,8 @@ h2 { font-size: 20px; margin: 0; }
 form { display: grid; gap: 18px; }
 label { display: grid; gap: 8px; font-size: 13px; min-width: 0; }
 label span { display: contents; color: #b34636; }
-input, select { width: 100%; box-sizing: border-box; border: 1px solid var(--border, #ded8ce); border-radius: 8px; padding: 11px 12px; color: inherit; background: var(--surface, #fffdf9); }
-select { font: inherit; }
+input, :deep(.app-select-button) { width: 100%; box-sizing: border-box; border: 1px solid var(--border, #ded8ce); border-radius: 8px; padding: 11px 12px; color: inherit; background: var(--surface, #fffdf9); }
+:deep(.app-select-button) { font: inherit; }
 .store-dialog-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .store-dialog-error { color: #b34636; font-size: 13px; margin: 0; }

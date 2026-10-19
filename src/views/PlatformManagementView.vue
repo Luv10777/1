@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
@@ -180,8 +181,8 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
       <div v-else class="mg-list-caption"><h2>实名审核记录</h2><span><LockKeyhole :size="13" />敏感资料默认脱敏</span></div>
       <form class="management-filters" @submit.prevent="search">
         <label class="mg-search"><Search :size="17" /><input v-model="keyword" :placeholder="isIdentity ? '搜索用户名称、用户编号或证件尾号' : section === 'merchants' ? '搜索商家、经营主体或地区' : '搜索标题、发布商家或地区'" aria-label="搜索关键词" maxlength="100" /><button v-if="keyword" type="button" aria-label="清空搜索" @click="keyword = ''; search()"><X :size="14" /></button></label>
-        <label v-if="section === 'information'" class="mg-select"><span class="sr-only">信息分类</span><select v-model="category"><option value="">全部分类</option><option v-for="(label, value) in informationCategories" :key="value" :value="value">{{ label }}</option></select></label>
-        <label class="mg-select"><span class="sr-only">处理状态</span><select v-model="status"><option value="">全部状态</option><option v-for="value in statusOptions" :key="value" :value="value">{{ managementStatuses[value] }}</option></select></label>
+        <label v-if="section === 'information'" class="mg-select"><span class="sr-only">信息分类</span><AppSelect v-model="category"><option value="">全部分类</option><option v-for="(label, value) in informationCategories" :key="value" :value="value">{{ label }}</option></AppSelect></label>
+        <label class="mg-select"><span class="sr-only">处理状态</span><AppSelect v-model="status"><option value="">全部状态</option><option v-for="value in statusOptions" :key="value" :value="value">{{ managementStatuses[value] }}</option></AppSelect></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
       </form>
       <div v-if="error" class="mg-state mg-error" role="alert"><ClipboardList :size="30" /><h3>暂时无法读取数据</h3><p>{{ error }}</p><button class="mg-button" type="button" :disabled="loading" @click="load">重新读取</button></div>
@@ -202,7 +203,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
           </tbody>
         </table>
       </div>
-      <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 条记录` }}</span><div><label><span class="sr-only">每页条数</span><select v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></select></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
+      <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 条记录` }}</span><div><label><span class="sr-only">每页条数</span><AppSelect v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></AppSelect></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
     <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '当前为平台人工审核；未接入第三方权威身份核验。查看完整资料及审核操作均留存记录。' : '记录直接来自平台数据库；信息审核、上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
 

@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { RouterLink } from 'vue-router'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, RefreshCw, Search, X } from 'lucide-vue-next'
 import { useTaskCenter } from '../composables/useTaskCenter'
@@ -24,9 +25,9 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
             <legend><CalendarDays :size="14" /> 提交时间 <small>北京时间</small></legend>
             <div><input v-model="filters.from" type="datetime-local" aria-label="开始时间（北京时间）"><span>至</span><input v-model="filters.until" type="datetime-local" aria-label="结束时间（北京时间，不含）"></div>
           </fieldset>
-          <label>使用模块<select v-model="filters.module"><option value="">全部模块</option><option v-for="(label, id) in taskModules" :key="id" :value="id">{{ label }}</option></select></label>
+          <label>使用模块<AppSelect v-model="filters.module"><option value="">全部模块</option><option v-for="(label, id) in taskModules" :key="id" :value="id">{{ label }}</option></AppSelect></label>
           <label>模型名称<input v-model="filters.model" type="search" placeholder="搜索模型，如 Seedance" maxlength="200"></label>
-          <label>任务状态<select v-model="filters.status"><option value="">全部状态</option><option v-for="[id, state] in filterStatuses" :key="id" :value="id">{{ state.label }}</option></select></label>
+          <label>任务状态<AppSelect v-model="filters.status"><option value="">全部状态</option><option v-for="[id, state] in filterStatuses" :key="id" :value="id">{{ state.label }}</option></AppSelect></label>
         </div>
         <div class="usage-filter-bottom">
           <p>按提交时间查询；未设置时间时展示全部记录。</p>
@@ -100,7 +101,7 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-filters{margin-bottom:20px;padding:20px 20px 0}
 .usage-filter-fields{display:grid;grid-template-columns:minmax(340px,2.3fr) minmax(140px,1fr) minmax(160px,1.2fr) minmax(120px,.8fr);gap:16px;align-items:end}
 .usage-filter-fields>label{display:grid;gap:9px;font-size:12px;color:var(--color-text-muted)}
-.usage-filter-fields input,.usage-filter-fields select{display:block;width:100%;min-width:0;height:38px;padding:0 10px;border:1px solid var(--color-border-subtle);border-radius:4px;background:var(--color-bg-surface);color:var(--color-primary);font-size:12px}
+.usage-filter-fields input,.usage-filter-fields :deep(.app-select-button){display:block;width:100%;min-width:0;height:38px;padding:0 10px;border:1px solid var(--color-border-subtle);border-radius:4px;background:var(--color-bg-surface);color:var(--color-primary);font-size:12px}
 .usage-filter-fields input::placeholder{color:var(--color-text-muted)}
 .usage-date-range{margin:0;padding:0;border:0;min-width:0}
 .usage-date-range legend{display:flex;align-items:center;gap:6px;margin-bottom:9px;padding:0;font-size:12px;color:var(--color-text-muted)}

@@ -172,7 +172,7 @@
 .publishing-page button,
 .publishing-page input,
 .publishing-page textarea,
-.publishing-page select {
+.publishing-page :is(select, .app-select-button) {
   font: inherit;
 }
 .publishing-page button {
@@ -185,7 +185,7 @@
 .publishing-page button:focus-visible,
 .publishing-page input:focus-visible,
 .publishing-page textarea:focus-visible,
-.publishing-page select:focus-visible {
+.publishing-page :is(select, .app-select-button):focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
@@ -667,7 +667,7 @@
   color: var(--pub-commerce);
   flex-shrink: 0;
 }
-:where(.publishing-page) .select-wrap select {
+:where(.publishing-page) .select-wrap :is(select, .app-select-button) {
   appearance: none;
   width: 100%;
   border: 0;

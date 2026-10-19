@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { teamApi } from '../services/teamApi'
 import { stores, loadStores } from '../stores/merchantContext'
+import { auth } from '../stores/auth'
+import UserAvatar from '../components/UserAvatar.vue'
 
 const members = ref([])
 const loading = ref(true)
@@ -83,7 +85,6 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
   <div class="team-page">
     <header class="team-header">
       <div>
-        <p class="eyebrow">TEAM / 01</p>
         <h1>员工管理</h1>
         <p class="header-desc">添加店员并分配门店。店员用登记的手机号和验证码登录，只能进入分配给他的门店。</p>
       </div>
@@ -99,7 +100,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
         </div>
         <article v-for="member in members" :key="member.id" class="member-row" :class="{ disabled: member.status === 'DISABLED' }">
           <div class="member-who">
-            <span class="member-avatar" aria-hidden="true">{{ (member.name || '员').slice(0, 1) }}</span>
+            <UserAvatar class="member-avatar" :src="(member.self && auth.user?.avatarUrl) || member.avatarUrl || ''" :name="member.name || '员'" />
             <div><strong>{{ member.name || '未填写姓名' }}<em v-if="member.self">当前账号</em></strong><small>{{ member.phone || '未绑定手机号' }}</small></div>
           </div>
           <span class="role-badge" :class="{ owner: member.role === 'OWNER' }">{{ member.role === 'OWNER' ? '管理员' : '店员' }}</span>

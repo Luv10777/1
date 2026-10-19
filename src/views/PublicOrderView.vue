@@ -49,7 +49,7 @@ watch(() => route.params.token, loadOrder, { immediate: true })
           <div v-for="(step, index) in steps" :key="step.status" :class="{ active: order.status !== 'CANCELLED' && index <= activeStep, cancelled: order.status === 'CANCELLED' && index === 0 }"><span><component :is="step.icon" :size="16" /></span><strong>{{ order.status === 'CANCELLED' && index === 0 ? '订单已取消' : step.label }}</strong></div>
         </section>
         <section class="public-order-detail">
-          <header><div><p>ORDER RECEIPT</p><h2>订单内容</h2></div><span>{{ order.orderNumber }}</span></header>
+          <header><div><h2>订单内容</h2></div><span>{{ order.orderNumber }}</span></header>
           <div class="public-order-lines"><div v-for="item in order.items" :key="item.productId || item.productName"><span>{{ item.productName }} × {{ item.quantity }}</span><strong>¥{{ formatMoney(item.lineTotal) }}</strong></div></div>
           <div class="public-order-total"><span>订单金额</span><strong>¥{{ formatMoney(order.totalAmount) }}</strong></div>
           <dl><div><dt>提交时间</dt><dd>{{ new Date(order.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</dd></div><div><dt>订单状态</dt><dd>{{ orderStatuses[order.status] || order.status }}</dd></div></dl>

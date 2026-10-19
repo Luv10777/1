@@ -37,6 +37,8 @@ import static org.awaitility.Awaitility.await;
 // database until the context closes, and closing waits for them.
 @Testcontainers
 @SpringBootTest(properties = {"growth.worker.enabled=true", "growth.worker.poll-interval=200",
+        // Sessions here are put on air directly in the database; keep live metering from pausing them.
+        "growth.live.billing-interval-ms=3600000",
         "growth.worker.parallelism=1",
         "logging.level.root=WARN", "logging.level.com.wuyao.growth=WARN",
         // A developer's local .env must not point this test at a real model or bucket.

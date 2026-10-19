@@ -348,7 +348,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 
       <section class="premium-console" :aria-busy="Boolean(isScanning || loadingHistory)">
         <div class="console-head">
-          <div><p class="premium-overline">分析工作区</p><h2>{{ reportMode === 'ai' ? '提示词与分镜复刻' : '实拍拆解与复刻方案' }}</h2></div>
+          <div><h2>{{ reportMode === 'ai' ? '提示词与分镜复刻' : '实拍拆解与复刻方案' }}</h2></div>
           <div class="console-tools history-tools">
             <button type="button" class="history-trigger" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen; historyOpen && refreshHistory()"><span class="material-symbols-outlined">history</span><span>反推历史</span><span class="material-symbols-outlined history-chevron">expand_more</span></button>
             <div v-if="historyOpen" class="history-menu">

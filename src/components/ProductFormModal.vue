@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from './AppSelect.vue'
 import { nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
 import { X, Package, Ticket, Upload, Pencil, Plus, Trash2 } from 'lucide-vue-next'
@@ -175,11 +176,11 @@ async function submit() {
                 </fieldset>
                 <label class="product-field">
                   <span>分类 <b>*</b></span>
-                  <select v-model="form.category" :aria-invalid="!!errors.category" aria-describedby="product-category-error">
+                  <AppSelect v-model="form.category" :aria-invalid="!!errors.category" aria-describedby="product-category-error">
                     <option disabled value="">请选择分类</option>
                     <option v-if="isReadOnly && form.category && !productCategories.includes(form.category)" :value="form.category">{{ form.category }}</option>
                     <option v-for="category in productCategories" :key="category" :value="category">{{ category }}</option>
-                  </select>
+                  </AppSelect>
                   <small v-if="errors.category" id="product-category-error" class="product-error">{{ errors.category }}</small>
                 </label>
                 <div class="product-form-columns">
