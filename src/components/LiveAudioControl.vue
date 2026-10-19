@@ -377,31 +377,31 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-desktop-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .audio-desktop-head > div:first-child { min-width: 0; }
 .audio-desktop-head strong { font-size: 13px; font-weight: 600; }
-.audio-desktop-head strong span { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 11px; font-weight: 400; }
+.audio-desktop-head strong span { margin-left: 8px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 12px; font-weight: 400; }
 .audio-desktop-head p { margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
 .audio-desktop-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
 .audio-desktop-actions a { display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; }
 .audio-control-live { padding: 18px 22px; }
 .audio-live-bar { display: flex; align-items: center; gap: 12px; }
 .audio-live-copy { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; flex: 1; }
-.audio-live-copy small { width: 100%; color: var(--ink-muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.audio-live-copy small { width: 100%; color: var(--ink-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .audio-live-actions { display: flex; align-items: center; flex-shrink: 0; gap: 14px; }
 .audio-volume { display: flex; align-items: center; gap: 10px; margin: 12px 0 0 48px; color: var(--ink-muted); font-size: 12px; }
 .audio-volume input { flex: 1; max-width: 220px; accent-color: var(--color-accent); }
 .audio-secondary { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
 .audio-secondary > summary { color: var(--ink); font-size: 12px; cursor: pointer; }
-.audio-secondary > summary span { margin-left: 10px; color: var(--ink-muted); font-size: 11px; }
+.audio-secondary > summary span { margin-left: 10px; color: var(--ink-muted); font-size: 12px; }
 .audio-secondary-body { padding-top: 16px; }
-.audio-developer > summary { color: var(--ink-muted); font-size: 11px; }
+.audio-developer > summary { color: var(--ink-muted); font-size: 12px; }
 .audio-developer .audio-secondary-body > button { margin-top: 12px; }
 .audio-field { display: flex; flex-direction: column; gap: 8px; color: var(--ink); font-size: 12px; }
 .audio-field > span { display: flex; align-items: center; gap: 6px; }
-.audio-field > span small { color: var(--ink-muted); font-size: 11px; }
+.audio-field > span small { color: var(--ink-muted); font-size: 12px; }
 .audio-field input, .audio-field textarea, .speech-actions select { min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--night-panel); font-size: 12px; line-height: 1.6; }
 .audio-field input::placeholder, .audio-field textarea::placeholder { color: var(--ink-muted); opacity: .8; }
 .audio-field textarea { resize: vertical; min-height: 90px; }
 .speech-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-.speech-actions small { margin-right: auto; color: var(--ink-muted); font-size: 11px; }
+.speech-actions small { margin-right: auto; color: var(--ink-muted); font-size: 12px; }
 .speech-actions select { width: auto; padding: 7px 10px; min-height: 36px; }
 .audio-help { margin: 8px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.8; }
 .audio-secondary-body > .audio-help:first-child { margin: 0 0 14px; }
@@ -424,7 +424,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
 .audio-feed li.failed { border-left-color: var(--red); }
 .audio-feed-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .audio-feed-head strong { min-width: 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
-.audio-feed-head span { flex-shrink: 0; color: var(--ink-muted); font-size: 11px; }
+.audio-feed-head span { flex-shrink: 0; color: var(--ink-muted); font-size: 12px; }
 .audio-feed li.working .audio-feed-head span { color: var(--amber); }
 .audio-feed li.failed .audio-feed-head span { color: var(--red); }
 .audio-feed p { margin: 6px 0 0; color: var(--ink-soft); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }

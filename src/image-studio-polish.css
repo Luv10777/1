@@ -43,7 +43,7 @@
   border-radius: 8px;
   background: #fff;
   color: #574e48;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
   white-space: nowrap;
   text-decoration: none;
@@ -65,7 +65,7 @@
 .product-set-studio :is(.creation-toolbar button, .creation-library-links a, .creation-result-actions button, .creation-progress button):active { transform: translateY(0); box-shadow: none; }
 
 .poster-workbench .poster-gallery-tabs { gap: 7px; flex-wrap: wrap; }
-.poster-workbench .poster-gallery-tabs button { min-height: 34px; font-size: 11px; }
+.poster-workbench .poster-gallery-tabs button { min-height: 34px; font-size: 12px; }
 .poster-workbench .poster-gallery-tabs button.active,
 .product-set-studio .creation-view-tabs button.active {
   border-color: #e9d5cc;
@@ -79,12 +79,12 @@
 .product-set-studio .creation-view-tabs,
 .product-set-studio .creation-library-links { gap: 7px; flex-wrap: wrap; }
 .product-set-studio .creation-toolbar button,
-.product-set-studio .creation-library-links a { font-size: 11px; }
+.product-set-studio .creation-library-links a { font-size: 12px; }
 
 .poster-workbench .poster-item-actions,
 .product-set-studio .creation-result-actions { gap: 8px; margin-top: 14px; }
 .poster-workbench .poster-item-actions button,
-.product-set-studio .creation-result-actions button { min-height: 35px; padding: 8px 12px; font-size: 11px; }
+.product-set-studio .creation-result-actions button { min-height: 35px; padding: 8px 12px; font-size: 12px; }
 .poster-workbench .poster-item-actions button:first-child,
 .product-set-studio .creation-result-actions button:first-child {
   border-color: #e9d6cf;
@@ -96,8 +96,8 @@
 .poster-workbench .poster-result-head button { margin-left: auto; }
 .product-set-studio .creation-progress button { margin-left: 8px; }
 .poster-workbench .poster-result-empty button { margin-top: 20px; }
-.poster-workbench .poster-recall { padding-inline: 9px; font-size: 10px; }
-.poster-workbench .poster-add-reference { min-height: 34px; font-size: 10px; }
+.poster-workbench .poster-recall { padding-inline: 9px; font-size: 12px; }
+.poster-workbench .poster-add-reference { min-height: 34px; font-size: 12px; }
 .poster-workbench .poster-load-more { margin: 20px auto 0; }
 
 .poster-workbench .poster-purpose-groups {

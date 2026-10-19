@@ -104,23 +104,23 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-filter-fields input::placeholder{color:var(--color-text-muted)}
 .usage-date-range{margin:0;padding:0;border:0;min-width:0}
 .usage-date-range legend{display:flex;align-items:center;gap:6px;margin-bottom:9px;padding:0;font-size:12px;color:var(--color-text-muted)}
-.usage-date-range legend small{margin-left:4px;font-size:10px}
+.usage-date-range legend small{margin-left:4px;font-size:12px}
 .usage-date-range>div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-muted)}
 .usage-date-range input{flex:1;width:0;min-width:0;padding:0 6px;font-variant-numeric:tabular-nums}
 .usage-filter-bottom{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0}
-.usage-filter-bottom p{margin:0;font-size:11px;color:var(--color-text-muted)}
+.usage-filter-bottom p{margin:0;font-size:12px;color:var(--color-text-muted)}
 .usage-filter-bottom>div{display:flex;gap:8px}
 .usage-summary{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;border-top:1px solid var(--color-border-subtle);padding:14px 0;font-size:12px;color:var(--color-text-muted);font-variant-numeric:tabular-nums}
 .usage-summary>span{display:inline-flex;align-items:baseline;gap:7px}
 .usage-summary strong{font-size:14px;font-weight:600;color:var(--color-primary)}
 .usage-summary .usage-summary-charge strong{font-size:19px;color:var(--color-accent-text)}
-.usage-summary>small{margin-left:auto;font-size:10px}
+.usage-summary>small{margin-left:auto;font-size:12px}
 .usage-error{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px;padding:14px 16px;background:var(--color-bg-surface);border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-error);font-size:13px}
 .usage-error button{padding:4px 0;background:none;border:0;color:inherit;text-decoration:underline;white-space:nowrap}
 .usage-log{overflow:hidden}
 .usage-log-heading{display:flex;justify-content:space-between;gap:20px;align-items:baseline;padding:20px}
 .usage-log-heading h2{display:flex;align-items:baseline;gap:10px;margin:0;font-size:15px;font-weight:600}
-.usage-log-heading h2 span,.usage-log-heading p{margin:0;font-size:11px;font-weight:400;color:var(--color-text-muted)}
+.usage-log-heading h2 span,.usage-log-heading p{margin:0;font-size:12px;font-weight:400;color:var(--color-text-muted)}
 .usage-table-scroll{overflow-x:auto;scrollbar-width:thin}
 .usage-table{width:100%;min-width:1060px;border-collapse:collapse;text-align:left;font-size:12px}
 .usage-table th{height:42px;padding:0 16px;border-block:1px solid var(--color-border-subtle);background:var(--color-bg-canvas);font-size:12px;font-weight:500;color:var(--color-text-muted);white-space:nowrap}
@@ -129,20 +129,20 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-table td:first-child,.usage-table th:first-child{padding-left:20px}
 .usage-table tr:hover>td,.usage-row-expanded>td{background:color-mix(in srgb,var(--color-bg-subtle) 45%,var(--color-bg-surface))}
 .usage-table td>strong{font-weight:500;white-space:nowrap}
-.usage-table time{white-space:nowrap;font-size:11px;font-variant-numeric:tabular-nums}
-.usage-table td>small{display:block;margin-top:7px;font-size:10px;color:var(--color-text-muted);line-height:1.4}
+.usage-table time{white-space:nowrap;font-size:12px;font-variant-numeric:tabular-nums}
+.usage-table td>small{display:block;margin-top:7px;font-size:12px;color:var(--color-text-muted);line-height:1.4}
 .usage-code{font-family:var(--font-mono)}
 .usage-model-cell{max-width:230px;overflow-wrap:anywhere}
-.usage-model{display:inline-block;padding:5px 9px;border:1px solid var(--color-border-subtle);border-radius:4px;background:var(--color-bg-surface);font-size:11px;line-height:1.5}
+.usage-model{display:inline-block;padding:5px 9px;border:1px solid var(--color-border-subtle);border-radius:4px;background:var(--color-bg-surface);font-size:12px;line-height:1.5}
 .usage-numeric,.usage-result-count,.usage-charge{font-variant-numeric:tabular-nums}
 .usage-result-count{display:flex;align-items:center;gap:8px;font-size:14px}
-.inline{font-size:10px;color:var(--color-text-muted);font-weight:400;white-space:nowrap}
+.inline{font-size:12px;color:var(--color-text-muted);font-weight:400;white-space:nowrap}
 .usage-success{color:var(--color-success)}
 .usage-failed{color:var(--color-error)}
 .usage-slash{color:var(--color-border-strong)}
 .usage-charge{display:inline-block;font-size:15px;font-weight:600;white-space:nowrap}
-.usage-unbilled{color:var(--color-text-muted);font-size:11px}
-.usage-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;white-space:nowrap;color:var(--color-text-muted)}
+.usage-unbilled{color:var(--color-text-muted);font-size:12px}
+.usage-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;color:var(--color-text-muted)}
 .usage-status i{width:5px;height:5px;border-radius:50%;background:currentColor}
 .usage-status[data-tone=success]{color:var(--color-success)}
 .usage-status[data-tone=error]{color:var(--color-error)}
@@ -162,12 +162,12 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-detail-intro>a{flex-shrink:0;color:var(--color-accent-text)}
 .usage-item-list{margin-bottom:24px}
 .usage-detail-content h3{margin:0 0 12px;font-size:12px;font-weight:600}
-.usage-item{display:grid;grid-template-columns:2fr 1.4fr 100px 110px;gap:12px;align-items:baseline;padding:12px 0;border-top:1px solid var(--color-border-subtle);font-size:11px}
+.usage-item{display:grid;grid-template-columns:2fr 1.4fr 100px 110px;gap:12px;align-items:baseline;padding:12px 0;border-top:1px solid var(--color-border-subtle);font-size:12px}
 .usage-item>span:first-child{overflow-wrap:anywhere}
 .usage-item small{margin-left:12px;color:var(--color-text-muted);line-height:1.6}
-.usage-item>strong{text-align:right;font-size:11px;font-weight:500}
+.usage-item>strong{text-align:right;font-size:12px;font-weight:500}
 .usage-item-error{grid-column:1/-1;margin:0;color:var(--color-error);line-height:1.7}
-.usage-event{display:grid;grid-template-columns:160px 72px 100px 1fr;gap:16px;padding:10px 0;border-top:1px solid var(--color-border-subtle);font-size:11px;color:var(--color-text-muted)}
+.usage-event{display:grid;grid-template-columns:160px 72px 100px 1fr;gap:16px;padding:10px 0;border-top:1px solid var(--color-border-subtle);font-size:12px;color:var(--color-text-muted)}
 .usage-event strong{font-weight:500;color:var(--color-primary)}
 .usage-event [data-tone=charge]{color:var(--color-accent-text)}
 .usage-detail-state{margin:0;padding:20px;color:var(--color-text-muted);font-size:12px}
@@ -175,17 +175,17 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-empty strong{font-size:14px;font-weight:500;color:var(--color-primary)}
 .usage-empty p{margin:0;font-size:12px;line-height:1.7}
 .usage-empty>a{margin-top:6px;font-size:12px;color:var(--color-accent-text)}
-.usage-pagination{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 20px;font-size:11px;color:var(--color-text-muted);border-top:1px solid var(--color-border-subtle)}
+.usage-pagination{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 20px;font-size:12px;color:var(--color-text-muted);border-top:1px solid var(--color-border-subtle)}
 .usage-pagination p{margin:0}
 .usage-pagination nav{display:flex;align-items:center;gap:14px}
 .usage-page-button{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--color-border-subtle);border-radius:4px;background:var(--color-bg-surface)}
 .usage-page-button:hover:not(:disabled){background:var(--color-bg-subtle)}
-.usage-footnote{margin:16px 0 0;font-size:11px;line-height:1.8;color:var(--color-text-muted)}
+.usage-footnote{margin:16px 0 0;font-size:12px;line-height:1.8;color:var(--color-text-muted)}
 .usage-sr-only{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .spinning{animation:usage-spin 1.2s linear infinite}
 @keyframes usage-spin{to{transform:rotate(360deg)}}
 @media(min-width:1600px){.usage-filter-fields{grid-template-columns:minmax(430px,2.3fr) 1fr 1.2fr .8fr}.usage-table td{height:88px}}
 @media(max-width:1250px){.usage-filter-fields{grid-template-columns:1fr 1fr}.usage-date-range{grid-column:1/-1}.usage-summary>small{width:100%;margin-left:0}.usage-log-heading{align-items:flex-start;flex-direction:column;gap:8px}}
-@media(max-width:640px){.usage-heading{align-items:flex-start}.usage-heading h1{font-size:25px}.usage-heading p{max-width:200px;font-size:12px;line-height:1.7}.usage-heading>.usage-button{padding:0 10px}.usage-filters{padding:16px 16px 0}.usage-filter-fields{gap:14px 12px}.usage-filter-fields>label:nth-child(3){grid-column:1/-1;grid-row:3}.usage-date-range>div{flex-direction:column;align-items:stretch;gap:5px}.usage-date-range input{width:100%;flex:auto}.usage-date-range>div>span{font-size:10px}.usage-filter-bottom{align-items:flex-end;gap:12px}.usage-filter-bottom p{max-width:150px;line-height:1.7}.usage-summary{gap:12px 18px}.usage-summary-charge{width:100%}.usage-log-heading{padding:16px}.usage-pagination{padding:14px 16px;flex-wrap:wrap}.usage-pagination nav{margin-left:auto}.usage-footnote{font-size:10px}}
+@media(max-width:640px){.usage-heading{align-items:flex-start}.usage-heading h1{font-size:25px}.usage-heading p{max-width:200px;font-size:12px;line-height:1.7}.usage-heading>.usage-button{padding:0 10px}.usage-filters{padding:16px 16px 0}.usage-filter-fields{gap:14px 12px}.usage-filter-fields>label:nth-child(3){grid-column:1/-1;grid-row:3}.usage-date-range>div{flex-direction:column;align-items:stretch;gap:5px}.usage-date-range input{width:100%;flex:auto}.usage-date-range>div>span{font-size:12px}.usage-filter-bottom{align-items:flex-end;gap:12px}.usage-filter-bottom p{max-width:150px;line-height:1.7}.usage-summary{gap:12px 18px}.usage-summary-charge{width:100%}.usage-log-heading{padding:16px}.usage-pagination{padding:14px 16px;flex-wrap:wrap}.usage-pagination nav{margin-left:auto}.usage-footnote{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.spinning{animation:none}.usage-detail-button svg,.usage-button{transition:none}}
 </style>

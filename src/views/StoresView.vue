@@ -107,7 +107,7 @@ async function closeStore(store) {
 :global(.page-scroll.stores-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
 .stores-page { max-width: 1400px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
 .stores-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 30px; }
-.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .stores-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
 .header-desc { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.75; }
 .primary-button, .ghost-button, .link-button { font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -130,7 +130,7 @@ async function closeStore(store) {
 .store-card-title h2 { margin: 0; overflow: hidden; font-family: var(--font-serif); font-size: 19px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .store-card-title p { margin: 4px 0 0; color: var(--color-accent-text); font-size: 12px; font-weight: 600; }
 .store-card-title p.muted { color: var(--color-text-muted); font-weight: 500; }
-.store-badge { flex: none; padding: 4px 8px; border-radius: 4px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); font-size: 10px; font-weight: 700; }
+.store-badge { flex: none; padding: 4px 8px; border-radius: 4px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); font-size: 12px; font-weight: 700; }
 .store-facts { display: grid; gap: 9px; margin: 18px 0 14px; padding-top: 16px; border-top: 1px solid var(--color-border-subtle); }
 .store-facts > div { display: grid; grid-template-columns: 64px 1fr; gap: 10px; font-size: 13px; line-height: 1.6; }
 .store-facts dt { color: var(--color-text-muted); font-size: 12px; }

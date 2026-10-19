@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import StoreSwitcher from '../components/StoreSwitcher.vue'
 import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
@@ -24,6 +25,19 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
+const yanhuoPlan = computed(() => {
+  const summary = billing.summary
+  if (billing.error) return { label: '暂不可读', state: '' }
+  if (summary?.memberActive) return { label: summary.plan?.name || '会员', state: 'active' }
+  return summary?.plan ? { label: '会员已到期', state: 'expired' } : { label: '未开通会员', state: '' }
+})
+const yanhuoNote = computed(() => {
+  const summary = billing.summary
+  if (!summary) return '套餐与充值'
+  if (summary.held) return `生成中预占 ${number(summary.held)}`
+  if (summary.memberActive && summary.memberUntil) return `有效至 ${new Date(summary.memberUntil).toLocaleDateString('zh-CN')}`
+  return '开通会员即可创作'
+})
 const needsStore = computed(() => auth.isAuthenticated && billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
 // 侧边栏和顶栏使用当前账号资料；未设置头像时回退到名字首字。
@@ -283,8 +297,12 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 
       <div class="sidebar-footer paper-sidebar-footer">
         <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
-          <Wallet :size="18" class="sidebar-yanhuo-icon" />
-          <div class="sidebar-yanhuo-copy"><div><span>可用烟火</span><ArrowUpRight :size="14" /></div><strong>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong><p>{{ billing.error ? '账户暂不可读' : billing.summary?.memberActive ? billing.summary.plan?.name : billing.summary?.plan ? '会员已到期' : '尚未开通会员' }}<span v-if="billing.summary?.held"> · 预占 {{ number(billing.summary.held) }}</span></p><span class="sidebar-yanhuo-action">套餐与充值</span></div>
+          <Wallet :size="18" class="sidebar-yanhuo-icon" aria-hidden="true" />
+          <div class="sidebar-yanhuo-copy">
+            <div class="sidebar-yanhuo-head"><span>烟火余额</span><span class="sidebar-yanhuo-plan" :class="yanhuoPlan.state">{{ yanhuoPlan.label }}</span></div>
+            <strong class="sidebar-yanhuo-number">{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong>
+            <div class="sidebar-yanhuo-foot"><span>{{ yanhuoNote }}</span><span class="sidebar-yanhuo-action">充值<ArrowUpRight :size="13" aria-hidden="true" /></span></div>
+          </div>
         </RouterLink>
         <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
@@ -298,7 +316,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <RouterLink to="/image/create" class="header-brand" aria-label="一方志内容工具"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
-            <select v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select>
+            <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
@@ -348,5 +366,5 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 @media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
 @media (max-width: 860px) { .topbar .header-store, .topbar .top-account { display: none; } }
 @media (max-width: 860px) { .paper-main .page-scroll.page-scroll-workspace { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } }
-@media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 11px; } .topbar-entry svg { display: none; } .topbar .header-brand strong { display: none; } }
+@media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 12px; } .topbar-entry svg { display: none; } .topbar .header-brand strong { display: none; } }
 </style>

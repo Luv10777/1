@@ -42,7 +42,7 @@
 .publishing-page .pub-select-option[aria-selected="true"] .pub-select-option-icon { color: var(--pub-accent-text); }
 .publishing-page .pub-select-option-copy { min-width: 0; flex: 1; }
 .publishing-page .pub-select-option b { display: block; color: var(--pub-heading); font-size: 13px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
-.publishing-page .pub-select-option small { display: block; margin-top: 3px; color: var(--pub-muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.publishing-page .pub-select-option small { display: block; margin-top: 3px; color: var(--pub-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .publishing-page .pub-select-check { color: var(--pub-accent-text); flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   .publishing-page :is(.pub-select-menu, .pub-select-chevron, .pub-select-trigger, .pub-select-option) { transition: none; }
@@ -74,7 +74,7 @@
 }
 .publishing-page .pub-picture-select[aria-pressed="true"] { border-color: #2563eb; }
 .publishing-page .pub-picture-select img { width: 100%; height: 100%; object-fit: contain; }
-.publishing-page .pub-picture-select span { position: absolute; left: 5px; top: 5px; padding: 3px 6px; font-size: 11px; border-radius: 4px; background: #18181bd9; color: #fff; }
+.publishing-page .pub-picture-select span { position: absolute; left: 5px; top: 5px; padding: 3px 6px; font-size: 12px; border-radius: 4px; background: #18181bd9; color: #fff; }
 .publishing-page .pub-picture-actions { display: flex; justify-content: space-between; gap: 3px; margin-top: 5px; }
 .publishing-page .pub-picture-actions button, .publishing-page .pub-icon-button {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -106,9 +106,9 @@
 .publishing-page .pub-commerce-picker { min-width: 0; }
 .publishing-page .pub-commerce-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .publishing-page .pub-commerce-heading .field-label { margin: 0; }
-.publishing-page .pub-commerce-heading small { font-size: 11px; color: var(--pub-muted); }
+.publishing-page .pub-commerce-heading small { font-size: 12px; color: var(--pub-muted); }
 .publishing-page .pub-commerce-source { font-size: 12px; color: var(--pub-text); line-height: 1.7; margin: 10px 0; overflow-wrap: anywhere; }
-.publishing-page .pub-commerce-source span { display: block; color: var(--pub-muted); font-size: 11px; }
+.publishing-page .pub-commerce-source span { display: block; color: var(--pub-muted); font-size: 12px; }
 .publishing-page .pub-commerce-message { display: flex; align-items: start; gap: 10px; background: var(--pub-muted-surface); padding: 16px; border-radius: 8px; border: 1px solid var(--pub-border); }
 .publishing-page .pub-commerce-message > svg { flex-shrink: 0; color: var(--pub-commerce); }
 .publishing-page .pub-commerce-message b { font-size: 13px; font-weight: 600; color: var(--pub-heading); }

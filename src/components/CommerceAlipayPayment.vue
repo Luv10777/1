@@ -43,7 +43,7 @@ watch(() => props.order.payment?.qrCodeUrl, () => { imageError.value = false })
 .commerce-alipay-label { margin: 20px 0 4px; color: var(--color-text-muted); font-size: 12px; }
 .commerce-alipay-amount { margin: 0; font-size: 36px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .commerce-alipay-amount > span { margin-right: 4px; font-size: 21px; }
-.commerce-alipay-order { margin: 10px 0 16px; color: var(--color-text-muted); font-size: 11px; overflow-wrap: anywhere; }
+.commerce-alipay-order { margin: 10px 0 16px; color: var(--color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
 .commerce-alipay-order strong { color: var(--color-primary); font-weight: 500; user-select: all; }
 .commerce-alipay-code { display: flex; justify-content: center; align-items: center; width: min(100%, 280px); min-height: 180px; margin: 0 auto; background: #fff; }
 .commerce-alipay-code img { display: block; width: 100%; height: auto; aspect-ratio: 1; }
@@ -53,7 +53,7 @@ watch(() => props.order.payment?.qrCodeUrl, () => { imageError.value = false })
 .commerce-alipay-download:hover { text-decoration: underline; }
 .commerce-alipay-download:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .commerce-alipay-instructions { display: grid; gap: 8px; margin: 16px 0 0; padding: 16px 0 0 18px; border-top: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 12px; line-height: 1.8; text-align: left; }
-.commerce-alipay-help { margin: 14px 0 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.8; text-align: left; }
+.commerce-alipay-help { margin: 14px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.8; text-align: left; }
 .commerce-alipay-help a { margin-left: 4px; color: var(--color-accent-text); white-space: nowrap; }
 @media (max-width: 560px) { .commerce-alipay { padding: 20px 14px; } .commerce-alipay-amount { font-size: 32px; } }
 </style>
