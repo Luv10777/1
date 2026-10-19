@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -36,6 +37,7 @@ public class LiveSessionService {
     private final KnowledgeService knowledge;
     private final StoreAccessService stores;
     private final VoiceService voices;
+    private final LiveBilling billing;
 
     /** A session that is on air or merely paused. A store has at most one. */
     public static final Set<String> ACTIVE = Set.of("LIVE", "PAUSED");
@@ -109,6 +111,7 @@ public class LiveSessionService {
     /** Starts the configured session lifecycle; external streaming is not implemented here. */
     @Transactional
     public LiveDtos.View start(Long id, Long userId) {
+        billing.lockAccount();
         LiveSession session = require(id, userId, true);
         requireState(session, Set.of("DRAFT"));
         // The room link stays optional: nothing reads it until a comment source is connected,
@@ -126,8 +129,11 @@ public class LiveSessionService {
                             "门店已有一场正在进行的直播「" + other.getName() + "」，请先结束它再开始新的一场");
                 });
         buildSnapshot(session, selected, userId);
+        Instant now = Instant.now();
+        // Reserves the first hour; no live entitlement or too few credits leaves the session a draft.
+        billing.startAir(session, now);
         session.setStatus("LIVE");
-        session.setStartedAt(Instant.now());
+        session.setStartedAt(now);
         try {
             return saveView(session);
         } catch (DataIntegrityViolationException raced) {
@@ -316,11 +322,51 @@ public class LiveSessionService {
     }
 
     private LiveDtos.View transition(Long id, String nextState, Set<String> allowed, Long userId) {
+        billing.lockAccount();
         LiveSession session = require(id, userId, true);
         requireState(session, allowed);
-        session.setStatus(nextState);
-        if ("ENDED".equals(nextState)) session.setEndedAt(Instant.now());
+        applyTransition(session, nextState, Instant.now());
         return saveView(session);
+    }
+
+    /** Only on-air time is billed: leaving LIVE closes the stretch, ENDED settles by the minute. */
+    private void applyTransition(LiveSession session, String nextState, Instant now) {
+        if ("LIVE".equals(nextState)) billing.startAir(session, now);
+        else if ("LIVE".equals(session.getStatus())) billing.stopAir(session, now);
+        session.setStatus(nextState);
+        if ("ENDED".equals(nextState)) {
+            session.setEndedAt(now);
+            billing.settle(session);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> onAirIds(Long tenantId) {
+        return sessions.findByTenantIdAndStatusIn(tenantId, Set.of("LIVE")).stream().map(LiveSession::getId).toList();
+    }
+
+    /**
+     * Worker-only metering: reserves the next hour before the current one runs out, and pauses the
+     * session when it cannot (credits used up, membership expired or the plan has no live access).
+     * Returns false when the session was paused.
+     */
+    @Transactional
+    public boolean meter(Long id) {
+        billing.lockAccount();
+        LiveSession session = sessions.findForUpdate(id).orElse(null);
+        if (session == null || !"LIVE".equals(session.getStatus())) return true;
+        Instant now = Instant.now();
+        String reservation = session.getBillingReservationId();
+        int hours = session.getBilledHours();
+        if (billing.renew(session, now)) {
+            if (hours != session.getBilledHours() || !Objects.equals(reservation, session.getBillingReservationId())) {
+                saveView(session);
+            }
+            return true;
+        }
+        applyTransition(session, "PAUSED", now);
+        saveView(session);
+        return false;
     }
 
     private void replaceProducts(LiveSession session, List<Long> ids, Long userId) {

@@ -149,6 +149,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <ul class="yanhuo-entitlements">
             <li :class="{ enabled: account.memberActive && account.plan?.imageEnabled }"><Check :size="14" />图片创作</li>
             <li :class="{ enabled: account.memberActive && account.plan?.videoEnabled }"><Check :size="14" />视频创作</li>
+            <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />直播</li>
           </ul>
           <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '选择套餐' }}<ArrowUpRight :size="15" /></a>
         </article>
@@ -177,7 +178,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <div class="yanhuo-plan-top"><h3>{{ plan.name }}</h3><span v-if="account.plan?.code === plan.code && account.memberActive" class="yanhuo-current">当前套餐</span></div>
             <p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p>
             <p class="yanhuo-plan-description">{{ plan.description }}</p>
-            <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li></ul>
+            <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li></ul>
             <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="subscribe(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button>
           </article>
         </div>
@@ -198,6 +199,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <div><dt>图片创作</dt><dd><strong>{{ account.imageCredits }} 烟火 / 张</strong>生成中先预占，未交付的退回。</dd></div>
           <div><dt>视频反推</dt><dd><strong>{{ account.videoAnalysisCredits }} 烟火 / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
           <div><dt>视频生成</dt><dd><strong>按确认的报价</strong>先预占烟火，交付后按实际用量结算。</dd></div>
+          <div><dt>直播</dt><dd><strong>{{ account.liveCreditsPerHour }} 烟火 / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>
         </dl>
         <p class="yanhuo-note">其他模块按正式公布的规则计费。</p>
       </section>

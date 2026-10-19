@@ -7,8 +7,10 @@ import java.util.List;
 public final class BillingDtos {
     private BillingDtos() {}
     public record PlanSnapshot(Long id, String code, String name, String description, long priceMinor,
-                               int durationDays, long giftCredits, boolean imageEnabled, boolean videoEnabled) {}
-    public record Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits, long available,
+                               int durationDays, long giftCredits, boolean imageEnabled, boolean videoEnabled,
+                               boolean liveEnabled) {}
+    public record Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits,
+                          int liveCreditsPerHour, long available,
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
                           Instant memberUntil, PlanSnapshot plan, boolean canManage, boolean operator,
                           PaymentInstructions payment, String paymentMethod) {}
@@ -22,7 +24,7 @@ public final class BillingDtos {
                           @NotBlank @Size(max=100) String name, @NotNull @Size(max=600) String description,
                           @Min(1) @Max(100000000) long priceMinor, @Min(1) @Max(3660) int durationDays,
                           @Min(0) @Max(100000000) long giftCredits, boolean imageEnabled, boolean videoEnabled,
-                          boolean published) {}
+                          boolean liveEnabled, boolean published) {}
     public record Publication(boolean published) {}
     public record PlanListing(PlanSnapshot plan, boolean published) {}
     public record Confirmation(@Min(1) long receivedAmountMinor,

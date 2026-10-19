@@ -60,6 +60,21 @@ public class LiveSession {
     @Column(name = "ended_at")
     private Instant endedAt;
 
+    /** On-air seconds of finished LIVE stretches; paused time is never counted. */
+    @Column(name = "live_seconds", nullable = false)
+    private long liveSeconds = 0;
+
+    /** Start of the current LIVE stretch, or null while paused, ended or never started. */
+    @Column(name = "live_segment_started_at")
+    private Instant liveSegmentStartedAt;
+
+    @Column(name = "billing_reservation_id", length = 36)
+    private String billingReservationId;
+
+    /** Whole hours reserved so far; settlement charges by the minute and returns the rest. */
+    @Column(name = "billed_hours", nullable = false)
+    private int billedHours = 0;
+
     @Column(name = "created_by")
     private Long createdBy;
 

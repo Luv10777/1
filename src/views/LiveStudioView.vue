@@ -28,6 +28,7 @@ const stageTabs = [
 const sessionTools = ref(null)
 const realtimeFeed = ref({ status: 'NOT_READY', message: '', items: [] })
 let realtimePoll = null
+let sessionStatusPoll = null
 const audioControl = ref(null)
 const setStage = (next) => {
   stage.value = next
@@ -550,12 +551,28 @@ const loadRealtime = async () => {
   if (!activeSessionId.value || stage.value !== 'live') return
   try { realtimeFeed.value = await liveApi.realtime(activeSessionId.value) } catch { /* keep the last feed state visible */ }
 }
+// 后台按小时预占烟火，续不上会自动暂停本场；这里定期核对状态，免得页面还显示在播、主播已经不说话。
+const checkSessionStatus = async () => {
+  const id = activeSessionId.value
+  if (!id || stage.value !== 'live' || currentStatus.value !== 'LIVE' || apiBusy.value) return
+  try {
+    const latest = await liveApi.get(id)
+    if (id !== activeSessionId.value || currentStatus.value !== 'LIVE' || latest.status === 'LIVE') return
+    currentSession.value = latest
+    rememberSession(latest)
+    if (latest.status === 'PAUSED') draftError.value = '烟火不足或会员已到期，本场已自动暂停。充值或续订后点「继续」即可恢复播报。'
+  } catch { /* 下一轮再核对 */ }
+}
 watch(() => [stage.value, activeSessionId.value], ([nextStage, id]) => {
   clearInterval(realtimePoll)
+  clearInterval(sessionStatusPoll)
   realtimeFeed.value = { status: 'NOT_READY', message: '', items: [] }
-  if (nextStage === 'live' && id) { loadRealtime(); realtimePoll = setInterval(loadRealtime, 3000) }
+  if (nextStage === 'live' && id) {
+    loadRealtime(); realtimePoll = setInterval(loadRealtime, 3000)
+    sessionStatusPoll = setInterval(checkSessionStatus, 30000)
+  }
 }, { immediate: true })
-onBeforeUnmount(() => clearInterval(realtimePoll))
+onBeforeUnmount(() => { clearInterval(realtimePoll); clearInterval(sessionStatusPoll) })
 // 桌面端是用来开播的：只要这一场还没结束，打开就是直播工作台；配置在旁边的页签里。
 const stageFor = (status) => (status === 'ENDED' ? 'review' : hasWorkbench && (isActiveSession({ status }) || inDesktop) ? 'live' : 'setup')
 const loadSessionCore = async (id, ticket, storeId) => {
