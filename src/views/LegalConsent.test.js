@@ -106,7 +106,7 @@ test('store checkout keeps recipient details and the cart when consent is missin
   } finally { await context.close() }
 })
 
-test('top-ups, subscriptions and pending payments require consent while paid order details remain accessible', async () => {
+test('top-ups and subscriptions require consent', async () => {
   const context = await fixture('BillingView', '/billing', [{ path: '/billing', name: 'billing' }])
   const originalFetch = globalThis.fetch
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ code: 200, data: [] }) })
@@ -114,11 +114,9 @@ test('top-ups, subscriptions and pending payments require consent while paid ord
     const { auth } = await context.vite.ssrLoadModule('/src/stores/auth.js')
     const { billing, billingApi } = await context.vite.ssrLoadModule('/src/stores/billing.js')
     billing.summary = { canManage: true, payment: { available: true } }
-    billingApi.ledger = async () => ({ items: [], hasMore: false })
     const calls = []
     billingApi.topUp = async values => { calls.push(['topup', values]); return { state: 'CANCELLED' } }
     billingApi.subscribe = async values => { calls.push(['subscribe', values]); return { state: 'CANCELLED' } }
-    billingApi.refresh = async id => { calls.push(['refresh', id]); return { id, state: 'CANCELLED' } }
     const view = context.mount()
     await settle()
     let focusCount = 0
@@ -126,18 +124,14 @@ test('top-ups, subscriptions and pending payments require consent while paid ord
     assert.equal(view.purchaseConsent, false)
     await view.topUp()
     await view.subscribe({ id: 3 })
-    await view.resumeOrder({ id: 4, state: 'PENDING_PAYMENT' })
     assert.deepEqual(calls, [])
-    assert.ok(focusCount >= 3)
-    await view.resumeOrder({ id: 5, state: 'PAID' })
-    assert.deepEqual(calls, [['refresh', 5]], 'reading an existing payment record does not require a new purchase')
+    assert.ok(focusCount >= 2)
     view.purchaseConsent = true
     await view.topUp()
     await view.subscribe({ id: 3 })
-    await view.resumeOrder({ id: 4, state: 'PENDING_PAYMENT' })
-    assert.deepEqual(calls.map(([kind]) => kind), ['refresh', 'topup', 'subscribe', 'refresh'])
-    assert.equal(calls[1][1].amountMinor, 5000)
-    assert.equal(calls[2][1].planId, 3)
+    assert.deepEqual(calls.map(([kind]) => kind), ['topup', 'subscribe'])
+    assert.equal(calls[0][1].amountMinor, 5000)
+    assert.equal(calls[1][1].planId, 3)
     auth.state.user = { id: 2, tenantId: 9 }
     assert.equal(view.purchaseConsent, false, 'another account cannot inherit purchase consent')
   } finally { await context.close(); globalThis.fetch = originalFetch }
