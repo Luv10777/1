@@ -57,7 +57,7 @@ onBeforeUnmount(() => { requestVersion++ })
   <main class="public-commerce public-information-page" :class="{ 'in-shell': inShell }">
     <header v-if="!inShell" class="public-commerce-topbar">
       <RouterLink to="/image/create" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
-      <nav aria-label="公开服务"><RouterLink to="/merchant-alliance">商户联盟</RouterLink><RouterLink to="/information-publishing">发布与管理</RouterLink></nav>
+      <nav aria-label="公开服务"><RouterLink to="/merchant-alliance">商城好物</RouterLink><RouterLink to="/information-publishing">发布与管理</RouterLink></nav>
     </header>
     <div class="public-information-content">
       <header class="information-masthead">

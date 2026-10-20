@@ -32,7 +32,7 @@ watch(() => auth.isAuthenticated, signedIn => {
 
 <template>
   <div class="business-page merchant-alliance-page merchant-join-page">
-    <header class="business-heading"><div><h1>成为一方商家</h1><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><RouterLink to="/merchant-alliance" class="business-link"><ArrowLeft :size="15" aria-hidden="true" />返回商户联盟</RouterLink></header>
+    <header class="business-heading"><div><h1>成为一方商家</h1><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><RouterLink to="/merchant-alliance" class="business-link"><ArrowLeft :size="15" aria-hidden="true" />返回商城好物</RouterLink></header>
     <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
       <div class="business-records-heading"><div><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>

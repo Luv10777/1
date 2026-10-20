@@ -135,7 +135,7 @@ const navGroups = [
     key: 'mall',
     label: '商城',
     items: [
-      { name: 'merchant-alliance', label: '商户联盟', path: '/merchant-alliance' },
+      { name: 'merchant-alliance', label: '商城好物', path: '/merchant-alliance' },
       { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'public-information', label: '信息广场', path: '/information' },
       { name: 'information-publishing', label: '我的发布', path: '/information-publishing' },
@@ -144,7 +144,7 @@ const navGroups = [
   {
     // 联盟券是会员权益（领券、到店核销、供券结算），和商城的网上买卖分开放。
     key: 'alliance',
-    label: '联盟券',
+    label: '商户联盟',
     items: [
       { name: 'alliance-pool', label: '领券中心', path: '/alliance/pool' },
       { name: 'alliance-vouchers', label: '我的联盟券', path: '/alliance/vouchers' },
@@ -192,7 +192,7 @@ const getInitialExpandedGroups = () => {
 }
 
 const expandedGroups = ref(getInitialExpandedGroups())
-// 入驻页是商户联盟下的子页，侧边栏继续高亮「商户联盟」。
+// 入驻页是商城好物下的子页，侧边栏继续高亮「商城好物」。
 const isActive = (name) => route.name === name || (name === 'merchant-alliance' && route.name === 'merchant-join')
 const isGroupActive = (group) => isActive(group.name) || route.meta.navGroup === group.key || group.items?.some(item => isActive(item.name))
 const isGroupExpanded = (key) => expandedGroups.value.has(key)
@@ -330,7 +330,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
-            <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="15" aria-hidden="true" />商户联盟</RouterLink>
+            <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
             <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><UserAvatar v-if="auth.isAuthenticated" class="small" :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span v-else class="user-avatar small"><UserRound :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
@@ -350,7 +350,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
         <SiteFooter v-if="route.matched.length" />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
-      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="21" aria-hidden="true" /><small>联盟</small></RouterLink></nav>
+      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="21" aria-hidden="true" /><small>好物</small></RouterLink></nav>
     </main>
   </div>
 </template>

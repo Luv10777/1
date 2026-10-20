@@ -97,7 +97,7 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商户联盟', navGroup: 'mall' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商城好物', navGroup: 'mall' } },
   { path: '/merchant-alliance/join', name: 'merchant-join', component: MerchantJoinView, meta: { guest: true, title: '商家入驻', navGroup: 'mall' } },
   { path: '/alliance/pool', name: 'alliance-pool', component: AlliancePoolView, meta: { title: '领券中心', navGroup: 'alliance' } },
   { path: '/alliance/vouchers', name: 'alliance-vouchers', component: AllianceVouchersView, meta: { title: '我的联盟券', navGroup: 'alliance' } },

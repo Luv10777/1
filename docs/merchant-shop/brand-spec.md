@@ -8,4 +8,4 @@
 
 品牌素材：`public/images/brand/yifangzhi-mark.png`；字体：`public/fonts/yifangzhi-serif-sc.woff2`、`public/fonts/yifangzhi-sans-sc.woff2`。产品图片由用户提供的 `一方志-32-1.png`、`一方志-32-2.png` 压缩为 JPEG 后通过素材上传接口入库，公开展示使用 API 返回的签名图片地址。
 
-商户联盟页（`/merchant-alliance`）的商品墙读取 `GET /api/public/products`，展示全平台已上架的实物商品，不再依赖手工维护的选品文件。访客可浏览并进入店铺下单；入驻申请在 `/merchant-alliance/join`，提交经营资料和读取申请记录需要认证。下单后由商家确认，目前没有线上付款。
+商城好物页（`/merchant-alliance`）的商品墙读取 `GET /api/public/products`，展示全平台已上架的实物商品，不再依赖手工维护的选品文件。访客可浏览并进入店铺下单；入驻申请在 `/merchant-alliance/join`，提交经营资料和读取申请记录需要认证。下单后由商家确认，目前没有线上付款。
