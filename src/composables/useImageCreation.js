@@ -56,9 +56,11 @@ export function useImageCreation(workflow) {
     return Object.values(ratios).some(values => values?.includes(value))
   }
   const supportsQuality = value => supportsImageSize(capabilities.value, value, ratio.value)
+  // 海报只开放 1K / 2K。
+  const qualities = product.value ? IMAGE_QUALITIES : IMAGE_QUALITIES.filter(tier => tier !== '4K')
   function syncHighestQuality() {
     if (supportsQuality(quality.value)) return
-    const supported = IMAGE_QUALITIES.filter(tier => supportsQuality(tier))
+    const supported = qualities.filter(tier => supportsQuality(tier))
     if (supported.length) quality.value = supported.at(-1)
   }
   const active = computed(() => isImageActive(current.value?.status))
@@ -325,7 +327,7 @@ export function useImageCreation(workflow) {
     if (!locked.value && lastPrompt.value) brief.value = lastPrompt.value
   }
   return reactive({
-    product, brief, ratio, quality, count, platform, imageType, purpose, style, files, busy, error,
+    product, brief, ratio, quality, qualities, count, platform, imageType, purpose, style, files, busy, error,
     capabilities, capabilityState, capabilityError, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
