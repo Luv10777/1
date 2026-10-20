@@ -6,14 +6,17 @@ import {
   imageDimensions,
   isImageActive,
 } from "../domain/imageCreation";
-import { POSTER_SCENARIOS } from "../domain/posterScenarios";
+import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from "../domain/posterStyles";
 import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
-import InspirationCard from "./InspirationCard.vue";
+import PosterStyleCard from "./PosterStyleCard.vue";
 import { Check, Pencil, X } from "lucide-vue-next";
 
-const props = defineProps({ studio: { type: Object, required: true } });
+const props = defineProps({ studio: { type: Object, required: true }, storeName: { type: String, default: "" } });
 const emit = defineEmits(["choose"]);
 const studio = computed(() => props.studio);
+const swatchTitle = computed(() => props.storeName.replace(/[（(].*$/, "").trim().slice(0, 6) || "一方志");
+const moment = upcomingMoment();
+const seasonalStyle = SEASONAL_PREFIX + moment.name;
 const galleryScroll = ref(null);
 const preview = ref(null);
 const previewDialog = ref(null);
@@ -138,7 +141,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           "
           @click="showTab('inspiration')"
         >
-          灵感画廊</button
+          海报风格</button
         ><button
           type="button"
           :class="{ active: studio.workspaceTab === 'result' }"
@@ -175,15 +178,27 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-if="studio.workspaceTab === 'inspiration'"
         class="poster-inspiration-view"
       >
-        <div class="poster-inspiration-grid">
-          <InspirationCard
-            v-for="(scenario, index) in POSTER_SCENARIOS"
-            :key="scenario.focus"
-            :scenario="scenario"
-            :index="index"
-            :selected="studio.style === scenario.focus"
+        <div class="poster-style-grid">
+          <PosterStyleCard
+            v-for="style in POSTER_STYLES"
+            :key="style.key"
+            :look="style.key"
+            :name="style.name"
+            :fit="style.fit"
+            :title="swatchTitle"
+            :selected="studio.style === style.name"
             :disabled="studio.locked"
-            @select="emit('choose', $event)"
+            @select="emit('choose', style.name)"
+          />
+          <PosterStyleCard
+            look="seasonal"
+            name="应时"
+            :fit="`下一个：${moment.next}`"
+            :title="moment.name"
+            :note="moment.days ? `${moment.days} 天后 · ${moment.month}/${moment.day}` : '就是今天'"
+            :selected="studio.style === seasonalStyle"
+            :disabled="studio.locked"
+            @select="emit('choose', seasonalStyle)"
           />
         </div>
       </div>
@@ -259,10 +274,10 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           <span class="poster-empty-emblem">志</span>
           <h3>让一张海报，讲好门店的故事。</h3>
           <p>
-            选一个经营场景，写下真实商品和活动。生成后海报会完整出现在这里。
+            写下真实商品和活动，再挑一个海报风格。生成后海报会完整出现在这里。
           </p>
           <button type="button" @click="showTab('inspiration')">
-            浏览灵感方向 ↗
+            挑选海报风格 ↗
           </button>
         </div>
         <div class="poster-thread">

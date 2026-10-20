@@ -8,8 +8,8 @@
 .paper-app :is(.video-generate-button,.premium-primary,.new-work-button){background:var(--color-accent);color:var(--color-on-accent);border-color:transparent;box-shadow:none}
 .paper-app :is(input,textarea,:is(select, .app-select-button)):focus-visible{outline-color:var(--color-primary)}
 /* A borderless field inside its own bordered box shows focus on that box, never as a second dark frame inside it. */
-:root :is(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .floating-prompt-bar, .poster-composer) :is(input, textarea):focus-visible { outline: none; }
-:where(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .floating-prompt-bar, .poster-composer):focus-within { border-color: var(--color-primary); }
+:root :is(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .poster-composer) :is(input, textarea):focus-visible { outline: none; }
+:where(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .poster-composer):focus-within { border-color: var(--color-primary); }
 /* The publishing state aliases come from the same paper/ink system in both modes. */
 :root .paper-app:has(.publishing-page){
  --pub-canvas:var(--color-bg-canvas);--pub-input:var(--color-bg-surface);--pub-surface:var(--color-bg-surface);--pub-panel:var(--color-bg-surface);--pub-card:var(--color-bg-surface);--pub-muted-surface:var(--color-bg-subtle);--pub-hover-surface:var(--color-bg-subtle);
@@ -120,7 +120,6 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 .paper-app :is(.video-create-header,.video-entry-grid,.studio-header,.studio-workspace,.dh-page-header,.dh-workspace) { width: 100%; max-width: none; }
 .paper-app .poster-studio-page { min-height: 100%; background: var(--night); }
 .paper-app:has(.poster-studio-page) .main-area { position: relative; }
-.paper-app .floating-prompt-shell { position: absolute; left: 50%; width: min(820px, calc(100% - 48px)); bottom: 24px; }
 .paper-app :is(.video-workbench-sidebar,.video-workbench-action) { border-color: var(--line); background: var(--night-panel); box-shadow: none; }
 .paper-app .video-workbench-sidebar { flex-basis: clamp(320px, 28vw, 400px); width: clamp(320px, 28vw, 400px); }
 .paper-app .video-workbench-canvas { background: var(--night); }
@@ -143,14 +142,13 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 .paper-app :is(.workflow-card::before,.video-entry-orb) { display: none; }
 .paper-app :is(.workflow-tags span,.video-entry-icon) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night); }
 .paper-app :is(.workflow-card-cyan .workflow-arrow,.video-entry-card-cyan .video-entry-cta,.video-entry-icon-cyan) { color: var(--color-accent-text); }
-.paper-app :is(.floating-prompt-bar,.prompt-popover,.history-dropdown,.upload-modal) { border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--night-panel); box-shadow: var(--shadow-paper-elevated); backdrop-filter: none; }
-.paper-app .floating-prompt-bar::after { display: none; }
-.paper-app :is(.prompt-pill,.filter-chip,.history-trigger) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); }
-.paper-app :is(.prompt-send,.upload-button,.primary-action) { border-color: var(--color-accent); border-radius: 4px; color: var(--color-on-accent); background: var(--color-accent); }
-.paper-app :is(.prompt-send,.upload-button,.primary-action):hover { background: var(--color-accent-hover); }
+.paper-app :is(.history-dropdown,.upload-modal) { border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--night-panel); box-shadow: var(--shadow-paper-elevated); backdrop-filter: none; }
+.paper-app :is(.filter-chip,.history-trigger) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); }
+.paper-app :is(.upload-button,.primary-action) { border-color: var(--color-accent); border-radius: 4px; color: var(--color-on-accent); background: var(--color-accent); }
+.paper-app :is(.upload-button,.primary-action):hover { background: var(--color-accent-hover); }
 .paper-app .template-overlay { opacity: 1; transform: none; }
 @media(max-width:1100px) { .paper-app .video-workbench-sidebar { flex-basis: 320px; width: 320px; } }
-@media(max-width:860px) { .paper-app .page-scroll { padding: 24px 20px 80px; } .paper-app .page-scroll.page-scroll-workspace { padding: 0 0 56px; } .paper-app .floating-prompt-shell { bottom: 70px; width: calc(100% - 32px); } }
+@media(max-width:860px) { .paper-app .page-scroll { padding: 24px 20px 80px; } .paper-app .page-scroll.page-scroll-workspace { padding: 0 0 56px; } }
 @media(max-width:760px) { .paper-app .page-scroll.page-scroll-workspace { display: block; overflow: auto; } .paper-app .page-scroll-workspace > * { height: auto; min-height: 100%; } .paper-app .video-workbench-page { display: block; height: auto; overflow: visible; } .paper-app .video-workbench-sidebar { width: 100%; height: auto; } .paper-app .video-workbench-scroll { overflow: visible; } .paper-app .video-workbench-canvas { min-height: 560px; height: 560px; } }
 /* Asset and merchant pages use the same paper/ink tokens in both themes. */
 :root .paper-app :is(.store-info-page,.brands-page,.knowledge-page,.works-library,.asset-library) { --paper:var(--color-bg-canvas); --surface:var(--color-bg-surface); --ink:var(--color-primary); --muted:var(--color-text-muted); --line:var(--color-border-subtle); max-width:none; margin:0; padding:0; color:var(--ink); background:var(--night); font-family:var(--font-sans); }
