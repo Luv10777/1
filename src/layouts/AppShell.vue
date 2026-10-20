@@ -119,7 +119,7 @@ const navGroups = [
     key: 'mall',
     label: '商城',
     items: [
-      { name: 'merchant-alliance', label: '商家入驻', path: '/merchant-alliance' },
+      { name: 'merchant-alliance', label: '商户联盟', path: '/merchant-alliance' },
       { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'public-information', label: '信息广场', path: '/information' },
       { name: 'information-publishing', label: '我的发布', path: '/information-publishing' },
@@ -165,7 +165,8 @@ const getInitialExpandedGroups = () => {
 }
 
 const expandedGroups = ref(getInitialExpandedGroups())
-const isActive = (name) => route.name === name
+// 入驻页是商户联盟下的子页，侧边栏继续高亮「商户联盟」。
+const isActive = (name) => route.name === name || (name === 'merchant-alliance' && route.name === 'merchant-join')
 const isGroupActive = (group) => isActive(group.name) || route.meta.navGroup === group.key || group.items?.some(item => isActive(item.name))
 const isGroupExpanded = (key) => expandedGroups.value.has(key)
 const saveExpandedGroups = () => {
@@ -298,7 +299,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
             <select v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select>
-            <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
+            <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="15" aria-hidden="true" />商户联盟</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
             <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><span class="user-avatar small"><template v-if="auth.isAuthenticated">{{ userInitial }}</template><UserRound v-else :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
@@ -317,7 +318,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
         <slot v-else />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
-      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>入驻</small></RouterLink></nav>
+      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="21" aria-hidden="true" /><small>联盟</small></RouterLink></nav>
     </main>
   </div>
 </template>

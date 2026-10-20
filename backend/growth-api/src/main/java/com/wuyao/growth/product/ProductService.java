@@ -151,6 +151,16 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    public PageResult<ProductDtos.PublicListing> publicCatalog(int page, int size, String keyword) {
+        if (page < 0 || size < 1 || size > 50) throw BizException.of(ErrorCode.BAD_REQUEST, "page 必须非负，size 必须在 1 到 50 之间");
+        String normalized = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        var result = productRepository.searchPublicPhysical(normalized, PageRequest.of(page, size));
+        return PageResult.of(result, result.getContent().stream().map(product -> ProductDtos.PublicListing.of(product,
+                imageRepository.findByProductIdOrderBySortOrderAscIdAsc(product.getId()).stream()
+                        .findFirst().map(ProductImage::getAssetId).orElse(null))).toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<SaleProduct> saleProducts(List<Long> productIds) {
         return productRepository.findAllById(productIds).stream()
                 .filter(product -> "ACTIVE".equals(product.getStatus()) && "PUBLISHED".equals(product.getOnlineStatus())

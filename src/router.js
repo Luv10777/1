@@ -37,6 +37,7 @@ const MerchantAllianceView = () => import('./views/MerchantAllianceView.vue')
 const InformationPublishingView = () => import('./views/InformationPublishingView.vue')
 const PublicStorefrontView = () => import('./views/PublicStorefrontView.vue')
 const PublicOrderView = () => import('./views/PublicOrderView.vue')
+const MerchantJoinView = () => import('./views/MerchantJoinView.vue')
 const MerchantOrdersView = () => import('./views/MerchantOrdersView.vue')
 const PublicInformationView = () => import('./views/PublicInformationView.vue')
 const PublicInformationDetailView = () => import('./views/PublicInformationDetailView.vue')
@@ -47,8 +48,8 @@ const routes = [
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/store/:storeId(\\d+)', name: 'public-storefront', component: PublicStorefrontView, meta: { public: true, title: '店铺商品' } },
   { path: '/order/:token', name: 'public-order', component: PublicOrderView, meta: { public: true, title: '订单查询' } },
-  { path: '/information', name: 'public-information', component: PublicInformationView, meta: { public: true, title: '本地商家信息' } },
-  { path: '/information/:id(\\d+)', name: 'public-information-detail', component: PublicInformationDetailView, meta: { public: true, title: '信息详情' } },
+  { path: '/information', name: 'public-information', component: PublicInformationView, meta: { public: true, shellWhenSignedIn: true, title: '本地商家信息', navGroup: 'mall' } },
+  { path: '/information/:id(\\d+)', name: 'public-information-detail', component: PublicInformationDetailView, meta: { public: true, shellWhenSignedIn: true, title: '信息详情', navGroup: 'mall' } },
   { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
   { path: '/app', name: 'app-download', component: AppDownloadView, meta: { public: true, title: '一方志 App' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益', eyebrow: 'SAAS COMMERCIAL' } },
@@ -90,7 +91,8 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', eyebrow: 'GEO GROWTH', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', eyebrow: 'GEO GROWTH', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', eyebrow: 'GEO GROWTH', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商家入驻', navGroup: 'mall' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商户联盟', navGroup: 'mall' } },
+  { path: '/merchant-alliance/join', name: 'merchant-join', component: MerchantJoinView, meta: { guest: true, title: '商家入驻', navGroup: 'mall' } },
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
   // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
   { path: '/identity', alias: '/real-name', name: 'identity', redirect: { name: 'settings', hash: '#identity' } },

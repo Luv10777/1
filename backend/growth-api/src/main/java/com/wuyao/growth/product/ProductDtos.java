@@ -111,6 +111,16 @@ public final class ProductDtos {
         }
     }
 
+    /** 商品墙上的一张卡片：不含问答、版本号等管理字段，只带第一张图的素材编号。 */
+    public record PublicListing(Long id, Long storeId, String name, String category, BigDecimal price,
+                                String saleUnit, String specification, Integer inventory, Long coverAssetId) {
+        static PublicListing of(Product product, Long coverAssetId) {
+            return new PublicListing(product.getId(), product.getStoreId(), product.getName(), product.getCategory(),
+                    product.getPrice(), product.getSaleUnit(), product.getSpecification(), product.getInventory(),
+                    coverAssetId);
+        }
+    }
+
     public record ImageView(Long id, Long assetId, Integer sortOrder) {
         static ImageView of(ProductImage image) {
             return new ImageView(image.getId(), image.getAssetId(), image.getSortOrder());

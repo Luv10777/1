@@ -88,7 +88,7 @@ test('expired sessions preserve guest browsing and require login only for privat
     assert.equal(router.currentRoute.value.name, 'image-create', 'a saved login link to the former home opens guest browsing')
     await router.push('/login?redirect=/dashboard')
     assert.equal(router.currentRoute.value.name, 'login', 'opening login from within the app preserves login intent')
-    for (const path of ['/image/create', '/image/create/poster', '/video/analyze', '/digital-human', '/merchant-alliance', '/information?category=supply', '/information/7', '/store/5', '/order/receipt', '/login']) {
+    for (const path of ['/image/create', '/image/create/poster', '/video/analyze', '/digital-human', '/merchant-alliance', '/merchant-alliance/join', '/information?category=supply', '/information/7', '/store/5', '/order/receipt', '/login']) {
       signedIn()
       await router.push(path)
       const previous = router.currentRoute.value.fullPath

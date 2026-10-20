@@ -5,10 +5,14 @@ import { ArrowLeft, ArrowRight, CalendarDays, MapPin, Phone, Store } from 'lucid
 import { businessCommunityService } from '../services/businessCommunity'
 import InformationContent from '../components/InformationContent.vue'
 import { informationCategoryNames, informationDate, informationFilters, informationQuery } from '../utils/informationPresentation'
+import { auth } from '../stores/auth'
+import { inDesktop } from '../utils/desktop'
 import '../public-commerce.css'
 import '../public-information.css'
 
 const route = useRoute()
+// 登录后在侧边栏壳里打开，壳自带导航，不再画页面自己的顶栏。
+const inShell = computed(() => auth.isAuthenticated && !inDesktop)
 const item = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -35,8 +39,8 @@ onBeforeUnmount(() => { requestVersion++ })
 </script>
 
 <template>
-  <main class="public-commerce public-information-detail-page">
-    <header class="public-commerce-topbar"><RouterLink to="/image/create" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>商家信息服务</small></span></RouterLink><nav aria-label="公开服务"><RouterLink :to="back">信息广场</RouterLink><RouterLink to="/information-publishing">发布与管理</RouterLink></nav></header>
+  <main class="public-commerce public-information-detail-page" :class="{ 'in-shell': inShell }">
+    <header v-if="!inShell" class="public-commerce-topbar"><RouterLink to="/image/create" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>商家信息服务</small></span></RouterLink><nav aria-label="公开服务"><RouterLink :to="back">信息广场</RouterLink><RouterLink to="/information-publishing">发布与管理</RouterLink></nav></header>
     <div class="public-information-detail-content">
       <RouterLink :to="back" class="information-back"><ArrowLeft :size="15" aria-hidden="true" />返回信息广场</RouterLink>
       <p v-if="loading" class="public-state" role="status">正在读取信息…</p>

@@ -5,10 +5,13 @@ import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui
 import AppShell from './layouts/AppShell.vue'
 import DesktopShell from './layouts/DesktopShell.vue'
 import { inDesktop } from './utils/desktop'
+import { auth } from './stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const isPublic = computed(() => Boolean(route.meta.public))
+// 信息广场对游客公开，但已登录的商家从侧边栏点进来时要继续带着侧边栏。
+const bareLayout = computed(() => isPublic.value && !(route.meta.shellWhenSignedIn && auth.isAuthenticated && !inDesktop))
 const membershipOpen = ref(false)
 const showMembership = () => { membershipOpen.value = true }
 onMounted(() => window.addEventListener('membership-required', showMembership))
@@ -22,7 +25,7 @@ function openMembership() {
 <template>
   <div class="site-layout">
     <div class="site-content">
-      <RouterView v-if="isPublic" />
+      <RouterView v-if="bareLayout" />
       <!-- 桌面端只做直播，不带平台的导航。 -->
       <DesktopShell v-else-if="inDesktop">
         <RouterView />

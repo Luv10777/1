@@ -3,8 +3,11 @@ package com.wuyao.growth.commerce;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.common.web.PageResult;
+import com.wuyao.growth.product.ProductDtos;
 import com.wuyao.growth.product.ProductService;
 import com.wuyao.growth.store.StoreAccessService;
+import com.wuyao.growth.store.StoreService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,7 @@ public class CommerceService {
     private final SalesOrderRepository orders;
     private final SalesOrderItemRepository items;
     private final StoreAccessService storeAccess;
+    private final StoreService stores;
     @PersistenceContext private EntityManager entityManager;
 
     public CommerceDtos.Receipt place(CommerceDtos.PlaceOrderRequest request) {
@@ -39,6 +43,16 @@ public class CommerceService {
             throw BizException.of(ErrorCode.BAD_REQUEST, "一次下单只能购买同一家店铺的商品");
         }
         return TenantContext.runAs(tenantId, () -> writer.place(storeId, request, requested, tenantId));
+    }
+
+    /** 全平台商品墙。门店已关闭的商品查不到店名，直接略过，不展示一个打不开的店铺。 */
+    @Transactional(readOnly = true)
+    public PageResult<CommerceDtos.CatalogItem> publicCatalog(int page, int size, String keyword) {
+        PageResult<ProductDtos.PublicListing> listed = products.publicCatalog(page, size, keyword);
+        Map<Long, String> names = stores.publicNames(listed.items().stream().map(ProductDtos.PublicListing::storeId).distinct().toList());
+        List<CommerceDtos.CatalogItem> items = listed.items().stream().filter(item -> names.containsKey(item.storeId()))
+                .map(item -> CommerceDtos.CatalogItem.of(item, names.get(item.storeId()))).toList();
+        return new PageResult<>(items, listed.page(), listed.size(), listed.total(), listed.totalPages());
     }
 
     @Transactional(readOnly = true)

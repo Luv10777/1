@@ -83,7 +83,7 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
   <main class="public-commerce">
     <header class="public-commerce-topbar">
       <RouterLink to="/information" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>本地商家与商品</small></span></RouterLink>
-      <nav aria-label="公开服务"><RouterLink to="/information">商家信息</RouterLink><RouterLink to="/merchant-alliance">商家入驻</RouterLink></nav>
+      <nav aria-label="公开服务"><RouterLink to="/information">商家信息</RouterLink><RouterLink to="/merchant-alliance">商户联盟</RouterLink></nav>
     </header>
 
     <div class="public-commerce-content">

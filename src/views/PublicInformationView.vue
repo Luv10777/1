@@ -4,10 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, FilePenLine, FileText, MapPin, Search, Store, X } from 'lucide-vue-next'
 import { businessCommunityService } from '../services/businessCommunity'
 import { informationCategories, informationCategoryNames, informationDate, informationFilters, informationQuery } from '../utils/informationPresentation'
+import { auth } from '../stores/auth'
+import { inDesktop } from '../utils/desktop'
 import '../public-commerce.css'
 import '../public-information.css'
 
 const route = useRoute()
+// 登录后在侧边栏壳里打开，壳自带导航，不再画页面自己的顶栏。
+const inShell = computed(() => auth.isAuthenticated && !inDesktop)
 const router = useRouter()
 const filters = computed(() => informationFilters(route.query))
 const query = ref(filters.value.keyword)
@@ -50,10 +54,10 @@ onBeforeUnmount(() => { requestVersion++ })
 </script>
 
 <template>
-  <main class="public-commerce public-information-page">
-    <header class="public-commerce-topbar">
+  <main class="public-commerce public-information-page" :class="{ 'in-shell': inShell }">
+    <header v-if="!inShell" class="public-commerce-topbar">
       <RouterLink to="/image/create" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
-      <nav aria-label="公开服务"><RouterLink to="/merchant-alliance">商家入驻</RouterLink><RouterLink to="/information-publishing">发布与管理</RouterLink></nav>
+      <nav aria-label="公开服务"><RouterLink to="/merchant-alliance">商户联盟</RouterLink><RouterLink to="/information-publishing">发布与管理</RouterLink></nav>
     </header>
     <div class="public-information-content">
       <header class="information-masthead">
@@ -86,7 +90,7 @@ onBeforeUnmount(() => { requestVersion++ })
 
         <aside class="information-sidebar" aria-label="商家服务">
           <section class="information-service-note"><span class="information-note-index">商家来信</span><h2>让你的消息<br />被更多人看见。</h2><p>写清具体内容、所在地区和参与方式。发布后生成独立页面，可分享、编辑与下架。</p><RouterLink to="/information-publishing" class="public-text-link">发布与管理信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></section>
-          <RouterLink to="/merchant-alliance" class="information-service-link"><Store :size="22" aria-hidden="true" /><div><strong>好物与商家</strong><span>查看实物商品，申请商家入驻。</span></div><ArrowRight :size="16" aria-hidden="true" /></RouterLink>
+          <RouterLink to="/merchant-alliance" class="information-service-link"><Store :size="22" aria-hidden="true" /><div><strong>好物与商家</strong><span>查看联盟商家的实物商品，或申请入驻。</span></div><ArrowRight :size="16" aria-hidden="true" /></RouterLink>
           <p class="information-reading-note">点击标题阅读全文。信息详情展示发布商家、发布时间及有效期，内容由发布商家维护。</p>
         </aside>
       </div>

@@ -2,6 +2,7 @@ package com.wuyao.growth.commerce;
 
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
+import com.wuyao.growth.common.web.PageResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,6 +14,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CommerceController {
     private final CommerceService service;
+
+    @GetMapping("/api/public/products")
+    public ApiResponse<PageResult<CommerceDtos.CatalogItem>> catalog(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return ApiResponse.ok(service.publicCatalog(page, size, keyword));
+    }
 
     @PostMapping("/api/public/orders")
     public ApiResponse<CommerceDtos.Receipt> place(@Valid @RequestBody CommerceDtos.PlaceOrderRequest request) {
