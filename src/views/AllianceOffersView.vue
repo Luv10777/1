@@ -145,7 +145,7 @@ onBeforeUnmount(() => { generation++ })
             <tr v-for="offer in offers" :key="offer.id">
               <td><strong>{{ offer.productName }}</strong><br /><span class="alliance-muted">{{ offer.storeName }}</span></td>
               <td class="num">¥{{ yuan(offer.faceValueMinor) }}</td>
-              <td class="num"><template v-if="offer.settleAmountMinor != null">¥{{ yuan(offer.settleAmountMinor) }}<br /><span class="alliance-muted">约定 {{ discountLabel(offer.settleRateBp) }}</span></template><span v-else class="alliance-muted">审核时约定</span></td>
+              <td class="num"><template v-if="offer.settleAmountMinor != null">¥{{ yuan(offer.settleAmountMinor) }}<br /><span class="alliance-muted">约定 {{ discountLabel(offer.settleRateBp) }}</span></template><span v-else-if="offer.status === 'PENDING_REVIEW'" class="alliance-muted">审核时约定</span><span v-else class="alliance-muted">—</span></td>
               <td class="num">{{ offer.claimedQty }} / {{ offer.totalQty }}</td>
               <td class="num">{{ offer.redeemedQty }}</td>
               <td><span class="alliance-tag" :class="tagClass(offer.status)">{{ offerStatuses[offer.status] || offer.status }}</span><p v-if="offer.reviewNote" class="alliance-muted">{{ offer.reviewNote }}</p></td>
