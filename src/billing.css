@@ -35,7 +35,6 @@
 .yanhuo-sources dd { margin: 6px 0 0; font-size: 16px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .yanhuo-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: flex-start; margin-top: auto; min-height: 36px; padding: 0 14px; border: 1px solid var(--color-primary); border-radius: 4px; color: var(--color-primary); font-size: 12px; font-weight: 500; }
 .yanhuo-secondary:hover { background: var(--color-bg-subtle); }
-.yanhuo-purchase-terms { margin-top: 32px; }
 .yanhuo-section { margin-top: 40px; scroll-margin-top: 24px; }
 .yanhuo-section-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .yanhuo-section-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
@@ -68,7 +67,15 @@
 .yanhuo-topup-total strong { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 40px; }
 .yanhuo-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 10px 20px; background: var(--color-accent); color: var(--color-on-accent); border: 1px solid transparent; border-radius: 4px; font-size: 13px; }
 .yanhuo-primary:hover:not(:disabled) { background: var(--color-accent-text); }
-.yanhuo-topup-row > button { margin-left: auto; }
+.yanhuo-checkout { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.yanhuo-pay-methods { display: flex; flex-wrap: wrap; gap: 12px; border: 0; padding: 0; margin: 0 0 16px; }
+.yanhuo-pay-methods legend { margin-bottom: 8px; padding: 0; font-size: 12px; color: var(--ink-muted); }
+.yanhuo-pay-methods label { display: inline-flex; align-items: center; gap: 10px; min-width: 160px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 4px; background: var(--color-bg-surface); font-size: 14px; cursor: pointer; }
+.yanhuo-pay-methods label.selected { border-color: var(--color-accent); }
+.yanhuo-pay-methods input { margin: 0; width: 14px; height: 14px; accent-color: var(--color-accent); }
+.yanhuo-checkout-row { display: flex; align-items: center; gap: 24px; }
+.yanhuo-checkout-row .yanhuo-legal-consent { flex: 1; margin: 0; }
+.yanhuo-checkout-row > button { flex: 0 0 auto; }
 .yanhuo-note { font-size: 12px; color: var(--ink-muted); line-height: 1.8; margin: 12px 0 0; }
 .yanhuo-empty { display: grid; justify-items: center; text-align: center; padding: 34px 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
 .yanhuo-empty img { margin-bottom: 10px; object-fit: contain; }
@@ -148,5 +155,5 @@
 @keyframes yanhuo-spin { to { transform: rotate(360deg); } }
 .yanhuo-icon .spinning { animation: yanhuo-spin 1s linear infinite; }
 @media (max-width: 900px) { .yanhuo-overview { grid-template-columns: 1fr; } .yanhuo-rule-grid { grid-template-columns: 1fr; } .yanhuo-rule-grid > div + div { border-left: 0; border-top: 1px solid var(--line); } }
-@media (max-width: 640px) { .yanhuo-heading { margin-bottom: 22px; } .yanhuo-heading h1 { font-size: 26px; } .yanhuo-card { padding: 20px; } .yanhuo-number { font-size: 34px; } .yanhuo-section { margin-top: 32px; } .yanhuo-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .yanhuo-amounts label { padding: 14px; } .yanhuo-topup-row { gap: 20px; } .yanhuo-topup-row > button { flex-basis: 100%; margin-left: 0; } .yanhuo-custom { flex: 1; min-width: 0; } .yanhuo-money-input { max-width: none; } .yanhuo-plan-form { grid-template-columns: 1fr 1fr; } .yanhuo-payment { padding: 20px; } }
+@media (max-width: 640px) { .yanhuo-heading { margin-bottom: 22px; } .yanhuo-heading h1 { font-size: 26px; } .yanhuo-card { padding: 20px; } .yanhuo-number { font-size: 34px; } .yanhuo-section { margin-top: 32px; } .yanhuo-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .yanhuo-amounts label { padding: 14px; } .yanhuo-topup-row { gap: 20px; } .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; } .yanhuo-pay-methods label { flex: 1; } .yanhuo-custom { flex: 1; min-width: 0; } .yanhuo-money-input { max-width: none; } .yanhuo-plan-form { grid-template-columns: 1fr 1fr; } .yanhuo-payment { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { .yanhuo-icon .spinning { animation: none; } }
