@@ -45,7 +45,9 @@ export function useImageCreation(workflow) {
   const owner = readUser()
   const pendingKey = 'image-pending:' + (owner?.userId || owner?.id || 'session') + ':' + workflow
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
-  const estimatedCredits = computed(() => (product.value ? Number(count.value) : 1) * 3)
+  // 单价以服务端账单摘要为准；未读到时为 null，页面不显示具体数字。
+  const imageCredits = computed(() => billing.summary?.imageCredits ?? null)
+  const estimatedCredits = computed(() => imageCredits.value == null ? null : (product.value ? Number(count.value) : 1) * imageCredits.value)
   const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
   const requiresLogin = computed(() => !auth.isAuthenticated)
   const supportsRatio = value => {
@@ -328,6 +330,6 @@ export function useImageCreation(workflow) {
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
-    supportsQuality, loadCapabilities, billing, estimatedCredits, requiresLogin,
+    supportsQuality, loadCapabilities, billing, imageCredits, estimatedCredits, requiresLogin,
   })
 }
