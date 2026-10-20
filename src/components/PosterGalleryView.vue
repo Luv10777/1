@@ -191,7 +191,6 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
       >
         <div class="poster-view-intro">
           <strong>留下的每一版，都可以继续编辑。</strong>
-          <p>按时间排列的海报会话，点击可查看图片与继续修改。</p>
         </div>
         <p v-if="!studio.history.length" class="poster-empty-history">
           还没有海报创作记录。
@@ -410,7 +409,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   </button>
                 </div>
                 <form v-if="item.url && turn.id === studio.current?.id && turn.status === 'SUCCEEDED'" class="poster-conversation-editor" @submit.prevent="submitEditor(item)">
-                  <div class="poster-conversation-heading"><strong>继续修改这张海报</strong><small>可多选，生成后仍在当前会话中</small></div>
+                  <div class="poster-conversation-heading"><strong>继续修改这张海报</strong></div>
                   <div class="poster-conversation-options" role="group" aria-label="选择修改项">
                     <label v-for="option in [{ type: 'TEXT', label: '修改文字' }, { type: 'LAYOUT', label: '换版式' }, { type: 'SCENE', label: '换场景' }, { type: 'MESSAGE', label: '换传播角度' }]" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" />{{ option.label }}</label>
                   </div>
