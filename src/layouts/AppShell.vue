@@ -136,12 +136,20 @@ const navGroups = [
     label: '商城',
     items: [
       { name: 'merchant-alliance', label: '商户联盟', path: '/merchant-alliance' },
-      { name: 'alliance-vouchers', label: '我的联盟券', path: '/alliance/vouchers' },
-      { name: 'alliance-redeem', label: '门店核销', path: '/alliance/redeem' },
-      { name: 'alliance-offers', label: '供券管理', path: '/alliance/offers', ownerOnly: true },
       { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'public-information', label: '信息广场', path: '/information' },
       { name: 'information-publishing', label: '我的发布', path: '/information-publishing' },
+    ],
+  },
+  {
+    // 联盟券是会员权益（领券、到店核销、供券结算），和商城的网上买卖分开放。
+    key: 'alliance',
+    label: '联盟券',
+    items: [
+      { name: 'alliance-pool', label: '领券中心', path: '/alliance/pool' },
+      { name: 'alliance-vouchers', label: '我的联盟券', path: '/alliance/vouchers' },
+      { name: 'alliance-redeem', label: '门店核销', path: '/alliance/redeem' },
+      { name: 'alliance-offers', label: '供券管理', path: '/alliance/offers', ownerOnly: true },
     ],
   },
   {
