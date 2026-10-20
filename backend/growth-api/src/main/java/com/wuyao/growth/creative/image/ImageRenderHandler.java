@@ -141,10 +141,12 @@ public class ImageRenderHandler implements TaskHandler {
  }
  static String imagePrompt(ImageCreation creation,ImageDtos.Spec spec) {
    String prompt=cleanLegacyPrompt(spec.prompt());
-   if((!spec.headline().isBlank() || !spec.caption().isBlank())
-       && !prompt.contains("Headline:") && !prompt.contains("Caption:"))
+   boolean hasCopy=!spec.headline().isBlank() || !spec.caption().isBlank();
+   if(hasCopy && !prompt.contains("Headline:") && !prompt.contains("Caption:"))
      prompt+=(prompt.isBlank()?"":"\n")+"Text content to display (render exactly; do not invent other copy):"
        +"\nHeadline: "+spec.headline()+"\nCaption: "+spec.caption();
+   // Image models tend to repeat a headline when this is left unsaid.
+   if(hasCopy) prompt+="\nRender each line of text exactly once: no duplicated or repeated text, no extra words.";
    var understanding=creation.getPlan()==null?null:creation.getPlan().understanding();
    if(understanding!=null) prompt+="\nUnderstood user requirements (take precedence over conflicting creative defaults):"
      +"\nGoal: "+understanding.summary()+"\nMust change: "+join(understanding.mustChange())
