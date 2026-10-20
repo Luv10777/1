@@ -408,6 +408,26 @@ class FoundationIntegrationTest {
     }
 
     @Test
+    void billingTopupRecordsListOnlyPaidTopupsWithTheirLedgerBalances() {
+        long before=TenantContext.runAs(tenantA,()->billingService.summary(true,false).available());
+        var paid=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-record-1",1500)));
+        TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-record-2",200)));
+        TenantContext.runAs(tenantA,()->billingService.confirmPayment(paid.id(),new BillingDtos.Confirmation(1500,"topup-record-receipt"),-1L));
+        var records=TenantContext.runAs(tenantA,()->billingService.topups(0,20));
+        assertThat(records.items()).singleElement().satisfies(r->{
+            assertThat(r.orderId()).isEqualTo(paid.id());
+            assertThat(r.amountMinor()).isEqualTo(1500);
+            assertThat(r.credits()).isEqualTo(150);
+            assertThat(r.paymentMethod()).isEqualTo("MANUAL");
+            assertThat(r.paidAt()).isNotNull();
+            assertThat(r.balanceBefore()).isEqualTo(before);
+            assertThat(r.balanceAfter()).isEqualTo(before+150);
+        });
+        assertThat(records.hasMore()).isFalse();
+        assertThat(TenantContext.runAs(tenantB,()->billingService.topups(0,20)).items()).isEmpty();
+    }
+
+    @Test
     void billingPaymentMustMatchReceiptAndFulfilOnlyOnceAcrossConcurrentConfirmations() throws Exception {
         var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1200)));
         assertThat(order.credits()).isEqualTo(120);

@@ -35,5 +35,8 @@ public final class BillingDtos {
                             PlanSnapshot plan, Instant createdAt, Instant expiresAt, Instant paidAt,
                             PaymentInstructions payment, String paymentMethod, String paymentCodeUrl,
                             Long createdBy, Long confirmedBy) {}
+    /** A paid top-up with the balance read from its ledger entry, not recomputed from today's balance. */
+    public record TopupRecord(String orderId, Instant paidAt, long amountMinor, long credits, String paymentMethod,
+                              long balanceBefore, long balanceAfter) {}
     public record History<T>(List<T> items, boolean hasMore) {}
 }

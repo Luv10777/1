@@ -304,6 +304,11 @@ public class BillingService {
         return new BillingDtos.History<>(list.stream().limit(size).map(this::view).toList(),list.size()>size);
     }
     @Transactional(readOnly=true)
+    public BillingDtos.History<BillingDtos.TopupRecord> topups(int page,int size) {
+        checkPage(page,size); var list=store.topups(page,size);
+        return new BillingDtos.History<>(list.stream().limit(size).toList(),list.size()>size);
+    }
+    @Transactional(readOnly=true)
     public BillingDtos.History<BillingDtos.LedgerView> ledger(int page,int size) {
         checkPage(page,size); var list=store.ledger(page,size);
         return new BillingDtos.History<>(list.stream().limit(size).map(l->new BillingDtos.LedgerView(l.getId(),l.getType(),l.getDescription(),

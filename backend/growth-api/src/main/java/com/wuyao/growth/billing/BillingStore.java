@@ -61,6 +61,13 @@ public class BillingStore {
         return em.createQuery("from BillingOrder o where o.tenantId = :tenant order by o.createdAt desc,o.id",BillingOrder.class)
             .setParameter("tenant",TenantContext.require()).setFirstResult(Math.multiplyExact(page,size)).setMaxResults(size+1).getResultList();
     }
+    public List<BillingDtos.TopupRecord> topups(int page,int size) {
+        return em.createQuery("select o.id,o.paidAt,o.amountMinor,o.credits,o.paymentMethod,l.availableAfter-l.giftDelta-l.purchasedDelta,l.availableAfter "
+                +"from BillingOrder o join BillingLedger l on l.orderId=o.id and l.tenantId=o.tenantId "
+                +"where o.tenantId=:tenant and o.kind='TOPUP' and o.state='PAID' and l.type='PURCHASE' order by o.paidAt desc,o.id",Object[].class)
+            .setParameter("tenant",TenantContext.require()).setFirstResult(Math.multiplyExact(page,size)).setMaxResults(size+1).getResultList()
+            .stream().map(r->new BillingDtos.TopupRecord((String)r[0],(java.time.Instant)r[1],(Long)r[2],(Long)r[3],(String)r[4],(Long)r[5],(Long)r[6])).toList();
+    }
     public Optional<BillingReservation> reservationByKey(String key) {
         return em.createQuery("from BillingReservation r where r.tenantId = :tenant and r.requestKey = :key",BillingReservation.class)
             .setParameter("tenant",TenantContext.require()).setParameter("key",key).getResultStream().findFirst();
