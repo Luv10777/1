@@ -8,8 +8,8 @@ import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound, ChevronsUpDown } from 'lucide-vue-next'
-import { billing, number, refreshBilling } from '../stores/billing'
+import { Store, FilePenLine, UserRound, ChevronsUpDown } from 'lucide-vue-next'
+import { billing, refreshBilling } from '../stores/billing'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
 const route = useRoute()
@@ -26,18 +26,12 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
-const yanhuoPlan = computed(() => {
+// 侧栏账号处显示当前套餐：没有生效中的会员即为免费版；账户读不到时不显示，避免误报。
+const memberTier = computed(() => {
   const summary = billing.summary
-  if (billing.error) return { label: '暂不可读', state: '' }
-  if (summary?.memberActive) return { label: summary.plan?.name || '会员', state: 'active' }
-  return summary?.plan ? { label: '会员已到期', state: 'expired' } : { label: '未开通会员', state: '' }
-})
-const yanhuoNote = computed(() => {
-  const summary = billing.summary
-  if (!summary) return '套餐与充值'
-  if (summary.held) return `生成中预占 ${number(summary.held)}`
-  if (summary.memberActive && summary.memberUntil) return `有效至 ${new Date(summary.memberUntil).toLocaleDateString('zh-CN')}`
-  return '开通会员即可创作'
+  if (billing.error || !summary) return null
+  if (!summary.memberActive) return { label: '免费版', paid: false, until: '' }
+  return { label: summary.plan?.name || '会员', paid: true, until: summary.memberUntil ? new Date(summary.memberUntil).toLocaleDateString('zh-CN') : '' }
 })
 const needsStore = computed(() => auth.isAuthenticated && billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
@@ -297,15 +291,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
       </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
-        <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
-          <Wallet :size="18" class="sidebar-yanhuo-icon" aria-hidden="true" />
-          <div class="sidebar-yanhuo-copy">
-            <div class="sidebar-yanhuo-head"><span>烟火余额</span><span class="sidebar-yanhuo-plan" :class="yanhuoPlan.state">{{ yanhuoPlan.label }}</span></div>
-            <strong class="sidebar-yanhuo-number">{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong>
-            <div class="sidebar-yanhuo-foot"><span>{{ yanhuoNote }}</span><span class="sidebar-yanhuo-action">充值<ArrowUpRight :size="13" aria-hidden="true" /></span></div>
-          </div>
-        </RouterLink>
-        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><span v-if="memberTier" class="account-tier" :class="{ paid: memberTier.paid }">{{ memberTier.label }}</span></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><div v-if="memberTier" class="account-menu-plan"><strong>{{ memberTier.label }}</strong><small>{{ memberTier.until ? '有效期至 ' + memberTier.until : memberTier.paid ? '会员生效中' : '开通会员即可使用 AI 创作' }}</small><RouterLink to="/billing" @click="accountOpen = false; closeMenu()">{{ memberTier.paid ? '续订套餐' : '开通会员' }}</RouterLink></div><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
       </div>
     </aside>
