@@ -74,6 +74,9 @@
 .paper-nav .nav-item.active:before { top: 8px; bottom: 8px; }
 .paper-nav .nav-group-trigger .nav-group-icon { color: currentColor; }
 .paper-nav .nav-group-items .nav-item-label { font-family: var(--font-sans); }
+/* Short windows still scroll the menu by wheel or touch; a second scrollbar beside the page's own looked like stray scrolling. */
+.paper-nav.primary-nav { scrollbar-width: none; }
+.paper-nav.primary-nav::-webkit-scrollbar { display: none; }
 .paper-sidebar .tenant-copy strong { font-family: var(--font-sans); font-size: 12px; font-weight: 500; letter-spacing: .01em; }
 .paper-sidebar .tenant-copy small, .paper-sidebar .status-capsule small { letter-spacing: .08em; }
 .paper-sidebar .sidebar-create-button { font-family: var(--font-sans); font-weight: 600; letter-spacing: .02em; }
