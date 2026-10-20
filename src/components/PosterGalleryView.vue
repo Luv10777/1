@@ -7,6 +7,7 @@ import {
   isImageActive,
 } from "../domain/imageCreation";
 import { POSTER_SCENARIOS } from "../domain/posterScenarios";
+import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
 import InspirationCard from "./InspirationCard.vue";
 import { Check, Pencil, X } from "lucide-vue-next";
 
@@ -158,9 +159,12 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           }}</small>
         </button>
       </nav>
-      <RouterLink to="/works" class="poster-works-link"
-        >作品库 <span aria-hidden="true">↗</span></RouterLink
-      >
+      <div class="poster-toolbar-end">
+        <RouterLink to="/works" class="poster-works-link"
+          >作品库 <span aria-hidden="true">↗</span></RouterLink
+        >
+        <ImageWorkspaceSwitch />
+      </div>
     </header>
 
     <div ref="galleryScroll" class="poster-gallery-scroll">
@@ -168,10 +172,6 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-if="studio.workspaceTab === 'inspiration'"
         class="poster-inspiration-view"
       >
-        <div class="poster-view-intro">
-          <strong>一张海报，从真实的经营场景开始。</strong>
-          <p>选一个方向，左侧画面重点与提示词会一起更新；你可以继续修改。</p>
-        </div>
         <div class="poster-inspiration-grid">
           <InspirationCard
             v-for="(scenario, index) in POSTER_SCENARIOS"
@@ -317,6 +317,10 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             <p v-if="turn.question" class="poster-result-note">
               {{ turn.question }}
             </p>
+            <form v-if="turn.id === studio.current?.id && turn.status === 'NEEDS_INPUT'" class="poster-conversation-editor" @submit.prevent="studio.revise">
+              <textarea v-model="studio.revision" class="poster-conversation-input" maxlength="1000" aria-label="补充信息" placeholder="补充上面问到的信息，提交后继续规划这张海报" />
+              <button type="submit" class="poster-conversation-submit" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">补充并继续</button>
+            </form>
             <p v-if="turn.error" class="poster-result-error">
               {{ turn.error }}
               <button

@@ -8,7 +8,7 @@
   --studio-ease: cubic-bezier(.22, 1, .36, 1);
 }
 
-.poster-showcase-head > .studio-mode-switch.video-mode-switch,
+.poster-toolbar-end > .studio-mode-switch.video-mode-switch,
 .product-showcase-head > .studio-mode-switch.video-mode-switch {
   border-color: var(--studio-line);
   border-radius: 11px;

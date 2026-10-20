@@ -123,7 +123,7 @@ watch([selectedPlatform, imageType], () => {
         </section>
       </fieldset>
       <footer class="product-control-footer">
-        <p class="generation-billing-note">本次预占 {{ studio.estimatedCredits }} 烟火 · 成功交付每张 3 烟火，未交付部分退回。</p>
+        <p v-if="studio.imageCredits != null" class="generation-billing-note">本次预占 {{ studio.estimatedCredits }} 烟火 · 成功交付每张 {{ studio.imageCredits }} 烟火，未交付部分退回。</p>
         <RouterLink v-if="studio.billing.summary && !studio.billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员 →</RouterLink>
         <p v-if="studio.error" class="creation-item-error" role="alert">{{ studio.error }}</p>
         <p class="product-demo-note" role="status">{{ studio.requiresLogin ? '登录后开始创作' : studio.capabilityState === 'checking' ? '正在检查创作服务…' : studio.capabilityState === 'error' ? `创作服务检查失败：${studio.capabilityError}` : !studio.configured ? '图片创作服务尚未接通，可先准备商品照片' : '自动安排主图、细节与场景' }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p>
