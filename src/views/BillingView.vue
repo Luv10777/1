@@ -5,6 +5,7 @@ import { ArrowUpRight, Check, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
 import BillingPlanManager from '../components/BillingPlanManager.vue'
+import BillingCheckoutTerms from '../components/BillingCheckoutTerms.vue'
 import { auth } from '../stores/auth'
 
 const route = useRoute()
@@ -14,13 +15,16 @@ const returnTo = computed(() => typeof route.query.redirect === 'string'
   ? route.query.redirect : '/dashboard')
 const amount = ref(50)
 const purchaseConsent = ref(false)
-const purchaseConsentInput = ref(null)
+const planTerms = ref(null)
+const topupTerms = ref(null)
 watch(() => [auth.user?.id, auth.tenantId], () => { purchaseConsent.value = false }, { flush: 'sync' })
 const preset = [10, 50, 100, 300]
 const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= 1 && amount.value <= 100000)
 const topupCredits = computed(() => validAmount.value ? amount.value * (account.value?.creditsPerYuan || 10) : 0)
 const busy = ref(false)
 const error = ref('')
+// The checkout block where the last purchase error happened, so the message shows beside that button.
+const errorAt = ref('')
 const plansError = ref('')
 const payment = ref(null)
 const qr = ref('')
@@ -37,7 +41,6 @@ const keys = new Map()
 const labels = { PENDING_PAYMENT: '待支付', PAID: '已到账', CANCELLED: '已取消', EXPIRED: '已过期' }
 const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期' : '尚未开通会员')
 const canPay = computed(() => account.value?.canManage && account.value?.payment.available && !billing.error && !busy.value)
-const paymentLabel = computed(() => ({ MANUAL: '查看付款信息', ALIPAY: '支付宝支付' })[account.value?.paymentMethod] || '微信支付')
 const keyFor = (key) => {
   if (!keys.has(key)) keys.set(key, 'billing-' + crypto.randomUUID())
   return keys.get(key)
@@ -96,24 +99,24 @@ const openAlipay = async () => {
   catch (e) { tab.close(); paymentError.value = e.message || '支付宝收银台暂时无法打开' }
   finally { paymentLoading.value = false }
 }
-const checkPurchaseConsent = (message) => {
+const checkPurchaseConsent = (message, terms, at) => {
   if (purchaseConsent.value) return true
-  error.value = message
-  nextTick(() => purchaseConsentInput.value?.focus())
+  error.value = message; errorAt.value = at
+  nextTick(() => terms.value?.focus())
   return false
 }
 const topUp = async () => {
   if (!validAmount.value || !canPay.value) return
-  if (!checkPurchaseConsent('充值前请阅读并同意用户协议、隐私协议和售后服务规则。')) return
-  busy.value = true; error.value = ''
+  if (!checkPurchaseConsent('充值前请阅读并同意用户协议、隐私协议和售后服务规则。', topupTerms, 'topup')) return
+  busy.value = true; error.value = ''; errorAt.value = 'topup'
   try { await openPayment(await billingApi.topUp({ requestKey: keyFor('topup:' + amount.value), amountMinor: amount.value * 100 })) }
   catch (e) { error.value = e.message || '充值订单创建失败' }
   finally { busy.value = false }
 }
 const subscribe = async (plan) => {
   if (!canPay.value) return
-  if (!checkPurchaseConsent('订阅前请阅读并同意用户协议、隐私协议和售后服务规则。')) return
-  busy.value = true; error.value = ''
+  if (!checkPurchaseConsent('订阅前请阅读并同意用户协议、隐私协议和售后服务规则。', planTerms, 'plan')) return
+  busy.value = true; error.value = ''; errorAt.value = 'plan'
   try { await openPayment(await billingApi.subscribe({ requestKey: keyFor('plan:' + plan.id), planId: plan.id })) }
   catch (e) { error.value = e.message || '订阅订单创建失败' }
   finally { busy.value = false }
@@ -173,12 +176,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         </article>
       </section>
 
-      <div class="yanhuo-purchase-terms">
-        <label class="yanhuo-legal-consent"><input ref="purchaseConsentInput" v-model="purchaseConsent" type="checkbox" :disabled="busy" :aria-invalid="Boolean(error && !purchaseConsent)" /><span>我已阅读并同意<a href="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册协议》</a>、<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>和<a href="/policies/aftersales" target="_blank" rel="noopener noreferrer">《售后与退款规则》</a>，确认按所选金额、套餐期限、权益和订单信息购买。</span></label>
-        <p v-if="error" class="yanhuo-alert" role="alert">{{ error }}</p>
-        <p v-if="!account.canManage" class="yanhuo-note">充值与订阅由账户管理员办理。</p><p v-else-if="!account.payment.available" class="yanhuo-note">微信收款暂未开放。</p>
-      </div>
-
       <section id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">
         <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>订阅与续期，套餐赠送的烟火在开通时发放。</p></header>
         <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
@@ -192,6 +189,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="subscribe(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button>
           </article>
         </div>
+        <BillingCheckoutTerms v-if="billing.plans.length" ref="planTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'plan' ? error : ''" />
       </section>
 
       <section id="topup" class="yanhuo-section" aria-labelledby="topup-title">
@@ -199,7 +197,10 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
         <form class="yanhuo-card yanhuo-topup-card" @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small>{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
-          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : paymentLabel }}</button></div>
+          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div></div>
+          <BillingCheckoutTerms ref="topupTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'topup' ? error : ''">
+            <button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '确认支付' }}</button>
+          </BillingCheckoutTerms>
         </form>
       </section>
 

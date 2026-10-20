@@ -120,7 +120,8 @@ test('top-ups and subscriptions require consent', async () => {
     const view = context.mount()
     await settle()
     let focusCount = 0
-    view.purchaseConsentInput = { focus() { focusCount++ } }
+    view.topupTerms = { focus() { focusCount++ } }
+    view.planTerms = { focus() { focusCount++ } }
     assert.equal(view.purchaseConsent, false)
     await view.topUp()
     await view.subscribe({ id: 3 })
