@@ -76,6 +76,8 @@
 .yanhuo-checkout-row { display: flex; align-items: center; gap: 24px; }
 .yanhuo-checkout-row .yanhuo-legal-consent { flex: 1; margin: 0; }
 .yanhuo-checkout-row > button { flex: 0 0 auto; }
+.yanhuo-payment .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; }
+.yanhuo-payment .yanhuo-pay-methods label { flex: 1; }
 .yanhuo-note { font-size: 12px; color: var(--ink-muted); line-height: 1.8; margin: 12px 0 0; }
 .yanhuo-empty { display: grid; justify-items: center; text-align: center; padding: 34px 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
 .yanhuo-empty img { margin-bottom: 10px; object-fit: contain; }
