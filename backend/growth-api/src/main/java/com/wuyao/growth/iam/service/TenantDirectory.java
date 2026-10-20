@@ -14,4 +14,10 @@ public class TenantDirectory {
 
     @Transactional(readOnly=true)
     public List<Long> idsAfter(Long after) { return tenants.idsAfter(after,PageRequest.of(0,100)); }
+
+    /** 商户对外显示的名称；商户不存在时为空。 */
+    @Transactional(readOnly=true)
+    public java.util.Optional<String> name(Long tenantId) {
+        return tenants.findById(tenantId).map(com.wuyao.growth.iam.entity.Tenant::getName);
+    }
 }

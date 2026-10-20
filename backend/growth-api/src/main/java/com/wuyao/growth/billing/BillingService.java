@@ -24,6 +24,7 @@ public class BillingService {
     private final BillingProperties config;
     private final WechatPayGateway wechat;
     private final AlipayGateway alipay;
+    private final org.springframework.context.ApplicationEventPublisher events;
     /** Generation writers use one account-first lock order, including cancellation and retries. */
     @Transactional
     public void lockForGeneration() { store.lockAccount(); }
@@ -163,6 +164,7 @@ public class BillingService {
             Instant start=a.active(Instant.now())?a.getMemberUntil():Instant.now();
             a.setPlanSnapshot(p); a.setMemberUntil(start.plus(Duration.ofDays(p.durationDays())));
             a.setMembershipOrderId(o.getId()); a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),o.getCredits()));
+            events.publishEvent(new BillingDtos.MembershipActivated(o.getTenantId(),o.getId(),p,start,a.getMemberUntil()));
         } else a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),o.getCredits()));
         o.setReceiptReference(receipt); o.setConfirmedBy(operator); o.setPaidAt(Instant.now()); o.setState("PAID");
         ledger(a,"order:"+o.getId(),"MEMBERSHIP".equals(o.getKind())?"GRANT":"PURCHASE",
@@ -315,6 +317,7 @@ public class BillingService {
         var p=new BillingPlan(); p.setCode(input.code()); p.setName(input.name().trim()); p.setDescription(input.description().trim());
         p.setPriceMinor(input.priceMinor()); p.setDurationDays(input.durationDays()); p.setGiftCredits(input.giftCredits());
         p.setImageEnabled(input.imageEnabled()); p.setVideoEnabled(input.videoEnabled()); p.setLiveEnabled(input.liveEnabled());
+        p.setAllianceQuotaMinor(input.allianceQuotaMinor());
         p.setPublished(input.published());
         store.save(p); store.flush(); return p.snapshot();
     }

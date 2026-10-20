@@ -8,7 +8,7 @@ public final class BillingDtos {
     private BillingDtos() {}
     public record PlanSnapshot(Long id, String code, String name, String description, long priceMinor,
                                int durationDays, long giftCredits, boolean imageEnabled, boolean videoEnabled,
-                               boolean liveEnabled) {}
+                               boolean liveEnabled, long allianceQuotaMinor) {}
     public record Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits,
                           int liveCreditsPerHour, long available,
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
@@ -24,7 +24,15 @@ public final class BillingDtos {
                           @NotBlank @Size(max=100) String name, @NotNull @Size(max=600) String description,
                           @Min(1) @Max(100000000) long priceMinor, @Min(1) @Max(3660) int durationDays,
                           @Min(0) @Max(100000000) long giftCredits, boolean imageEnabled, boolean videoEnabled,
-                          boolean liveEnabled, boolean published) {}
+                          boolean liveEnabled, boolean published, @Min(0) @Max(100000000) long allianceQuotaMinor) {
+        public NewPlan(String code, String name, String description, long priceMinor, int durationDays, long giftCredits,
+                       boolean imageEnabled, boolean videoEnabled, boolean liveEnabled, boolean published) {
+            this(code, name, description, priceMinor, durationDays, giftCredits, imageEnabled, videoEnabled, liveEnabled, published, 0);
+        }
+    }
+    /** 会员订单入账、会员期确定后发出，与入账同一事务。联盟券模块据此发放本期额度。 */
+    public record MembershipActivated(Long tenantId, String billingOrderId, PlanSnapshot plan,
+                                      Instant periodStart, Instant periodEnd) {}
     public record Publication(boolean published) {}
     public record PlanListing(PlanSnapshot plan, boolean published) {}
     public record Confirmation(@Min(1) long receivedAmountMinor,

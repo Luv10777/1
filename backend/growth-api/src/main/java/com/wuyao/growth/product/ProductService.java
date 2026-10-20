@@ -26,6 +26,7 @@ public class ProductService {
     private final ProductFaqRepository faqRepository;
     private final AssetRepository assetRepository;
     private final StoreAccessService storeAccessService;
+    private final List<ProductDeletionGuard> deletionGuards;
 
     @Transactional(readOnly = true)
     public PageResult<ProductDtos.View> list(Long storeId, String keyword, String type, String category,
@@ -86,6 +87,9 @@ public class ProductService {
     public void delete(Long id, Long userId) {
         Product product = findProductForUpdate(id);
         storeAccessService.requireAccess(product.getStoreId(), userId);
+        for (ProductDeletionGuard guard : deletionGuards) {
+            guard.blocksDeletion(id).ifPresent(reason -> { throw BizException.of(ErrorCode.CONFLICT, reason); });
+        }
         product.setStatus("DELETED");
         product.setDeletedAt(Instant.now());
         product.setUpdatedAt(Instant.now());
@@ -183,6 +187,35 @@ public class ProductService {
         return new SaleProduct(product.getId(), product.getTenantId(), product.getStoreId(),
                 product.getName(), product.getPrice(), product.getInventory());
     }
+
+    /**
+     * 锁住当前商户的一件在售商品并返回它的事实，供调用方在同一事务里判断后再 {@link #takeStock}。
+     * 已删除、不在这家门店的商品按不存在处理。
+     */
+    @Transactional
+    public StockFacts lockStock(Long productId, Long storeId) {
+        Product product = productRepository.findForUpdate(productId)
+                .filter(p -> "ACTIVE".equals(p.getStatus()) && storeId.equals(p.getStoreId()))
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "商品不存在或已删除"));
+        Long cover = imageRepository.findByProductIdOrderBySortOrderAscIdAsc(productId).stream()
+                .findFirst().map(ProductImage::getAssetId).orElse(null);
+        return new StockFacts(product.getId(), product.getStoreId(), product.getName(), product.getType(),
+                product.getCategory(), product.getPrice(), product.getSaleUnit(), product.getInventory(), cover);
+    }
+
+    /** 从可售库存里拿走一部分（不限库存的商品不扣）。须先在同一事务里 {@link #lockStock}。 */
+    @Transactional
+    public void takeStock(Long productId, int quantity) {
+        Product product = productRepository.findForUpdate(productId)
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "商品不存在或已删除"));
+        if (product.getInventory() == null) return;
+        if (product.getInventory() < quantity) throw BizException.of(ErrorCode.CONFLICT, "商品库存不足");
+        product.setInventory(product.getInventory() - quantity);
+        product.setUpdatedAt(Instant.now());
+    }
+
+    public record StockFacts(Long id, Long storeId, String name, String type, String category,
+                             java.math.BigDecimal price, String saleUnit, Integer inventory, Long coverAssetId) {}
 
     @Transactional
     public void restoreInventory(Long productId, int quantity) {
