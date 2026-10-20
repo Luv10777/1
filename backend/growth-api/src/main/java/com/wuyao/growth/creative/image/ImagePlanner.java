@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 public class ImagePlanner {
  private final AiGateway gateway;
  private final ObjectMapper json;
- public static final String POSTER_VERSION="poster-intent-first-v4";
+ public static final String POSTER_VERSION="poster-intent-first-v5";
  public static final String PRODUCT_SET_VERSION="product-set-intent-first-v4";
  static String version(String workflow) {return "POSTER".equals(workflow)?POSTER_VERSION:PRODUCT_SET_VERSION;}
  static String system(String workflow) {
@@ -43,6 +43,7 @@ public class ImagePlanner {
   posterContext.recentPostersToAvoid 默认用于避开重复版式，不借用其中的商品事实、品牌、活动或文案。没有相反要求时，新方案在主体位置/裁切、文字区、镜头距离/角度、背景环境、视觉动线中至少改变两项。
   posterContext.variation 为 LAYOUT 时默认改变主体与文字版式；SCENE 时默认改变环境与光线；MESSAGE 时默认改变视线引导和信息强调。换版默认保留 previousPoster 文案，understanding 明确要求修改或删除的内容除外；没有依据的场景可作为创意场景，不声称还原真实门店。
   参考图角色默认分工：SUBJECT 为主体依据，保留未要求修改的身份、包装、Logo、形状、颜色、比例和材质；STYLE 参考气质；LAYOUT 参考版式；BACKGROUND 参考环境。用户明确指定参考用途或修改主体时遵从需求。
+  styleGuide 存在时是用户选定的海报风格，用其中的画面事实落实配色、光线、材质、构图和字体气质，其中 Avoid 列出的内容写入 mustAvoid；understanding 的明确要求与之冲突时以 understanding 为准。
   不编造真实折扣、配方、门店名称、人物身份或平台认证。节庆、高奢、抽象画面和空镜按用户需求选择，不自动添加。关键信息不足时省略，只有用户要求本身存在无法解决的关键矛盾才提出一个简短 question。
   visualDirection 具体说明 Visual concept、Focal point、Hierarchy、Palette、Lighting、Material language、Camera language、Composition language、Typography direction、Brand guardrails。items 数量等于请求 count。每张 item 包含 role、shotType、focalPoint、materialLanguage、cameraLanguage、mustPreserve、mustAvoid、prompt、headline、caption。
  prompt 用短句和英文标签，按 Subject、Message、Composition、Typography、Lighting、Material、Camera、Color、Depth、Restrictions 排列；写明需求要求的主体处理、版式和限制。只有 headline 或 caption 非空时，末尾才列出对应文案行，且与字段逐字相同。
@@ -76,6 +77,7 @@ public class ImagePlanner {
        return new ImageDtos.Plan(understanding.summary(),understanding.question(),"",List.of(),
          trace(understood,req.workflow(),Map.of("understanding",usage(understood))),understanding);
      input.put("understanding",understanding);
+     if("POSTER".equals(req.workflow())) PosterStyles.guide(req.style()).ifPresent(guide->input.put("styleGuide",guide));
      var result=gateway.invokeReal(new ProviderRequest(ModelAlias.TEXT_CREATIVE,creation.getTenantId(),
        json.writeValueAsString(input),Map.of("system",system(req.workflow()),"references",refs,"stage","REFINE"),
        "image-plan-"+creation.getId()));

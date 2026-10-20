@@ -268,6 +268,7 @@ worker 崩溃后若底图已经保存，则从底图恢复；只有提交标记�
 创建请求包含 `requestKey, workflow, brief, references, ratio, quality, count, purpose, style, templateId`。
 `workflow` 为 POSTER 或 PRODUCT_SET。海报 count 固定 1；套图支持一到六张且必须提供主体素材。
 `templateId` 可空，支持 romantic/newyear/seasonal。不接受客户端 tenantId 或任意素材 URL。
+海报 `style` 为「帮我搭配」、`PosterStyles` 中的八种风格名或「应时·节点名」；后两类在规划阶段附上服务端维护的风格说明（`styleGuide`），其他旧值按原样交给规划器。
 
 revisions/answers 使用 `{requestKey, instruction}`。
 text 使用 `{requestKey, headline, caption}`；regenerate 使用 `{requestKey, variation}`。

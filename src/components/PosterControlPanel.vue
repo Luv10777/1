@@ -2,9 +2,8 @@
 import AppSelect from './AppSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { IMAGE_RATIOS, POSTER_PURPOSE_GROUPS } from '../domain/imageCreation'
-import { POSTER_SCENARIOS } from '../domain/posterScenarios'
 
-const props = defineProps({ studio: { type: Object, required: true }, prompted: Boolean })
+const props = defineProps({ studio: { type: Object, required: true } })
 const studio = computed(() => props.studio)
 const promptInput = ref(null)
 const fileInput = ref(null)
@@ -15,7 +14,6 @@ const serviceNotice = computed(() => studio.value.requiresLogin ? '登录后开�
   : studio.value.capabilityState === 'checking' ? '正在检查创作服务…'
   : studio.value.capabilityState === 'error' ? `创作服务检查失败：${studio.value.capabilityError}`
   : !studio.value.configured ? '图片创作服务暂未接通' : '')
-defineExpose({ focus: () => promptInput.value?.focus() })
 
 function hasFiles(event) { return Array.from(event.dataTransfer?.types || []).includes('Files') }
 function onDragOver(event) {
@@ -55,14 +53,13 @@ onBeforeUnmount(() => {
   <form class="poster-control-panel" @submit.prevent="studio.generate">
     <header class="poster-control-head"><h1>营销海报</h1></header>
     <div class="poster-control-scroll">
-      <section class="poster-control-section"><div class="poster-section-heading"><strong>经营场景</strong></div><div class="poster-focus-pills" role="group" aria-label="海报画面重点"><button v-for="scenario in POSTER_SCENARIOS" :key="scenario.focus" type="button" :disabled="studio.locked" :aria-pressed="studio.style === scenario.focus" :class="{ active: studio.style === scenario.focus }" @click="studio.style = scenario.focus">{{ scenario.focus }}</button></div></section>
-
       <section class="poster-control-section">
         <div class="poster-section-heading"><label for="poster-brief"><strong>画面描述</strong></label><button v-if="studio.lastPrompt" type="button" class="poster-recall" :disabled="studio.locked" title="填入上一条提示词" @click="studio.recallLastPrompt(); promptInput?.focus()">↶ 填入上一条</button></div>
-        <div class="poster-composer" :class="{ 'is-prompted': prompted }">
+        <div class="poster-composer">
           <textarea id="poster-brief" ref="promptInput" v-model="studio.brief" :disabled="studio.locked" rows="5" maxlength="2000" placeholder="例如：为门店的招牌桂花乌龙做一张秋日海报，突出真实茶饮与到店氛围…" @keydown.meta.enter.prevent="studio.generate" @keydown.ctrl.enter.prevent="studio.generate" />
           <div class="poster-inline-references"><div v-for="(file, index) in studio.files" :key="file.preview" class="poster-reference-chip"><img :src="file.preview" :alt="file.name" /><button type="button" class="poster-reference-remove" :disabled="studio.locked" :aria-label="`移除 ${file.name}`" @click="studio.removeFile(index)">×</button><div class="poster-reference-preview"><img :src="file.preview" :alt="file.name" /><span>{{ file.name }}</span></div><AppSelect :value="file.role" :disabled="studio.locked" :aria-label="`${file.name}的参考用途`" @change="studio.files[index].role = $event"><option value="SUBJECT">主体</option><option value="STYLE">风格</option></AppSelect></div><div class="poster-reference-actions"><button type="button" class="poster-add-reference" :disabled="studio.locked || studio.files.length >= 6" @click="fileInput?.click()"><span aria-hidden="true">＋</span> 从本地添加</button></div></div>
         </div>
+        <p v-if="studio.style !== '帮我搭配'" class="poster-style-chip">风格 · {{ studio.style }}<button type="button" :disabled="studio.locked" :aria-label="`取消风格 ${studio.style}`" @click="studio.style = '帮我搭配'">×</button></p>
         <input ref="fileInput" class="sr-only" type="file" accept="image/jpeg,image/png" multiple :disabled="studio.locked" @change="studio.addFiles" />
       </section>
 
