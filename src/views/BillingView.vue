@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpRight, Check, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
@@ -10,6 +10,7 @@ import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { auth } from '../stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 const account = computed(() => billing.summary)
 const returnTo = computed(() => typeof route.query.redirect === 'string'
   && route.query.redirect.startsWith('/') && !route.query.redirect.startsWith('//')
@@ -33,8 +34,8 @@ const paymentError = ref('')
 const paymentLoading = ref(false)
 const paymentDialog = ref(null)
 const planDialog = ref(null)
+const topupDialog = ref(null)
 const pendingPlan = ref(null)
-const topupInput = ref(null)
 const refreshButton = ref(null)
 let paymentTimer
 let balanceTimer
@@ -53,6 +54,13 @@ const reloadPlans = async () => {
   catch (e) { plansError.value = e.message || '套餐暂时无法读取' }
 }
 const refresh = async () => { await refreshBilling(); await reloadPlans() }
+// The top bar's balance chip lands here with ?topup=1; the query is dropped on close so the next click opens it again.
+const openTopup = async () => { await nextTick(); if (topupDialog.value && !topupDialog.value.open) topupDialog.value.showModal() }
+const closeTopup = () => {
+  topupDialog.value?.close()
+  if (route.query.topup) router.replace({ query: { ...route.query, topup: undefined } })
+}
+watch(() => route.query.topup, value => { if (value && account.value) openTopup() })
 const choosePlan = async (plan) => { pendingPlan.value = plan; await nextTick(); planDialog.value?.showModal() }
 const closePlan = () => { planDialog.value?.close(); pendingPlan.value = null }
 const closePayment = () => { clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus() }
@@ -114,7 +122,11 @@ const topUp = async () => {
   if (!validAmount.value || !canPay.value) return
   if (!checkPurchaseConsent('充值前请阅读并同意用户协议、隐私协议和售后服务规则。', topupTerms, 'topup')) return
   busy.value = true; error.value = ''; errorAt.value = 'topup'
-  try { await openPayment(await billingApi.topUp({ requestKey: keyFor('topup:' + amount.value), amountMinor: amount.value * 100 })) }
+  try {
+    const order = await billingApi.topUp({ requestKey: keyFor('topup:' + amount.value), amountMinor: amount.value * 100 })
+    closeTopup()
+    await openPayment(order)
+  }
   catch (e) { error.value = e.message || '充值订单创建失败' }
   finally { busy.value = false }
 }
@@ -139,7 +151,7 @@ const cancelPayment = async () => {
 }
 onMounted(async () => {
   await refresh()
-  if (route.query.topup) topupInput.value?.focus()
+  if (route.query.topup && account.value) openTopup()
   balanceTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBilling() }, 30000)
 })
 onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterval(balanceTimer); qrVersion += 1 })
@@ -179,9 +191,9 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <div class="yanhuo-card-head">
             <span class="yanhuo-card-label">可用烟火</span>
           </div>
-          <p class="yanhuo-number"><YanhuoIcon :size="30" />{{ number(account.available) }}<small>烟火</small></p>
+          <p class="yanhuo-number"><YanhuoIcon :size="30" />{{ number(account.available) }}</p>
           <dl class="yanhuo-sources"><div><dt>会员赠送</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
-          <a href="#topup" class="yanhuo-secondary">充值烟火<ArrowUpRight :size="15" /></a>
+          <button type="button" class="yanhuo-secondary" @click="openTopup">充值烟火<ArrowUpRight :size="15" /></button>
         </article>
       </section>
 
@@ -200,30 +212,33 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         </div>
       </section>
 
-      <section id="topup" class="yanhuo-section" aria-labelledby="topup-title">
-        <header class="yanhuo-section-head"><h2 id="topup-title">充值烟火</h2><p>1 元 = {{ account.creditsPerYuan }} 烟火，充值烟火可保留。</p></header>
-        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
-        <form class="yanhuo-card yanhuo-topup-card" @submit.prevent="topUp">
-          <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
-          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>
-          <BillingCheckoutTerms ref="topupTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'topup' ? error : ''">
-            <div class="yanhuo-checkout-pay"><span class="yanhuo-checkout-due">应付<strong>{{ validAmount ? yuan(amount * 100) : '—' }}</strong></span><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '确认支付' }}</button></div>
-          </BillingCheckoutTerms>
-        </form>
-      </section>
 
       <section class="yanhuo-section" aria-labelledby="rules-title">
         <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>创作需有效会员，优先使用会员赠送的烟火。</p></header>
         <dl class="yanhuo-rule-grid">
-          <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} 烟火 / 张</strong>生成中先预占，未交付的退回。</dd></div>
-          <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} 烟火 / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
+          <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong>生成中先预占，未交付的退回。</dd></div>
+          <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
           <div><dt>视频生成</dt><dd><strong>按确认的报价</strong>先预占烟火，交付后按实际用量结算。</dd></div>
-          <div><dt>直播</dt><dd><strong><YanhuoIcon :size="14" />{{ account.liveCreditsPerHour }} 烟火 / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>
+          <div><dt>直播</dt><dd><strong><YanhuoIcon :size="14" />{{ account.liveCreditsPerHour }} / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>
         </dl>
         <p class="yanhuo-note">其他模块按正式公布的规则计费。</p>
       </section>
       <BillingPlanManager v-if="account.operator" @updated="reloadPlans" />
     </template>
+    <dialog ref="topupDialog" class="yanhuo-payment yanhuo-topup-dialog" aria-labelledby="topup-title" @cancel.prevent="closeTopup" @click="event => { if (event.target === topupDialog) closeTopup() }">
+      <template v-if="account">
+        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="topup-title">充值烟火</h2><button class="yanhuo-icon" type="button" aria-label="关闭充值窗口" title="关闭" @click="closeTopup"><X :size="20" /></button></header>
+        <p class="yanhuo-topup-rate">1 元 = {{ account.creditsPerYuan }} 烟火，充值的烟火长期有效。</p>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">订阅或续订套餐</a>。</p>
+        <form class="yanhuo-topup-form" @submit.prevent="topUp">
+          <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }}</small></label></fieldset>
+          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>
+          <BillingCheckoutTerms ref="topupTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'topup' ? error : ''">
+            <div class="yanhuo-checkout-pay"><span class="yanhuo-checkout-due">应付<strong>{{ validAmount ? yuan(amount * 100) : '—' }}</strong></span><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '确认支付' }}</button></div>
+          </BillingCheckoutTerms>
+        </form>
+      </template>
+    </dialog>
     <dialog ref="planDialog" class="yanhuo-payment" aria-labelledby="plan-confirm-title" @cancel.prevent="closePlan" @click="event => { if (event.target === planDialog) closePlan() }">
       <template v-if="pendingPlan && account">
         <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="plan-confirm-title">{{ account.memberActive ? '续订套餐' : '订阅套餐' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭" title="关闭" @click="closePlan"><X :size="20" /></button></header>
