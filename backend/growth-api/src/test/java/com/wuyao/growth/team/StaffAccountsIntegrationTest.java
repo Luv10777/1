@@ -93,6 +93,8 @@ class StaffAccountsIntegrationTest {
         tenantA = owner.queryForObject("INSERT INTO tenants(name) VALUES ('甲商户') RETURNING id", Long.class);
         tenantB = owner.queryForObject("INSERT INTO tenants(name) VALUES ('乙商户') RETURNING id", Long.class);
         com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, tenantA, tenantB);
+        // 开播会预占第一个小时的直播烟火。
+        owner.update("UPDATE billing_accounts SET gift_available=1000 WHERE tenant_id=?", tenantA);
         // 没有写角色的旧账号就是管理员。
         bossA = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000001', '甲管理员') RETURNING id", Long.class, tenantA);
         Long bossB = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000009', '乙管理员') RETURNING id", Long.class, tenantB);

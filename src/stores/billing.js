@@ -61,6 +61,7 @@ export const billingApi = {
   cancel: id => post('/api/billing/orders/' + id + '/cancel', {}),
   alipay: id => post('/api/billing/orders/' + id + '/alipay', {}),
   orders: (page = 0) => get('/api/billing/orders', { page, size: 20 }),
+  topups: (page = 0) => get('/api/billing/topups', { page, size: 20 }),
   ledger: (page = 0) => get('/api/billing/ledger', { page, size: 20 }),
   operatorPlans: () => get('/api/billing/operations/plans'),
   createPlan: data => post('/api/billing/operations/plans', data),
