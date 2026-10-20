@@ -11,10 +11,9 @@ import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
 import PosterStyleCard from "./PosterStyleCard.vue";
 import { Check, Pencil, X } from "lucide-vue-next";
 
-const props = defineProps({ studio: { type: Object, required: true }, storeName: { type: String, default: "" } });
+const props = defineProps({ studio: { type: Object, required: true } });
 const emit = defineEmits(["choose"]);
 const studio = computed(() => props.studio);
-const swatchTitle = computed(() => props.storeName.replace(/[（(].*$/, "").trim().slice(0, 6) || "一方志");
 const moment = upcomingMoment();
 const seasonalStyle = SEASONAL_PREFIX + moment.name;
 const galleryScroll = ref(null);
@@ -178,27 +177,30 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-if="studio.workspaceTab === 'inspiration'"
         class="poster-inspiration-view"
       >
+        <button
+          type="button"
+          class="poster-seasonal"
+          :class="{ 'is-selected': studio.style === seasonalStyle }"
+          :disabled="studio.locked"
+          :aria-pressed="studio.style === seasonalStyle"
+          @click="emit('choose', seasonalStyle)"
+        >
+          <span class="poster-seasonal-label">应时</span>
+          <strong>{{ moment.name }}</strong>
+          <span>{{ moment.days ? `${moment.days} 天后 · ${moment.month}/${moment.day}` : "就是今天" }}</span>
+          <small>下一个：{{ moment.next }}</small>
+          <Check v-if="studio.style === seasonalStyle" class="poster-seasonal-check" :size="16" aria-hidden="true" />
+        </button>
         <div class="poster-style-grid">
           <PosterStyleCard
             v-for="style in POSTER_STYLES"
             :key="style.key"
-            :look="style.key"
+            :image="`/images/poster-styles/${style.key}.webp`"
             :name="style.name"
             :fit="style.fit"
-            :title="swatchTitle"
             :selected="studio.style === style.name"
             :disabled="studio.locked"
             @select="emit('choose', style.name)"
-          />
-          <PosterStyleCard
-            look="seasonal"
-            name="应时"
-            :fit="`下一个：${moment.next}`"
-            :title="moment.name"
-            :note="moment.days ? `${moment.days} 天后 · ${moment.month}/${moment.day}` : '就是今天'"
-            :selected="studio.style === seasonalStyle"
-            :disabled="studio.locked"
-            @select="emit('choose', seasonalStyle)"
           />
         </div>
       </div>
