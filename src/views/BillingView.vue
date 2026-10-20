@@ -6,6 +6,7 @@ import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
 import BillingPlanManager from '../components/BillingPlanManager.vue'
 import BillingCheckoutTerms from '../components/BillingCheckoutTerms.vue'
+import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { auth } from '../stores/auth'
 
 const route = useRoute()
@@ -176,9 +177,9 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         </article>
         <article class="yanhuo-card yanhuo-balance-card">
           <div class="yanhuo-card-head">
-            <span class="yanhuo-card-label"><Wallet :size="15" />可用烟火</span>
+            <span class="yanhuo-card-label">可用烟火</span>
           </div>
-          <p class="yanhuo-number">{{ number(account.available) }}<small>烟火</small></p>
+          <p class="yanhuo-number"><YanhuoIcon :size="30" />{{ number(account.available) }}<small>烟火</small></p>
           <dl class="yanhuo-sources"><div><dt>会员赠送</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
           <a href="#topup" class="yanhuo-secondary">充值烟火<ArrowUpRight :size="15" /></a>
         </article>
@@ -203,8 +204,8 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <header class="yanhuo-section-head"><h2 id="topup-title">充值烟火</h2><p>1 元 = {{ account.creditsPerYuan }} 烟火，充值烟火可保留。</p></header>
         <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link">订阅或续订套餐</a>。</p>
         <form class="yanhuo-card yanhuo-topup-card" @submit.prevent="topUp">
-          <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small>{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
-          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong>{{ number(topupCredits) }}</strong></div></div>
+          <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }} 烟火</small></label></fieldset>
+          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input ref="topupInput" v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>
           <BillingCheckoutTerms ref="topupTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'topup' ? error : ''">
             <div class="yanhuo-checkout-pay"><span class="yanhuo-checkout-due">应付<strong>{{ validAmount ? yuan(amount * 100) : '—' }}</strong></span><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '确认支付' }}</button></div>
           </BillingCheckoutTerms>
@@ -214,10 +215,10 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <section class="yanhuo-section" aria-labelledby="rules-title">
         <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>创作需有效会员，优先使用会员赠送的烟火。</p></header>
         <dl class="yanhuo-rule-grid">
-          <div><dt>图片创作</dt><dd><strong>{{ account.imageCredits }} 烟火 / 张</strong>生成中先预占，未交付的退回。</dd></div>
-          <div><dt>视频反推</dt><dd><strong>{{ account.videoAnalysisCredits }} 烟火 / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
+          <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} 烟火 / 张</strong>生成中先预占，未交付的退回。</dd></div>
+          <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} 烟火 / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
           <div><dt>视频生成</dt><dd><strong>按确认的报价</strong>先预占烟火，交付后按实际用量结算。</dd></div>
-          <div><dt>直播</dt><dd><strong>{{ account.liveCreditsPerHour }} 烟火 / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>
+          <div><dt>直播</dt><dd><strong><YanhuoIcon :size="14" />{{ account.liveCreditsPerHour }} 烟火 / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>
         </dl>
         <p class="yanhuo-note">其他模块按正式公布的规则计费。</p>
       </section>

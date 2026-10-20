@@ -1,5 +1,6 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
+import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { RouterLink } from 'vue-router'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, RefreshCw, Search, X } from 'lucide-vue-next'
 import { useTaskCenter } from '../composables/useTaskCenter'
@@ -35,7 +36,7 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
         </div>
       </form>
       <div class="usage-summary" aria-live="polite" :aria-busy="loading">
-        <span class="usage-summary-charge">实际消耗 <strong>{{ result ? number(result.summary.chargedCredits) : '—' }}</strong> 烟火</span>
+        <span class="usage-summary-charge">实际消耗 <strong><YanhuoIcon :size="16" />{{ result ? number(result.summary.chargedCredits) : '—' }}</strong> 烟火</span>
         <span>预占中 <strong>{{ result ? number(result.summary.heldCredits) : '—' }}</strong></span>
         <span>已退回 <strong>{{ result ? number(result.summary.releasedCredits) : '—' }}</strong></span>
         <span>成功 <strong>{{ result ? number(result.summary.succeeded) : '—' }}</strong></span>
@@ -62,7 +63,7 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
                 <td class="usage-model-cell"><span class="usage-model" :title="taskModel(row.model)">{{ taskModel(row.model) }}</span></td>
                 <td class="usage-numeric">{{ row.quantity }} <small class="inline">{{ row.unit }}</small></td>
                 <td><div class="usage-result-count"><span class="usage-success">{{ row.succeeded }}</span><span class="usage-slash">/</span><span :class="{ 'usage-failed': row.failed > 0 }">{{ row.failed }}</span><small class="inline">{{ row.unit }}</small></div><small v-if="row.cancelled || row.pending">{{ row.cancelled ? `取消 ${row.cancelled} ${row.unit}` : '' }}{{ row.cancelled && row.pending ? ' · ' : '' }}{{ row.pending ? `未完成 ${row.pending} ${row.unit}` : '' }}</small></td>
-                <td><span v-if="row.chargedCredits !== null" class="usage-charge">{{ number(row.chargedCredits) }} <small class="inline">烟火</small></span><span v-else class="usage-unbilled">未计费记录</span><small v-if="row.heldCredits || row.releasedCredits">{{ row.heldCredits ? `预占 ${number(row.heldCredits)}` : '' }}{{ row.heldCredits && row.releasedCredits ? ' · ' : '' }}{{ row.releasedCredits ? `退回 ${number(row.releasedCredits)}` : '' }}</small></td>
+                <td><span v-if="row.chargedCredits !== null" class="usage-charge"><YanhuoIcon :size="14" />{{ number(row.chargedCredits) }} <small class="inline">烟火</small></span><span v-else class="usage-unbilled">未计费记录</span><small v-if="row.heldCredits || row.releasedCredits">{{ row.heldCredits ? `预占 ${number(row.heldCredits)}` : '' }}{{ row.heldCredits && row.releasedCredits ? ' · ' : '' }}{{ row.releasedCredits ? `退回 ${number(row.releasedCredits)}` : '' }}</small></td>
                 <td><span class="usage-status" :data-tone="taskStatus(row.status).tone"><i aria-hidden="true" />{{ taskStatus(row.status).label }}</span></td>
                 <td class="usage-action-column"><button class="usage-detail-button" type="button" :aria-expanded="expandedId === row.id" :aria-controls="`detail-${row.id}`" :aria-label="`${expandedId === row.id ? '收起' : '查看'} ${row.id} 消费明细`" @click="toggleDetail(row.id)">{{ expandedId === row.id ? '收起' : '明细' }}<ChevronDown :size="14" :class="{ rotated: expandedId === row.id }" /></button></td>
               </tr>
