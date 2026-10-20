@@ -7,6 +7,9 @@
 .paper-app :is(.product-showcase-glow,.poster-glow,.device-glow-layer){display:none}.paper-app .video-workbench-canvas{background:var(--color-bg-subtle)}.paper-app .video-workbench-action{background:var(--color-bg-surface)}
 .paper-app :is(.video-generate-button,.premium-primary,.new-work-button){background:var(--color-accent);color:var(--color-on-accent);border-color:transparent;box-shadow:none}
 .paper-app :is(input,textarea,:is(select, .app-select-button)):focus-visible{outline-color:var(--color-primary)}
+/* A borderless field inside its own bordered box shows focus on that box, never as a second dark frame inside it. */
+:root :is(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .floating-prompt-bar, .poster-composer) :is(input, textarea):focus-visible { outline: none; }
+:where(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .floating-prompt-bar, .poster-composer):focus-within { border-color: var(--color-primary); }
 /* The publishing state aliases come from the same paper/ink system in both modes. */
 :root .paper-app:has(.publishing-page){
  --pub-canvas:var(--color-bg-canvas);--pub-input:var(--color-bg-surface);--pub-surface:var(--color-bg-surface);--pub-panel:var(--color-bg-surface);--pub-card:var(--color-bg-surface);--pub-muted-surface:var(--color-bg-subtle);--pub-hover-surface:var(--color-bg-subtle);
@@ -63,7 +66,11 @@
 .paper-nav .has-active-item > .nav-group-trigger { color: var(--color-accent-text); }
 .paper-nav .nav-group-label { flex: 1; font-family: var(--font-sans); font-weight: 600; letter-spacing: .02em; }
 .paper-nav .nav-group-icon { flex: 0 0 20px; }
+/* One dropdown arrow site-wide: the drawn chevron at a lighter stroke, in the muted text colour. */
+svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 .paper-nav .nav-group-chevron { transform: rotate(-90deg); transition: transform .15s; }
+.paper-nav .nav-group-chevron { flex: none; color: var(--color-text-muted); }
+.account-button .chevron { flex: none; color: var(--color-text-muted); }
 .paper-nav .nav-group-chevron.expanded { transform: rotate(0); }
 /* 二级菜单与一级拉开层次：不带图标，文字和一级的文字左对齐（12 内边距 + 20 图标 + 10 间距 = 42），
    颜色退后一档，行距收紧成一组，组尾留白再接下一个一级。 */
@@ -74,6 +81,9 @@
 .paper-nav .nav-item.active:before { top: 8px; bottom: 8px; }
 .paper-nav .nav-group-trigger .nav-group-icon { color: currentColor; }
 .paper-nav .nav-group-items .nav-item-label { font-family: var(--font-sans); }
+/* Short windows still scroll the menu by wheel or touch; a second scrollbar beside the page's own looked like stray scrolling. */
+.paper-nav.primary-nav { scrollbar-width: none; }
+.paper-nav.primary-nav::-webkit-scrollbar { display: none; }
 .paper-sidebar .tenant-copy strong { font-family: var(--font-sans); font-size: 12px; font-weight: 500; letter-spacing: .01em; }
 .paper-sidebar .tenant-copy small, .paper-sidebar .status-capsule small { letter-spacing: .08em; }
 .paper-sidebar .sidebar-create-button { font-family: var(--font-sans); font-weight: 600; letter-spacing: .02em; }

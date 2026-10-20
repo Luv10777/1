@@ -35,7 +35,7 @@
 .yanhuo-sources dd { margin: 6px 0 0; font-size: 16px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .yanhuo-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: flex-start; margin-top: auto; min-height: 36px; padding: 0 14px; border: 1px solid var(--color-primary); border-radius: 4px; color: var(--color-primary); font-size: 12px; font-weight: 500; }
 .yanhuo-secondary:hover { background: var(--color-bg-subtle); }
-.yanhuo-purchase-terms { margin-top: 32px; }
+button.yanhuo-secondary { background: transparent; font-family: inherit; cursor: pointer; }
 .yanhuo-section { margin-top: 40px; scroll-margin-top: 24px; }
 .yanhuo-section-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .yanhuo-section-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
@@ -68,7 +68,31 @@
 .yanhuo-topup-total strong { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 40px; }
 .yanhuo-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 10px 20px; background: var(--color-accent); color: var(--color-on-accent); border: 1px solid transparent; border-radius: 4px; font-size: 13px; }
 .yanhuo-primary:hover:not(:disabled) { background: var(--color-accent-text); }
-.yanhuo-topup-row > button { margin-left: auto; }
+.yanhuo-checkout { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.yanhuo-pay-methods { display: flex; flex-wrap: wrap; gap: 12px; border: 0; padding: 0; margin: 0 0 16px; }
+.yanhuo-pay-methods legend { margin-bottom: 8px; padding: 0; font-size: 12px; color: var(--ink-muted); }
+.yanhuo-pay-methods label { display: inline-flex; align-items: center; gap: 10px; min-width: 160px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 4px; background: var(--color-bg-surface); font-size: 14px; cursor: pointer; }
+.yanhuo-pay-methods label.selected { border-color: var(--color-accent); }
+.yanhuo-pay-methods input { margin: 0; width: 14px; height: 14px; accent-color: var(--color-accent); }
+.yanhuo-checkout-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
+.yanhuo-checkout-row .yanhuo-legal-consent { flex: 0 1 auto; max-width: 560px; margin: 0; }
+.yanhuo-checkout-row > button, .yanhuo-checkout-pay { flex: 0 0 auto; }
+.yanhuo-checkout-pay { display: flex; align-items: center; gap: 20px; }
+.yanhuo-checkout-due { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--ink-muted); }
+.yanhuo-checkout-due strong { font-size: 22px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.yanhuo-checkout-pay .yanhuo-primary { min-width: 140px; }
+.yanhuo-payment .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; }
+.yanhuo-payment.yanhuo-topup-dialog { width: min(720px, calc(100vw - 32px)); }
+.yanhuo-topup-rate { margin: 6px 0 18px 42px; font-size: 12px; color: var(--ink-muted); }
+.yanhuo-topup-dialog .yanhuo-checkout-row { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 16px 32px; }
+.yanhuo-topup-dialog .yanhuo-checkout-row .yanhuo-legal-consent { flex: 1 1 280px; }
+.yanhuo-topup-dialog .yanhuo-checkout-pay { margin-left: auto; }
+.yanhuo-payment[open] { animation: yanhuo-dialog-in .2s cubic-bezier(.2, .8, .2, 1); }
+.yanhuo-payment[open]::backdrop { animation: yanhuo-backdrop-in .2s ease-out; }
+@keyframes yanhuo-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes yanhuo-backdrop-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .yanhuo-payment[open], .yanhuo-payment[open]::backdrop { animation: none; } }
+.yanhuo-payment .yanhuo-pay-methods label { flex: 1; }
 .yanhuo-note { font-size: 12px; color: var(--ink-muted); line-height: 1.8; margin: 12px 0 0; }
 .yanhuo-empty { display: grid; justify-items: center; text-align: center; padding: 34px 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
 .yanhuo-empty img { margin-bottom: 10px; object-fit: contain; }
@@ -127,26 +151,16 @@
 .yanhuo-plan-permissions legend { margin-bottom: 12px; color: var(--ink-muted); }
 .yanhuo-plan-permissions label { display: flex; align-items: center; gap: 6px; }
 .yanhuo-plan-permissions input { margin: 0; }
-.sidebar-yanhuo { display: flex; gap: 10px; padding: 14px 14px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-surface); box-shadow: var(--shadow-paper); transition: border-color .18s; }
-.sidebar-yanhuo:hover { border-color: var(--color-border-strong); }
-.sidebar-yanhuo-icon { display: none; flex: 0 0 18px; color: var(--color-accent-text); }
-.sidebar-yanhuo-copy { min-width: 0; flex: 1; }
-.sidebar-yanhuo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-muted); }
-.sidebar-yanhuo-plan { max-width: 116px; padding: 0 8px; overflow: hidden; border: 1px solid currentColor; border-radius: 2px; font-size: 12px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
-.sidebar-yanhuo-plan.active { color: var(--color-accent-text); }
-.sidebar-yanhuo-plan.expired { color: var(--color-warning); }
-.sidebar-yanhuo-number { display: flex; align-items: baseline; gap: 6px; margin: 10px 0 12px; color: var(--ink); font: 500 26px/1.15 var(--font-sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.sidebar-yanhuo-number small { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--ink-muted); }
-.sidebar-yanhuo-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-muted); }
-.sidebar-yanhuo-foot > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-yanhuo-action { display: inline-flex; align-items: center; gap: 2px; flex: none; color: var(--color-accent-text); font-weight: 500; }
-.sidebar.is-collapsed .sidebar-footer { display: block; padding: 8px; }
-.sidebar.is-collapsed .sidebar-yanhuo-copy, .sidebar.is-collapsed .sidebar-footer .account-wrap { display: none; }
-.sidebar.is-collapsed .sidebar-yanhuo { padding: 12px; justify-content: center; }
-.sidebar.is-collapsed .sidebar-yanhuo-icon { display: block; }
+.account-plan { overflow: hidden; color: var(--ink-muted); font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.account-plan b { color: var(--color-accent-text); font-weight: 500; }
+.account-menu-link { display: block; padding: 10px; border-radius: 4px; color: var(--color-accent-text); font-size: 12px; font-weight: 500; }
+.account-menu-link:hover { background: var(--color-bg-subtle); }
 .yanhuo-page .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @keyframes yanhuo-spin { to { transform: rotate(360deg); } }
 .yanhuo-icon .spinning { animation: yanhuo-spin 1s linear infinite; }
 @media (max-width: 900px) { .yanhuo-overview { grid-template-columns: 1fr; } .yanhuo-rule-grid { grid-template-columns: 1fr; } .yanhuo-rule-grid > div + div { border-left: 0; border-top: 1px solid var(--line); } }
-@media (max-width: 640px) { .yanhuo-heading { margin-bottom: 22px; } .yanhuo-heading h1 { font-size: 26px; } .yanhuo-card { padding: 20px; } .yanhuo-number { font-size: 34px; } .yanhuo-section { margin-top: 32px; } .yanhuo-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .yanhuo-amounts label { padding: 14px; } .yanhuo-topup-row { gap: 20px; } .yanhuo-topup-row > button { flex-basis: 100%; margin-left: 0; } .yanhuo-custom { flex: 1; min-width: 0; } .yanhuo-money-input { max-width: none; } .yanhuo-plan-form { grid-template-columns: 1fr 1fr; } .yanhuo-payment { padding: 20px; } }
+@media (max-width: 640px) { .yanhuo-heading { margin-bottom: 22px; } .yanhuo-heading h1 { font-size: 26px; } .yanhuo-card { padding: 20px; } .yanhuo-number { font-size: 34px; } .yanhuo-section { margin-top: 32px; } .yanhuo-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .yanhuo-amounts label { padding: 14px; } .yanhuo-topup-row { gap: 20px; } .yanhuo-checkout-row, .yanhuo-topup-dialog .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; } .yanhuo-topup-rate { margin-left: 0; } .yanhuo-checkout-pay { justify-content: space-between; } .yanhuo-checkout-pay .yanhuo-primary { flex: 1; } .yanhuo-pay-methods label { flex: 1; } .yanhuo-custom { flex: 1; min-width: 0; } .yanhuo-money-input { max-width: none; } .yanhuo-plan-form { grid-template-columns: 1fr 1fr; } .yanhuo-payment { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { .yanhuo-icon .spinning { animation: none; } }
+.yanhuo-coin { flex: none; display: inline-block; margin-right: .3em; vertical-align: -.12em; }
+
+.account-copy { min-width: 0; }

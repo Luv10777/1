@@ -8,8 +8,9 @@ import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound, ChevronsUpDown } from 'lucide-vue-next'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown } from 'lucide-vue-next'
 import { billing, number, refreshBilling } from '../stores/billing'
+import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
 const route = useRoute()
@@ -26,18 +27,12 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
-const yanhuoPlan = computed(() => {
+// 侧栏账号处显示当前套餐：没有生效中的会员即为免费版；账户读不到时不显示，避免误报。
+const memberTier = computed(() => {
   const summary = billing.summary
-  if (billing.error) return { label: '暂不可读', state: '' }
-  if (summary?.memberActive) return { label: summary.plan?.name || '会员', state: 'active' }
-  return summary?.plan ? { label: '会员已到期', state: 'expired' } : { label: '未开通会员', state: '' }
-})
-const yanhuoNote = computed(() => {
-  const summary = billing.summary
-  if (!summary) return '套餐与充值'
-  if (summary.held) return `生成中预占 ${number(summary.held)}`
-  if (summary.memberActive && summary.memberUntil) return `有效至 ${new Date(summary.memberUntil).toLocaleDateString('zh-CN')}`
-  return '开通会员即可创作'
+  if (billing.error || !summary) return null
+  if (!summary.memberActive) return { label: '免费版', paid: false, until: '' }
+  return { label: summary.plan?.name || '会员', paid: true, until: summary.memberUntil ? new Date(summary.memberUntil).toLocaleDateString('zh-CN') : '' }
 })
 const needsStore = computed(() => auth.isAuthenticated && billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
@@ -283,7 +278,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
             >
               <span class="material-symbols-outlined nav-group-icon" aria-hidden="true">{{ navIcons[group.key] || 'folder' }}</span>
               <span class="nav-group-label">{{ group.label }}</span>
-              <span class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true">⌄</span>
+              <ChevronDown :size="15" class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true" />
             </button>
             <div
               v-show="!collapsed && isGroupExpanded(group.key)"
@@ -310,15 +305,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
       </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
-        <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
-          <Wallet :size="18" class="sidebar-yanhuo-icon" aria-hidden="true" />
-          <div class="sidebar-yanhuo-copy">
-            <div class="sidebar-yanhuo-head"><span>烟火余额</span><span class="sidebar-yanhuo-plan" :class="yanhuoPlan.state">{{ yanhuoPlan.label }}</span></div>
-            <strong class="sidebar-yanhuo-number">{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong>
-            <div class="sidebar-yanhuo-foot"><span>{{ yanhuoNote }}</span><span class="sidebar-yanhuo-action">充值<ArrowUpRight :size="13" aria-hidden="true" /></span></div>
-          </div>
-        </RouterLink>
-        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>您还没有加入一方志</template></small><strong>{{ userName }}</strong></span><ChevronsUpDown :size="16" class="chevron" aria-hidden="true" /></button><div v-if="accountOpen" class="account-menu"><RouterLink v-if="memberTier" to="/billing" class="account-menu-link" @click="accountOpen = false; closeMenu()">{{ memberTier.paid ? '续订套餐' : '开通会员' }}</RouterLink><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
       </div>
     </aside>
@@ -330,6 +317,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <RouterLink to="/image/create" class="header-brand" aria-label="一方志内容工具"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
+            <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
@@ -381,6 +369,9 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .sidebar-footer .account-wrap { margin-top: 14px; }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }
+.topbar-balance { gap: 4px; font-variant-numeric: tabular-nums; font-weight: 500; }
+.topbar-balance .yanhuo-coin { margin-right: 0; }
+.topbar-balance-label { margin-right: 2px; color: var(--color-text-muted); font-weight: 400; }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
 @media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
