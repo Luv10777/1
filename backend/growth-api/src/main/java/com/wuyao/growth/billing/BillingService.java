@@ -23,6 +23,7 @@ public class BillingService {
     private final BillingStore store;
     private final BillingProperties config;
     private final WechatPayGateway wechat;
+    private final AlipayGateway alipay;
     /** Generation writers use one account-first lock order, including cancellation and retries. */
     @Transactional
     public void lockForGeneration() { store.lockAccount(); }
@@ -58,7 +59,7 @@ public class BillingService {
         o.setCreatedBy(currentUserId());
         o.setKind("TOPUP"); o.setAmountMinor(input.amountMinor()); o.setCredits(input.amountMinor()/10);
         o.setPaymentMethod(config.getPaymentMethod());
-        o.setExpiresAt(Instant.now().plus("WECHAT".equals(o.getPaymentMethod())?Duration.ofMinutes(30):Duration.ofDays(7))); store.save(o);
+        o.setExpiresAt(Instant.now().plus("MANUAL".equals(o.getPaymentMethod())?Duration.ofDays(7):Duration.ofMinutes(30))); store.save(o);
         return view(o);
     }
     @Transactional
@@ -79,7 +80,7 @@ public class BillingService {
         o.setCreatedBy(currentUserId());
         o.setKind("MEMBERSHIP"); o.setAmountMinor(p.getPriceMinor()); o.setCredits(p.getGiftCredits());
         o.setPlanSnapshot(p.snapshot()); o.setPaymentMethod(config.getPaymentMethod());
-        o.setExpiresAt(Instant.now().plus("WECHAT".equals(o.getPaymentMethod())?Duration.ofMinutes(30):Duration.ofDays(7))); store.save(o);
+        o.setExpiresAt(Instant.now().plus("MANUAL".equals(o.getPaymentMethod())?Duration.ofDays(7):Duration.ofMinutes(30))); store.save(o);
         return view(o);
     }
     @Transactional
@@ -101,7 +102,7 @@ public class BillingService {
     public boolean claimReconciliation(String id) {
         var o=requireOrder(store.lockOrder(id));
         var now=Instant.now();
-        if(!"WECHAT".equals(o.getPaymentMethod())||!java.util.Set.of("PENDING_PAYMENT","EXPIRED").contains(o.getState())
+        if(!java.util.Set.of("WECHAT","ALIPAY").contains(o.getPaymentMethod())||!java.util.Set.of("PENDING_PAYMENT","EXPIRED").contains(o.getState())
             ||(o.getReconciliationAfter()!=null&&o.getReconciliationAfter().isAfter(now))) return false;
         o.setReconciliationAfter(now.plusSeconds(30));
         return true;
@@ -115,7 +116,7 @@ public class BillingService {
     public BillingDtos.OrderView confirmPayment(String id,BillingDtos.Confirmation input,Long operator) {
         if(!config.getOperatorUserIds().contains(operator)) throw BizException.of(ErrorCode.FORBIDDEN,"没有收款核销权限");
         var a=store.lockAccount(); var o=requireOrder(store.lockOrder(id));
-        if(!"MANUAL".equals(o.getPaymentMethod())) throw bad("微信支付订单须以微信验证的支付结果入账");
+        if(!"MANUAL".equals(o.getPaymentMethod())) throw bad("在线支付订单须以支付平台验证的支付结果入账");
         String receipt="manual:"+input.receiptReference().trim();
         if(o.getAmountMinor()!=input.receivedAmountMinor()) throw bad("实际到账金额与订单金额不一致");
         if("PAID".equals(o.getState())) {
@@ -132,6 +133,18 @@ public class BillingService {
         if(!"WECHAT".equals(o.getPaymentMethod())) throw bad("订单收款方式不匹配");
         wechat.validatePaid(transaction,view(o),TenantContext.require());
         String receipt="wechat:"+transaction.path("transaction_id").asText();
+        if("PAID".equals(o.getState())) {
+            if(!receipt.equals(o.getReceiptReference())) throw bad("支付流水与已入账订单不一致");
+            return view(o);
+        }
+        return fulfil(a,o,receipt,null);
+    }
+    @Transactional
+    public BillingDtos.OrderView confirmAlipay(String id,com.fasterxml.jackson.databind.JsonNode trade) {
+        var a=store.lockAccount(); var o=requireOrder(store.lockOrder(id));
+        if(!"ALIPAY".equals(o.getPaymentMethod())) throw bad("订单收款方式不匹配");
+        alipay.validatePaid(trade,view(o));
+        String receipt="alipay:"+trade.path("trade_no").asText();
         if("PAID".equals(o.getState())) {
             if(!receipt.equals(o.getReceiptReference())) throw bad("支付流水与已入账订单不一致");
             return view(o);
@@ -270,6 +283,8 @@ public class BillingService {
     private BillingDtos.PaymentInstructions payment() {
         if("WECHAT".equals(config.getPaymentMethod()))
             return new BillingDtos.PaymentInstructions(wechat.configured(),"","","","微信扫码支付，支付成功后自动到账。","");
+        if("ALIPAY".equals(config.getPaymentMethod()))
+            return new BillingDtos.PaymentInstructions(alipay.configured(),"","","","支付宝付款，支付成功后自动到账。","");
         return config.payment();
     }
     private BillingOrder requireOrder(BillingOrder o) {

@@ -59,6 +59,7 @@ export const billingApi = {
   order: id => get('/api/billing/orders/' + id),
   refresh: id => post('/api/billing/orders/' + id + '/refresh', {}),
   cancel: id => post('/api/billing/orders/' + id + '/cancel', {}),
+  alipay: id => post('/api/billing/orders/' + id + '/alipay', {}),
   orders: (page = 0) => get('/api/billing/orders', { page, size: 20 }),
   ledger: (page = 0) => get('/api/billing/ledger', { page, size: 20 }),
   operatorPlans: () => get('/api/billing/operations/plans'),
