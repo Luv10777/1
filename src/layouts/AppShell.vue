@@ -8,8 +8,9 @@ import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Store, FilePenLine, UserRound, ChevronsUpDown } from 'lucide-vue-next'
-import { billing, refreshBilling } from '../stores/billing'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown } from 'lucide-vue-next'
+import { billing, number, refreshBilling } from '../stores/billing'
+import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
 const route = useRoute()
@@ -264,7 +265,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
             >
               <span class="material-symbols-outlined nav-group-icon" aria-hidden="true">{{ navIcons[group.key] || 'folder' }}</span>
               <span class="nav-group-label">{{ group.label }}</span>
-              <span class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true">⌄</span>
+              <ChevronDown :size="15" class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true" />
             </button>
             <div
               v-show="!collapsed && isGroupExpanded(group.key)"
@@ -291,7 +292,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
       </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
-        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><span v-if="memberTier" class="account-tier" :class="{ paid: memberTier.paid }">{{ memberTier.label }}</span></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><div v-if="memberTier" class="account-menu-plan"><strong>{{ memberTier.label }}</strong><small>{{ memberTier.until ? '有效期至 ' + memberTier.until : memberTier.paid ? '会员生效中' : '开通会员即可使用 AI 创作' }}</small><RouterLink to="/billing" @click="accountOpen = false; closeMenu()">{{ memberTier.paid ? '续订套餐' : '开通会员' }}</RouterLink></div><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>您还没有加入一方志</template></small><strong>{{ userName }}</strong></span><ChevronsUpDown :size="16" class="chevron" aria-hidden="true" /></button><div v-if="accountOpen" class="account-menu"><RouterLink v-if="memberTier" to="/billing" class="account-menu-link" @click="accountOpen = false; closeMenu()">{{ memberTier.paid ? '续订套餐' : '开通会员' }}</RouterLink><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
       </div>
     </aside>
@@ -303,6 +304,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <RouterLink to="/image/create" class="header-brand" aria-label="一方志内容工具"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
+            <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
@@ -354,6 +356,8 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .sidebar-footer .account-wrap { margin-top: 14px; }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }
+.topbar-balance { gap: 4px; font-variant-numeric: tabular-nums; font-weight: 500; }
+.topbar-balance .yanhuo-coin { margin-right: 0; }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
 @media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
