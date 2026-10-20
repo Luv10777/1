@@ -1,8 +1,7 @@
 <script setup>
 import AppSelect from './AppSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { IMAGE_RATIOS, POSTER_PURPOSE_GROUPS } from '../domain/imageCreation'
-import { POSTER_SCENARIOS } from '../domain/posterScenarios'
+import { IMAGE_QUALITIES, IMAGE_RATIOS, POSTER_PURPOSE_GROUPS } from '../domain/imageCreation'
 
 const props = defineProps({ studio: { type: Object, required: true }, prompted: Boolean })
 const studio = computed(() => props.studio)
@@ -55,8 +54,6 @@ onBeforeUnmount(() => {
   <form class="poster-control-panel" @submit.prevent="studio.generate">
     <header class="poster-control-head"><h1>营销海报</h1></header>
     <div class="poster-control-scroll">
-      <section class="poster-control-section"><div class="poster-section-heading"><strong>经营场景</strong></div><div class="poster-focus-pills" role="group" aria-label="海报画面重点"><button v-for="scenario in POSTER_SCENARIOS" :key="scenario.focus" type="button" :disabled="studio.locked" :aria-pressed="studio.style === scenario.focus" :class="{ active: studio.style === scenario.focus }" @click="studio.style = scenario.focus">{{ scenario.focus }}</button></div></section>
-
       <section class="poster-control-section">
         <div class="poster-section-heading"><label for="poster-brief"><strong>画面描述</strong></label><button v-if="studio.lastPrompt" type="button" class="poster-recall" :disabled="studio.locked" title="填入上一条提示词" @click="studio.recallLastPrompt(); promptInput?.focus()">↶ 填入上一条</button></div>
         <div class="poster-composer" :class="{ 'is-prompted': prompted }">
@@ -68,9 +65,9 @@ onBeforeUnmount(() => {
 
       <details class="poster-output-settings">
         <summary><strong>输出设置</strong><span>{{ studio.ratio }} · {{ studio.quality }} · {{ studio.purpose }}</span></summary>
-        <section class="poster-control-section"><div class="poster-section-heading"><strong>海报比例</strong></div><div class="poster-ratio-grid" role="group" aria-label="海报比例"><button v-for="ratio in IMAGE_RATIOS" :key="ratio" type="button" :disabled="studio.locked || !studio.supportsRatio(ratio)" :aria-pressed="studio.ratio === ratio" :class="{ active: studio.ratio === ratio }" @click="studio.ratio = ratio"><span class="poster-ratio-icon" :style="{ aspectRatio: ratio.replace(':', ' / ') }" />{{ ratio }}</button></div></section>
+        <section class="poster-control-section"><div class="poster-section-heading"><strong>海报比例</strong></div><AppSelect v-model="studio.ratio" :disabled="studio.locked" aria-label="海报比例"><option v-for="ratio in IMAGE_RATIOS" :key="ratio" :value="ratio" :disabled="!studio.supportsRatio(ratio)">{{ ratio }}</option></AppSelect></section>
 
-        <section class="poster-control-section"><div class="poster-section-heading"><strong>输出画质</strong></div><div class="poster-quality-grid" role="group" aria-label="输出画质"><button v-for="quality in studio.qualities" :key="quality" type="button" :disabled="studio.locked || !studio.supportsQuality(quality)" :aria-pressed="studio.quality === quality" :class="{ active: studio.quality === quality }" @click="studio.quality = quality">{{ quality }}</button></div></section>
+        <section class="poster-control-section"><div class="poster-section-heading"><strong>输出画质</strong></div><div class="poster-quality-grid" role="group" aria-label="输出画质"><button v-for="quality in IMAGE_QUALITIES" :key="quality" type="button" :disabled="studio.locked || !studio.supportsQuality(quality)" :title="studio.supportsQuality(quality) ? undefined : '当前比例不支持该画质'" :aria-pressed="studio.quality === quality" :class="{ active: studio.quality === quality }" @click="studio.quality = quality">{{ quality }}</button></div></section>
 
         <section class="poster-control-section"><div class="poster-section-heading"><strong>发布用途</strong></div><div class="poster-purpose-groups" role="tablist" aria-label="发布用途分类"><button v-for="(group, index) in POSTER_PURPOSE_GROUPS" :key="group.label" type="button" role="tab" :aria-selected="purposeGroup === index" :class="{ active: purposeGroup === index }" @click="purposeGroup = index">{{ group.label }}</button></div><div class="poster-purpose-options" role="group" aria-label="发布用途"><button v-for="option in currentPurposes" :key="option.label" type="button" :disabled="studio.locked" :aria-pressed="studio.purpose === option.label" :class="{ active: studio.purpose === option.label }" @click="studio.purpose = option.label">{{ option.label }}</button></div></section>
       </details>

@@ -104,6 +104,9 @@ async function saveTitle(entry) {
     titleSaving.value = false;
   }
 }
+function historyDate(value) {
+  return new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
 function turnPrompt(turn) {
   if (!turn.parentId) return turn.brief || "这次海报创作";
   return turn.brief?.split("\n本次修改：").at(-1) || "继续修改海报";
@@ -189,52 +192,27 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-else-if="studio.workspaceTab === 'history'"
         class="poster-history-view"
       >
-        <div class="poster-view-intro">
-          <strong>留下的每一版，都可以继续编辑。</strong>
-        </div>
-        <p v-if="!studio.history.length" class="poster-empty-history">
-          还没有海报创作记录。
-        </p>
-        <div v-else class="poster-history-list">
-          <div
-            v-for="entry in studio.history"
-            :key="entry.id"
-            class="poster-history-entry"
-          >
-            <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" @click="studio.openCreation(entry.id)">
-            <span class="poster-history-thumb"
-              ><img
-                v-if="entry.previewUrl"
-                :src="entry.previewUrl"
-                :alt="`${entry.title || '海报创作'}缩略图`"
-                loading="lazy"
-              /><span v-else aria-label="暂无成图">待成图</span></span
-            ><span class="poster-history-copy"
-              ><strong>{{ entry.title || "海报创作" }}</strong
-              ><small
-                >{{ new Date(entry.createdAt).toLocaleString() }}</small
-              ></span
-            ><span class="poster-history-status">{{
-              IMAGE_STATUS[entry.status]
-            }}</span
-            ><span aria-hidden="true">↗</span>
+        <p v-if="!studio.history.length" class="poster-empty-history">还没有海报</p>
+        <ul v-else class="poster-history-grid">
+          <li v-for="entry in studio.history" :key="entry.id" class="poster-history-card">
+            <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" :aria-label="`打开${entry.title || '海报创作'}`" @click="studio.openCreation(entry.id)">
+              <img v-if="entry.previewUrl" :src="entry.previewUrl" :alt="`${entry.title || '海报创作'}缩略图`" loading="lazy" />
+              <span v-else class="poster-history-placeholder">待成图</span>
+              <span v-if="entry.status !== 'SUCCEEDED'" class="poster-history-status">{{ IMAGE_STATUS[entry.status] }}</span>
             </button>
             <form v-if="editingTitleId === entry.id" class="poster-history-rename" @submit.prevent="saveTitle(entry)">
               <input v-model="editingTitle" maxlength="100" aria-label="作品名称" @keydown.esc.prevent="editingTitleId = null" />
-              <button type="submit" title="保存名称" aria-label="保存名称" :disabled="titleSaving || !editingTitle.trim()"><Check :size="16" /></button>
-              <button type="button" title="取消" aria-label="取消" @click="editingTitleId = null"><X :size="16" /></button>
+              <button type="submit" title="保存名称" aria-label="保存名称" :disabled="titleSaving || !editingTitle.trim()"><Check :size="14" /></button>
+              <button type="button" title="取消" aria-label="取消" @click="editingTitleId = null"><X :size="14" /></button>
             </form>
-            <button v-else type="button" class="poster-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="16" /></button>
-          </div>
-        </div>
-        <button
-          v-if="studio.historyMore"
-          type="button"
-          class="poster-load-more"
-          @click="studio.refreshHistory(false)"
-        >
-          加载更早的记录 ↓
-        </button>
+            <div v-else class="poster-history-meta">
+              <strong :title="entry.title || '海报创作'">{{ entry.title || "海报创作" }}</strong>
+              <button type="button" class="poster-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="13" /></button>
+            </div>
+            <time class="poster-history-date" :datetime="entry.createdAt">{{ historyDate(entry.createdAt) }}</time>
+          </li>
+        </ul>
+        <button v-if="studio.historyMore" type="button" class="poster-load-more" @click="studio.refreshHistory(false)">加载更多</button>
       </div>
 
       <div v-else class="poster-result-view">
