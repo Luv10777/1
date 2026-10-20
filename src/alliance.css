@@ -1,0 +1,99 @@
+/* 联盟券：领券中心、我的联盟券、供券管理、门店核销、平台后台。字号不小于 12px。 */
+
+.alliance-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.alliance-tabs { display: flex; gap: 4px; margin: 0 0 20px; border-bottom: 1px solid var(--line); }
+.alliance-tabs a, .alliance-tabs button { position: relative; padding: 10px 14px; border: 0; background: none; color: var(--ink-muted); font-size: 13px; cursor: pointer; }
+.alliance-tabs .active { color: var(--ink); font-weight: 600; }
+.alliance-tabs .active::after { content: ''; position: absolute; right: 10px; bottom: -1px; left: 10px; height: 2px; background: var(--color-accent); }
+.alliance-tabs small { margin-left: 4px; color: var(--ink-muted); font: 12px var(--font-mono); }
+
+.alliance-panel { padding: 18px 20px; margin-bottom: 20px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel); }
+.alliance-panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.alliance-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.alliance-muted { margin: 0; color: var(--ink-muted); font-size: 12px; line-height: 1.8; }
+.alliance-notice { margin: 0 0 16px; padding: 10px 12px; border-left: 2px solid var(--color-success); background: var(--night-panel); color: var(--color-success); font-size: 12px; line-height: 1.7; }
+.alliance-notice a { margin-left: 6px; color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 3px; }
+.alliance-error { margin: 0 0 16px; padding: 10px 12px; border-left: 2px solid var(--color-error); background: var(--night-panel); color: var(--color-error); font-size: 12px; line-height: 1.7; }
+
+.alliance-quota { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: end; }
+.alliance-quota strong { font: 600 22px/1.3 var(--font-mono); color: var(--color-accent-text); }
+.alliance-quota-bar { grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 3px; background: var(--color-bg-subtle); }
+.alliance-quota-bar span { display: block; height: 100%; background: var(--color-accent); }
+
+.alliance-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.alliance-filters label { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 200px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink-muted); }
+.alliance-filters input { width: 100%; min-width: 0; height: 38px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 13px; }
+
+.alliance-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; padding: 0; margin: 0; list-style: none; }
+.alliance-voucher-card { display: flex; flex-direction: column; gap: 10px; height: 100%; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel); }
+.alliance-voucher-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.alliance-voucher-card h3 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.alliance-face { flex-shrink: 0; color: var(--color-accent-text); font: 600 18px var(--font-mono); }
+.alliance-facts { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+.alliance-facts li { display: flex; align-items: flex-start; gap: 6px; overflow-wrap: anywhere; }
+.alliance-facts svg { flex-shrink: 0; margin-top: 3px; }
+.alliance-voucher-card footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
+.alliance-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 3px; background: var(--color-bg-subtle); color: var(--ink-muted); font-size: 12px; white-space: nowrap; }
+.alliance-tag.is-active { background: color-mix(in srgb, var(--color-success) 14%, transparent); color: var(--color-success); }
+.alliance-tag.is-warning { background: color-mix(in srgb, var(--color-warning) 16%, transparent); color: var(--color-warning); }
+.alliance-tag.is-error { background: color-mix(in srgb, var(--color-error) 12%, transparent); color: var(--color-error); }
+
+.alliance-state { display: grid; justify-items: center; gap: 8px; padding: 48px 20px; color: var(--ink-muted); text-align: center; font-size: 12px; }
+.alliance-state h3 { margin: 0; color: var(--ink); font: 600 16px var(--font-serif); }
+.alliance-state p { margin: 0; line-height: 1.8; }
+
+.alliance-pager { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 0 4px; color: var(--ink-muted); font-size: 12px; }
+.alliance-pager button { min-height: 34px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
+.alliance-pager button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* 弹窗 */
+.alliance-dialog { position: fixed; inset: 0; z-index: 1000; }
+.alliance-dialog-backdrop { position: fixed; inset: 0; background: rgb(30 27 23 / 38%); }
+.alliance-dialog-position { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; overflow-y: auto; }
+.alliance-dialog-panel { position: relative; width: min(100%, 460px); max-height: calc(100dvh - 48px); padding: 24px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--night-panel); color: var(--ink); }
+.alliance-dialog-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.alliance-dialog-panel h2 { margin: 0; font: 600 20px/1.4 var(--font-serif); }
+.alliance-dialog-close { display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.alliance-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* 券码 */
+.alliance-code { display: grid; justify-items: center; gap: 10px; padding: 18px 0; margin: 4px 0 14px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
+.alliance-code img { width: 200px; height: 200px; border-radius: 4px; background: #fff; }
+.alliance-code strong { font: 600 30px/1.2 var(--font-mono); letter-spacing: .18em; }
+
+/* 表单 */
+.alliance-form { display: grid; gap: 14px; }
+.alliance-form label { display: grid; gap: 6px; font-size: 12px; color: var(--ink-muted); }
+.alliance-form input, .alliance-form textarea, .alliance-form select { width: 100%; min-width: 0; padding: 9px 11px; border: 1px solid var(--line); border-radius: 4px; background: var(--night); color: var(--ink); font-size: 13px; }
+.alliance-form small { color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
+
+/* 门店核销 */
+.alliance-redeem { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.alliance-code-input { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--night); color: var(--ink); font: 600 28px/1.2 var(--font-mono); letter-spacing: .2em; text-align: center; }
+.alliance-spaced { margin-top: 14px; }
+.alliance-preview { display: grid; gap: 8px; padding: 14px; margin-top: 14px; border: 1px solid var(--color-accent); border-radius: 6px; }
+.alliance-preview strong { font-size: 16px; }
+
+/* 表格式列表（供券、结算、后台） */
+.alliance-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.alliance-table th, .alliance-table td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.alliance-table th { color: var(--ink-muted); font-weight: 500; white-space: nowrap; }
+.alliance-table td.num { font-family: var(--font-mono); white-space: nowrap; }
+.alliance-table-wrap { overflow-x: auto; }
+.alliance-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.alliance-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.alliance-stats div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel); }
+.alliance-stats span { display: block; color: var(--ink-muted); font-size: 12px; }
+.alliance-stats strong { display: block; margin-top: 4px; font: 600 18px var(--font-mono); }
+
+@media (max-width: 760px) {
+  .alliance-redeem { grid-template-columns: minmax(0, 1fr); }
+  .alliance-quota { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .alliance-dialog-position { padding: 12px; }
+  .alliance-dialog-panel { padding: 20px 16px; }
+  .alliance-panel { padding: 14px; }
+}

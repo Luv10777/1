@@ -283,6 +283,32 @@ class AllianceVoucherIntegrationTest {
     }
 
     @Test
+    void twoClerksRedeemingTheSameCodeAtOnceSucceedOnlyOnce() throws Exception {
+        long offerId = createOffer(2);
+        approve(offerId);
+        String ref = claim(offerId, holderToken);
+        String code = data(get("/api/alliance/vouchers/" + ref), holderToken, 200).path("code").asText();
+        var start = new CountDownLatch(1);
+        List<Integer> statuses = new ArrayList<>();
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            List<Future<Integer>> results = new ArrayList<>();
+            for (String token : List.of(staffToken, supplierToken)) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return mvc.perform(post(redeemPath(store)).header("Authorization", "Bearer " + token)
+                                    .contentType("application/json").content(json.writeValueAsBytes(Map.of("code", code))))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (var result : results) statuses.add(result.get());
+        }
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(owner.queryForObject("SELECT count(*) FROM alliance_settlements", Integer.class)).isEqualTo(1);
+        assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE idempotency_key LIKE 'alliance-redeemed:%'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
     void earlyRenewalAddsTheNextPeriodWithoutStackingQuota() throws Exception {
         Long planId = owner.queryForObject("SELECT id FROM billing_plans", Long.class);
         member(holder, planId, "renewal");

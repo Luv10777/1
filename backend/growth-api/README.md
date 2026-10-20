@@ -425,8 +425,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V50 | 商家申请、信息公开发布、实物商品上架、订单与公开店铺 RLS 策略 | `codex/guest-creation-browsing` |
 | V52 | 信息发布审核、驳回意见与审核后发布时间 | `codex/information-review` |
 | V53 | 个人头像及待确认头像上传凭证 | `codex/scroll-footer-account-avatar` |
+| V55 | 联盟券：套餐联盟券额度、供券单、领取记录、核销尝试、额度、联盟券、结算单 | `feat/alliance-vouchers` |
 
-下一个可用编号：V54。
+下一个可用编号：V56（V54 直播计费已在主干）。
 
 后端检查：
 

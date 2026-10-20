@@ -28,6 +28,15 @@ public final class AllianceDtos {
 
     public record PaidRequest(@NotBlank @Size(min = 4, max = 150) String reference) {}
 
+    /** 当前生效的业务规则，页面上的说明文字从这里取，不写死。 */
+    public record Rules(int settleRateBp, int perSupplierLimit, long monthlyFaceCapMinor, int inventorySharePercent,
+                        int unlimitedInventoryCap, int voucherValidDays, int disputeDays) {
+        static Rules of(AllianceProperties c) {
+            return new Rules(c.getSettleRateBp(), c.getPerSupplierLimit(), c.getMonthlyFaceCapMinor(),
+                    c.getInventorySharePercent(), c.getUnlimitedInventoryCap(), c.getVoucherValidDays(), c.getDisputeDays());
+        }
+    }
+
     // ---------- 供券商户 ----------
 
     public record OfferView(Long id, Long storeId, String storeName, Long productId, String productName, String saleUnit,

@@ -188,7 +188,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <div class="yanhuo-plan-top"><h3>{{ plan.name }}</h3><span v-if="account.plan?.code === plan.code && account.memberActive" class="yanhuo-current">当前套餐</span></div>
             <p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p>
             <p class="yanhuo-plan-description">{{ plan.description }}</p>
-            <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li></ul>
+            <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li><li v-if="plan.allianceQuotaMinor"><Check :size="15" />联盟券额度 ¥{{ (plan.allianceQuotaMinor / 100).toFixed(2) }} / 期</li></ul>
             <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="subscribe(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button>
           </article>
         </div>
