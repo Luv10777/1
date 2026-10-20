@@ -54,7 +54,7 @@ public class BillingStore {
             .setParameter("tenant",TenantContext.require()).getSingleResult()>0;
     }
     public List<String> reconciliationOrders() {
-        return em.createQuery("select o.id from BillingOrder o where o.tenantId=:tenant and o.paymentMethod='WECHAT' and o.state in ('PENDING_PAYMENT','EXPIRED') order by o.createdAt",String.class)
+        return em.createQuery("select o.id from BillingOrder o where o.tenantId=:tenant and o.paymentMethod in ('WECHAT','ALIPAY') and o.state in ('PENDING_PAYMENT','EXPIRED') order by o.createdAt",String.class)
             .setParameter("tenant",TenantContext.require()).setMaxResults(20).getResultList();
     }
     public List<BillingOrder> orders(int page,int size) {

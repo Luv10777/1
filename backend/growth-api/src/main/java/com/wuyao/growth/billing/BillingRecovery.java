@@ -21,7 +21,6 @@ public class BillingRecovery {
     private final VideoAnalysisService analyses;
     private final BillingService billing;
     private final BillingCheckoutService checkout;
-    private final WechatPayGateway wechat;
     public void recover() {
         Long after=0L;
         while(true) {
@@ -30,9 +29,9 @@ public class BillingRecovery {
             for(Long tenant:ids) TenantContext.runAs(tenant,()->{
                 try {
                     if(!billing.claimRecovery()) return null;
-                    if(wechat.configured()) for(String id:billing.reconciliationOrders()) {
+                    if(checkout.reconciles()) for(String id:billing.reconciliationOrders()) {
                         try { checkout.refresh(id); }
-                        catch(RuntimeException e) { log.warn("微信订单对账等待重试: tenant={} order={}",tenant,id); }
+                        catch(RuntimeException e) { log.warn("在线支付订单对账等待重试: tenant={} order={}",tenant,id); }
                     }
                     recoverFailures(tenant);
                 } catch(RuntimeException e) { log.warn("烟火恢复检查失败: tenant={}",tenant,e); }
