@@ -31,6 +31,8 @@ const qr = ref('')
 const paymentError = ref('')
 const paymentLoading = ref(false)
 const paymentDialog = ref(null)
+const planDialog = ref(null)
+const pendingPlan = ref(null)
 const topupInput = ref(null)
 const refreshButton = ref(null)
 let paymentTimer
@@ -50,6 +52,8 @@ const reloadPlans = async () => {
   catch (e) { plansError.value = e.message || '套餐暂时无法读取' }
 }
 const refresh = async () => { await refreshBilling(); await reloadPlans() }
+const choosePlan = async (plan) => { pendingPlan.value = plan; await nextTick(); planDialog.value?.showModal() }
+const closePlan = () => { planDialog.value?.close(); pendingPlan.value = null }
 const closePayment = () => { clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus() }
 const applyPayment = async (order) => {
   if (disposed || !payment.value) return
@@ -117,7 +121,11 @@ const subscribe = async (plan) => {
   if (!canPay.value) return
   if (!checkPurchaseConsent('订阅前请阅读并同意用户协议、隐私协议和售后服务规则。', planTerms, 'plan')) return
   busy.value = true; error.value = ''; errorAt.value = 'plan'
-  try { await openPayment(await billingApi.subscribe({ requestKey: keyFor('plan:' + plan.id), planId: plan.id })) }
+  try {
+    const order = await billingApi.subscribe({ requestKey: keyFor('plan:' + plan.id), planId: plan.id })
+    closePlan()
+    await openPayment(order)
+  }
   catch (e) { error.value = e.message || '订阅订单创建失败' }
   finally { busy.value = false }
 }
@@ -186,10 +194,9 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p>
             <p class="yanhuo-plan-description">{{ plan.description }}</p>
             <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li></ul>
-            <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="subscribe(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button>
+            <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="choosePlan(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button>
           </article>
         </div>
-        <BillingCheckoutTerms v-if="billing.plans.length" ref="planTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'plan' ? error : ''" />
       </section>
 
       <section id="topup" class="yanhuo-section" aria-labelledby="topup-title">
@@ -216,6 +223,16 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
       <BillingPlanManager v-if="account.operator" @updated="reloadPlans" />
     </template>
+    <dialog ref="planDialog" class="yanhuo-payment" aria-labelledby="plan-confirm-title" @cancel.prevent="closePlan" @click="event => { if (event.target === planDialog) closePlan() }">
+      <template v-if="pendingPlan && account">
+        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="plan-confirm-title">{{ account.memberActive ? '续订套餐' : '订阅套餐' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭" title="关闭" @click="closePlan"><X :size="20" /></button></header>
+        <p class="yanhuo-payment-amount">{{ yuan(pendingPlan.priceMinor) }}</p>
+        <p class="yanhuo-payment-item">{{ pendingPlan.name }} · {{ pendingPlan.durationDays }} 天 · 赠送 {{ number(pendingPlan.giftCredits) }} 烟火</p>
+        <BillingCheckoutTerms ref="planTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'plan' ? error : ''">
+          <button class="yanhuo-primary" type="button" :disabled="!canPay" @click="subscribe(pendingPlan)">{{ busy ? '正在创建订单...' : '确认支付' }}</button>
+        </BillingCheckoutTerms>
+      </template>
+    </dialog>
     <dialog ref="paymentDialog" class="yanhuo-payment" aria-labelledby="payment-title" @cancel.prevent="closePayment" @click="event => { if (event.target === paymentDialog) closePayment() }">
       <template v-if="payment">
         <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="payment-title">{{ payment.state === 'PAID' ? '烟火已到账' : payment.kind === 'TOPUP' ? '充值烟火' : '订阅会员' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭支付窗口" title="关闭" @click="closePayment"><X :size="20" /></button></header>
