@@ -35,6 +35,7 @@
 .yanhuo-sources dd { margin: 6px 0 0; font-size: 16px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .yanhuo-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; align-self: flex-start; margin-top: auto; min-height: 36px; padding: 0 14px; border: 1px solid var(--color-primary); border-radius: 4px; color: var(--color-primary); font-size: 12px; font-weight: 500; }
 .yanhuo-secondary:hover { background: var(--color-bg-subtle); }
+button.yanhuo-secondary { background: transparent; font-family: inherit; cursor: pointer; }
 .yanhuo-section { margin-top: 40px; scroll-margin-top: 24px; }
 .yanhuo-section-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .yanhuo-section-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
@@ -81,6 +82,16 @@
 .yanhuo-checkout-due strong { font-size: 22px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
 .yanhuo-checkout-pay .yanhuo-primary { min-width: 140px; }
 .yanhuo-payment .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; }
+.yanhuo-payment.yanhuo-topup-dialog { width: min(720px, calc(100vw - 32px)); }
+.yanhuo-topup-rate { margin: 6px 0 18px 42px; font-size: 12px; color: var(--ink-muted); }
+.yanhuo-topup-dialog .yanhuo-checkout-row { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 16px 32px; }
+.yanhuo-topup-dialog .yanhuo-checkout-row .yanhuo-legal-consent { flex: 1 1 280px; }
+.yanhuo-topup-dialog .yanhuo-checkout-pay { margin-left: auto; }
+.yanhuo-payment[open] { animation: yanhuo-dialog-in .2s cubic-bezier(.2, .8, .2, 1); }
+.yanhuo-payment[open]::backdrop { animation: yanhuo-backdrop-in .2s ease-out; }
+@keyframes yanhuo-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes yanhuo-backdrop-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .yanhuo-payment[open], .yanhuo-payment[open]::backdrop { animation: none; } }
 .yanhuo-payment .yanhuo-pay-methods label { flex: 1; }
 .yanhuo-note { font-size: 12px; color: var(--ink-muted); line-height: 1.8; margin: 12px 0 0; }
 .yanhuo-empty { display: grid; justify-items: center; text-align: center; padding: 34px 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
@@ -148,7 +159,7 @@
 @keyframes yanhuo-spin { to { transform: rotate(360deg); } }
 .yanhuo-icon .spinning { animation: yanhuo-spin 1s linear infinite; }
 @media (max-width: 900px) { .yanhuo-overview { grid-template-columns: 1fr; } .yanhuo-rule-grid { grid-template-columns: 1fr; } .yanhuo-rule-grid > div + div { border-left: 0; border-top: 1px solid var(--line); } }
-@media (max-width: 640px) { .yanhuo-heading { margin-bottom: 22px; } .yanhuo-heading h1 { font-size: 26px; } .yanhuo-card { padding: 20px; } .yanhuo-number { font-size: 34px; } .yanhuo-section { margin-top: 32px; } .yanhuo-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .yanhuo-amounts label { padding: 14px; } .yanhuo-topup-row { gap: 20px; } .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; } .yanhuo-checkout-pay { justify-content: space-between; } .yanhuo-checkout-pay .yanhuo-primary { flex: 1; } .yanhuo-pay-methods label { flex: 1; } .yanhuo-custom { flex: 1; min-width: 0; } .yanhuo-money-input { max-width: none; } .yanhuo-plan-form { grid-template-columns: 1fr 1fr; } .yanhuo-payment { padding: 20px; } }
+@media (max-width: 640px) { .yanhuo-heading { margin-bottom: 22px; } .yanhuo-heading h1 { font-size: 26px; } .yanhuo-card { padding: 20px; } .yanhuo-number { font-size: 34px; } .yanhuo-section { margin-top: 32px; } .yanhuo-amounts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .yanhuo-amounts label { padding: 14px; } .yanhuo-topup-row { gap: 20px; } .yanhuo-checkout-row, .yanhuo-topup-dialog .yanhuo-checkout-row { flex-direction: column; align-items: stretch; gap: 16px; } .yanhuo-topup-rate { margin-left: 0; } .yanhuo-checkout-pay { justify-content: space-between; } .yanhuo-checkout-pay .yanhuo-primary { flex: 1; } .yanhuo-pay-methods label { flex: 1; } .yanhuo-custom { flex: 1; min-width: 0; } .yanhuo-money-input { max-width: none; } .yanhuo-plan-form { grid-template-columns: 1fr 1fr; } .yanhuo-payment { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { .yanhuo-icon .spinning { animation: none; } }
 .yanhuo-coin { flex: none; display: inline-block; margin-right: .3em; vertical-align: -.12em; }
 

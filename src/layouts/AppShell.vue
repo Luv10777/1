@@ -304,7 +304,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <RouterLink to="/image/create" class="header-brand" aria-label="一方志内容工具"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
-            <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
+            <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商家入驻</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
@@ -358,6 +358,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }
 .topbar-balance { gap: 4px; font-variant-numeric: tabular-nums; font-weight: 500; }
 .topbar-balance .yanhuo-coin { margin-right: 0; }
+.topbar-balance-label { margin-right: 2px; color: var(--color-text-muted); font-weight: 400; }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
 @media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
