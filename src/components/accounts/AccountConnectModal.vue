@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../AppSelect.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, TransitionChild, TransitionRoot } from '@headlessui/vue'
 import { Check, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, ShieldCheck, Smartphone, X } from 'lucide-vue-next'
@@ -93,7 +94,7 @@ onBeforeUnmount(() => { stopTimers(); qrGeneration += 1 })
           <TransitionChild as="template" enter="duration-200 ease-out motion-reduce:duration-0" enter-from="scale-95 opacity-0" enter-to="scale-100 opacity-100" leave="duration-150 ease-in motion-reduce:duration-0" leave-from="scale-100 opacity-100" leave-to="scale-95 opacity-0">
             <DialogPanel class="w-full max-w-xl overflow-hidden rounded-md border border-solid border-border-subtle bg-bg-surface shadow-paper-elevated">
               <header class="flex items-center justify-between border-0 border-b border-solid border-border-subtle px-6 py-5">
-                <div><div class="mb-1 text-xs font-medium text-brand-accent-ink">账号授权中心 <span class="ml-2 rounded bg-bg-subtle px-1.5 py-0.5 text-[10px] text-brand-muted">本地演示</span></div><DialogTitle class="m-0 text-xl font-semibold text-brand-primary">{{ account ? '续期账号授权' : '绑定互通' }}</DialogTitle></div>
+                <div><div class="mb-1 text-xs font-medium text-brand-accent-ink">账号授权中心 <span class="ml-2 rounded bg-bg-subtle px-1.5 py-0.5 text-xs text-brand-muted">本地演示</span></div><DialogTitle class="m-0 text-xl font-semibold text-brand-primary">{{ account ? '续期账号授权' : '绑定互通' }}</DialogTitle></div>
                 <button :class="control" aria-label="关闭授权弹窗" @click="emit('close')"><X :size="18" /></button>
               </header>
               <ol class="m-0 flex list-none items-center gap-2 px-6 pt-6">
@@ -110,7 +111,7 @@ onBeforeUnmount(() => { stopTimers(); qrGeneration += 1 })
                       </label>
                     </div><p class="mb-0 mt-2 text-xs text-brand-muted">{{ selectedMeta.provider }}</p>
                   </fieldset>
-                  <label class="block text-sm font-medium">授权身份<select v-model="identity" :disabled="!!account" class="mt-2 block w-full rounded-lg border border-solid border-border-subtle bg-bg-surface px-3 py-2.5 text-sm text-brand-primary focus:text-brand-accent-ink disabled:bg-bg-subtle"><option v-for="item in selectedMeta.identity" :key="item">{{ item }}</option></select></label>
+                  <label class="block text-sm font-medium">授权身份<AppSelect v-model="identity" :disabled="!!account" class="mt-2 block w-full rounded-lg border border-solid border-border-subtle bg-bg-surface px-3 py-2.5 text-sm text-brand-primary focus:text-brand-accent-ink disabled:bg-bg-subtle"><option v-for="item in selectedMeta.identity" :key="item">{{ item }}</option></AppSelect></label>
                   <label class="block text-sm font-medium">{{ account ? '续期账号' : '演示账号昵称' }}<input v-model="name" maxlength="30" :readonly="!!account" placeholder="输入昵称，体验绑定后的账号管理" class="mt-2 block w-full rounded-lg border border-solid border-border-subtle bg-bg-surface px-3 py-2.5 text-sm text-brand-primary text-brand-accent-ink read-only:bg-bg-subtle" /></label>
                 </div>
                 <div v-else-if="step === 2" class="text-center">
@@ -133,7 +134,7 @@ onBeforeUnmount(() => { stopTimers(); qrGeneration += 1 })
               </div>
               <footer class="space-y-4 border-0 border-t border-solid border-border-subtle bg-bg-subtle px-6 py-4">
                 <div class="flex justify-between gap-3"><button :class="control" @click="step === 1 ? emit('close') : back()"><ChevronLeft v-if="step > 1" class="mr-1 inline" :size="14" />{{ step === 1 ? '取消' : '重新选择' }}</button><button v-if="step === 1" :class="primary" :disabled="!name.trim()" @click="next">下一步 <ChevronRight :size="15" /></button><button v-if="step === 3" :class="primary" :disabled="!permissions.length" @click="complete">{{ account ? '确认续期' : '完成授权' }}<Check :size="15" /></button></div>
-                <p class="m-0 flex gap-2 text-[11px] leading-5 text-brand-muted"><ShieldCheck class="mt-0.5 shrink-0" :size="14" />授权过程严格遵守官方开放平台数据安全协议，平台不会获取您的账号登录密码。</p>
+                <p class="m-0 flex gap-2 text-xs leading-5 text-brand-muted"><ShieldCheck class="mt-0.5 shrink-0" :size="14" />授权过程严格遵守官方开放平台数据安全协议，平台不会获取您的账号登录密码。</p>
               </footer>
             </DialogPanel>
           </TransitionChild>

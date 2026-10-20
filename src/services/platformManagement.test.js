@@ -14,11 +14,12 @@ test('platform controls send authenticated requests and identity values are only
   }
   try {
     const { platformManagementApi: api } = await vite.ssrLoadModule('/src/services/platformManagement.js')
-    const target = { tenantId: 3, id: 8 }
+    const target = { tenantId: 3, id: 8, updatedAt: '2026-10-18T08:00:00Z' }
     await api.information({ page: 1, size: 20, keyword: '合作', status: '', category: undefined })
     assert.ok(!calls[0].url.includes('status='))
     assert.ok(!calls[0].url.includes('undefined'))
-    await api.informationStatus(target, { status: 'OFFLINE', note: '测试内容违规' })
+    await api.informationStatus(target, { status: 'PUBLISHED', note: '已核对提交内容', updatedAt: target.updatedAt })
+    assert.deepEqual(JSON.parse(calls[1].options.body), { status: 'PUBLISHED', note: '已核对提交内容', updatedAt: target.updatedAt })
     await api.merchantReview(target, { status: 'APPROVED', note: '已核对经营主体' })
     await api.revealIdentity(target, '核对本人实名申请')
     await api.identityReview(target, { status: 'REJECTED', note: '需要补充核验资料' })

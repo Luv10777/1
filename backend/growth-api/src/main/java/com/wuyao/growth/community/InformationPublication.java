@@ -42,11 +42,13 @@ public class InformationPublication {
     @Column(name = "valid_until")
     private LocalDate validUntil;
     @Column(nullable = false, length = 20)
-    private String status = "PUBLISHED";
+    private String status = "PENDING_REVIEW";
+    @Column(name = "review_note", length = 500)
+    private String reviewNote;
     @Column(name = "platform_blocked", nullable = false)
     private boolean platformBlocked = false;
-    @Column(name = "published_at", nullable = false)
-    private Instant publishedAt = Instant.now();
+    @Column(name = "published_at")
+    private Instant publishedAt;
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
     @Column(name = "updated_at", nullable = false)

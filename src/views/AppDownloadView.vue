@@ -8,7 +8,6 @@ import AppDownloadPanel from '../components/AppDownloadPanel.vue'
     <header class="app-head">
       <span class="app-mark"><img src="/images/brand/yifangzhi-mark.png" alt=""></span>
       <div>
-        <p class="eyebrow">YIFANGZHI APP · ANDROID</p>
         <h1>一方志 App<span>试用</span></h1>
       </div>
     </header>

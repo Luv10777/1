@@ -38,6 +38,6 @@ public interface InformationPublicationRepository extends JpaRepository<Informat
 
     /** 商户关闭时下线它发布的全部信息。 */
     @Modifying(flushAutomatically = true)
-    @Query("update InformationPublication i set i.status = 'OFFLINE', i.updatedAt = :now where i.tenantId = :tenantId and i.status = 'PUBLISHED'")
+    @Query("update InformationPublication i set i.status = 'OFFLINE', i.updatedAt = :now where i.tenantId = :tenantId and i.status in ('PUBLISHED', 'PENDING_REVIEW')")
     int takeDownAll(@Param("tenantId") Long tenantId, @Param("now") Instant now);
 }

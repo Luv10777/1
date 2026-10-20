@@ -58,7 +58,7 @@ onBeforeUnmount(() => { generation++ })
 <template>
   <section id="products" class="alliance-wall" aria-labelledby="alliance-wall-title">
     <div class="alliance-wall-toolbar">
-      <div><span class="merchant-section-index">联盟好物</span><h2 id="alliance-wall-title">一方好物</h2></div>
+      <h2 id="alliance-wall-title">联盟好物</h2>
       <form class="alliance-search" role="search" @submit.prevent="search">
         <Search :size="15" aria-hidden="true" />
         <input v-model="query" type="search" maxlength="80" placeholder="搜索商品名称或分类" aria-label="搜索商品" />

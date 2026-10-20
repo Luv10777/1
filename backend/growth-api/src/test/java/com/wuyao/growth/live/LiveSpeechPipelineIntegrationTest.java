@@ -181,6 +181,8 @@ class LiveSpeechPipelineIntegrationTest {
 
         tenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('直播测试') RETURNING id", Long.class);
         com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, tenant);
+        // Starting a session reserves its first hour of live time.
+        owner.update("UPDATE billing_accounts SET gift_available=1000 WHERE tenant_id=?", tenant);
         Long user = owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?, 'host', '主播') RETURNING id", Long.class, tenant);
         token = jwt.issueAccessToken(user, tenant, null);
         store = api(post("/api/stores"), Map.of("name", "蜂蜜小店")).path("id").asLong();

@@ -138,7 +138,7 @@ async function deleteProduct() {
 <template>
   <section class="products-page">
     <header class="products-header">
-      <div><p class="products-eyebrow">ASSET CENTER / PRODUCTS</p><h1>商品库</h1><p class="products-subtitle">沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。</p></div>
+      <div><h1>商品库</h1><p class="products-subtitle">沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。</p></div>
       <div class="products-header-actions">
         <RouterLink v-if="selectedStoreId" class="product-button" :to="`/store/${selectedStoreId}`" target="_blank"><ExternalLink :size="15" />预览店铺</RouterLink>
         <RouterLink v-if="selectedStoreId" class="product-button" to="/orders"><ClipboardList :size="15" />订单管理</RouterLink>

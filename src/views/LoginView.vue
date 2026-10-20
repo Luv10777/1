@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, ArrowUpRight, ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
@@ -18,14 +19,11 @@ const showPassword = ref(false)
 const notice = ref('')
 const error = ref('')
 const dialog = ref(null)
-const dialogKind = ref('')
-const dialogTitle = computed(() => ({ forgot: '找回账号访问权限', terms: '用户协议', privacy: '隐私政策' })[dialogKind.value])
 const smsTab = ref(null)
 const passwordTab = ref(null)
 const pageForm = ref(null)
 const agreedInput = ref(null)
 const actionBusy = computed(() => busy.value || sending.value || wechatBusy.value || wechatVerifying.value)
-const legalUrls = { terms: import.meta.env.VITE_TERMS_URL, privacy: import.meta.env.VITE_PRIVACY_URL }
 const wechatTicket = ref('')
 const wechatBinding = ref(false)
 const wechatNickname = ref('')
@@ -105,7 +103,7 @@ async function focusInvalid() {
 }
 
 function checkAgreement() {
-  errors.agreed = form.agreed ? '' : '请先阅读并勾选用户协议与隐私政策'
+  errors.agreed = form.agreed ? '' : '请先阅读并同意用户注册协议与隐私协议'
   if (errors.agreed) nextTick(() => agreedInput.value?.focus())
   return !errors.agreed
 }
@@ -213,7 +211,7 @@ async function submit() {
     errors.account = accountError(form.account)
     errors.password = passwordError(form.password)
   }
-  errors.agreed = form.agreed ? '' : '请先阅读并勾选用户协议与隐私政策'
+  errors.agreed = form.agreed ? '' : '请先阅读并同意用户注册协议与隐私协议'
   if (Object.values(errors).some(Boolean)) return focusInvalid()
   busy.value = true
   try {
@@ -250,15 +248,7 @@ function loginWithWechat() {
   window.location.assign(loginUrl.href)
 }
 
-function openDialog(kind) {
-  if (legalUrls[kind]) {
-    const url = trustedLink(legalUrls[kind])
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer')
-      return
-    }
-  }
-  dialogKind.value = kind
+function openDialog() {
   dialog.value?.showModal()
 }
 
@@ -274,7 +264,7 @@ function useSmsInstead() {
     <section class="access-entry" aria-labelledby="access-title">
       <header class="access-header">
         <a class="access-brand" href="/login" aria-label="一方志首页">
-          <span class="access-mark" aria-hidden="true">志</span>
+          <span class="access-mark" aria-hidden="true" />
           <span><strong>一方志</strong><small>为每一方商家立传</small></span>
         </a>
         <div class="access-header-actions">
@@ -289,13 +279,12 @@ function useSmsInstead() {
       </header>
       <div class="access-form-area">
         <div v-if="!wechatBinding" class="access-intro">
-          <p class="access-kicker">{{ isRegister ? 'YOUR NEXT CHAPTER' : 'WELCOME BACK' }}<span /></p>
           <h1 id="access-title">{{ isRegister ? '从一方烟火开始' : '欢迎回到一方志' }}</h1>
           <p>{{ isRegister ? '一个账号，记录门店的每一天。' : '记录一方水土，讲述万家故事。' }}</p>
         </div>
         <p v-if="wechatVerifying" class="access-message" role="status"><LoaderCircle class="access-spinner" :size="18" aria-hidden="true" /> 正在确认微信登录…</p>
         <form v-else-if="wechatBinding" ref="wechatForm" class="wechat-binding" novalidate :aria-busy="wechatBusy" aria-labelledby="wechat-title" @submit.prevent="completeWechatBinding">
-          <p class="access-kicker">WECHAT VERIFIED<span /></p>
+          <p class="access-kicker">微信已验证<span /></p>
           <h2 id="wechat-title">{{ wechatPasswordRequired ? '设置登录密码' : '绑定手机号' }}</h2>
           <p>{{ wechatPasswordRequired ? `手机号 ${wechatPhone} 已验证。设置密码后，也可使用手机号和密码登录。` : `已确认微信账号「${wechatNickname}」。验证手机号后，将绑定已有账号或创建新账号。` }}</p>
           <div class="access-fields">
@@ -323,12 +312,12 @@ function useSmsInstead() {
                   <label for="login-phone">手机号</label>
                   <div class="access-input-shell" :class="{ 'has-error': errors.phone }">
                     <div class="access-country">
-                      <select v-model="form.country" aria-label="国家或地区区号" :disabled="actionBusy">
+                      <AppSelect v-model="form.country" aria-label="国家或地区区号" :disabled="actionBusy">
                         <option value="+86">+86 中国大陆</option>
                         <option value="+852" disabled>+852 中国香港（暂未开放）</option>
                         <option value="+853" disabled>+853 中国澳门（暂未开放）</option>
                         <option value="+886" disabled>+886 中国台湾（暂未开放）</option>
-                      </select>
+                      </AppSelect>
                       <span aria-hidden="true">{{ form.country }}<ChevronDown :size="13" /></span>
                     </div>
                     <input id="login-phone" v-model="form.phone" class="focus:ring-2 focus:ring-brand-primary" name="phone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="请输入手机号" :disabled="actionBusy" :aria-invalid="Boolean(errors.phone)" :aria-describedby="errors.phone ? 'phone-error' : undefined" @input="errors.phone = ''" @blur="form.phone && (errors.phone = phoneError(form.phone, form.country))" />
@@ -379,27 +368,27 @@ function useSmsInstead() {
         <div v-if="!wechatVerifying" class="access-consent">
           <div class="access-consent-row">
             <input id="login-agreed" ref="agreedInput" v-model="form.agreed" type="checkbox" :disabled="actionBusy" :aria-invalid="Boolean(errors.agreed)" :aria-describedby="errors.agreed ? 'agreement-error' : undefined" @change="errors.agreed = ''" />
-            <div><label for="login-agreed">我已阅读并同意</label><button type="button" @click="openDialog('terms')">《用户协议》</button><span>和</span><button type="button" @click="openDialog('privacy')">《隐私政策》</button></div>
+            <div><label for="login-agreed">我已阅读并同意</label><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册协议》</RouterLink><span>和</span><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</RouterLink></div>
           </div>
           <p v-if="errors.agreed" id="agreement-error" class="access-field-error" role="alert">{{ errors.agreed }}</p>
         </div>
       </div>
       <footer class="access-footer"><ShieldCheck :size="14" aria-hidden="true" /><span>一方志 · 为每一方商家立传</span></footer>
     </section>
-    <aside class="access-board" aria-label="记录一方水土，讲述万家故事">
-      <div class="access-board-top"><span>一方志 —— 为每一方商家立传</span><span>商家故事 / 壹</span></div>
-      <div class="access-story"><div class="access-poem"><p>一方水土，一方志。</p><p>为每一方商家立传。</p></div><figure><img src="/images/publishing/restaurant.jpg" alt="暖灯下的街边小店，桌椅静候来客" /><figcaption>市井日常 · 每一间小店，都值得被看见</figcaption></figure></div>
-      <div class="access-board-bottom"><span>记录一方水土，讲述万家故事</span><span class="story-seal">志</span></div>
+    <aside class="access-board" aria-label="一方水土，一方志">
+      <div class="access-board-center">
+        <span class="access-board-logo" role="img" aria-label="一方志 YIFANGZHI" />
+        <span class="access-board-rule" aria-hidden="true" />
+        <p class="access-board-line">一方水土，一方志。</p>
+      </div>
+      <p class="access-board-foot">记录一方水土，讲述万家故事</p>
     </aside>
     <dialog ref="dialog" class="access-dialog" aria-labelledby="access-dialog-title" @click="event => event.target === dialog && dialog.close()">
       <button class="access-dialog-close" type="button" aria-label="关闭" @click="dialog.close()"><X :size="20" /></button>
       <LockKeyhole :size="25" class="access-dialog-icon" aria-hidden="true" />
-      <h2 id="access-dialog-title">{{ dialogTitle }}</h2>
-      <template v-if="dialogKind === 'forgot'">
-        <p>忘记密码也可以通过已绑定的手机号登录。若手机号已停用，请联系平台管理员协助处理。</p>
-        <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录<ArrowRight :size="18" /></button>
-      </template>
-      <template v-else><p>{{ dialogTitle }}全文暂未发布，请联系平台管理员获取并阅读后再继续。</p><button class="access-submit w-full" type="button" @click="dialog.close()">我知道了</button></template>
+      <h2 id="access-dialog-title">找回账号访问权限</h2>
+      <p>忘记密码也可以通过已绑定的手机号登录。若手机号已停用，请联系平台管理员协助处理。</p>
+      <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录<ArrowRight :size="18" /></button>
     </dialog>
   </main>
 </template>

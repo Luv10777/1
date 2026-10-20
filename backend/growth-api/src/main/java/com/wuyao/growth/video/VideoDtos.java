@@ -43,7 +43,13 @@ public final class VideoDtos {
             List<String> resolutions) {}
 
     public record History(Long id, String prompt, String model, String ratio,
-                          int durationSeconds, String resolution, String status, Instant createdAt) {}
+                          int durationSeconds, String resolution, String status, Instant createdAt,
+                          String outputUrl, Integer actualWidth, Integer actualHeight, Integer actualDurationMs) {
+        public History(Long id, String prompt, String model, String ratio,
+                       int durationSeconds, String resolution, String status, Instant createdAt) {
+            this(id, prompt, model, ratio, durationSeconds, resolution, status, createdAt, null, null, null, null);
+        }
+    }
 
     public record Reference(Long assetId, String name, String url) {}
 

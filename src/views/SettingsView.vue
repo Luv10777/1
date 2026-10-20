@@ -1,7 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { accountApi } from '../services/accountApi'
+import { accountApi, validateAvatar } from '../services/accountApi'
+import UserAvatar from '../components/UserAvatar.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
 import { identityValidation, managementDate } from '../domain/platformManagement'
 import { auth } from '../stores/auth'
@@ -16,6 +17,11 @@ const loadError = ref('')
 const nameDraft = ref('')
 const savingName = ref(false)
 const nameMessage = ref({ text: '', error: false })
+const avatarInput = ref(null)
+const avatarFile = ref(null)
+const avatarPreview = ref('')
+const savingAvatar = ref(false)
+const avatarMessage = ref({ text: '', error: false })
 
 const passwordOpen = ref(false)
 const byCode = ref(false)
@@ -64,6 +70,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   document.querySelector('.page-scroll')?.classList.remove('settings-scroll')
   clearIdentityForm()
+  clearAvatarDraft()
 })
 
 function clearIdentityForm() {
@@ -125,10 +132,50 @@ async function load() {
   try {
     profile.value = await accountApi.profile()
     nameDraft.value = profile.value.name || ''
+    auth.updateAvatar(profile.value.avatarUrl, profile.value.id)
   } catch (error) {
     loadError.value = error.message || '账号资料加载失败，请重试'
   } finally {
     loading.value = false
+  }
+}
+
+function clearAvatarDraft() {
+  if (avatarPreview.value) URL.revokeObjectURL(avatarPreview.value)
+  avatarPreview.value = ''
+  avatarFile.value = null
+  if (avatarInput.value) avatarInput.value.value = ''
+}
+
+function selectAvatar(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  avatarMessage.value = { text: '', error: false }
+  try {
+    validateAvatar(file)
+    clearAvatarDraft()
+    avatarFile.value = file
+    avatarPreview.value = URL.createObjectURL(file)
+  } catch (error) {
+    event.target.value = ''
+    avatarMessage.value = { text: error.message, error: true }
+  }
+}
+
+async function saveAvatar() {
+  if (!avatarFile.value || savingAvatar.value) return
+  savingAvatar.value = true
+  avatarMessage.value = { text: '', error: false }
+  try {
+    const saved = await accountApi.updateAvatar(avatarFile.value)
+    profile.value = { ...profile.value, avatarUrl: saved.avatarUrl }
+    auth.updateAvatar(saved.avatarUrl, saved.id)
+    clearAvatarDraft()
+    avatarMessage.value = { text: '头像已更新', error: false }
+  } catch (error) {
+    avatarMessage.value = { text: error.message || '头像保存失败，请重试', error: true }
+  } finally {
+    savingAvatar.value = false
   }
 }
 
@@ -243,7 +290,6 @@ async function savePassword() {
 <template>
   <div class="settings-page">
     <header class="settings-header">
-      <p class="eyebrow">SYSTEM / SETTINGS</p>
       <h1>系统设置</h1>
       <p class="header-desc">查看和修改你自己的账号资料、登录密码和实名认证。只影响当前登录的这个账号。</p>
     </header>
@@ -257,10 +303,26 @@ async function savePassword() {
         <header class="card-header">
           <div>
             <h2 id="profile-title">个人资料</h2>
-            <p>名字会显示在右上角，以及管理员的员工列表里。</p>
+            <p>头像和名字用于识别你的账号。名字也会显示在管理员的员工列表里。</p>
           </div>
           <span class="role-badge" :class="{ owner: profile.role !== 'STAFF' }">{{ roleText }}</span>
         </header>
+        <div class="avatar-section" :aria-busy="savingAvatar">
+          <UserAvatar class="profile-avatar" :src="avatarPreview || profile.avatarUrl" :name="profile.name" />
+          <div class="avatar-details">
+            <h3>个人头像</h3>
+            <p id="avatar-help">支持 JPG、PNG，最大 2 MB。头像将居中裁剪，保存后显示在顶部和侧栏。</p>
+            <input ref="avatarInput" class="avatar-file-input" type="file" accept="image/jpeg,image/png" aria-label="选择头像图片" aria-describedby="avatar-help" :disabled="savingAvatar" @change="selectAvatar" />
+            <div class="avatar-actions">
+              <button type="button" class="ghost-button" :disabled="savingAvatar" @click="avatarInput?.click()">{{ avatarFile ? '重新选择' : '更换头像' }}</button>
+              <template v-if="avatarFile">
+                <button type="button" class="primary-button" :disabled="savingAvatar" @click="saveAvatar">{{ savingAvatar ? '保存中…' : '保存头像' }}</button>
+                <button type="button" class="link-button" :disabled="savingAvatar" @click="clearAvatarDraft">取消</button>
+              </template>
+            </div>
+            <p v-if="avatarMessage.text" class="inline-message" :class="{ error: avatarMessage.error }" :role="avatarMessage.error ? 'alert' : 'status'">{{ avatarMessage.text }}</p>
+          </div>
+        </div>
         <form class="name-row" @submit.prevent="saveName">
           <label class="field">
             <span>姓名</span>
@@ -371,7 +433,7 @@ async function savePassword() {
           </label>
           <label class="consent">
             <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
-            <span>我确认以上是本人真实、准确的身份信息，并同意平台用于本次实名审核。不能替别人提交。</span>
+            <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
           </label>
           <p class="hint">姓名和身份证号在服务端加密保存，只有平台审核人员能查看完整资料，每次查看都会留下记录。目前由平台人工审核，还没有接入公安等第三方核验。</p>
           <div class="form-footer">
@@ -456,7 +518,7 @@ async function savePassword() {
 :global(.page-scroll.settings-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
 .settings-page { max-width: 760px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
 .settings-header { margin-bottom: 28px; }
-.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .settings-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
 .header-desc { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.75; }
 .primary-button, .ghost-button, .link-button { font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -473,18 +535,25 @@ async function savePassword() {
 .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
 .card-header h2 { margin: 0 0 4px; font-family: var(--font-serif); font-size: 20px; font-weight: 750; }
 .card-header p { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
-.role-badge, .state-badge { flex: none; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 11px; font-weight: 700; }
+.role-badge, .state-badge { flex: none; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 12px; font-weight: 700; }
 .role-badge.owner { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); }
 .state-badge.on { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
 
 .name-row { display: flex; align-items: flex-end; gap: 10px; }
+.avatar-section { display: flex; align-items: flex-start; gap: 18px; padding-bottom: 22px; margin-bottom: 20px; border-bottom: 1px solid var(--color-border-subtle); }
+.profile-avatar { width: 72px; height: 72px; font-size: 28px; }
+.avatar-details { min-width: 0; }
+.avatar-details h3 { margin: 0 0 4px; font-size: 13px; }
+.avatar-details > p:not(.inline-message) { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
+.avatar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.avatar-file-input { display: none; }
 .name-row .field { flex: 1; margin: 0; }
 .field { display: grid; gap: 7px; margin: 0 0 16px; }
 .field > span, .field > label { color: var(--color-primary); font-size: 12px; font-weight: 700; }
 .field input { width: 100%; height: 40px; box-sizing: border-box; padding: 10px 11px; border: 1px solid var(--color-border-subtle); border-radius: 4px; outline: 0; color: var(--color-primary); background: var(--color-bg-surface); font: 500 13px/1.5 inherit; }
 .field input:focus { border-color: var(--color-accent); }
 .field input:disabled { color: var(--color-text-muted); background: var(--color-bg-subtle); }
-.field small { color: var(--color-text-muted); font-size: 11px; line-height: 1.6; }
+.field small { color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 .code-row { display: flex; gap: 10px; }
 .code-row input { flex: 1; }
 .inline-message { margin: 10px 0 0; color: var(--color-success); font-size: 12px; line-height: 1.7; }
@@ -492,9 +561,9 @@ async function savePassword() {
 .settings-card > .inline-message + .ghost-button { margin-top: 14px; }
 
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 20px 0 0; padding: 16px 0 0; border-top: 1px solid var(--color-border-subtle); }
-.facts dt { color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+.facts dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .facts dd { margin: 4px 0 0; font-size: 14px; word-break: break-all; }
-.card-foot { margin: 16px 0 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.6; }
+.card-foot { margin: 16px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 
 .password-form { max-width: 420px; }
 .proof-switch { margin: -6px 0 16px; font-size: 12px; }
@@ -510,7 +579,8 @@ async function savePassword() {
 .review-note p { margin: 4px 0 0; color: var(--color-text-muted); white-space: pre-wrap; }
 .consent { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; cursor: pointer; }
 .consent input { margin-top: 4px; accent-color: var(--color-accent); }
-.hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 11px; line-height: 1.7; }
+.consent a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
 #identity { scroll-margin-top: 20px; }
 
 .danger-card { border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border-subtle)); }
@@ -524,6 +594,8 @@ async function savePassword() {
 .closure-panel > .form-notice { margin-bottom: 4px; }
 
 @media (max-width: 640px) {
+  .avatar-section { gap: 12px; }
+  .profile-avatar { width: 56px; height: 56px; font-size: 24px; }
   .settings-page { padding: 22px 16px 58px; }
   .settings-header h1 { font-size: 30px; }
   .settings-card { padding: 18px 16px; }

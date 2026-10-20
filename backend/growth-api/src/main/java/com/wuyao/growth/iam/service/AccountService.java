@@ -39,6 +39,7 @@ public class AccountService {
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
     private final TenantRepository tenants;
+    private final AccountAvatarService avatars;
 
     /** 当前商户里这个可用账号的角色。停用、移除或不属于当前商户的账号一律拒绝。 */
     @Transactional(readOnly = true)
@@ -59,7 +60,8 @@ public class AccountService {
     /** 登录者自己的资料，系统设置里展示用。 */
     @Transactional(readOnly = true)
     public AccountDtos.Profile profile(Long userId) {
-        return AccountDtos.Profile.of(active(userId));
+        User user = active(userId);
+        return AccountDtos.Profile.of(user, avatars.url(user.getAvatarKey()));
     }
 
     /** 每个人都能改自己的显示名字，管理员和店员一样。 */
@@ -71,7 +73,7 @@ public class AccountService {
                 .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "账号不可用或不属于当前商户"));
         user.setName(name.trim());
         user.setUpdatedAt(Instant.now());
-        return AccountDtos.Profile.of(user);
+        return AccountDtos.Profile.of(user, avatars.url(user.getAvatarKey()));
     }
 
     /** 当前商户未移除的账号，管理员在前。 */
@@ -79,7 +81,7 @@ public class AccountService {
     public List<AccountDtos.Account> members() {
         return users.findAllByTenantIdAndStatusNotOrderByIdAsc(TenantContext.require(), REMOVED).stream()
                 .sorted((a, b) -> Boolean.compare(OWNER.equals(b.getRole()), OWNER.equals(a.getRole())))
-                .map(AccountDtos.Account::of).toList();
+                .map(this::account).toList();
     }
 
     /**
@@ -113,7 +115,7 @@ public class AccountService {
             throw BizException.of(ErrorCode.CONFLICT, "这个手机号刚刚被注册，请刷新后重试");
         }
         log.info("添加店员: tenantId={} userId={}", tenantId, user.getId());
-        return AccountDtos.Account.of(user);
+        return account(user);
     }
 
     @Transactional
@@ -121,19 +123,19 @@ public class AccountService {
         User user = staffForUpdate(userId);
         user.setName(name.trim());
         user.setUpdatedAt(Instant.now());
-        return AccountDtos.Account.of(user);
+        return account(user);
     }
 
     /** 停用立即生效：令牌版本加一，已签发的访问令牌和刷新令牌都随之作废。 */
     @Transactional
     public AccountDtos.Account setStaffEnabled(Long userId, boolean enabled) {
         User user = staffForUpdate(userId);
-        if (enabled == ACTIVE.equals(user.getStatus())) return AccountDtos.Account.of(user);
+        if (enabled == ACTIVE.equals(user.getStatus())) return account(user);
         user.setStatus(enabled ? ACTIVE : DISABLED);
         user.setUpdatedAt(Instant.now());
         if (!enabled) signOutEverywhere(user);
         log.info("店员{}: tenantId={} userId={}", enabled ? "启用" : "停用", user.getTenantId(), userId);
-        return AccountDtos.Account.of(user);
+        return account(user);
     }
 
     /**
@@ -170,5 +172,9 @@ public class AccountService {
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "成员不存在"));
         if (!STAFF.equals(user.getRole())) throw BizException.of(ErrorCode.BAD_REQUEST, "管理员的账号不能在这里修改");
         return user;
+    }
+
+    private AccountDtos.Account account(User user) {
+        return AccountDtos.Account.of(user, avatars.url(user.getAvatarKey()));
     }
 }

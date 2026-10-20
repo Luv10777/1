@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 // 桌面端的外壳。软件只做直播这一件事，所以这里只有切换门店和退出登录，没有平台的其余导航；
 // 商品、知识库、门店这些资料仍在网页版里维护。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -33,12 +34,13 @@ onBeforeUnmount(() => clearInterval(updateTimer))
       <header class="topbar paper-topbar"><div class="topbar-inner">
         <span class="header-brand"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>实景直播</small></span>
         <div class="topbar-actions">
-          <select v-if="stores.length > 1" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading">
+          <AppSelect v-if="stores.length > 1" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading">
             <option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option>
-          </select>
+          </AppSelect>
           <span v-else-if="stores.length" class="desk-store">{{ selectedStore }}</span>
           <span class="desk-user">{{ userName }}</span>
           <RouterLink to="/billing" class="secondary-button compact">会员与烟火</RouterLink>
+          <a href="/policies/terms" class="secondary-button compact" target="_blank" rel="noopener noreferrer">协议与售后</a>
           <button type="button" class="secondary-button compact" @click="logout">退出登录</button>
         </div>
       </div></header>

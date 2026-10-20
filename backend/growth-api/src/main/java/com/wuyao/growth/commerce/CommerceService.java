@@ -26,6 +26,7 @@ public class CommerceService {
     private final SalesOrderRepository orders;
     private final SalesOrderItemRepository items;
     private final StoreAccessService storeAccess;
+    private final CommercePaymentProperties payment;
     private final StoreService stores;
     @PersistenceContext private EntityManager entityManager;
 
@@ -61,14 +62,16 @@ public class CommerceService {
                 .setParameter("token", token).getSingleResult();
         SalesOrder order = orders.findByLookupToken(token)
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "订单凭证无效或已过期"));
-        return CommerceDtos.Receipt.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId()), false);
+        return CommerceDtos.Receipt.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId()), false,
+                payment.forOrder(order));
     }
 
     @Transactional(readOnly = true)
     public List<CommerceDtos.MerchantOrder> merchantOrders(Long storeId, Long userId) {
         storeAccess.requireAccess(storeId, userId);
         return orders.findAllByStoreIdOrderByCreatedAtDescIdDesc(storeId).stream()
-                .map(order -> CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId())))
+                .map(order -> CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId()),
+                        payment.forOrder(order)))
                 .toList();
     }
 

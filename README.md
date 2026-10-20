@@ -1,6 +1,6 @@
 # 一方志 · AI 商家增长平台
 
-**嘉兴市一方志科技有限公司 · WUYAO NEXUS**
+**嘉兴市梧曜科技有限公司 · WUYAO NEXUS**
 
 面向本地生活商家的 AI 内容增长工作台。
 
@@ -107,4 +107,4 @@ npm test && npm run lint && npm run typecheck && npm run build
 
 ## 许可
 
-嘉兴市一方志科技有限公司版权所有
+嘉兴市梧曜科技有限公司版权所有

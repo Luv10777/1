@@ -1,10 +1,14 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import StoreSwitcher from '../components/StoreSwitcher.vue'
+import SiteFooter from '../components/SiteFooter.vue'
+import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound } from 'lucide-vue-next'
+import { Wallet, ArrowUpRight, Store, FilePenLine, UserRound, ChevronsUpDown } from 'lucide-vue-next'
 import { billing, number, refreshBilling } from '../stores/billing'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
@@ -22,11 +26,23 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
+const yanhuoPlan = computed(() => {
+  const summary = billing.summary
+  if (billing.error) return { label: '暂不可读', state: '' }
+  if (summary?.memberActive) return { label: summary.plan?.name || '会员', state: 'active' }
+  return summary?.plan ? { label: '会员已到期', state: 'expired' } : { label: '未开通会员', state: '' }
+})
+const yanhuoNote = computed(() => {
+  const summary = billing.summary
+  if (!summary) return '套餐与充值'
+  if (summary.held) return `生成中预占 ${number(summary.held)}`
+  if (summary.memberActive && summary.memberUntil) return `有效至 ${new Date(summary.memberUntil).toLocaleDateString('zh-CN')}`
+  return '开通会员即可创作'
+})
 const needsStore = computed(() => auth.isAuthenticated && billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
-// 侧边栏和顶栏显示的是当前登录的人：名字来自会话，头像取名字的第一个字。
+// 侧边栏和顶栏使用当前账号资料；未设置头像时回退到名字首字。
 const userName = computed(() => auth.isAuthenticated ? auth.user?.name || '未命名用户' : '登录')
-const userInitial = computed(() => userName.value.slice(0, 1))
 // Reviews is a long-form feed and must use the shell's normal page scrolling.
 // Keeping it in the edge-workspace list applies overflow:hidden and prevents
 // the review stream from being scrolled once it exceeds the viewport.
@@ -218,11 +234,11 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
         <span class="tenant-avatar">{{ selectedStoreRecord?.name?.slice(0, 1) || '店' }}</span>
         <span class="tenant-copy"><small>当前门店</small><strong>{{ selectedStore }}</strong></span>
         <template v-if="stores.length > 1">
-          <span class="chevron" aria-hidden="true">⌄</span>
-          <!-- 透明的原生下拉盖在整块上：点哪里都能切换，键盘和读屏也照常可用。 -->
-          <select v-model="selectedStoreId" class="tenant-select" aria-label="切换门店" :disabled="storeLoading">
+          <ChevronsUpDown :size="16" class="tenant-chevron" aria-hidden="true" />
+          <!-- 透明的门店下拉按钮盖在整块上：点哪里都能切换，键盘和读屏也照常可用。 -->
+          <AppSelect v-model="selectedStoreId" class="tenant-select" aria-label="切换门店" :disabled="storeLoading">
             <option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option>
-          </select>
+          </AppSelect>
         </template>
       </div>
       <nav class="primary-nav paper-nav" aria-label="主导航">
@@ -283,10 +299,14 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 
       <div class="sidebar-footer paper-sidebar-footer">
         <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="sidebar-yanhuo" :title="billing.error ? '烟火账户暂时无法读取' : billing.summary ? number(billing.summary.available) + ' 烟火 · 套餐与充值' : '读取烟火账户'" @click="closeMenu">
-          <Wallet :size="18" class="sidebar-yanhuo-icon" />
-          <div class="sidebar-yanhuo-copy"><div><span>可用烟火</span><ArrowUpRight :size="14" /></div><strong>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong><p>{{ billing.error ? '账户暂不可读' : billing.summary?.memberActive ? billing.summary.plan?.name : billing.summary?.plan ? '会员已到期' : '尚未开通会员' }}<span v-if="billing.summary?.held"> · 预占 {{ number(billing.summary.held) }}</span></p><span class="sidebar-yanhuo-action">套餐与充值</span></div>
+          <Wallet :size="18" class="sidebar-yanhuo-icon" aria-hidden="true" />
+          <div class="sidebar-yanhuo-copy">
+            <div class="sidebar-yanhuo-head"><span>烟火余额</span><span class="sidebar-yanhuo-plan" :class="yanhuoPlan.state">{{ yanhuoPlan.label }}</span></div>
+            <strong class="sidebar-yanhuo-number">{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '...' }}<small>烟火</small></strong>
+            <div class="sidebar-yanhuo-foot"><span>{{ yanhuoNote }}</span><span class="sidebar-yanhuo-action">充值<ArrowUpRight :size="13" aria-hidden="true" /></span></div>
+          </div>
         </RouterLink>
-        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><span class="user-avatar">{{ userInitial }}</span><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><button class="account-button" @click="accountOpen = !accountOpen"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><strong>{{ userName }}</strong><small v-if="auth.user?.role">{{ auth.user.role }}</small></span><span class="chevron">⌄</span></button><div v-if="accountOpen" class="account-menu"><button @click="router.push('/settings'); accountOpen = false">账户设置</button><button @click="logout">退出登录</button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span><span class="chevron">↗</span></RouterLink></div>
       </div>
     </aside>
@@ -298,11 +318,11 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <RouterLink to="/image/create" class="header-brand" aria-label="一方志内容工具"><span class="seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><strong>一方志</strong><small>为每一方商家立传</small></RouterLink>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
-            <select v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" aria-label="切换门店" :disabled="storeLoading || !stores.length"><option v-if="!stores.length" :value="null">{{ storeLoading ? '加载门店…' : '尚无门店' }}</option><option v-for="store in stores" :key="store.id" :value="store.id">{{ store.name }}</option></select>
+            <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="15" aria-hidden="true" />商户联盟</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
-            <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><span class="user-avatar small"><template v-if="auth.isAuthenticated">{{ userInitial }}</template><UserRound v-else :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
+            <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><UserAvatar v-if="auth.isAuthenticated" class="small" :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span v-else class="user-avatar small"><UserRound :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
           </div>
         </div>
       </header>
@@ -316,6 +336,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
           <button v-else-if="!storeLoading" class="secondary-button compact" @click="loadStores">刷新</button>
         </section>
         <slot v-else />
+        <SiteFooter v-if="route.matched.length" />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
       <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: ['merchant-alliance', 'merchant-join'].includes(route.name) }"><Store :size="21" aria-hidden="true" /><small>联盟</small></RouterLink></nav>
@@ -324,14 +345,27 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 </template>
 
 <style scoped>
+/* 页脚属于页面内容；短页面和全高工作台也要滚动到底才能看到。 */
+.page-scroll > :first-child { min-height: 100%; }
+.page-scroll > .site-footer { margin-top: 28px; }
+.page-scroll.page-scroll-workspace { overflow-y: auto; }
+.page-scroll.page-scroll-workspace > :first-child { flex: none; }
+.page-scroll.page-scroll-workspace > .site-footer { flex: none; height: auto; min-height: 0; margin: 0; padding: 12px 16px; }
+
 .store-context-state { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px; text-align: center; }
 .store-context-state > span { font-size: 36px; color: var(--muted, #8d8478); }
 .store-context-state h2 { margin: 20px 0 8px; font-size: 22px; }
 .store-context-state p { margin: 0 0 22px; font-size: 14px; color: var(--muted, #8d8478); }
 .tenant-switcher { position: relative; }
 .tenant-switcher.switchable:hover { border-color: var(--line-strong); }
-.tenant-switcher.switchable:has(.tenant-select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.tenant-select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
+/* 门店卡片：和下方烟火卡片同一套卡片样式，首字头像用朱砂浅底。 */
+.tenant-switcher { gap: 12px; margin: 16px 12px 20px; padding: 10px 12px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); box-shadow: var(--shadow-paper); transition: border-color .18s; }
+.tenant-switcher .tenant-avatar { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 8px; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); font: 600 15px var(--font-serif); }
+.tenant-switcher .tenant-copy { gap: 2px; }
+.tenant-switcher .tenant-copy small { color: var(--color-text-muted); font-size: 12px; letter-spacing: 0; }
+.tenant-switcher .tenant-copy strong { overflow: hidden; color: var(--color-primary); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tenant-chevron { flex: none; color: var(--color-text-muted); }
+:deep(.tenant-select) { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
 .sidebar-footer .account-wrap { margin-top: 14px; }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }
@@ -339,5 +373,6 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
 @media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }
 @media (max-width: 860px) { .topbar .header-store, .topbar .top-account { display: none; } }
-@media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 11px; } .topbar-entry svg { display: none; } .topbar .header-brand strong { display: none; } }
+@media (max-width: 860px) { .paper-main .page-scroll.page-scroll-workspace { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } }
+@media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 12px; } .topbar-entry svg { display: none; } .topbar .header-brand strong { display: none; } }
 </style>

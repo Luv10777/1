@@ -16,9 +16,10 @@ public class BillingPlan {
     private long giftCredits;
     private boolean imageEnabled;
     private boolean videoEnabled;
+    private boolean liveEnabled;
     private boolean published;
     private Instant createdAt = Instant.now();
     public BillingDtos.PlanSnapshot snapshot() {
-        return new BillingDtos.PlanSnapshot(id,code,name,description,priceMinor,durationDays,giftCredits,imageEnabled,videoEnabled);
+        return new BillingDtos.PlanSnapshot(id,code,name,description,priceMinor,durationDays,giftCredits,imageEnabled,videoEnabled,liveEnabled);
     }
 }

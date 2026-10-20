@@ -10,7 +10,11 @@ public interface ImageItemRepository extends JpaRepository<ImageItem,Long> {
  @Query("select i.creationId from ImageItem i where i.id=:id")
  Optional<Long> creationId(Long id);
  List<ImageItem> findByCreationIdOrderByOrdinal(Long id);
- Page<ImageItem> findByStatusAndOutputKeyIsNotNullOrderByIdDesc(String status, Pageable page);
+ @Query(value="select i from ImageItem i, ImageCreation c where c.id=i.creationId and c.createdBy=:userId "
+   +"and i.status='SUCCEEDED' and i.outputKey is not null order by i.id desc",
+   countQuery="select count(i) from ImageItem i, ImageCreation c where c.id=i.creationId and c.createdBy=:userId "
+     +"and i.status='SUCCEEDED' and i.outputKey is not null")
+ Page<ImageItem> findWorksByCreator(Long userId, Pageable page);
  @Query(value="select c.reference_hash, i.image_hash from image_items i "
    +"join image_creations c on c.id=i.creation_id where i.tenant_id=:tenantId "
    +"and i.id<>:itemId and i.status='SUCCEEDED' and i.image_hash is not null "

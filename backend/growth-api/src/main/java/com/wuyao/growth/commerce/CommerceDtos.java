@@ -41,24 +41,29 @@ public final class CommerceDtos {
         }
     }
 
+    public record PaymentInstructions(String method, String recipient, String qrCodeUrl) {}
+
     public record Receipt(Long id, String orderNumber, String lookupToken, String status, BigDecimal totalAmount,
-                          String shippingCompany, String trackingNumber, List<Line> items, Instant createdAt) {
-        static Receipt of(SalesOrder order, List<SalesOrderItem> items, boolean includeToken) {
+                          String shippingCompany, String trackingNumber, List<Line> items, Instant createdAt,
+                          PaymentInstructions payment) {
+        static Receipt of(SalesOrder order, List<SalesOrderItem> items, boolean includeToken,
+                          PaymentInstructions payment) {
             return new Receipt(order.getId(), order.getOrderNumber(), includeToken ? order.getLookupToken() : null,
                     order.getStatus(), order.getTotalAmount(), order.getShippingCompany(), order.getTrackingNumber(),
-                    items.stream().map(Line::of).toList(), order.getCreatedAt());
+                    items.stream().map(Line::of).toList(), order.getCreatedAt(), payment);
         }
     }
 
     public record MerchantOrder(Long id, String orderNumber, String buyerName, String buyerPhone,
                                 String shippingAddress, String shippingCompany, String trackingNumber,
                                 String buyerNote, String status, BigDecimal totalAmount,
-                                List<Line> items, Instant createdAt, Instant updatedAt) {
-        static MerchantOrder of(SalesOrder order, List<SalesOrderItem> items) {
+                                List<Line> items, Instant createdAt, Instant updatedAt,
+                                PaymentInstructions payment) {
+        static MerchantOrder of(SalesOrder order, List<SalesOrderItem> items, PaymentInstructions payment) {
             return new MerchantOrder(order.getId(), order.getOrderNumber(), order.getBuyerName(), order.getBuyerPhone(),
                     order.getShippingAddress(), order.getShippingCompany(), order.getTrackingNumber(), order.getBuyerNote(),
                     order.getStatus(), order.getTotalAmount(),
-                    items.stream().map(Line::of).toList(), order.getCreatedAt(), order.getUpdatedAt());
+                    items.stream().map(Line::of).toList(), order.getCreatedAt(), order.getUpdatedAt(), payment);
         }
     }
 

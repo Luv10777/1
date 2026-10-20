@@ -1,6 +1,7 @@
 <script setup>
+import AppSelect from '../components/AppSelect.vue'
 import { onMounted, ref, watch } from 'vue'
-import { Store, ArrowLeft, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
@@ -31,9 +32,9 @@ watch(() => auth.isAuthenticated, signedIn => {
 
 <template>
   <div class="business-page merchant-alliance-page merchant-join-page">
-    <header class="business-heading"><div><p class="business-overline"><Store :size="15" aria-hidden="true" />一方志 · 商户联盟</p><h1>成为一方商家</h1><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><RouterLink to="/merchant-alliance" class="business-link"><ArrowLeft :size="15" aria-hidden="true" />返回商户联盟</RouterLink></header>
+    <header class="business-heading"><div><h1>成为一方商家</h1><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><RouterLink to="/merchant-alliance" class="business-link"><ArrowLeft :size="15" aria-hidden="true" />返回商户联盟</RouterLink></header>
     <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
-      <div class="business-records-heading"><div><span>APPLICATION STATUS</span><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
+      <div class="business-records-heading"><div><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>
       <p v-else-if="applicationsLoading && !applications.length" class="business-record-empty" role="status">正在读取申请记录…</p>
       <p v-else-if="!applications.length" class="business-record-empty">提交申请后，可在这里查看平台审核状态和意见。</p>
@@ -43,7 +44,7 @@ watch(() => auth.isAuthenticated, signedIn => {
     <template v-else>
       <ol class="business-process" aria-label="商家入驻流程"><li class="is-current"><span>01</span><strong>填写申请</strong></li><li><span>02</span><strong>资料审核</strong></li><li><span>03</span><strong>入驻联盟</strong></li></ol>
       <div class="business-editor-layout">
-        <section v-if="!auth.isAuthenticated" class="merchant-application-login"><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h3>为每一方商家立传</h3><p>登录后填写经营主体与联系人资料，提交入驻申请并查看审核进度。</p><RouterLink :to="{ name: 'login', query: { redirect: '/merchant-alliance' } }" class="business-button business-button-primary">登录并申请入驻<ArrowRight :size="16" aria-hidden="true" /></RouterLink><span>购买上方商品无需登录</span></section>
+        <section v-if="!auth.isAuthenticated" class="merchant-application-login"><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h3>为每一方商家立传</h3><p>登录后填写经营主体与联系人资料，提交入驻申请并查看审核进度。</p><RouterLink :to="{ name: 'login', query: { redirect: '/merchant-alliance/join' } }" class="business-button business-button-primary">登录并申请入驻<ArrowRight :size="16" aria-hidden="true" /></RouterLink><span>浏览和购买联盟商品无需登录</span></section>
         <form v-else ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
           <fieldset class="business-form-fields" :disabled="submitting">
             <section class="business-form-section">
@@ -51,14 +52,14 @@ watch(() => auth.isAuthenticated, signedIn => {
               <div class="business-field-grid">
                 <label class="business-field"><span>商家名称<b>*</b></span><input v-model="form.merchantName" name="merchant-name" maxlength="80" required placeholder="门店或品牌的对外名称" /></label>
                 <label class="business-field"><span>主体名称<b>*</b></span><input v-model="form.companyName" name="company-name" maxlength="120" required placeholder="营业执照上的企业或个体户名称" /></label>
-                <label class="business-field"><span>经营行业<b>*</b></span><select v-model="form.industry" name="merchant-industry" required><option value="" disabled>请选择经营行业</option><option v-for="industry in industries" :key="industry" :value="industry">{{ industry }}</option></select></label>
+                <label class="business-field"><span>经营行业<b>*</b></span><AppSelect v-model="form.industry" name="merchant-industry" required><option value="" disabled>请选择经营行业</option><option v-for="industry in industries" :key="industry" :value="industry">{{ industry }}</option></AppSelect></label>
                 <label class="business-field"><span>经营地区<b>*</b></span><input v-model="form.region" name="merchant-region" maxlength="80" required placeholder="省、市、区及主要经营范围" /></label>
               </div>
               <label class="business-field"><span>统一社会信用代码<b>*</b></span><input v-model.trim="form.creditCode" name="credit-code" minlength="18" maxlength="18" required pattern="[0-9ABCDEFGHJKLMNPQRTUWXY]{18}" placeholder="填写营业执照上的 18 位代码" title="请输入 18 位统一社会信用代码" @input="form.creditCode = form.creditCode.toUpperCase()" /><small>请与营业执照上的主体名称和统一社会信用代码保持一致。</small></label>
               <label class="business-field"><span>商家介绍<b>*</b><small>{{ form.introduction.length }}/1000</small></span><textarea v-model="form.introduction" name="merchant-introduction" maxlength="1000" rows="4" required placeholder="介绍主营产品、服务特色与希望开展的合作" /></label>
             </section>
             <section class="business-form-section"><div class="business-section-title"><span>02</span><h2>入驻联系人</h2></div><div class="business-field-grid"><label class="business-field"><span>联系人姓名<b>*</b></span><input v-model="form.contactName" name="contact-name" autocomplete="name" maxlength="40" required placeholder="负责人或授权联系人" /></label><label class="business-field"><span>联系电话<b>*</b></span><input v-model="form.contactPhone" name="contact-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required pattern="[0-9+\(\)\- ]{6,20}" placeholder="手机号或固定电话" title="请填写 6 至 20 位电话号码，可包含加号、括号、空格和连字符" /></label></div></section>
-            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="merchant-declaration" type="checkbox" required /><span>我确认申请资料真实、准确，并已获得经营主体的授权。</span></label></div>
+            <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="merchant-declaration" type="checkbox" required /><span>我确认申请资料真实准确、已获经营主体授权，已阅读并同意<a href="/policies/merchant" target="_blank" rel="noopener noreferrer">《商家入驻协议》</a>和<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>，同意平台为审核入驻申请处理所填资料。</span></label></div>
           </fieldset>
           <p v-if="error" class="business-form-feedback business-message-error" role="alert">{{ error }}</p>
           <footer class="business-form-actions"><span>带 * 的项目为必填项</span><div><button class="business-button business-button-primary" type="submit" :disabled="submitting"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在提交…' : '提交入驻申请' }}</button></div></footer>

@@ -36,6 +36,15 @@ public class User {
     @Column(length = 80)
     private String name;
 
+    @Column(name = "avatar_key", length = 300)
+    private String avatarKey;
+
+    @Column(name = "avatar_upload_key", length = 300)
+    private String avatarUploadKey;
+
+    @Column(name = "avatar_upload_expires_at")
+    private Instant avatarUploadExpiresAt;
+
     /** ACTIVE / DISABLED / REMOVED。只有 ACTIVE 能登录和通过请求校验。 */
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";

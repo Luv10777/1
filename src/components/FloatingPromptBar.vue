@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from './AppSelect.vue'
 import { ref, toRef } from 'vue'
 import { IMAGE_RATIOS, POSTER_PURPOSE_GROUPS } from '../domain/imageCreation'
 import ImageReferenceList from './ImageReferenceList.vue'
@@ -26,9 +27,9 @@ defineExpose({ focus: () => promptInput.value?.focus() })
       <div class="prompt-toolbar">
         <fieldset class="prompt-tools" :disabled="studio.locked">
           <button type="button" class="prompt-pill" :class="{ active: referencesOpen }" :aria-expanded="referencesOpen" @click="referencesOpen = !referencesOpen">＋ 参考照片{{ studio.files.length ? ' · ' + studio.files.length : '' }}</button>
-          <label class="prompt-pill creation-select-pill">画面重点<select v-model="studio.style" aria-label="海报画面重点"><option>帮我搭配</option><option>招牌产品</option><option>活动促销</option><option>新店开业</option><option>到店氛围</option><option>服务特色</option><option>节气节日</option></select></label>
-          <label class="prompt-pill creation-select-pill">比例<select v-model="studio.ratio" aria-label="海报比例"><option v-for="ratio in IMAGE_RATIOS" :key="ratio" :disabled="!studio.supportsRatio(ratio)">{{ ratio }}</option></select></label>
-          <label class="prompt-pill creation-select-pill purpose-select-pill">用途<select v-model="studio.purpose" aria-label="海报发布用途"><optgroup v-for="group in POSTER_PURPOSE_GROUPS" :key="group.label" :label="group.label"><option v-for="option in group.options" :key="option.label" :value="option.label">{{ option.label }}</option></optgroup></select></label>
+          <label class="prompt-pill creation-select-pill">画面重点<AppSelect v-model="studio.style" aria-label="海报画面重点"><option>帮我搭配</option><option>招牌产品</option><option>活动促销</option><option>新店开业</option><option>到店氛围</option><option>服务特色</option><option>节气节日</option></AppSelect></label>
+          <label class="prompt-pill creation-select-pill">比例<AppSelect v-model="studio.ratio" aria-label="海报比例"><option v-for="ratio in IMAGE_RATIOS" :key="ratio" :disabled="!studio.supportsRatio(ratio)">{{ ratio }}</option></AppSelect></label>
+          <label class="prompt-pill creation-select-pill purpose-select-pill">用途<AppSelect v-model="studio.purpose" aria-label="海报发布用途"><optgroup v-for="group in POSTER_PURPOSE_GROUPS" :key="group.label" :label="group.label"><option v-for="option in group.options" :key="option.label" :value="option.label">{{ option.label }}</option></optgroup></AppSelect></label>
         </fieldset>
         <button type="submit" class="prompt-send creation-send" :disabled="studio.busy || !studio.configured || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.active ? '创作中…' : '生成海报' }}<span v-if="!studio.busy && !studio.active" aria-hidden="true">→</span></button>
       </div>

@@ -6,7 +6,7 @@ import MerchantProductWall from '../components/MerchantProductWall.vue'
 <template>
   <div class="business-page merchant-alliance-page">
     <header class="business-heading">
-      <div><p class="business-overline"><Store :size="15" aria-hidden="true" />一方志 · 商户联盟</p><h1>一方好物，一起经营。</h1><p>发现联盟商家的实物商品，也让你的好生意被更多人看见。</p></div>
+      <div><h1>一方好物，一起经营。</h1><p>发现联盟商家的实物商品，也让你的好生意被更多人看见。</p></div>
       <div class="business-heading-links">
         <RouterLink to="/information" class="business-link">浏览商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink>
         <RouterLink :to="{ name: 'merchant-join' }" class="business-button business-button-primary">成为一方商家<ArrowRight :size="15" aria-hidden="true" /></RouterLink>

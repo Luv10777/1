@@ -319,6 +319,20 @@ public class VideoWorkflowService {
     }
 
     @Transactional(readOnly = true)
+    public PageResult<VideoDtos.History> works(int page, int size, Long userId) {
+        var result = workflows.findByCreatedByAndStatusAndOutputStorageKeyIsNotNullOrderByIdDesc(
+                userId, "SUCCEEDED", PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size))));
+        return PageResult.of(result, result.getContent().stream().map(w -> {
+            Asset output = w.getOutputAssetId() == null ? null : assets.findById(w.getOutputAssetId()).orElse(null);
+            String url = storage.presignGet(w.getOutputStorageKey(), Duration.ofMinutes(30));
+            return new VideoDtos.History(w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(),
+                    w.getDurationSeconds(), w.getResolution(), w.getStatus(), w.getCreatedAt(), url,
+                    output == null ? null : output.getWidth(), output == null ? null : output.getHeight(),
+                    output == null ? null : output.getDurationMs());
+        }).toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<VideoDtos.Capability> capabilities() { return VideoCapabilities.all(); }
 
     @Transactional
