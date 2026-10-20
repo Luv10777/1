@@ -68,6 +68,16 @@ class ImagePlannerTest {
      .contains("Headline: 双人餐 99 元","Caption: 周末限定")
      .doesNotContain("Preserve existing logos/branding");
  }
+ @Test void imageModelIsToldNotToRepeatCopyWheneverThereIsCopy() {
+   var creation=new ImageCreation();creation.setRequest(request(1));
+   var appended=new ImageDtos.Spec("海报","暖光桌面","双人餐 99 元","");
+   var plannerWritten=new ImageDtos.Spec("海报","暖光桌面\nHeadline: 双人餐 99 元","双人餐 99 元","");
+   var noCopy=new ImageDtos.Spec("海报","暖光桌面","","");
+   assertThat(ImageRenderHandler.imagePrompt(creation,appended)).contains("Render each line of text exactly once");
+   assertThat(ImageRenderHandler.imagePrompt(creation,plannerWritten)).contains("Render each line of text exactly once")
+     .containsOnlyOnce("Headline:");
+   assertThat(ImageRenderHandler.imagePrompt(creation,noCopy)).isEqualTo("暖光桌面");
+ }
  @Test void rendererRemovesLegacyBrandingAndTextRestrictionsFromSavedPrompts() {
    var spec=new ImageDtos.Spec("商品图","移除商品 Logo，保留包装文字。\nNo added headline, caption, prices, labels, slogans or decorative typography. Preserve only authentic text printed on the referenced product and its real logo.\nEmpty text fields must not render any text.","","");
    var prompt=ImageRenderHandler.cleanLegacyPrompt(spec.prompt());
