@@ -5,10 +5,34 @@ import { RouterLink } from 'vue-router'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, RefreshCw, Search, X } from 'lucide-vue-next'
 import { useTaskCenter } from '../composables/useTaskCenter'
 import { taskModules, taskStatuses, taskStatus, taskModel, taskWorkflow, taskDate, taskResultLink } from '../domain/taskUsage'
-import { number } from '../stores/billing'
+import { onMounted, ref } from 'vue'
+import { billingApi, dateTime, number, yuan } from '../stores/billing'
+import { auth } from '../stores/auth'
 
 const { filters, result, loading, error, expandedId, detail, detailLoading, detailError, load, search, reset, toggleDetail, loadDetail } = useTaskCenter()
 const events = { RESERVE: '预占', CAPTURE: '实际扣费', RELEASE: '退回' }
+// 充值记录读的是订单列表（仅商家管理员可读），只列支付平台确认到账的充值。
+const topups = ref([])
+const topupPage = ref(0)
+const topupMore = ref(false)
+const topupLoading = ref(false)
+const topupError = ref('')
+const paymentMethods = { ALIPAY: '支付宝', WECHAT: '微信支付', MANUAL: '人工收款' }
+async function loadTopups() {
+  topupLoading.value = true; topupError.value = ''
+  try {
+    // A page may hold only unpaid or membership orders, so keep reading until a top-up turns up or the list ends.
+    let found = 0
+    do {
+      const page = await billingApi.orders(topupPage.value)
+      const paid = page.items.filter(order => order.kind === 'TOPUP' && order.state === 'PAID')
+      topups.value.push(...paid); found += paid.length
+      topupMore.value = page.hasMore; topupPage.value += 1
+    } while (!found && topupMore.value)
+  } catch (e) { topupError.value = e.message || '充值记录暂时无法读取' }
+  finally { topupLoading.value = false }
+}
+onMounted(() => { if (auth.isOwner) loadTopups() })
 const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUPTED', 'QUEUED', 'GENERATING', 'SAVING'].includes(id))
 </script>
 
@@ -84,6 +108,19 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
       </div>
       <footer v-if="result?.records.total" class="usage-pagination"><p>共 {{ number(result.records.total) }} 条 · 每页 {{ result.records.size }} 条</p><nav aria-label="任务日志分页"><button class="usage-page-button" type="button" :disabled="loading || result.records.page === 0" aria-label="上一页" @click="load(result.records.page - 1)"><ChevronLeft :size="16" /></button><span>第 {{ result.records.page + 1 }} / {{ result.records.totalPages }} 页</span><button class="usage-page-button" type="button" :disabled="loading || result.records.page + 1 >= result.records.totalPages" aria-label="下一页" @click="load(result.records.page + 1)"><ChevronRight :size="16" /></button></nav></footer>
     </section>
+    <section v-if="auth.isOwner" class="usage-log usage-topups" aria-labelledby="topup-log-title" :aria-busy="topupLoading">
+      <header class="usage-log-heading"><h2 id="topup-log-title">充值记录</h2><p>仅列出支付平台确认到账的充值。</p></header>
+      <div v-if="topupLoading && !topups.length" class="usage-empty usage-empty-compact" role="status"><RefreshCw :size="22" class="spinning" /><strong>正在读取充值记录</strong></div>
+      <div v-else-if="!topups.length" class="usage-empty usage-empty-compact"><strong>{{ topupError ? '充值记录暂时无法读取' : '还没有充值记录' }}</strong><RouterLink :to="{ path: '/billing', query: { topup: '1' } }">充值烟火</RouterLink></div>
+      <div v-else class="usage-table-scroll" role="region" aria-label="充值记录表格，可横向滚动" tabindex="0">
+        <table class="usage-table">
+          <caption class="usage-sr-only">充值到账时间、金额、到账烟火、支付方式与订单号</caption>
+          <thead><tr><th scope="col">到账时间</th><th scope="col">充值金额</th><th scope="col">到账烟火</th><th scope="col">支付方式</th><th scope="col">订单号</th></tr></thead>
+          <tbody><tr v-for="order in topups" :key="order.id"><td>{{ dateTime(order.paidAt) }}</td><td>{{ yuan(order.amountMinor) }}</td><td><span class="usage-charge"><YanhuoIcon :size="14" />{{ number(order.credits) }}</span></td><td>{{ paymentMethods[order.paymentMethod] || order.paymentMethod }}</td><td class="usage-order-id">{{ order.id.slice(0, 8) }}</td></tr></tbody>
+        </table>
+      </div>
+      <footer v-if="topupMore && topups.length" class="usage-pagination"><button class="usage-page-button" type="button" :disabled="topupLoading" @click="loadTopups">{{ topupLoading ? '正在读取…' : '加载更多' }}</button></footer>
+    </section>
     <p class="usage-footnote">烟火消耗以实际扣费流水为准；失败或取消后未消耗的预占会退回。单张消耗见明细，沿用的原图不重复计费。时间均为北京时间。</p>
   </div>
 </template>
@@ -120,6 +157,11 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-error{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px;padding:14px 16px;background:var(--color-bg-surface);border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-error);font-size:13px}
 .usage-error button{padding:4px 0;background:none;border:0;color:inherit;text-decoration:underline;white-space:nowrap}
 .usage-log{overflow:hidden}
+.usage-topups{margin-top:20px}
+.usage-topups .usage-pagination{justify-content:center}
+.usage-topups .usage-page-button{width:auto;padding:0 14px}
+.usage-empty.usage-empty-compact{min-height:140px}
+.usage-order-id{font-family:var(--font-mono);font-size:12px;color:var(--color-text-muted)}
 .usage-log-heading{display:flex;justify-content:space-between;gap:20px;align-items:baseline;padding:20px}
 .usage-log-heading h2{display:flex;align-items:baseline;gap:10px;margin:0;font-size:15px;font-weight:600}
 .usage-log-heading h2 span,.usage-log-heading p{margin:0;font-size:12px;font-weight:400;color:var(--color-text-muted)}
