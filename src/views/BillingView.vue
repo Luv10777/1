@@ -34,6 +34,10 @@ const paymentError = ref('')
 const paymentLoading = ref(false)
 const paymentDialog = ref(null)
 const planDialog = ref(null)
+const successDialog = ref(null)
+// Balance just before a top-up was paid, so the success popup can show before → added → now from real readings.
+let balanceBefore = null
+const topupResult = ref(null)
 const topupDialog = ref(null)
 const pendingPlan = ref(null)
 const refreshButton = ref(null)
@@ -63,6 +67,7 @@ const closeTopup = () => {
 watch(() => route.query.topup, value => { if (value && account.value) openTopup() })
 const choosePlan = async (plan) => { pendingPlan.value = plan; await nextTick(); planDialog.value?.showModal() }
 const closePlan = () => { planDialog.value?.close(); pendingPlan.value = null }
+const closeSuccess = () => { successDialog.value?.close(); topupResult.value = null }
 const closePayment = () => { clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus() }
 const applyPayment = async (order) => {
   if (disposed || !payment.value) return
@@ -72,6 +77,12 @@ const applyPayment = async (order) => {
     keys.clear()
     qr.value = ''
     await refreshBilling()
+    if (order.kind === 'TOPUP' && !disposed) {
+      topupResult.value = { before: balanceBefore, credits: order.credits, now: billing.summary?.available ?? null, paidAt: order.paidAt }
+      closePayment()
+      await nextTick()
+      successDialog.value?.showModal()
+    }
   } else if (order.paymentCodeUrl) {
     const version = ++qrVersion
     const image = await QRCode.toDataURL(order.paymentCodeUrl, { width: 280, margin: 2, color: { dark: '#20282b', light: '#ffffff' } })
@@ -92,7 +103,10 @@ const pollPayment = async (remote = false) => {
     if (!disposed && payment.value?.state === 'PENDING_PAYMENT') paymentTimer = setTimeout(pollPayment, 4000)
   }
 }
+// Coming back from the Alipay tab: ask the provider at once instead of waiting for its notification or the next poll.
+const checkOnReturn = () => { if (document.visibilityState === 'visible' && payment.value?.state === 'PENDING_PAYMENT') pollPayment(true) }
 const openPayment = async (order) => {
+  balanceBefore = order.state === 'PENDING_PAYMENT' ? billing.summary?.available ?? null : null
   payment.value = order
   paymentError.value = ''
   qr.value = ''
@@ -153,8 +167,9 @@ onMounted(async () => {
   await refresh()
   if (route.query.topup && account.value) openTopup()
   balanceTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBilling() }, 30000)
+  globalThis.window?.addEventListener('focus', checkOnReturn)
 })
-onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterval(balanceTimer); qrVersion += 1 })
+onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterval(balanceTimer); globalThis.window?.removeEventListener('focus', checkOnReturn); qrVersion += 1 })
 </script>
 
 <template>
@@ -237,6 +252,19 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <div class="yanhuo-checkout-pay"><span class="yanhuo-checkout-due">应付<strong>{{ validAmount ? yuan(amount * 100) : '—' }}</strong></span><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '确认支付' }}</button></div>
           </BillingCheckoutTerms>
         </form>
+      </template>
+    </dialog>
+    <dialog ref="successDialog" class="yanhuo-payment yanhuo-success-dialog" aria-labelledby="success-title" @cancel.prevent="closeSuccess" @click="event => { if (event.target === successDialog) closeSuccess() }">
+      <template v-if="topupResult">
+        <div class="yanhuo-success-mark"><Check :size="26" /></div>
+        <h2 id="success-title">充值成功</h2>
+        <p class="yanhuo-success-time">{{ dateTime(topupResult.paidAt) }} 到账</p>
+        <dl class="yanhuo-success-rows">
+          <div v-if="topupResult.before !== null"><dt>原有烟火</dt><dd><YanhuoIcon :size="16" />{{ number(topupResult.before) }}</dd></div>
+          <div class="added"><dt>本次充值</dt><dd>+{{ number(topupResult.credits) }}</dd></div>
+          <div v-if="topupResult.now !== null" class="total"><dt>现在烟火</dt><dd><YanhuoIcon :size="18" />{{ number(topupResult.now) }}</dd></div>
+        </dl>
+        <button class="yanhuo-primary" type="button" @click="closeSuccess">完成</button>
       </template>
     </dialog>
     <dialog ref="planDialog" class="yanhuo-payment" aria-labelledby="plan-confirm-title" @cancel.prevent="closePlan" @click="event => { if (event.target === planDialog) closePlan() }">
