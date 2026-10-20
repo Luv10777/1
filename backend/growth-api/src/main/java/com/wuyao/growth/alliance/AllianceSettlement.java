@@ -31,6 +31,8 @@ public class AllianceSettlement {
     private String status = "HOLDING";
     private Instant payableAfter;
     private boolean frozen;
+    /** 所属对账单；为空表示还没汇总进任何对账单。 */
+    private Long statementId;
     private String paidReference;
     private Long paidBy;
     private Instant paidAt;

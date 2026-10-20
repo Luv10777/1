@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 @SpringBootTest(properties = {"growth.worker.enabled=false", "logging.level.root=WARN",
         "logging.level.com.wuyao.growth=WARN", "growth.platform.operator-user-ids=900"})
@@ -57,6 +58,7 @@ class AllianceVoucherIntegrationTest {
         registry.add("spring.flyway.password", POSTGRES::getPassword);
         registry.add("spring.flyway.placeholders.app_db_password", () -> "growth_dev_local");
         registry.add("growth.jwt.secret", () -> "test-only-random-signing-secret-0123456789abcdef");
+        registry.add("growth.identity.encryption-key", () -> java.util.Base64.getEncoder().encodeToString(new byte[32]));
     }
 
     private static final String SUPPLIER_CODE = "91330400MA2B000001";
@@ -75,7 +77,7 @@ class AllianceVoucherIntegrationTest {
     final Set<Long> handledTasks = new HashSet<>();
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         owner.execute("TRUNCATE tenants RESTART IDENTITY CASCADE");
         owner.execute("TRUNCATE billing_plans RESTART IDENTITY CASCADE");
@@ -122,6 +124,7 @@ class AllianceVoucherIntegrationTest {
         var plan = billing.createPlan(new BillingDtos.NewPlan("FANGZHI", "方志", "test-only", 29900, 30, 1000,
                 true, true, false, true, 15000));
         for (Long tenant : List.of(supplier, holder, sameSubject, rival)) member(tenant, plan.id(), "first");
+        data(put("/api/alliance/settlement-account"), supplierToken, account("6222020000001234"), 200);
     }
 
     // ---------- 场景 ----------
@@ -171,11 +174,33 @@ class AllianceVoucherIntegrationTest {
         var settlement = data(get("/api/alliance/settlements"), supplierToken, 200).path("items").get(0);
         assertThat(settlement.path("state").asText()).isEqualTo("IN_DISPUTE_WINDOW");
         assertThat(settlement.path("settleAmountMinor").asLong()).isEqualTo(1500);
-        long settlementId = settlement.path("id").asLong();
-        String paid = "/api/platform/tenants/" + supplier + "/alliance/settlements/" + settlementId + "/paid";
-        assertThat(message(post(paid), operatorToken, Map.of("reference", "BANK-0001"), 409)).contains("申诉期");
-        owner.update("UPDATE alliance_settlements SET payable_after = now() - interval '1 minute' WHERE id = ?", settlementId);
-        assertThat(data(post(paid), operatorToken, Map.of("reference", "BANK-0001"), 200).path("state").asText()).isEqualTo("PAID");
+        // 申诉期还没满：上月对账单不收它。
+        assertThat(generate(previousMonth())).isZero();
+        endDisputeWindowLastMonth();
+        assertThat(generate(previousMonth())).isEqualTo(1);
+        assertThat(generate(previousMonth())).as("同一个月重复生成只有一张").isZero();
+        var statement = data(get("/api/alliance/statements"), supplierToken, 200).get(0);
+        assertThat(statement.path("settleTotalMinor").asLong()).isEqualTo(1500);
+        assertThat(data(get("/api/alliance/settlements"), supplierToken, 200).path("items").get(0).path("state").asText()).isEqualTo("IN_STATEMENT");
+        long statementId = statement.path("id").asLong();
+        String statementPath = "/api/platform/tenants/" + supplier + "/alliance/statements/" + statementId;
+        // 收款账户还没核对：不能确认，也不能打款。
+        assertThat(message(post("/api/alliance/statements/" + statementId + "/confirm"), supplierToken, null, 409)).contains("核对");
+        refused(post(statementPath + "/paid"), operatorToken, Map.of("reference", "BANK-0001", "paidDate", java.time.LocalDate.now().toString()), 409);
+        assertThat(data(get("/api/platform/alliance/accounts"), operatorToken, 200).get(0).path("registeredCompanyName").asText()).isEqualTo("乙家茶铺有限公司");
+        data(post("/api/platform/tenants/" + supplier + "/alliance/settlement-account/review"), operatorToken, Map.of("approved", true), 200);
+        var confirmed = data(post("/api/alliance/statements/" + statementId + "/confirm"), supplierToken, null, 200);
+        assertThat(confirmed.path("payeeAccountLast4").asText()).isEqualTo("1234");
+        // 确认后改账户：这张对账单仍按确认时的账户打款。
+        data(put("/api/alliance/settlement-account"), supplierToken, account("6222020000009999"), 200);
+        assertThat(data(get("/api/alliance/statements"), supplierToken, 200).get(0).path("payeeAccountLast4").asText()).isEqualTo("1234");
+        assertThat(data(post(statementPath + "/reveal"), operatorToken, Map.of("purpose", "线下打款核对账号"), 200)
+                .path("accountNumber").asText()).isEqualTo("6222020000001234");
+        assertThat(owner.queryForObject("SELECT count(*) FROM platform_management_audit WHERE target_type = 'SETTLEMENT_ACCOUNT'", Integer.class)).isEqualTo(1);
+        refused(post("/api/alliance/statements/" + statementId + "/confirm"), holderToken, null, 404);
+        assertThat(data(post(statementPath + "/paid"), operatorToken,
+                Map.of("reference", "BANK-0001", "paidDate", java.time.LocalDate.now().toString()), 200).path("status").asText()).isEqualTo("PAID");
+        assertThat(data(get("/api/alliance/settlements"), supplierToken, 200).path("items").get(0).path("state").asText()).isEqualTo("PAID");
 
         var rules = json.readTree(mvc.perform(get("/api/public/alliance/rules")).andReturn().getResponse()
                 .getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
@@ -203,9 +228,9 @@ class AllianceVoucherIntegrationTest {
         runSyncTasks();
         var settlement = data(get("/api/alliance/settlements"), supplierToken, 200).path("items").get(0);
         assertThat(settlement.path("state").asText()).isEqualTo("FROZEN");
-        owner.update("UPDATE alliance_settlements SET payable_after = now() - interval '1 minute'");
-        refused(post("/api/platform/tenants/" + supplier + "/alliance/settlements/" + settlement.path("id").asLong() + "/paid"),
-                operatorToken, Map.of("reference", "BANK-0002"), 409);
+        // 申诉中的结算单即使申诉期满了，也不会进对账单。
+        endDisputeWindowLastMonth();
+        assertThat(generate(previousMonth())).isZero();
 
         var disputes = data(get("/api/platform/alliance/disputes"), operatorToken, 200);
         assertThat(disputes.get(0).path("disputeReason").asText()).isEqualTo("到店没有拿到茶叶");
@@ -387,7 +412,77 @@ class AllianceVoucherIntegrationTest {
 
     @Autowired AllianceVoucherService voucherService;
 
+    @Test
+    void statementObjectionVoidRegenerateAndAutoConfirm() throws Exception {
+        long offerId = createOffer(2);
+        approve(offerId);
+        String ref = claim(offerId, holderToken);
+        String code = data(get("/api/alliance/vouchers/" + ref), holderToken, 200).path("code").asText();
+        data(post(redeemPath(store)), staffToken, Map.of("code", code), 200);
+        endDisputeWindowLastMonth();
+        assertThat(generate(previousMonth())).isEqualTo(1);
+        long first = data(get("/api/alliance/statements"), supplierToken, 200).get(0).path("id").asLong();
+        assertThat(data(get("/api/alliance/statements/" + first), supplierToken, 200).path("lines").size()).isEqualTo(1);
+
+        // 商户有异议 → 平台作废 → 结算单放回 → 重新生成能收进来
+        data(post("/api/alliance/statements/" + first + "/objection"), supplierToken, Map.of("reason", "金额与我记录的不一致"), 200);
+        var objected = data(get("/api/platform/alliance/statements").param("status", "OBJECTED"), operatorToken, 200);
+        assertThat(objected.get(0).path("statement").path("objectionNote").asText()).isEqualTo("金额与我记录的不一致");
+        data(post("/api/platform/tenants/" + supplier + "/alliance/statements/" + first + "/void"), operatorToken, Map.of("note", "按商户意见重新出单"), 200);
+        assertThat(data(get("/api/alliance/settlements"), supplierToken, 200).path("items").get(0).path("state").asText()).isEqualTo("PAYABLE");
+        assertThat(generate(previousMonth())).isEqualTo(1);
+        long second = owner.queryForObject("SELECT id FROM alliance_statements WHERE status = 'PENDING_CONFIRM'", Long.class);
+
+        // 到期没处理：账户没核对时不自动确认，核对后下一轮自动确认
+        owner.update("UPDATE alliance_statements SET confirm_due_at = now() - interval '1 minute' WHERE id = ?", second);
+        assertThat(TenantContext.runAs(supplier, () -> statementService.autoConfirmDue())).isZero();
+        data(post("/api/platform/tenants/" + supplier + "/alliance/settlement-account/review"), operatorToken, Map.of("approved", true), 200);
+        assertThat(TenantContext.runAs(supplier, () -> statementService.autoConfirmDue())).isEqualTo(1);
+        var auto = data(get("/api/alliance/statements/" + second), supplierToken, 200).path("statement");
+        assertThat(auto.path("status").asText()).isEqualTo("CONFIRMED");
+        assertThat(auto.path("autoConfirmed").asBoolean()).isTrue();
+
+        // 账号只存密文和后 4 位；别家商户看不到账户和对账单
+        byte[] cipher = owner.queryForObject("SELECT account_number_ciphertext FROM alliance_settlement_accounts", byte[].class);
+        assertThat(new String(cipher, java.nio.charset.StandardCharsets.ISO_8859_1)).doesNotContain("6222020000001234");
+        assertThat(data(get("/api/alliance/settlement-account"), supplierToken, 200).path("accountNumberLast4").asText()).isEqualTo("1234");
+        assertThat(data(get("/api/alliance/settlement-account"), supplierToken, 200).has("accountNumber")).isFalse();
+        assertThat(data(get("/api/alliance/statements"), holderToken, 200).size()).isZero();
+        assertThat(data(get("/api/alliance/settlement-account"), holderToken, 200).has("accountNumberLast4"))
+                .as("别家商户读不到这个账户，自己也还没有账户").isFalse();
+    }
+
+    @Test
+    void offeringRequiresASettlementAccount() throws Exception {
+        owner.update("DELETE FROM alliance_settlement_accounts");
+        assertThat(message(post("/api/alliance/offers"), supplierToken,
+                Map.of("storeId", store, "productId", product, "quantity", 1), 403)).contains("收款账户");
+    }
+
+    @Autowired AllianceStatementService statementService;
+
     // ---------- 工具 ----------
+
+    private static Map<String, Object> account(String number) {
+        return Map.of("accountType", "CORPORATE", "accountName", "乙家茶铺有限公司", "bankName", "中国工商银行",
+                "branchName", "嘉兴南湖支行", "accountNumber", number, "financeContactName", "乙家财务", "financeContactPhone", "0573-80000101");
+    }
+
+    private static String previousMonth() {
+        return java.time.YearMonth.now(java.time.ZoneId.of("Asia/Shanghai")).minusMonths(1).toString();
+    }
+
+    /** 把所有结算单的申诉期截止时间挪到上个月底之前，让它们能进上月对账单。 */
+    private void endDisputeWindowLastMonth() {
+        var zone = java.time.ZoneId.of("Asia/Shanghai");
+        var monthStart = java.time.YearMonth.now(zone).atDay(1).atStartOfDay(zone).toInstant();
+        owner.update("UPDATE alliance_settlements SET payable_after = ?", java.sql.Timestamp.from(monthStart.minusSeconds(3600)));
+    }
+
+    private int generate(String period) throws Exception {
+        return data(post("/api/platform/alliance/statements/generate").param("period", period), operatorToken, null, 200)
+                .path("created").asInt();
+    }
 
     private long createOffer(int quantity) throws Exception {
         return data(post("/api/alliance/offers"), supplierToken,

@@ -9,6 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,6 +28,8 @@ public class AllianceController {
     private final AllianceClaimService claims;
     private final AllianceOfferService offers;
     private final AllianceSettlementService settlements;
+    private final AllianceAccountService accounts;
+    private final AllianceStatementService statements;
 
     @GetMapping("/quota")
     public ApiResponse<AllianceDtos.QuotaView> quota() {
@@ -84,5 +87,38 @@ public class AllianceController {
     public ApiResponse<PageResult<AllianceDtos.SettlementView>> settlements(@RequestParam(defaultValue = "0") int page,
                                                                              @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(settlements.mine(page, size));
+    }
+
+    @GetMapping("/settlement-account")
+    public ApiResponse<AllianceDtos.AccountView> account() {
+        return ApiResponse.ok(accounts.mine().orElse(null));
+    }
+
+    @PutMapping("/settlement-account")
+    public ApiResponse<AllianceDtos.AccountView> saveAccount(@Valid @RequestBody AllianceDtos.AccountRequest request,
+                                                             @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(accounts.save(request, me.userId()));
+    }
+
+    @GetMapping("/statements")
+    public ApiResponse<List<AllianceDtos.StatementView>> statements() {
+        return ApiResponse.ok(statements.mine());
+    }
+
+    @GetMapping("/statements/{id}")
+    public ApiResponse<AllianceDtos.StatementDetail> statement(@PathVariable Long id) {
+        return ApiResponse.ok(statements.detail(id));
+    }
+
+    @PostMapping("/statements/{id}/confirm")
+    public ApiResponse<AllianceDtos.StatementView> confirm(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(statements.confirm(id, me.userId()));
+    }
+
+    @PostMapping("/statements/{id}/objection")
+    public ApiResponse<AllianceDtos.StatementView> object(@PathVariable Long id,
+                                                          @Valid @RequestBody AllianceDtos.ObjectionRequest request,
+                                                          @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(statements.object(id, request.reason(), me.userId()));
     }
 }

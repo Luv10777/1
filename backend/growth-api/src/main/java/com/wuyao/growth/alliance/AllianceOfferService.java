@@ -35,6 +35,7 @@ public class AllianceOfferService {
     private final StoreService stores;
     private final ProductService products;
     private final MerchantQualificationService qualification;
+    private final AllianceAccountService settlementAccounts;
 
     /** 领券第 2 步需要的信息：由领券方第 1 步生成，供券方只拿到券码的哈希。 */
     record ClaimTicket(UUID ref, Long supplierTenantId, Long offerId, Long holderTenantId, String holderName,
@@ -46,6 +47,7 @@ public class AllianceOfferService {
         storeAccess.requireAccess(request.storeId(), userId);
         var merchant = qualification.approvedMerchant()
                 .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "请先通过商家入驻审核，再提供联盟券"));
+        settlementAccounts.requirePresent();
         var store = stores.profile(request.storeId())
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "门店不存在或已停用"));
         var product = products.lockStock(request.productId(), request.storeId());

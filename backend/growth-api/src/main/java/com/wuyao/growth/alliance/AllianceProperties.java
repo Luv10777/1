@@ -27,4 +27,6 @@ public class AllianceProperties {
     private int redeemAttemptLimit = 10;
     /** 暂停核销多少分钟。 */
     private int redeemLockMinutes = 15;
+    /** 对账单生成后，商户多少天不处理视为确认。 */
+    private int statementConfirmDays = 5;
 }

@@ -22,6 +22,18 @@ interface AllianceSettlementRepository extends JpaRepository<AllianceSettlement,
     @Query("select s from AllianceSettlement s where s.id = :id")
     Optional<AllianceSettlement> findByIdForUpdate(@Param("id") Long id);
 
+    /** 可以进对账单的：未结算、没冻结、申诉期在截止时间前已满、还没进过对账单。 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select s from AllianceSettlement s
+            where s.tenantId = :tenantId and s.status = 'HOLDING' and s.frozen = false
+              and s.statementId is null and s.payableAfter < :cutoff
+            order by s.payableAfter, s.id
+            """)
+    List<AllianceSettlement> eligibleForStatement(@Param("tenantId") Long tenantId, @Param("cutoff") java.time.Instant cutoff);
+
+    List<AllianceSettlement> findAllByStatementIdOrderByCreatedAtAscIdAsc(Long statementId);
+
     Page<AllianceSettlement> findAllByTenantIdOrderByCreatedAtDescIdDesc(Long tenantId, Pageable pageable);
 
     List<AllianceSettlement> findAllByTenantIdAndStatusOrderByCreatedAtAsc(Long tenantId, String status);

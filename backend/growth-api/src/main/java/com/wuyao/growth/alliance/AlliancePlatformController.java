@@ -54,19 +54,88 @@ public class AlliancePlatformController {
         return ApiResponse.ok();
     }
 
-    @GetMapping("/alliance/settlements")
-    public ApiResponse<List<AllianceDtos.PlatformSettlement>> settlements(@RequestParam(required = false) String status,
-                                                                         @AuthenticationPrincipal AuthPrincipal me) {
+    @GetMapping("/alliance/accounts")
+    public ApiResponse<List<AllianceDtos.PlatformAccount>> accounts(@RequestParam(required = false) String status,
+                                                                   @AuthenticationPrincipal AuthPrincipal me) {
         management.requireOperator(me);
-        return ApiResponse.ok(platform.settlements(status));
+        return ApiResponse.ok(platform.accounts(status));
     }
 
-    @PostMapping("/tenants/{tenantId}/alliance/settlements/{id}/paid")
-    public ApiResponse<AllianceDtos.SettlementView> paid(@PathVariable Long tenantId, @PathVariable Long id,
-                                                         @Valid @RequestBody AllianceDtos.PaidRequest request,
-                                                         @AuthenticationPrincipal AuthPrincipal me) {
+    @PostMapping("/tenants/{tenantId}/alliance/settlement-account/review")
+    public ApiResponse<AllianceDtos.AccountView> reviewAccount(@PathVariable Long tenantId,
+                                                               @Valid @RequestBody AllianceDtos.AccountReviewRequest request,
+                                                               @AuthenticationPrincipal AuthPrincipal me) {
         management.requireOperator(me);
-        return ApiResponse.ok(platform.markPaid(tenantId, id, request.reference(), me.userId()));
+        return ApiResponse.ok(platform.reviewAccount(tenantId, request, me.userId()));
+    }
+
+    @PostMapping("/tenants/{tenantId}/alliance/settlement-account/reveal")
+    public ApiResponse<AllianceDtos.RevealView> revealAccount(@PathVariable Long tenantId,
+                                                              @Valid @RequestBody AllianceDtos.RevealRequest request,
+                                                              @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.revealAccount(tenantId, request.purpose(), me.userId()));
+    }
+
+    @GetMapping("/alliance/statements")
+    public ApiResponse<List<AllianceDtos.PlatformStatement>> statements(@RequestParam(required = false) String status,
+                                                                       @RequestParam(required = false) String period,
+                                                                       @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.statements(status, period));
+    }
+
+    @GetMapping("/tenants/{tenantId}/alliance/statements/{id}")
+    public ApiResponse<AllianceDtos.StatementDetail> statement(@PathVariable Long tenantId, @PathVariable Long id,
+                                                               @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.statement(tenantId, id));
+    }
+
+    @PostMapping("/tenants/{tenantId}/alliance/statements/{id}/paid")
+    public ApiResponse<AllianceDtos.StatementView> statementPaid(@PathVariable Long tenantId, @PathVariable Long id,
+                                                                 @Valid @RequestBody AllianceDtos.StatementPaidRequest request,
+                                                                 @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.statementPaid(tenantId, id, request, me.userId()));
+    }
+
+    @PostMapping("/tenants/{tenantId}/alliance/statements/{id}/void")
+    public ApiResponse<AllianceDtos.StatementView> voidStatement(@PathVariable Long tenantId, @PathVariable Long id,
+                                                                 @Valid @RequestBody AllianceDtos.StatementNoteRequest request,
+                                                                 @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.voidStatement(tenantId, id, request.note(), me.userId()));
+    }
+
+    @PostMapping("/tenants/{tenantId}/alliance/statements/{id}/resolve")
+    public ApiResponse<AllianceDtos.StatementView> resolveStatement(@PathVariable Long tenantId, @PathVariable Long id,
+                                                                    @Valid @RequestBody AllianceDtos.StatementNoteRequest request,
+                                                                    @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.resolveStatement(tenantId, id, request.note(), me.userId()));
+    }
+
+    @PostMapping("/tenants/{tenantId}/alliance/statements/{id}/reveal")
+    public ApiResponse<AllianceDtos.RevealView> revealPayee(@PathVariable Long tenantId, @PathVariable Long id,
+                                                            @Valid @RequestBody AllianceDtos.RevealRequest request,
+                                                            @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        return ApiResponse.ok(platform.revealStatementPayee(tenantId, id, request.purpose(), me.userId()));
+    }
+
+    /** period 形如 2026-09，只能是已经结束的月份。 */
+    @PostMapping("/alliance/statements/generate")
+    public ApiResponse<java.util.Map<String, Integer>> generate(@RequestParam String period,
+                                                                @AuthenticationPrincipal AuthPrincipal me) {
+        management.requireOperator(me);
+        java.time.YearMonth month;
+        try {
+            month = java.time.YearMonth.parse(period);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw com.wuyao.growth.common.web.BizException.of(com.wuyao.growth.common.web.ErrorCode.BAD_REQUEST, "月份格式应为 2026-09");
+        }
+        return ApiResponse.ok(java.util.Map.of("created", platform.generateStatements(month)));
     }
 
     @GetMapping("/alliance/summary")

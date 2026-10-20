@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class MerchantQualificationService {
     private final MerchantApplicationRepository applications;
 
-    public record ApprovedMerchant(String merchantName, String creditCode) {}
+    public record ApprovedMerchant(String merchantName, String companyName, String creditCode) {}
 
     /** 最近一次审核通过的入驻申请。 */
     @Transactional(readOnly = true)
@@ -23,7 +23,7 @@ public class MerchantQualificationService {
         return applications.findAllByTenantIdOrderByCreatedAtDescIdDesc(TenantContext.require()).stream()
                 .filter(application -> "APPROVED".equals(application.getStatus()))
                 .findFirst()
-                .map(application -> new ApprovedMerchant(application.getMerchantName(), application.getCreditCode()));
+                .map(application -> new ApprovedMerchant(application.getMerchantName(), application.getCompanyName(), application.getCreditCode()));
     }
 
     /** 线上卖货、发布信息、提供联盟券都要求入驻审核通过。 */

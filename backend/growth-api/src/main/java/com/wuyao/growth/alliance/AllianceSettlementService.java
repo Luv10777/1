@@ -93,37 +93,4 @@ public class AllianceSettlementService {
         });
     }
 
-    @Transactional(readOnly = true)
-    public AllianceSettlement require(Long id) {
-        return settlements.findById(id).filter(s -> TenantContext.require().equals(s.getTenantId()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "结算单不存在"));
-    }
-
-    /** 平台线下打款后标记已结。申诉期内、冻结中和已作废的结算单不能标记。 */
-    @Transactional
-    public AllianceDtos.SettlementView markPaid(Long id, String reference, Long operatorId) {
-        var settlement = settlements.findByIdForUpdate(id).filter(s -> TenantContext.require().equals(s.getTenantId()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "结算单不存在"));
-        Instant now = Instant.now();
-        String state = AllianceDtos.SettlementView.state(settlement, now);
-        if (!"PAYABLE".equals(state)) {
-            throw BizException.of(ErrorCode.CONFLICT, switch (state) {
-                case "IN_DISPUTE_WINDOW" -> "还在申诉期内，期满后才能结算";
-                case "FROZEN" -> "领券商户正在申诉，处理完才能结算";
-                case "PAID" -> "这张结算单已经结算过了";
-                default -> "这张结算单已作废";
-            });
-        }
-        settlement.setStatus("PAID");
-        settlement.setPaidReference(reference.trim());
-        settlement.setPaidBy(operatorId);
-        settlement.setPaidAt(now);
-        settlement.setUpdatedAt(now);
-        return AllianceDtos.SettlementView.of(settlement, now);
-    }
-
-    @Transactional(readOnly = true)
-    public List<AllianceSettlement> byStatus(String status) {
-        return settlements.findAllByTenantIdAndStatusOrderByCreatedAtAsc(TenantContext.require(), status);
-    }
 }
