@@ -140,23 +140,13 @@
 .yanhuo-plan-permissions legend { margin-bottom: 12px; color: var(--ink-muted); }
 .yanhuo-plan-permissions label { display: flex; align-items: center; gap: 6px; }
 .yanhuo-plan-permissions input { margin: 0; }
-.sidebar-yanhuo { display: flex; gap: 10px; padding: 14px 14px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-surface); box-shadow: var(--shadow-paper); transition: border-color .18s; }
-.sidebar-yanhuo:hover { border-color: var(--color-border-strong); }
-.sidebar-yanhuo-icon { display: none; flex: 0 0 18px; color: var(--color-accent-text); }
-.sidebar-yanhuo-copy { min-width: 0; flex: 1; }
-.sidebar-yanhuo-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-muted); }
-.sidebar-yanhuo-plan { max-width: 116px; padding: 0 8px; overflow: hidden; border: 1px solid currentColor; border-radius: 2px; font-size: 12px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
-.sidebar-yanhuo-plan.active { color: var(--color-accent-text); }
-.sidebar-yanhuo-plan.expired { color: var(--color-warning); }
-.sidebar-yanhuo-number { display: flex; align-items: baseline; gap: 6px; margin: 10px 0 12px; color: var(--ink); font: 500 26px/1.15 var(--font-sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.sidebar-yanhuo-number small { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--ink-muted); }
-.sidebar-yanhuo-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-muted); }
-.sidebar-yanhuo-foot > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-yanhuo-action { display: inline-flex; align-items: center; gap: 2px; flex: none; color: var(--color-accent-text); font-weight: 500; }
-.sidebar.is-collapsed .sidebar-footer { display: block; padding: 8px; }
-.sidebar.is-collapsed .sidebar-yanhuo-copy, .sidebar.is-collapsed .sidebar-footer .account-wrap { display: none; }
-.sidebar.is-collapsed .sidebar-yanhuo { padding: 12px; justify-content: center; }
-.sidebar.is-collapsed .sidebar-yanhuo-icon { display: block; }
+.account-tier { justify-self: start; padding: 0 6px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink-muted); font-size: 12px; line-height: 18px; }
+.account-tier.paid { border-color: currentColor; color: var(--color-accent-text); }
+.sidebar-footer .account-menu { width: 184px; }
+.account-menu-plan { display: grid; gap: 4px; padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.account-menu-plan strong { font-size: 13px; font-weight: 600; }
+.account-menu-plan small { font-size: 12px; color: var(--ink-muted); }
+.account-menu-plan a { justify-self: start; margin-top: 4px; color: var(--color-accent-text); font-size: 12px; font-weight: 500; }
 .yanhuo-page .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @keyframes yanhuo-spin { to { transform: rotate(360deg); } }
 .yanhuo-icon .spinning { animation: yanhuo-spin 1s linear infinite; }

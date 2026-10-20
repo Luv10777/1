@@ -7,6 +7,9 @@
 .paper-app :is(.product-showcase-glow,.poster-glow,.device-glow-layer){display:none}.paper-app .video-workbench-canvas{background:var(--color-bg-subtle)}.paper-app .video-workbench-action{background:var(--color-bg-surface)}
 .paper-app :is(.video-generate-button,.premium-primary,.new-work-button){background:var(--color-accent);color:var(--color-on-accent);border-color:transparent;box-shadow:none}
 .paper-app :is(input,textarea,:is(select, .app-select-button)):focus-visible{outline-color:var(--color-primary)}
+/* A borderless field inside its own bordered box shows focus on that box, never as a second dark frame inside it. */
+:root :is(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .floating-prompt-bar, .poster-composer) :is(input, textarea):focus-visible { outline: none; }
+:where(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .floating-prompt-bar, .poster-composer):focus-within { border-color: var(--color-primary); }
 /* The publishing state aliases come from the same paper/ink system in both modes. */
 :root .paper-app:has(.publishing-page){
  --pub-canvas:var(--color-bg-canvas);--pub-input:var(--color-bg-surface);--pub-surface:var(--color-bg-surface);--pub-panel:var(--color-bg-surface);--pub-card:var(--color-bg-surface);--pub-muted-surface:var(--color-bg-subtle);--pub-hover-surface:var(--color-bg-subtle);
