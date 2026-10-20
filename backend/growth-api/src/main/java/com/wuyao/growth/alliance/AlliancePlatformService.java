@@ -40,7 +40,8 @@ public class AlliancePlatformService {
     }
 
     public AllianceDtos.OfferView review(Long tenantId, Long offerId, AllianceDtos.ReviewRequest request, Long operatorId) {
-        return TenantContext.runAs(tenantId, () -> offerService.review(offerId, request.approved(), request.note(), operatorId));
+        return TenantContext.runAs(tenantId, () -> offerService.review(offerId, request.approved(), request.note(),
+                request.settleRateBp(), operatorId));
     }
 
     public List<AllianceDtos.PlatformDispute> disputes() {

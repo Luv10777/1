@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { RefreshCw, Store, Ticket } from 'lucide-vue-next'
 import { allianceApi, yuan } from '../services/allianceApi'
 import '../alliance.css'
@@ -8,10 +8,6 @@ const rules = ref(null)
 const error = ref('')
 const loading = ref(false)
 
-// 结算比例按「折」说：5000 万分比 → 5 折，8500 → 8.5 折。
-const discount = computed(() => rules.value ? `${(rules.value.settleRateBp / 1000).toFixed(1).replace(/\.0$/, '')} 折` : '')
-const exampleFace = 3000
-const exampleSettle = computed(() => rules.value ? Math.floor(exampleFace * rules.value.settleRateBp / 10000) : 0)
 
 async function load() {
   loading.value = true
@@ -46,7 +42,7 @@ load()
           <li><strong>供券</strong><span>入驻商户拿自家门店的一件商品提供券，平台审核</span></li>
           <li><strong>领券</strong><span>会员商户用本期额度在领券中心挑选</span></li>
           <li><strong>到店核销</strong><span>出示券码，店员核对后当场交付</span></li>
-          <li><strong>结算</strong><span>过了 {{ rules.disputeDays }} 天申诉期，平台按面值 {{ discount }}结算给供券商户</span></li>
+          <li><strong>结算</strong><span>过了 {{ rules.disputeDays }} 天申诉期，平台按约定折扣结算给供券商户</span></li>
         </ol>
       </section>
 
@@ -106,7 +102,8 @@ load()
         </ul>
         <h3>结算</h3>
         <ul>
-          <li>核销后先过 <strong>{{ rules.disputeDays }} 天申诉期</strong>；期满且没有申诉，平台按面值的 <strong>{{ discount }}</strong>结算，例如面值 ¥{{ yuan(exampleFace) }} 的券结算 ¥{{ yuan(exampleSettle) }}。</li>
+          <li>平台审核每张供券单时，与你约定这张供券单的结算折扣；审核通过后可在「供券管理」看到约定的结算价。</li>
+          <li>核销后先过 <strong>{{ rules.disputeDays }} 天申诉期</strong>；期满且没有申诉，按约定折扣结算。</li>
           <li>结算按月线下打款，可在「供券管理 → 结算单」查看每一笔的状态。</li>
           <li>领券商户申诉期间，这笔结算冻结；平台判定核销无效的，这笔结算作废。</li>
         </ul>

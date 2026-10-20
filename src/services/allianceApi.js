@@ -28,7 +28,7 @@ export const allianceApi = {
 export const allianceAdminApi = {
   summary: () => get('/api/platform/alliance/summary'),
   pendingOffers: () => get('/api/platform/alliance/offers'),
-  review: (item, approved, note) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/offers/${id(item.offer.id)}/review`, { approved, note }),
+  review: (item, approved, note, settleRateBp) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/offers/${id(item.offer.id)}/review`, { approved, note, settleRateBp }),
   disputes: () => get('/api/platform/alliance/disputes'),
   resolveDispute: (item, valid, note) => post(`/api/platform/tenants/${id(item.holderTenantId)}/alliance/vouchers/${id(item.ref)}/dispute-resolution`, { valid, note }),
   settlements: status => get('/api/platform/alliance/settlements', params({ status })),
@@ -59,5 +59,8 @@ export const settlementStates = {
   PAID: '已结算',
   VOID: '已作废',
 }
+
+/** 约定的结算比例（万分比）显示成「x 折」：5000 → 5 折，8500 → 8.5 折。 */
+export const discountLabel = bp => bp ? `${(bp / 1000).toFixed(1).replace(/\.0$/, '')} 折` : ''
 
 export const yuan = minor => (Number(minor || 0) / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

@@ -18,7 +18,8 @@ public final class AllianceDtos {
 
     public record OfferRequest(@NotNull Long storeId, @NotNull Long productId, @Min(1) @Max(1000) int quantity) {}
 
-    public record ReviewRequest(boolean approved, @Size(max = 300) String note) {}
+    /** 通过时必须填写与供券商户约定的结算比例（万分比，5000 即面值的 5 折）。 */
+    public record ReviewRequest(boolean approved, @Size(max = 300) String note, @Min(1) @Max(10000) Integer settleRateBp) {}
 
     public record RedeemRequest(@NotBlank @Pattern(regexp = "\\d{8}", message = "请输入 8 位数字券码") String code) {}
 
@@ -29,11 +30,11 @@ public final class AllianceDtos {
     public record PaidRequest(@NotBlank @Size(min = 4, max = 150) String reference) {}
 
     /** 当前生效的业务规则，页面上的说明文字从这里取，不写死。 */
-    public record Rules(int settleRateBp, int perSupplierLimit, long monthlyFaceCapMinor, int inventorySharePercent,
+    public record Rules(int perSupplierLimit, long monthlyFaceCapMinor, int inventorySharePercent,
                         int unlimitedInventoryCap, int voucherValidDays, int disputeDays, int redeemAttemptLimit,
                         int redeemLockMinutes) {
         static Rules of(AllianceProperties c) {
-            return new Rules(c.getSettleRateBp(), c.getPerSupplierLimit(), c.getMonthlyFaceCapMinor(),
+            return new Rules(c.getPerSupplierLimit(), c.getMonthlyFaceCapMinor(),
                     c.getInventorySharePercent(), c.getUnlimitedInventoryCap(), c.getVoucherValidDays(), c.getDisputeDays(),
                     c.getRedeemAttemptLimit(), c.getRedeemLockMinutes());
         }
@@ -42,7 +43,7 @@ public final class AllianceDtos {
     // ---------- 供券商户 ----------
 
     public record OfferView(Long id, Long storeId, String storeName, Long productId, String productName, String saleUnit,
-                            long faceValueMinor, int settleRateBp, long settleAmountMinor, int totalQty, int claimedQty,
+                            long faceValueMinor, Integer settleRateBp, Long settleAmountMinor, int totalQty, int claimedQty,
                             long redeemedQty, String status, String reviewNote, Instant createdAt) {
         static OfferView of(AllianceOffer offer, long redeemed) {
             return new OfferView(offer.getId(), offer.getStoreId(), offer.getStoreName(), offer.getProductId(),

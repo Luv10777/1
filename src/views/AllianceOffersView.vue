@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { Plus, RefreshCw, X } from 'lucide-vue-next'
 import AppSelect from '../components/AppSelect.vue'
-import { allianceApi, offerStatuses, settlementStates, yuan } from '../services/allianceApi'
+import { allianceApi, discountLabel, offerStatuses, settlementStates, yuan } from '../services/allianceApi'
 import { stores, selectedStoreId } from '../stores/merchantContext'
 import '../alliance.css'
 
@@ -30,8 +30,6 @@ const maxQuantity = computed(() => {
   return product.value.inventory == null ? rules.value.unlimitedInventoryCap
     : Math.floor(product.value.inventory * rules.value.inventorySharePercent / 100)
 })
-const settleMinor = computed(() => rules.value ? Math.floor(faceMinor.value * rules.value.settleRateBp / 10000) : 0)
-const discount = computed(() => rules.value ? `${(rules.value.settleRateBp / 1000).toFixed(1).replace(/\.0$/, '')} 折` : '')
 const faceMinor = computed(() => product.value ? Math.round(Number(product.value.price) * 100) : 0)
 const date = value => value ? new Date(value).toLocaleDateString('zh-CN') : ''
 const tagClass = status => ({ ACTIVE: 'is-active', PENDING_REVIEW: 'is-warning', REJECTED: 'is-error', PAYABLE: 'is-active', FROZEN: 'is-error', IN_DISPUTE_WINDOW: 'is-warning' })[status] || ''
@@ -119,7 +117,7 @@ onBeforeUnmount(() => { generation++ })
 <template>
   <div class="business-page alliance-offers-page">
     <header class="business-heading">
-      <div><h1>供券管理</h1><p>拿自家门店的一件商品提供联盟券，会员商户领取后到店核销。<template v-if="rules">核销满 {{ rules.disputeDays }} 天、无申诉后，平台按面值 {{ discount }}结算给你。</template></p></div>
+      <div><h1>供券管理</h1><p>拿自家门店的一件商品提供联盟券，会员商户领取后到店核销。<template v-if="rules">核销满 {{ rules.disputeDays }} 天、无申诉后，平台按与你约定的折扣结算。</template></p></div>
       <div class="business-heading-links">
         <RouterLink :to="{ name: 'alliance-rules' }" class="business-link">联盟券规则</RouterLink>
         <RouterLink :to="{ name: 'alliance-redeem' }" class="business-link">去门店核销</RouterLink>
@@ -142,12 +140,12 @@ onBeforeUnmount(() => { generation++ })
       </div>
       <div v-else class="alliance-panel alliance-table-wrap">
         <table class="alliance-table">
-          <thead><tr><th>商品 / 门店</th><th>面值</th><th>结算价</th><th>已领 / 总数</th><th>已核销</th><th>状态</th><th>提交时间</th><th /></tr></thead>
+          <thead><tr><th>商品 / 门店</th><th>面值</th><th>约定结算价</th><th>已领 / 总数</th><th>已核销</th><th>状态</th><th>提交时间</th><th /></tr></thead>
           <tbody>
             <tr v-for="offer in offers" :key="offer.id">
               <td><strong>{{ offer.productName }}</strong><br /><span class="alliance-muted">{{ offer.storeName }}</span></td>
               <td class="num">¥{{ yuan(offer.faceValueMinor) }}</td>
-              <td class="num">¥{{ yuan(offer.settleAmountMinor) }}</td>
+              <td class="num"><template v-if="offer.settleAmountMinor != null">¥{{ yuan(offer.settleAmountMinor) }}<br /><span class="alliance-muted">约定 {{ discountLabel(offer.settleRateBp) }}</span></template><span v-else class="alliance-muted">审核时约定</span></td>
               <td class="num">{{ offer.claimedQty }} / {{ offer.totalQty }}</td>
               <td class="num">{{ offer.redeemedQty }}</td>
               <td><span class="alliance-tag" :class="tagClass(offer.status)">{{ offerStatuses[offer.status] || offer.status }}</span><p v-if="offer.reviewNote" class="alliance-muted">{{ offer.reviewNote }}</p></td>
@@ -185,7 +183,7 @@ onBeforeUnmount(() => { generation++ })
           <form class="alliance-form" @submit.prevent="submit">
             <label>门店<AppSelect v-model="form.storeId" name="alliance-store" required><option :value="null" disabled>请选择门店</option><option v-for="store in activeStores" :key="store.id" :value="store.id">{{ store.name }}</option></AppSelect></label>
             <label>商品<AppSelect v-model="form.productId" name="alliance-product" required :disabled="productsLoading || !products.length"><option :value="null" disabled>{{ productsLoading ? '正在读取商品…' : products.length ? '请选择商品' : '这家门店还没有可用的商品' }}</option><option v-for="item in products" :key="item.id" :value="item.id">{{ item.name }} · ¥{{ Number(item.price).toFixed(2) }} / {{ item.saleUnit }}</option></AppSelect></label>
-            <label>供券数量<input v-model.number="form.quantity" type="number" min="1" :max="maxQuantity" step="1" required /><small v-if="product && rules">{{ product.inventory == null ? `库存不限的商品，一次最多 ${maxQuantity} 张。` : `当前库存 ${product.inventory}，最多可提供 ${maxQuantity} 张（库存的 ${rules.inventorySharePercent}%）。` }}每张面值 ¥{{ yuan(faceMinor) }}，核销后平台按 {{ discount }}结算 ¥{{ yuan(settleMinor) }}。每月供券总面值不超过 ¥{{ yuan(rules.monthlyFaceCapMinor) }}。</small></label>
+            <label>供券数量<input v-model.number="form.quantity" type="number" min="1" :max="maxQuantity" step="1" required /><small v-if="product && rules">{{ product.inventory == null ? `库存不限的商品，一次最多 ${maxQuantity} 张。` : `当前库存 ${product.inventory}，最多可提供 ${maxQuantity} 张（库存的 ${rules.inventorySharePercent}%）。` }}每张面值 ¥{{ yuan(faceMinor) }}，结算折扣在平台审核时与你约定。每月供券总面值不超过 ¥{{ yuan(rules.monthlyFaceCapMinor) }}。</small></label>
             <p v-if="formError" class="alliance-error" role="alert">{{ formError }}</p>
             <div class="alliance-dialog-actions">
               <button type="button" class="business-button" :disabled="submitting" @click="formOpen = false">取消</button>

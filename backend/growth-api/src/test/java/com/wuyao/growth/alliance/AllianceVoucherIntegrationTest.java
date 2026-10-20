@@ -133,7 +133,14 @@ class AllianceVoucherIntegrationTest {
         refused(post("/api/alliance/offers"), supplierToken, Map.of("storeId", store, "productId", product, "quantity", 4), 400);
         assertThat(data(get("/api/alliance/pool"), holderToken, 200).path("total").asInt()).isZero();
 
+        var pending = data(get("/api/alliance/offers"), supplierToken, 200).get(0);
+        assertThat(pending.path("settleAmountMinor").isNumber()).as("审核前还没有约定结算价").isFalse();
+        assertThat(message(post("/api/platform/tenants/" + supplier + "/alliance/offers/" + offerId + "/review"), operatorToken,
+                Map.of("approved", true), 400)).contains("约定的结算折扣");
         approve(offerId);
+        var agreed = data(get("/api/alliance/offers"), supplierToken, 200).get(0);
+        assertThat(agreed.path("settleRateBp").asInt()).isEqualTo(5000);
+        assertThat(agreed.path("settleAmountMinor").asLong()).isEqualTo(1500);
         var quota = data(get("/api/alliance/quota"), holderToken, 200);
         assertThat(quota.path("current").path("amountMinor").asLong()).isEqualTo(15000);
         var pool = data(get("/api/alliance/pool").param("city", "嘉兴"), holderToken, 200);
@@ -172,8 +179,8 @@ class AllianceVoucherIntegrationTest {
 
         var rules = json.readTree(mvc.perform(get("/api/public/alliance/rules")).andReturn().getResponse()
                 .getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
-        assertThat(rules.path("settleRateBp").asInt()).as("规则页不登录也能读到").isEqualTo(5000);
-        assertThat(rules.path("voucherValidDays").asInt()).isEqualTo(30);
+        assertThat(rules.path("voucherValidDays").asInt()).as("规则页不登录也能读到").isEqualTo(30);
+        assertThat(rules.has("settleRateBp")).as("结算折扣逐张约定，没有全平台统一的数字").isFalse();
         var summary = data(get("/api/platform/alliance/summary"), operatorToken, 200);
         assertThat(summary.path("grantedMinor").asLong()).isEqualTo(60000);
         assertThat(summary.path("claimedFaceMinor").asLong()).isEqualTo(6000);
@@ -387,9 +394,10 @@ class AllianceVoucherIntegrationTest {
                 Map.of("storeId", store, "productId", product, "quantity", quantity), 200).path("id").asLong();
     }
 
+    /** 审核通过，与供券商户约定按面值的 5 折结算。 */
     private void approve(long offerId) throws Exception {
         assertThat(data(post("/api/platform/tenants/" + supplier + "/alliance/offers/" + offerId + "/review"), operatorToken,
-                Map.of("approved", true), 200).path("status").asText()).isEqualTo("ACTIVE");
+                Map.of("approved", true, "settleRateBp", 5000), 200).path("status").asText()).isEqualTo("ACTIVE");
     }
 
     private String claim(long offerId, String token) throws Exception {

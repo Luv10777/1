@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { Check, ChevronRight, ClipboardList, RefreshCw, Scale, Ticket, Wallet, X } from 'lucide-vue-next'
-import { allianceAdminApi as api, settlementStates, yuan } from '../services/allianceApi'
+import { allianceAdminApi as api, discountLabel, settlementStates, yuan } from '../services/allianceApi'
 import '../platform-management.css'
 
 const tab = ref('offers')
@@ -61,10 +61,18 @@ async function act(key, action, message) {
 }
 
 function review(item, approved) {
-  const note = approved ? '' : window.prompt('驳回原因（会展示给供券商户）')
-  if (!approved && !note?.trim()) return
-  return act(`offer-${item.tenantId}-${item.offer.id}`, () => api.review(item, approved, note?.trim() || ''),
-    approved ? `「${item.offer.productName}」已上架到券库` : `「${item.offer.productName}」已驳回，预留库存已还给商户`)
+  if (!approved) {
+    const note = window.prompt('驳回原因（会展示给供券商户）')
+    if (!note?.trim()) return
+    return act(`offer-${item.tenantId}-${item.offer.id}`, () => api.review(item, false, note.trim()),
+      `「${item.offer.productName}」已驳回，预留库存已还给商户`)
+  }
+  const input = window.prompt(`与「${item.supplierName}」约定的结算折扣：填 5 表示按面值 5 折结算，8.5 表示 8.5 折`)
+  if (input === null) return
+  const rate = Math.round(Number(input) * 1000)
+  if (!Number.isFinite(rate) || rate < 1 || rate > 10000) { error.value = '结算折扣请填 0.1 到 10 之间的数字，例如 5 或 8.5。'; return }
+  return act(`offer-${item.tenantId}-${item.offer.id}`, () => api.review(item, true, '', rate),
+    `「${item.offer.productName}」已上架到券库，约定按 ${discountLabel(rate)}结算`)
 }
 
 function resolve(item, valid) {
@@ -109,12 +117,12 @@ onBeforeUnmount(() => { generation++ })
         <div v-if="!offers.length" class="mg-state"><Ticket :size="32" /><h3>没有待审核的供券单</h3><p>商户提交供券后会出现在这里。审核时看定价是否合理、数量是否合适。</p></div>
         <div v-else class="management-table-wrap">
           <table class="management-table">
-            <thead><tr><th>商品 / 门店</th><th>供券商户</th><th>面值 / 结算价</th><th>数量</th><th>提交时间</th><th class="mg-table-action">处理</th></tr></thead>
+            <thead><tr><th>商品 / 门店</th><th>供券商户</th><th>面值</th><th>数量</th><th>提交时间</th><th class="mg-table-action">处理</th></tr></thead>
             <tbody>
               <tr v-for="item in offers" :key="`${item.tenantId}-${item.offer.id}`">
                 <td><strong>{{ item.offer.productName }}</strong><small>{{ item.offer.storeName }} · {{ item.storeAddress || '未填写地址' }}</small></td>
                 <td><span>{{ item.supplierName }}</span><small class="mg-mono">{{ item.supplierCreditCode }}</small></td>
-                <td class="mg-mono">¥{{ yuan(item.offer.faceValueMinor) }} / ¥{{ yuan(item.offer.settleAmountMinor) }}</td>
+                <td class="mg-mono">¥{{ yuan(item.offer.faceValueMinor) }}</td>
                 <td class="mg-mono">{{ item.offer.totalQty }} {{ item.offer.saleUnit }}</td>
                 <td class="mg-time">{{ date(item.offer.createdAt) }}</td>
                 <td class="mg-table-action"><button class="mg-text-button" type="button" :disabled="Boolean(busyKey)" @click="review(item, true)">通过</button> · <button class="mg-text-button" type="button" :disabled="Boolean(busyKey)" @click="review(item, false)">驳回</button></td>

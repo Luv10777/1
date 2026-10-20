@@ -426,8 +426,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V52 | 信息发布审核、驳回意见与审核后发布时间 | `codex/information-review` |
 | V53 | 个人头像及待确认头像上传凭证 | `codex/scroll-footer-account-avatar` |
 | V55 | 联盟券：套餐联盟券额度、供券单、领取记录、核销尝试、额度、联盟券、结算单 | `feat/alliance-vouchers` |
+| V56 | 联盟券结算折扣改为审核时逐张约定（审核前可为空） | `feat/alliance-vouchers` |
 
-下一个可用编号：V56（V54 直播计费已在主干）。
+下一个可用编号：V57（V54 直播计费已在主干）。
 
 后端检查：
 

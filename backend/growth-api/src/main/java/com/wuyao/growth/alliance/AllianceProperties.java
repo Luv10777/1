@@ -11,8 +11,6 @@ import org.springframework.stereotype.Component;
 @Getter
 @Setter
 public class AllianceProperties {
-    /** 平台付给供券商户的比例，万分比。5000 即面值的 5 折。 */
-    private int settleRateBp = 5000;
     /** 同一供券商户的券，每个领券商户每期最多领几张。 */
     private int perSupplierLimit = 2;
     /** 每个供券商户每月供券总面值上限（分）。 */

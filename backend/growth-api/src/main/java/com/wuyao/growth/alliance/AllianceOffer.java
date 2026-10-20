@@ -34,8 +34,9 @@ public class AllianceOffer {
     private String supplierName;
     private String supplierCreditCode;
     private long faceValueMinor;
-    private int settleRateBp;
-    private long settleAmountMinor;
+    /** 平台审核时与供券商户约定的结算比例（万分比），审核前为空。 */
+    private Integer settleRateBp;
+    private Long settleAmountMinor;
     private int totalQty;
     private int claimedQty;
     private String status = "PENDING_REVIEW";

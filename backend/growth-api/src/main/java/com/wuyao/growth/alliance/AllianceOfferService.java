@@ -82,8 +82,6 @@ public class AllianceOfferService {
         offer.setSupplierName(merchant.merchantName());
         offer.setSupplierCreditCode(merchant.creditCode());
         offer.setFaceValueMinor(face);
-        offer.setSettleRateBp(config.getSettleRateBp());
-        offer.setSettleAmountMinor(face * config.getSettleRateBp() / 10_000);
         offer.setTotalQty(quantity);
         offer.setCreatedBy(userId);
         return AllianceDtos.OfferView.of(offers.saveAndFlush(offer), 0);
@@ -109,13 +107,20 @@ public class AllianceOfferService {
         return AllianceDtos.OfferView.of(offer, claims.countByOfferIdAndStatus(offer.getId(), "REDEEMED"));
     }
 
-    /** 平台审核。调用方已切到供券商户的租户。 */
+    /** 平台审核，通过时写入与供券商户约定的结算比例。调用方已切到供券商户的租户。 */
     @Transactional
-    public AllianceDtos.OfferView review(Long id, boolean approved, String note, Long operatorId) {
+    public AllianceDtos.OfferView review(Long id, boolean approved, String note, Integer settleRateBp, Long operatorId) {
         var offer = offers.findForUpdate(id).filter(o -> TenantContext.require().equals(o.getTenantId()))
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "供券单不存在"));
         if (!"PENDING_REVIEW".equals(offer.getStatus())) throw BizException.of(ErrorCode.CONFLICT, "这张供券单已经审核过了");
         if (!approved && (note == null || note.isBlank())) throw BizException.of(ErrorCode.BAD_REQUEST, "驳回时请写明原因");
+        if (approved) {
+            if (settleRateBp == null || settleRateBp < 1 || settleRateBp > 10_000) {
+                throw BizException.of(ErrorCode.BAD_REQUEST, "请填写与商户约定的结算折扣");
+            }
+            offer.setSettleRateBp(settleRateBp);
+            offer.setSettleAmountMinor(offer.getFaceValueMinor() * settleRateBp / 10_000);
+        }
         offer.setStatus(approved ? "ACTIVE" : "REJECTED");
         offer.setReviewNote(note == null || note.isBlank() ? null : note.trim());
         offer.setReviewedBy(operatorId);
