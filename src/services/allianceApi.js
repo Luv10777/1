@@ -1,4 +1,4 @@
-import { get, post } from '../utils/request.js'
+import { get, post, put } from '../utils/request.js'
 
 const params = values => Object.fromEntries(Object.entries(values || {}).filter(([, value]) => value != null && value !== ''))
 const id = value => encodeURIComponent(value)
@@ -18,6 +18,12 @@ export const allianceApi = {
   withdrawOffer: offerId => post(`/api/alliance/offers/${id(offerId)}/withdraw`),
   settlements: values => get('/api/alliance/settlements', params(values)),
   storeProducts: storeId => get(`/api/stores/${id(storeId)}/products`, { size: 100 }),
+  account: () => get('/api/alliance/settlement-account'),
+  saveAccount: values => put('/api/alliance/settlement-account', values),
+  statements: () => get('/api/alliance/statements'),
+  statement: statementId => get(`/api/alliance/statements/${id(statementId)}`),
+  confirmStatement: statementId => post(`/api/alliance/statements/${id(statementId)}/confirm`),
+  objectStatement: (statementId, reason) => post(`/api/alliance/statements/${id(statementId)}/objection`, { reason }),
 
   previewRedemption: (storeId, code) => post(`/api/stores/${id(storeId)}/alliance-redemptions/preview`, { code }),
   redeem: (storeId, code) => post(`/api/stores/${id(storeId)}/alliance-redemptions`, { code }),
@@ -31,8 +37,16 @@ export const allianceAdminApi = {
   review: (item, approved, note, settleRateBp) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/offers/${id(item.offer.id)}/review`, { approved, note, settleRateBp }),
   disputes: () => get('/api/platform/alliance/disputes'),
   resolveDispute: (item, valid, note) => post(`/api/platform/tenants/${id(item.holderTenantId)}/alliance/vouchers/${id(item.ref)}/dispute-resolution`, { valid, note }),
-  settlements: status => get('/api/platform/alliance/settlements', params({ status })),
-  markPaid: (item, reference) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/settlements/${id(item.settlement.id)}/paid`, { reference }),
+  accounts: status => get('/api/platform/alliance/accounts', params({ status })),
+  reviewAccount: (item, approved, note) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/settlement-account/review`, { approved, note }),
+  revealAccount: (item, purpose) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/settlement-account/reveal`, { purpose }),
+  statements: values => get('/api/platform/alliance/statements', params(values)),
+  statement: item => get(`/api/platform/tenants/${id(item.tenantId)}/alliance/statements/${id(item.statement.id)}`),
+  statementPaid: (item, reference, paidDate) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/statements/${id(item.statement.id)}/paid`, { reference, paidDate }),
+  voidStatement: (item, note) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/statements/${id(item.statement.id)}/void`, { note }),
+  resolveStatement: (item, note) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/statements/${id(item.statement.id)}/resolve`, { note }),
+  revealPayee: (item, purpose) => post(`/api/platform/tenants/${id(item.tenantId)}/alliance/statements/${id(item.statement.id)}/reveal`, { purpose }),
+  generateStatements: period => post(`/api/platform/alliance/statements/generate?period=${id(period)}`),
 }
 
 export const voucherStatuses = {
@@ -56,8 +70,28 @@ export const settlementStates = {
   IN_DISPUTE_WINDOW: '申诉期',
   FROZEN: '申诉处理中',
   PAYABLE: '待结算',
+  IN_STATEMENT: '已入对账单',
   PAID: '已结算',
   VOID: '已作废',
+}
+
+export const statementStatuses = {
+  PENDING_CONFIRM: '待确认',
+  OBJECTED: '有异议',
+  CONFIRMED: '已确认，待打款',
+  PAID: '已打款',
+  VOID: '已作废',
+}
+
+export const accountStatuses = {
+  PENDING_VERIFY: '待平台核对',
+  VERIFIED: '已核对',
+  REJECTED: '已驳回',
+}
+
+export const accountTypes = {
+  CORPORATE: '对公账户',
+  INDIVIDUAL_OWNER: '个体户经营者本人账户',
 }
 
 /** 约定的结算比例（万分比）显示成「x 折」：5000 → 5 折，8500 → 8.5 折。 */

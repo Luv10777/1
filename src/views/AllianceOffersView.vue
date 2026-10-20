@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { Plus, RefreshCw, X } from 'lucide-vue-next'
 import AppSelect from '../components/AppSelect.vue'
+import AllianceAccountPanel from '../components/AllianceAccountPanel.vue'
+import AllianceStatementsPanel from '../components/AllianceStatementsPanel.vue'
 import { allianceApi, discountLabel, offerStatuses, settlementStates, yuan } from '../services/allianceApi'
 import { stores, selectedStoreId } from '../stores/merchantContext'
 import '../alliance.css'
@@ -126,12 +128,16 @@ onBeforeUnmount(() => { generation++ })
     </header>
     <nav class="alliance-tabs" aria-label="供券管理">
       <button type="button" :class="{ active: tab === 'offers' }" :aria-pressed="tab === 'offers'" @click="tab = 'offers'">供券单<small>{{ offers.length }}</small></button>
-      <button type="button" :class="{ active: tab === 'settlements' }" :aria-pressed="tab === 'settlements'" @click="tab = 'settlements'">结算单<small>{{ settlements.total }}</small></button>
+      <button type="button" :class="{ active: tab === 'settlements' }" :aria-pressed="tab === 'settlements'" @click="tab = 'settlements'">结算明细<small>{{ settlements.total }}</small></button>
+      <button type="button" :class="{ active: tab === 'statements' }" :aria-pressed="tab === 'statements'" @click="tab = 'statements'">对账单</button>
+      <button type="button" :class="{ active: tab === 'account' }" :aria-pressed="tab === 'account'" @click="tab = 'account'">收款账户</button>
     </nav>
     <p v-if="notice" class="alliance-notice" role="status">{{ notice }}</p>
     <p v-if="error" class="alliance-error" role="alert">{{ error }}</p>
 
-    <p v-if="loading && !offers.length" class="alliance-state" role="status">正在读取…</p>
+    <AllianceStatementsPanel v-if="tab === 'statements'" :confirm-days="rules?.statementConfirmDays ?? null" />
+    <AllianceAccountPanel v-else-if="tab === 'account'" />
+    <p v-else-if="loading && !offers.length" class="alliance-state" role="status">正在读取…</p>
     <template v-else-if="tab === 'offers'">
       <div v-if="!offers.length" class="alliance-state">
         <h3>还没有提供过联盟券</h3>
@@ -157,10 +163,11 @@ onBeforeUnmount(() => { generation++ })
       </div>
     </template>
     <template v-else>
-      <div v-if="!settlements.items.length" class="alliance-state"><h3>还没有结算单</h3><p>你的门店核销联盟券后，会在这里生成结算单。</p></div>
+      <p class="alliance-muted alliance-statements-intro">每核销一张券记一笔结算。过了申诉期的，会在下月 1 日汇总进「对账单」，按对账单打款。</p>
+      <div v-if="!settlements.items.length" class="alliance-state"><h3>还没有结算明细</h3><p>你的门店核销联盟券后，会在这里记一笔。</p></div>
       <div v-else class="alliance-panel alliance-table-wrap">
         <table class="alliance-table">
-          <thead><tr><th>商品</th><th>面值</th><th>结算金额</th><th>状态</th><th>可结算日期</th><th>结算记录</th></tr></thead>
+          <thead><tr><th>商品</th><th>面值</th><th>结算金额</th><th>状态</th><th>申诉期到</th><th>打款</th></tr></thead>
           <tbody>
             <tr v-for="item in settlements.items" :key="item.id">
               <td>{{ item.productName }}</td>

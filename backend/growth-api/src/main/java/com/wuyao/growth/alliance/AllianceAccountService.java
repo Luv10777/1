@@ -74,7 +74,7 @@ public class AllianceAccountService {
     @Transactional(readOnly = true)
     public void requirePresent() {
         if (accounts.findByTenantId(TenantContext.require()).isEmpty()) {
-            throw BizException.of(ErrorCode.FORBIDDEN, "请先在「供券管理 → 结算账户」填写收款账户，再提供联盟券");
+            throw BizException.of(ErrorCode.FORBIDDEN, "请先在「供券管理 → 收款账户」填写收款账户，再提供联盟券");
         }
     }
 

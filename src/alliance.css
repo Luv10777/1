@@ -88,6 +88,11 @@
 .alliance-stats span { display: block; color: var(--ink-muted); font-size: 12px; }
 .alliance-stats strong { display: block; margin-top: 4px; font: 600 18px var(--font-mono); }
 
+/* 收款账户与对账单 */
+.alliance-account-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.alliance-account-form .alliance-dialog-actions { grid-column: 1 / -1; }
+.alliance-statements-intro { margin-bottom: 14px; }
+
 /* 联盟券规则页 */
 .alliance-rules-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 14px 0 0; list-style: none; counter-reset: step; }
 .alliance-rules-steps li { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--night); counter-increment: step; }
@@ -101,6 +106,7 @@
 .alliance-rules-section a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 760px) {
+  .alliance-account-form { grid-template-columns: minmax(0, 1fr); }
   .alliance-rules-steps { grid-template-columns: minmax(0, 1fr); }
   .alliance-redeem { grid-template-columns: minmax(0, 1fr); }
   .alliance-quota { grid-template-columns: minmax(0, 1fr); }

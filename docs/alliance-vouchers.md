@@ -259,7 +259,7 @@ B 的领取记录自带到期时间。到期后，由任务在 B 一侧把记录
 | POST | `/api/alliance/offers` | 提交供券单（门店、商品、数量） |
 | GET | `/api/alliance/offers` | 我的供券单和领用情况 |
 | POST | `/api/alliance/offers/{id}/withdraw` | 撤回未领出的部分 |
-| GET | `/api/alliance/settlements` | 我的结算单 |
+| GET | `/api/alliance/settlements` | 我的结算明细（每核销一张一笔）。收款账户和月度对账单的接口见 [结算设计](alliance-settlement.md) |
 | POST | `/api/stores/{storeId}/alliance-redemptions/preview` | 店员输入或扫入券码，返回商品名称、领券商户名称、到期时间，供核对；不改变任何状态 |
 | POST | `/api/stores/{storeId}/alliance-redemptions` | 店员确认核销 |
 | GET | `/api/stores/{storeId}/alliance-redemptions` | 这家门店的核销记录 |
@@ -281,8 +281,7 @@ B 的领取记录自带到期时间。到期后，由任务在 B 一侧把记录
 |---|---|---|
 | GET | `/api/platform/alliance/offers` | 待审核的供券单 |
 | POST | `/api/platform/tenants/{tenantId}/alliance/offers/{id}/review` | 通过（必须填与商户约定的结算比例 `settleRateBp`）或驳回 |
-| GET | `/api/platform/alliance/settlements` | 待结算和已结算列表 |
-| POST | `/api/platform/tenants/{tenantId}/alliance/settlements/{id}/paid` | 线下打款后标记已结；申诉期内或冻结中的结算单不能标记 |
+| | 结算账户核对、对账单和标记打款 | 见 [结算设计](alliance-settlement.md)；不再逐条标记已结算 |
 | GET | `/api/platform/alliance/disputes` | 待处理的申诉 |
 | POST | `/api/platform/tenants/{tenantId}/alliance/vouchers/{ref}/dispute-resolution` | 判定核销有效或无效 |
 | GET | `/api/platform/alliance/summary` | 已发放额度、已领面值、已核销、过期、待结、已结、待审供券、待处理申诉。会员费收入看计费后台，这里不重复统计 |
