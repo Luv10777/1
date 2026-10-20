@@ -3,7 +3,6 @@ import { nextTick, ref, watch } from 'vue'
 import PosterControlPanel from '../components/PosterControlPanel.vue'
 import PosterGalleryView from '../components/PosterGalleryView.vue'
 import { useImageCreation } from '../composables/useImageCreation'
-import { selectedStoreRecord } from '../stores/merchantContext'
 import '../poster-workbench.css'
 
 const studio = useImageCreation('POSTER')
@@ -23,7 +22,7 @@ watch(() => [studio.optimistic, studio.current?.id], async ([optimistic, id], [w
   <section class="poster-workbench bg-[#FAF8F5] text-[#2D2826]" aria-label="营销海报工作区">
     <PosterControlPanel :studio="studio" />
     <div class="poster-showcase">
-      <PosterGalleryView ref="gallery" :studio="studio" :store-name="selectedStoreRecord?.name || ''" @choose="chooseStyle" />
+      <PosterGalleryView ref="gallery" :studio="studio" @choose="chooseStyle" />
     </div>
   </section>
 </template>
