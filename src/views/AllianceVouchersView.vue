@@ -95,6 +95,7 @@ onBeforeUnmount(() => { generation++ })
     <header class="business-heading">
       <div><h1>我的联盟券</h1><p>到券上的门店出示券码，由店员核销后当场交付。</p></div>
       <div class="business-heading-links">
+        <RouterLink :to="{ name: 'alliance-rules' }" class="business-link">联盟券规则</RouterLink>
         <RouterLink :to="{ name: 'alliance-pool' }" class="business-button business-button-primary"><Ticket :size="15" aria-hidden="true" />去领券中心</RouterLink>
       </div>
     </header>

@@ -18,10 +18,17 @@ import static org.mockito.Mockito.*;
 
 class CommunityServiceTest {
     private final InformationPublicationRepository publications = mock(InformationPublicationRepository.class);
-    private final CommunityService service = new CommunityService(mock(MerchantApplicationRepository.class), publications);
+    private final MerchantApplicationRepository applications = mock(MerchantApplicationRepository.class);
+    private final CommunityService service = new CommunityService(applications, publications);
 
     @BeforeEach
-    void setTenant() { TenantContext.set(2L); }
+    void setTenant() {
+        TenantContext.set(2L);
+        var approved = new MerchantApplication();
+        approved.setTenantId(2L);
+        approved.setStatus("APPROVED");
+        when(applications.findAllByTenantIdOrderByCreatedAtDescIdDesc(2L)).thenReturn(List.of(approved));
+    }
 
     @AfterEach
     void clearTenant() { TenantContext.clear(); }
@@ -108,5 +115,22 @@ class CommunityServiceTest {
         value.setReviewNote("内部审核依据与需要补充的资料");
         assertThat(CommunityDtos.InformationView.of(value).reviewNote()).isEqualTo(value.getReviewNote());
         assertThat(CommunityDtos.InformationView.publicOf(value).reviewNote()).isNull();
+    }
+
+    @Test
+    void merchantsWithoutAnApprovedApplicationCannotPublishOrResubmitInformation() {
+        var pending = new MerchantApplication();
+        pending.setTenantId(2L);
+        pending.setStatus("PENDING_REVIEW");
+        when(applications.findAllByTenantIdOrderByCreatedAtDescIdDesc(2L)).thenReturn(List.of(pending));
+        assertThatThrownBy(() -> service.publish(content(), 5L)).isInstanceOfSatisfying(BizException.class,
+                failure -> assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        var mine = new InformationPublication();
+        mine.setId(8L);
+        mine.setTenantId(2L);
+        when(publications.findByIdAndTenantId(8L, 2L)).thenReturn(Optional.of(mine));
+        assertThatThrownBy(() -> service.update(8L, content())).isInstanceOfSatisfying(BizException.class,
+                failure -> assertThat(failure.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        verify(publications, never()).saveAndFlush(any());
     }
 }

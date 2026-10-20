@@ -5,7 +5,7 @@ const id = value => encodeURIComponent(value)
 
 /** 联盟券：领券方的额度、券库和我的联盟券；供券方的供券单、结算和门店核销。 */
 export const allianceApi = {
-  rules: () => get('/api/alliance/rules'),
+  rules: () => get('/api/public/alliance/rules'),
   quota: () => get('/api/alliance/quota'),
   pool: values => get('/api/alliance/pool', params(values)),
   claim: offerId => post(`/api/alliance/offers/${id(offerId)}/claims`),

@@ -27,12 +27,6 @@ public class AllianceController {
     private final AllianceClaimService claims;
     private final AllianceOfferService offers;
     private final AllianceSettlementService settlements;
-    private final AllianceProperties config;
-
-    @GetMapping("/rules")
-    public ApiResponse<AllianceDtos.Rules> rules() {
-        return ApiResponse.ok(AllianceDtos.Rules.of(config));
-    }
 
     @GetMapping("/quota")
     public ApiResponse<AllianceDtos.QuotaView> quota() {

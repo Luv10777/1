@@ -79,7 +79,7 @@ onBeforeUnmount(() => { generation++ })
           <strong>¥{{ yuan(current.remainingMinor) }}</strong>
           <p class="alliance-muted">共 ¥{{ yuan(current.amountMinor) }}，已用 ¥{{ yuan(current.usedMinor) }}；同一商户的券每期最多领 {{ quota.perSupplierLimit }} 张</p>
         </div>
-        <RouterLink :to="{ name: 'alliance-vouchers' }" class="business-link">我的联盟券</RouterLink>
+        <span class="alliance-row-actions"><RouterLink :to="{ name: 'alliance-rules' }" class="business-link">联盟券规则</RouterLink><RouterLink :to="{ name: 'alliance-vouchers' }" class="business-link">我的联盟券</RouterLink></span>
         <div class="alliance-quota-bar" aria-hidden="true"><span :style="{ width: `${usedPercent}%` }" /></div>
       </div>
       <div v-else class="alliance-panel-heading">

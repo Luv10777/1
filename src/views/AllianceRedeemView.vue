@@ -72,7 +72,7 @@ onBeforeUnmount(() => { generation++ })
   <div class="business-page alliance-redeem-page">
     <header class="business-heading">
       <div><h1>门店核销</h1><p>顾客出示联盟券的数字券码，核对商品和领券商户无误后再核销，并当场交付。</p></div>
-      <div class="business-heading-links"><RouterLink :to="{ name: 'alliance-offers' }" class="business-link">供券管理</RouterLink></div>
+      <div class="business-heading-links"><RouterLink :to="{ name: 'alliance-rules', hash: '#for-suppliers' }" class="business-link">联盟券规则</RouterLink><RouterLink :to="{ name: 'alliance-offers' }" class="business-link">供券管理</RouterLink></div>
     </header>
 
     <div v-if="!selectedStoreId" class="alliance-state"><h3>{{ storeLoading ? '正在读取门店…' : '请先在页面顶部选择门店' }}</h3><p>联盟券只能在券上写的那家门店核销。</p></div>

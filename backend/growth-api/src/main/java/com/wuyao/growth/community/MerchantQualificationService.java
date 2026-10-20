@@ -26,6 +26,14 @@ public class MerchantQualificationService {
                 .map(application -> new ApprovedMerchant(application.getMerchantName(), application.getCreditCode()));
     }
 
+    /** 线上卖货、发布信息、提供联盟券都要求入驻审核通过。 */
+    public void requireApproved(String action) {
+        if (approvedMerchant().isEmpty()) {
+            throw com.wuyao.growth.common.web.BizException.of(com.wuyao.growth.common.web.ErrorCode.FORBIDDEN,
+                    "请先通过商家入驻审核，再" + action);
+        }
+    }
+
     /** 当前商户提交过的全部统一社会信用代码（不论审核结果），用来识别同一经营主体。 */
     @Transactional(readOnly = true)
     public Set<String> creditCodes() {

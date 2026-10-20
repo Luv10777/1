@@ -155,6 +155,19 @@ public class AllianceOfferService {
         return true;
     }
 
+    /** 供券商户入驻被暂停：撤回还没领出去的部分并还库存。已经领出去的券仍需在门店照常核销。 */
+    @org.springframework.context.event.EventListener
+    @Transactional
+    public void onQualificationChanged(com.wuyao.growth.community.MerchantQualificationChanged event) {
+        if (event.approved()) return;
+        offers.findAllByTenantIdAndStatusIn(event.tenantId(), OPEN).forEach(offer -> {
+            int unclaimed = offer.remaining();
+            if (unclaimed > 0) products.restoreInventory(offer.getProductId(), unclaimed);
+            offer.setStatus("WITHDRAWN");
+            offer.setUpdatedAt(Instant.now());
+        });
+    }
+
     @Transactional(readOnly = true)
     public boolean claimExists(UUID ref) {
         return claims.findByVoucherRef(ref).isPresent();

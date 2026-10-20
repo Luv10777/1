@@ -88,7 +88,20 @@
 .alliance-stats span { display: block; color: var(--ink-muted); font-size: 12px; }
 .alliance-stats strong { display: block; margin-top: 4px; font: 600 18px var(--font-mono); }
 
+/* 联盟券规则页 */
+.alliance-rules-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 14px 0 0; list-style: none; counter-reset: step; }
+.alliance-rules-steps li { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--night); counter-increment: step; }
+.alliance-rules-steps strong { font-size: 14px; }
+.alliance-rules-steps strong::before { content: counter(step) '. '; color: var(--color-accent-text); font-family: var(--font-mono); }
+.alliance-rules-steps span { color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
+.alliance-rules-section { scroll-margin-top: 80px; }
+.alliance-rules-section h2 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font: 600 18px/1.5 var(--font-serif); }
+.alliance-rules-section h3 { margin: 18px 0 6px; font-size: 13px; font-weight: 600; }
+.alliance-rules-section ul { display: grid; gap: 6px; padding-left: 18px; margin: 0; color: var(--ink); font-size: 13px; line-height: 1.8; }
+.alliance-rules-section a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 3px; }
+
 @media (max-width: 760px) {
+  .alliance-rules-steps { grid-template-columns: minmax(0, 1fr); }
   .alliance-redeem { grid-template-columns: minmax(0, 1fr); }
   .alliance-quota { grid-template-columns: minmax(0, 1fr); }
 }

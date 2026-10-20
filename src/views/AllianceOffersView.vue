@@ -121,6 +121,7 @@ onBeforeUnmount(() => { generation++ })
     <header class="business-heading">
       <div><h1>供券管理</h1><p>拿自家门店的一件商品提供联盟券，会员商户领取后到店核销。<template v-if="rules">核销满 {{ rules.disputeDays }} 天、无申诉后，平台按面值 {{ discount }}结算给你。</template></p></div>
       <div class="business-heading-links">
+        <RouterLink :to="{ name: 'alliance-rules' }" class="business-link">联盟券规则</RouterLink>
         <RouterLink :to="{ name: 'alliance-redeem' }" class="business-link">去门店核销</RouterLink>
         <button type="button" class="business-button business-button-primary" @click="openForm"><Plus :size="15" aria-hidden="true" />提供联盟券</button>
       </div>

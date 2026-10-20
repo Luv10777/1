@@ -1,7 +1,7 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
 import { onMounted, ref, watch } from 'vue'
-import { ArrowLeft, ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
+import { ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
@@ -32,7 +32,7 @@ watch(() => auth.isAuthenticated, signedIn => {
 
 <template>
   <div class="business-page merchant-alliance-page merchant-join-page">
-    <header class="business-heading"><div><h1>成为一方商家</h1><p>提交真实经营资料，入驻后管理商品、接收订单与发布商家信息。</p></div><RouterLink to="/merchant-alliance" class="business-link"><ArrowLeft :size="15" aria-hidden="true" />返回商城好物</RouterLink></header>
+    <header class="business-heading"><div><h1>加入商户联盟</h1><p>提交真实经营资料。平台审核通过后，可以线上卖货、发布商家信息、提供联盟券。</p></div><RouterLink :to="{ name: 'alliance-pool' }" class="business-link">去领券中心<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
     <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
       <div class="business-records-heading"><div><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>
@@ -40,7 +40,7 @@ watch(() => auth.isAuthenticated, signedIn => {
       <p v-else-if="!applications.length" class="business-record-empty">提交申请后，可在这里查看平台审核状态和意见。</p>
       <ul v-else class="business-record-list"><li v-for="application in applications" :key="application.id"><div class="business-record-main"><strong>{{ application.merchantName }} · {{ application.companyName }}</strong><small>{{ application.industry }} · {{ application.region }} · {{ new Date(application.createdAt).toLocaleDateString('zh-CN') }}</small><small v-if="application.reviewNote" class="business-review-note">平台意见：{{ application.reviewNote }}</small></div><span class="business-record-status" :class="`status-${application.status.toLowerCase()}`">{{ statusLabel[application.status] || application.status }}</span></li></ul>
     </section>
-    <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
+    <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料，通过后可以线上卖货、发布商家信息、提供联盟券。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
     <template v-else>
       <ol class="business-process" aria-label="商家入驻流程"><li class="is-current"><span>01</span><strong>填写申请</strong></li><li><span>02</span><strong>资料审核</strong></li><li><span>03</span><strong>入驻联盟</strong></li></ol>
       <div class="business-editor-layout">

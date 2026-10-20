@@ -27,6 +27,7 @@ public class ProductService {
     private final AssetRepository assetRepository;
     private final StoreAccessService storeAccessService;
     private final List<ProductDeletionGuard> deletionGuards;
+    private final com.wuyao.growth.community.MerchantQualificationService qualification;
 
     @Transactional(readOnly = true)
     public PageResult<ProductDtos.View> list(Long storeId, String keyword, String type, String category,
@@ -52,6 +53,7 @@ public class ProductService {
         product.setTenantId(tenantId);
         product.setStoreId(storeId);
         product.setCreatedBy(userId);
+        requireQualifiedToPublish(null, req.onlineStatus());
         apply(product, req.name(), req.type(), req.category(), req.price(), req.saleUnit(),
                 req.specification(), req.promotionRule(), req.coreSellingPoints(), req.inventory(), req.onlineStatus());
         Product saved = productRepository.save(product);
@@ -75,6 +77,7 @@ public class ProductService {
             throw BizException.of(ErrorCode.BAD_REQUEST, "请提供商品版本后再保存");
         }
         checkVersion(product.getVersion(), req.version());
+        requireQualifiedToPublish(product.getOnlineStatus(), req.onlineStatus());
         apply(product, req.name(), req.type(), req.category(), req.price(), req.saleUnit(),
                 req.specification(), req.promotionRule(), req.coreSellingPoints(), req.inventory(), req.onlineStatus());
         touchProduct(product);
@@ -186,6 +189,18 @@ public class ProductService {
         }
         return new SaleProduct(product.getId(), product.getTenantId(), product.getStoreId(),
                 product.getName(), product.getPrice(), product.getInventory());
+    }
+
+    /** 从未上架改为上架时，要求商户入驻审核通过。已经上架的商品继续编辑不再检查。 */
+    private void requireQualifiedToPublish(String current, String requested) {
+        if ("PUBLISHED".equals(requested) && !"PUBLISHED".equals(current)) qualification.requireApproved("上架线上售卖");
+    }
+
+    /** 商户入驻被暂停：在线商品全部撤回草稿，对外的店铺页和商城好物不再展示。 */
+    @org.springframework.context.event.EventListener
+    @Transactional
+    public void onQualificationChanged(com.wuyao.growth.community.MerchantQualificationChanged event) {
+        if (!event.approved()) productRepository.withdrawAll(event.tenantId(), Instant.now());
     }
 
     /**

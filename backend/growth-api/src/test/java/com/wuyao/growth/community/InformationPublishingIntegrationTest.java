@@ -63,6 +63,8 @@ class InformationPublishingIntegrationTest {
         otherTenantId = owner.queryForObject("INSERT INTO tenants(name) VALUES ('其他商家') RETURNING id", Long.class);
         userId = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13800000001', '发布管理员') RETURNING id", Long.class, tenantId);
         otherUserId = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13800000002', '其他管理员') RETURNING id", Long.class, otherTenantId);
+        MerchantTestFixtures.approveMerchant(owner, tenantId, userId);
+        MerchantTestFixtures.approveMerchant(owner, otherTenantId, otherUserId);
     }
 
     private CommunityDtos.InformationRequest content(String title, String category) {

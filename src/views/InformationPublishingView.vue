@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Eye, MapPin, Store, ArrowRight, Send, Check, CheckCircle2, ExternalLink, Pencil, RefreshCw, X } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
+import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { businessCommunityService } from '../services/businessCommunity'
 import { auth } from '../stores/auth'
 import { informationDate, publicationState } from '../utils/informationPresentation'
@@ -16,6 +17,7 @@ const categories = [
 ]
 const blankForm = () => ({ category: 'activity', title: '', merchantName: selectedStoreRecord.value?.name || '', region: '', summary: '', content: '', contactName: '', contactPhone: '', validUntil: '', declarationAccepted: false })
 const editingPublication = ref(null)
+const { approved } = useMerchantApproval()
 const publications = ref([])
 const publicationsLoading = ref(false)
 const publicationsError = ref('')
@@ -131,6 +133,7 @@ function startInformation() {
       <button class="business-button business-button-primary" type="button" @click="startInformation">继续发布信息<ArrowRight :size="15" aria-hidden="true" /></button>
     </section>
     <template v-else>
+      <p v-if="approved === false" class="business-message-error" role="status">通过商家入驻审核后才能发布信息。<RouterLink :to="{ name: 'merchant-join' }" class="business-link">去加入商户联盟</RouterLink></p>
       <ol class="business-process" aria-label="信息发布流程"><li class="is-current" aria-current="step"><span>01</span><strong>填写并提交</strong></li><li><span>02</span><strong>平台审核</strong></li><li><span>03</span><strong>通过后公开</strong></li></ol>
       <div class="business-editor-layout">
         <form ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
@@ -155,7 +158,7 @@ function startInformation() {
             <div class="business-declaration"><label><input v-model="form.declarationAccepted" name="information-declaration" type="checkbox" required /><span>我确认发布内容真实、合法，已获得所填联系方式的公开授权，已阅读<a href="/policies/publishing" target="_blank" rel="noopener">《公开信息发布规则》</a>和<a href="/policies/privacy" target="_blank" rel="noopener">《隐私协议》</a>，并同意提交平台审核，通过后按规则公开展示。</span></label></div>
           </fieldset>
           <p v-if="error" class="business-form-feedback business-message-error" role="alert">{{ error }}</p>
-          <footer class="business-form-actions"><span>{{ editingPublication ? '修改后需重新审核，审核期间不公开展示' : '提交后待审核，审核通过才会公开展示' }}</span><div><button class="business-button" type="button" :disabled="submitting" @click="preview"><Eye :size="16" aria-hidden="true" />{{ previewOpen ? '收起完整预览' : '预览信息' }}</button><button class="business-button business-button-primary" type="submit" :disabled="submitting"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在提交…' : editingPublication ? '重新提交审核' : '提交审核' }}</button></div></footer>
+          <footer class="business-form-actions"><span>{{ editingPublication ? '修改后需重新审核，审核期间不公开展示' : '提交后待审核，审核通过才会公开展示' }}</span><div><button class="business-button" type="button" :disabled="submitting" @click="preview"><Eye :size="16" aria-hidden="true" />{{ previewOpen ? '收起完整预览' : '预览信息' }}</button><button class="business-button business-button-primary" type="submit" :disabled="submitting || approved === false"><Send :size="16" aria-hidden="true" />{{ submitting ? '正在提交…' : editingPublication ? '重新提交审核' : '提交审核' }}</button></div></footer>
         </form>
 
         <aside class="business-preview-column">

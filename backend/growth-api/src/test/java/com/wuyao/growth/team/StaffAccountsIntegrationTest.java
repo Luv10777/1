@@ -96,6 +96,8 @@ class StaffAccountsIntegrationTest {
         // 没有写角色的旧账号就是管理员。
         bossA = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000001', '甲管理员') RETURNING id", Long.class, tenantA);
         Long bossB = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13900000009', '乙管理员') RETURNING id", Long.class, tenantB);
+        com.wuyao.growth.community.MerchantTestFixtures.approveMerchant(owner, tenantA, bossA);
+        com.wuyao.growth.community.MerchantTestFixtures.approveMerchant(owner, tenantB, bossB);
         boss = jwt.issueAccessToken(bossA, tenantA, "13900000001", 0);
         otherBoss = jwt.issueAccessToken(bossB, tenantB, "13900000009", 0);
         west = api(post("/api/stores"), boss, Map.of("name", "城西店")).path("id").asLong();

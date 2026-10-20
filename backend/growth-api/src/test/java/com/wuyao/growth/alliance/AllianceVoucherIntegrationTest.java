@@ -170,6 +170,10 @@ class AllianceVoucherIntegrationTest {
         owner.update("UPDATE alliance_settlements SET payable_after = now() - interval '1 minute' WHERE id = ?", settlementId);
         assertThat(data(post(paid), operatorToken, Map.of("reference", "BANK-0001"), 200).path("state").asText()).isEqualTo("PAID");
 
+        var rules = json.readTree(mvc.perform(get("/api/public/alliance/rules")).andReturn().getResponse()
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
+        assertThat(rules.path("settleRateBp").asInt()).as("规则页不登录也能读到").isEqualTo(5000);
+        assertThat(rules.path("voucherValidDays").asInt()).isEqualTo(30);
         var summary = data(get("/api/platform/alliance/summary"), operatorToken, 200);
         assertThat(summary.path("grantedMinor").asLong()).isEqualTo(60000);
         assertThat(summary.path("claimedFaceMinor").asLong()).isEqualTo(6000);
@@ -306,6 +310,41 @@ class AllianceVoucherIntegrationTest {
         assertThat(statuses).containsExactlyInAnyOrder(200, 409);
         assertThat(owner.queryForObject("SELECT count(*) FROM alliance_settlements", Integer.class)).isEqualTo(1);
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE idempotency_key LIKE 'alliance-redeemed:%'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void sellingOnlineAndPostingInformationRequireAnApprovedMerchantAndSuspensionTakesListingsDown() throws Exception {
+        Map<String, Object> published = Map.of("name", "白茶 100g", "type", "PHYSICAL", "category", "茶叶", "price", 50,
+                "saleUnit", "盒", "onlineStatus", "PUBLISHED");
+        Map<String, Object> information = Map.of("category", "notice", "title", "新茶到店", "merchantName", "某商户",
+                "region", "嘉兴", "content", "本周新茶到店", "declarationAccepted", true);
+        Long holderStore = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '甲家花店', (SELECT id FROM users WHERE phone='13800000003')) RETURNING id",
+                Long.class, holder);
+        // 甲家没有入驻申请：可以存草稿，但不能上架线上售卖，也不能发布信息。
+        assertThat(message(post("/api/stores/" + holderStore + "/products"), holderToken, published, 403)).contains("入驻审核");
+        data(post("/api/stores/" + holderStore + "/products"), holderToken, Map.of("name", "白茶 100g", "type", "PHYSICAL",
+                "category", "茶叶", "price", 50, "saleUnit", "盒", "onlineStatus", "DRAFT"), 200);
+        assertThat(message(post("/api/information-publications"), holderToken, information, 403)).contains("入驻审核");
+
+        // 乙家入驻通过：上架和发布都可以。
+        data(post("/api/stores/" + store + "/products"), supplierToken, published, 200);
+        data(post("/api/information-publications"), supplierToken, information, 200);
+        long offerId = createOffer(3);
+        approve(offerId);
+        String ref = claim(offerId, holderToken);
+        String code = data(get("/api/alliance/vouchers/" + ref), holderToken, 200).path("code").asText();
+        int reserved = inventory();
+
+        Long application = owner.queryForObject("SELECT id FROM merchant_applications WHERE tenant_id = ?", Long.class, supplier);
+        data(post("/api/platform/tenants/" + supplier + "/merchants/" + application + "/review"), operatorToken,
+                Map.of("status", "SUSPENDED", "note", "经营资料待复核"), 200);
+        assertThat(owner.queryForObject("SELECT count(*) FROM products WHERE tenant_id = ? AND online_status = 'PUBLISHED'", Integer.class, supplier)).isZero();
+        assertThat(owner.queryForList("SELECT status FROM information_publications WHERE tenant_id = ?", String.class, supplier)).containsOnly("OFFLINE");
+        assertThat(owner.queryForObject("SELECT status FROM alliance_offers WHERE id = ?", String.class, offerId)).isEqualTo("WITHDRAWN");
+        assertThat(inventory()).isEqualTo(reserved + 2);
+        assertThat(message(post("/api/stores/" + store + "/products"), supplierToken, published, 403)).contains("入驻审核");
+        // 已经领出去的券照常能在门店核销。
+        data(post(redeemPath(store)), staffToken, Map.of("code", code), 200);
     }
 
     @Test

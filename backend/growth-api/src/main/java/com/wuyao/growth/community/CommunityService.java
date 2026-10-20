@@ -41,6 +41,7 @@ public class CommunityService {
 
     @Transactional
     public CommunityDtos.InformationView publish(CommunityDtos.InformationRequest request, Long userId) {
+        requireApprovedMerchant();
         var value = new InformationPublication();
         value.setTenantId(TenantContext.require());
         value.setSubmittedBy(userId);
@@ -54,12 +55,20 @@ public class CommunityService {
         var value = publications.findByIdAndTenantId(id, TenantContext.require())
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "发布内容不存在"));
         if (value.isPlatformBlocked()) throw BizException.of(ErrorCode.FORBIDDEN, "该信息已由平台下线，请联系平台处理");
+        requireApprovedMerchant();
         apply(value, request);
         value.setStatus("PENDING_REVIEW");
         value.setPublishedAt(null);
         value.setReviewNote(null);
         value.setUpdatedAt(Instant.now());
         return CommunityDtos.InformationView.of(publications.saveAndFlush(value));
+    }
+
+    /** 发布信息要求入驻审核通过；规则与 MerchantQualificationService 一致：有一条通过的申请即可。 */
+    private void requireApprovedMerchant() {
+        boolean approved = applications.findAllByTenantIdOrderByCreatedAtDescIdDesc(TenantContext.require()).stream()
+                .anyMatch(application -> "APPROVED".equals(application.getStatus()));
+        if (!approved) throw BizException.of(ErrorCode.FORBIDDEN, "请先通过商家入驻审核，再发布信息");
     }
 
     @Transactional

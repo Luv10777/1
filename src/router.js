@@ -39,6 +39,7 @@ const PublicStorefrontView = () => import('./views/PublicStorefrontView.vue')
 const PublicOrderView = () => import('./views/PublicOrderView.vue')
 const MerchantJoinView = () => import('./views/MerchantJoinView.vue')
 const AlliancePoolView = () => import('./views/AlliancePoolView.vue')
+const AllianceRulesView = () => import('./views/AllianceRulesView.vue')
 const AllianceVouchersView = () => import('./views/AllianceVouchersView.vue')
 const AllianceOffersView = () => import('./views/AllianceOffersView.vue')
 const AllianceRedeemView = () => import('./views/AllianceRedeemView.vue')
@@ -98,10 +99,11 @@ const routes = [
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
   { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商城好物', navGroup: 'mall' } },
-  { path: '/merchant-alliance/join', name: 'merchant-join', component: MerchantJoinView, meta: { guest: true, title: '商家入驻', navGroup: 'mall' } },
+  { path: '/merchant-alliance/join', name: 'merchant-join', component: MerchantJoinView, meta: { guest: true, title: '商家入驻', navGroup: 'alliance' } },
   { path: '/alliance/pool', name: 'alliance-pool', component: AlliancePoolView, meta: { title: '领券中心', navGroup: 'alliance' } },
   { path: '/alliance/vouchers', name: 'alliance-vouchers', component: AllianceVouchersView, meta: { title: '我的联盟券', navGroup: 'alliance' } },
   { path: '/alliance/offers', name: 'alliance-offers', component: AllianceOffersView, meta: { title: '供券管理', navGroup: 'alliance' } },
+  { path: '/alliance/rules', name: 'alliance-rules', component: AllianceRulesView, meta: { guest: true, title: '联盟券规则', navGroup: 'alliance' } },
   { path: '/alliance/redeem', name: 'alliance-redeem', component: AllianceRedeemView, meta: { title: '门店核销', navGroup: 'alliance' } },
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
   // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
