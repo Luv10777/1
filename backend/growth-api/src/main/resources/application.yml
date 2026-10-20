@@ -188,7 +188,8 @@ growth:
       recipient: ${COMMERCE_ALIPAY_RECIPIENT:嘉兴市梧曜科技有限公司}
       qr-code-url: ${COMMERCE_ALIPAY_QR_CODE_URL:/images/payments/company-alipay-qr.png}
   billing:
-    payment-method: WECHAT
+    # WECHAT | ALIPAY | MANUAL，同一时间只开一种收款方式
+    payment-method: ${BILLING_PAYMENT_METHOD:WECHAT}
     operator-user-ids: ${BILLING_OPERATOR_USER_IDS:}
     wechat:
       app-id: ${WECHAT_PAY_APP_ID:}
@@ -199,6 +200,14 @@ growth:
       platform-key-id: ${WECHAT_PAY_PLATFORM_KEY_ID:}
       platform-public-key-path: ${WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH:}
       notify-url: ${WECHAT_PAY_NOTIFY_URL:}
+    alipay:
+      # 沙箱：https://openapi-sandbox.dl.alipaydev.com/gateway.do
+      gateway: ${ALIPAY_GATEWAY:https://openapi.alipay.com/gateway.do}
+      app-id: ${ALIPAY_APP_ID:}
+      seller-id: ${ALIPAY_SELLER_ID:}
+      private-key-path: ${ALIPAY_PRIVATE_KEY_PATH:}
+      alipay-public-key-path: ${ALIPAY_PUBLIC_KEY_PATH:}
+      notify-url: ${ALIPAY_NOTIFY_URL:}
     video:
       # Supply verified rates through an external Spring YAML file. No default commercial rate.
       rates: []

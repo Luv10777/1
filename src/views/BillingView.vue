@@ -37,7 +37,7 @@ const keys = new Map()
 const labels = { PENDING_PAYMENT: '待支付', PAID: '已到账', CANCELLED: '已取消', EXPIRED: '已过期' }
 const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期' : '尚未开通会员')
 const canPay = computed(() => account.value?.canManage && account.value?.payment.available && !billing.error && !busy.value)
-const paymentLabel = computed(() => account.value?.paymentMethod === 'MANUAL' ? '查看付款信息' : '微信支付')
+const paymentLabel = computed(() => ({ MANUAL: '查看付款信息', ALIPAY: '支付宝支付' })[account.value?.paymentMethod] || '微信支付')
 const keyFor = (key) => {
   if (!keys.has(key)) keys.set(key, 'billing-' + crypto.randomUUID())
   return keys.get(key)
@@ -84,6 +84,17 @@ const openPayment = async (order) => {
   paymentDialog.value?.showModal()
   await applyPayment(order)
   if (order.state === 'PENDING_PAYMENT') paymentTimer = setTimeout(pollPayment, 4000)
+}
+// The tab opens inside the click so popup blockers allow it; the signed URL is fetched fresh because Alipay rejects stale ones.
+const openAlipay = async () => {
+  if (!payment.value || paymentLoading.value) return
+  const tab = window.open('', '_blank')
+  if (!tab) { paymentError.value = '浏览器拦截了新窗口，请允许本站弹出窗口后重试'; return }
+  tab.opener = null
+  paymentLoading.value = true
+  try { tab.location.href = await billingApi.alipay(payment.value.id); paymentError.value = '' }
+  catch (e) { tab.close(); paymentError.value = e.message || '支付宝收银台暂时无法打开' }
+  finally { paymentLoading.value = false }
 }
 const checkPurchaseConsent = (message) => {
   if (purchaseConsent.value) return true
@@ -213,6 +224,10 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <template v-else-if="payment.state === 'PENDING_PAYMENT'">
           <template v-if="payment.paymentMethod === 'WECHAT'">
             <div class="yanhuo-qr"><img v-if="qr" :src="qr" width="240" height="240" alt="微信支付二维码"><span v-else>正在读取收款码...</span></div><p class="yanhuo-payment-caption">微信扫码支付</p>
+          </template>
+          <template v-else-if="payment.paymentMethod === 'ALIPAY'">
+            <button class="yanhuo-primary" type="button" :disabled="paymentLoading" @click="openAlipay">前往支付宝付款<ArrowUpRight :size="16" /></button>
+            <p class="yanhuo-payment-caption">在新窗口完成付款后回到这里，到账后自动更新</p>
           </template>
           <template v-else>
             <dl class="yanhuo-manual-details"><div><dt>收款方</dt><dd>{{ payment.payment.recipient }}</dd></div><div v-if="payment.payment.account"><dt>收款账号</dt><dd>{{ payment.payment.account }}</dd></div><div v-if="payment.payment.bank"><dt>开户行</dt><dd>{{ payment.payment.bank }}</dd></div></dl>

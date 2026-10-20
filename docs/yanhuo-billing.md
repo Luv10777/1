@@ -109,6 +109,44 @@ Native 订单有效期 30 分钟。创建、查询、关单请求使用商户 RS
 `time_expire` 使用秒级 RFC 3339 时间和 `+08:00` 偏移，不发送数据库时间中的小数秒。
 签名、验签及 AES-GCM 解密由当前网关实现，尚未接入微信官方 SDK；真实商户联调仍是正式收款前置条件。
 
+## 支付宝配置
+
+`BILLING_PAYMENT_METHOD=ALIPAY` 时使用支付宝电脑网站支付（`alipay.trade.page.pay`），同一时间只开一种收款方式。
+接口加签方式为**公钥模式**（RSA2），不支持公钥证书模式。
+
+配置前需要：
+
+- 已签约电脑网站支付，且该产品绑定在「已上线」的开放平台应用上。
+- 用支付宝开放平台密钥工具生成的应用私钥（PKCS8），对应应用公钥已上传到该应用的「开发设置 → 接口加签方式」。
+- 同一页面的支付宝公钥。
+- 可公网访问的 HTTPS 支付通知地址。
+
+| 环境变量 | 内容 |
+| --- | --- |
+| `BILLING_PAYMENT_METHOD` | `ALIPAY` |
+| `ALIPAY_GATEWAY` | 正式 `https://openapi.alipay.com/gateway.do`；沙箱 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
+| `ALIPAY_APP_ID` | 开放平台应用 APPID |
+| `ALIPAY_SELLER_ID` | 商户 PID（`2088` 开头），通知中的 `seller_id` 必须与之一致 |
+| `ALIPAY_PRIVATE_KEY_PATH` | 服务进程可读的应用私钥文件绝对路径；密钥工具导出的裸 Base64 或 PEM 均可 |
+| `ALIPAY_PUBLIC_KEY_PATH` | 支付宝公钥文件绝对路径 |
+| `ALIPAY_NOTIFY_URL` | 例如 `https://yifangzhi.com/api/billing/alipay/notify` |
+
+正式与沙箱是两套 APPID、PID 和密钥，不能混用。
+
+订单有效期 30 分钟，作为 `time_expire` 传给支付宝。收银台链接在用户点「前往支付宝付款」时由服务端现签，
+不保存：支付宝拒绝过期的请求时间戳。页面在点击时先打开新窗口，再把签好的链接填进去，避免被浏览器拦截弹窗。
+
+支付宝只在买家打开收银台后才建立交易，所以待支付订单查单得到已验签的 `ACQ.TRADE_NOT_EXIST` 是正常状态，
+不重建订单；订单过期后才在本地关闭，远端已建立交易的先关单。取消订单同样先查真实支付结果。
+查单与关单响应都按原始 JSON 文本验签；通知按排序参数验签，并核对 APPID、PID、订单号、金额和
+`TRADE_SUCCESS`/`TRADE_FINISHED` 状态，`passback_params` 携带租户与订单号。入账流水为 `alipay:<trade_no>`，
+与微信共享全局唯一约束。签名与验签由当前网关实现，未接入支付宝官方 SDK。
+
+2026-10-20 沙箱联调（本机）：1 元充值订单的收银台被沙箱网关接受；付款前查单得到已验签的
+`ACQ.TRADE_NOT_EXIST`；沙箱买家付款后，主动查单验签通过并入账 10 烟火，重复查单不重复入账。
+**未验证**：异步通知（本机收不到回调，须在服务器上用正式参数验证）；「前往支付宝付款」在真实 Chrome 中
+打开新窗口（桌面应用内置浏览器的新窗口未能加载）；正式环境收款。
+
 ### 人工收款通道
 
 默认收款方式为 `WECHAT`。人工通道仅在服务端显式配置 `MANUAL`、非空运营白名单、实际收款主体，
@@ -126,7 +164,7 @@ growth.billing.payment-instructions=付款后请向客服提供订单号和付�
 `BILLING_OPERATOR_USER_IDS` 仍填写实际运营用户 ID。可选的
 `growth.billing.payment-qr-code-url` 用于展示收款方提供的二维码，人工订单有效期为 7 天。
 页面展示收款信息，运营核实真实入账后调用人工核销接口；回单编号、金额、订单状态、有效期和运营权限均须通过校验。
-同一回单在所有租户间只能核销一次，微信订单不能走人工核销。
+同一回单在所有租户间只能核销一次，微信和支付宝订单不能走人工核销。
 
 ## 视频核验费率
 
