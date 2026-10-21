@@ -29,13 +29,12 @@
 /* 图片工作区切换栏需要脱离 flex 流，固定在各自页面的右上角。 */
 .image-workspace-switch.video-mode-switch{position:absolute}
 .image-workspace-switch button{font-size:12px}
-.product-showcase>.image-workspace-switch{top:24px;right:26px}
 ::view-transition-group(image-workspace){animation-duration:.58s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
 ::view-transition-old(image-workspace){animation:image-workspace-out .22s ease both}
 ::view-transition-new(image-workspace){animation:image-workspace-in .58s cubic-bezier(.22,1,.36,1) both}
 @keyframes image-workspace-in{from{opacity:0;transform:translateY(8px) scale(.992);filter:blur(3px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
 @keyframes image-workspace-out{from{opacity:1}to{opacity:0}}
-@media(max-width:860px){.poster-studio-header{padding-right:0;min-height:76px}.poster-studio-header .image-workspace-switch{top:42px;left:0;right:auto}.product-showcase>.image-workspace-switch{top:18px;right:18px}}
+@media(max-width:860px){.poster-studio-header{padding-right:0;min-height:76px}.poster-studio-header .image-workspace-switch{top:42px;left:0;right:auto}}
 @media(prefers-reduced-motion:reduce){::view-transition-group(image-workspace),::view-transition-old(image-workspace),::view-transition-new(image-workspace){animation:none}}
 
 /* Keep the visual specimen in the card background plane so copy never gets squeezed. */
