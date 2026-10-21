@@ -125,7 +125,7 @@
 .poster-style-card.is-selected { border-color: var(--poster-red); box-shadow: 0 0 0 1px var(--poster-red); }
 .poster-style-image { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #F2EEE8; }
 .poster-style-check { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--poster-red); color: #fff; }
-.poster-style-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 10px 12px 12px; border-top: 1px solid #F1ECE6; }
+.poster-style-meta { display: flex; flex-direction: column; gap: 2px; padding: 9px 12px 11px; border-top: 1px solid #F1ECE6; }
 .poster-style-meta strong { flex: none; font: 600 14px/1.4 var(--font-serif); }
 .poster-style-meta span { min-width: 0; overflow: hidden; color: var(--poster-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -270,7 +270,7 @@
   .poster-conversation-copy { grid-template-columns: minmax(0, 1fr); }
   .poster-conversation-submit { width: 100%; }
 }
-@container (max-width: 860px) { .poster-style-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@container (max-width: 520px) { .poster-style-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 @media (max-width: 760px) {
   .poster-workbench { flex-direction: column; height: auto; overflow: visible; }
   .poster-control-panel { flex: none; width: 100%; height: auto; overflow: visible; border-right: 0; border-bottom: 1px solid var(--poster-line); }
