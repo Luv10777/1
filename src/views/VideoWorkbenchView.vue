@@ -85,6 +85,13 @@ const conversationStatus = (item) => {
   if (item.error) return '提交失败'
   return '草稿'
 }
+// 创作记录里状态文字的颜色：生成中用朱砂，失败用错误色，其余保持浅灰。
+const statusTone = (item) => {
+  const status = conversationStatus(item)
+  if (status === '生成中' || status === '提交中') return 'working'
+  if (status === '生成失败' || status === '提交失败') return 'failed'
+  return 'muted'
+}
 const createConversation = (form = null) => {
   const item = {
     id: newConversationId(),
@@ -343,35 +350,31 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
   <div class="video-workbench-page flex h-[calc(100vh-64px)] w-full overflow-hidden border-t border-gray-200 bg-white">
     <button v-if="historyOpen" class="video-history-backdrop" aria-label="关闭创作记录" type="button" @click="historyOpen = false" />
     <aside class="video-conversation-sidebar" :class="{ 'is-open': historyOpen }" aria-label="视频创作记录">
-      <div class="video-conversation-head">
-        <div class="video-conversation-kicker"><img class="video-seal-glyph" src="/images/brand/yifangzhi-mark.png" alt="" /><span>视频工作台</span></div>
-        <button class="video-new-conversation" type="button" aria-label="新建对话" @click="startNewConversation"><span>＋</span> 新对话</button>
+      <div class="vs-history-head">
+        <span>创作记录<small v-if="conversations.length">{{ conversations.length }}</small></span>
+        <button class="vs-history-new" type="button" aria-label="新对话" title="新对话" @click="startNewConversation"><Plus :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+        <button class="video-history-close" type="button" aria-label="关闭创作记录" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
       </div>
-      <div class="video-conversation-title-row">
-        <span>创作记录</span><small>{{ conversations.length }} 条</small>
-        <button class="video-history-close" type="button" aria-label="关闭创作记录" @click="historyOpen = false">×</button>
-      </div>
-      <div class="video-conversation-list">
+      <div class="vs-history-list">
         <button
           v-for="item in conversations"
           :key="item.id"
-          class="video-conversation-item"
+          class="vs-history-item"
           :class="{ active: item.id === activeConversationId }"
           :aria-current="item.id === activeConversationId ? 'true' : undefined"
-          :title="videoModelLabel(item.selectedModel)"
+          :title="`${item.title} · ${videoModelLabel(item.selectedModel)} · ${item.resolution}`"
           type="button"
           @click="selectConversation(item)"
         >
-          <span class="video-conversation-item-mark" :class="`is-${conversationStatus(item) === '已完成' ? 'done' : conversationStatus(item) === '生成中' ? 'working' : 'draft'}`" aria-hidden="true" />
-          <span class="video-conversation-item-copy">
-            <strong>{{ item.title }}</strong>
-            <small>{{ conversationStatus(item) }} · {{ videoModelLabel(item.selectedModel) }} · {{ item.duration }} 秒 · {{ item.resolution }}</small>
-          </span>
-          <span class="video-conversation-item-arrow" aria-hidden="true">›</span>
+          <strong>{{ item.title }}</strong>
+          <small><span :class="`is-${statusTone(item)}`">{{ conversationStatus(item) }}</span> · {{ item.duration }} 秒</small>
         </button>
-        <div v-if="!conversations.length" class="video-conversation-empty">从一段新的商家故事开始。</div>
+        <p v-if="!conversations.length" class="vs-history-empty">从一段新的商家故事开始。</p>
         <p v-if="historyLoading" class="video-history-message" role="status">正在读取创作记录…</p>
-        <div v-else-if="historyError" class="video-history-message" role="status"><span>{{ historyError }}</span><button type="button" @click="loadHistory(historyPage)">重新加载</button></div>
+        <div v-else-if="historyError" class="video-history-message" role="status">
+          <span>{{ historyError }}</span>
+          <button type="button" @click="loadHistory(historyPage)">重新加载</button>
+        </div>
         <button v-else-if="historyHasMore" class="video-history-more" type="button" @click="loadHistory(historyPage + 1)">加载更早的创作</button>
       </div>
     </aside>

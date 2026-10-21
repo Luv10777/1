@@ -57,8 +57,27 @@
 :root .paper-app .video-workbench-page .video-workbench-scroll.vs-form { display: flex; flex-direction: column; gap: 32px; min-width: 0; margin: 0; padding: 20px 28px 24px; border: 0; background: var(--night-panel); }
 :root .paper-app .video-workbench-page .video-workbench-action.vs-footer { display: flex; flex-direction: column; gap: 10px; padding: 16px 28px 24px; border: 0; background: var(--night-panel); }
 :root .paper-app .video-workbench-page .video-workbench-action .generation-billing-link { align-self: center; font-size: 13px; }
-:root .paper-app .video-workbench-page img.video-seal-glyph { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 0; object-fit: contain; transform: none; }
-:root:not([data-theme="dark"]) .video-workbench-page img.video-seal-glyph { mix-blend-mode: multiply; }
+
+/* 创作记录栏：标题 + 新对话图标，列表每条两行，选中项浅底，不加描边和箭头 */
+:root .paper-app .video-workbench-page .video-conversation-sidebar { padding: 20px 10px 12px; }
+.vs-history-head { display: flex; align-items: center; gap: 4px; padding: 0 4px 12px 10px; }
+.vs-history-head > span { display: flex; flex: 1; align-items: baseline; gap: 8px; color: var(--ink); font-size: 15px; font-weight: 600; }
+.vs-history-head small { color: var(--ink-muted); font-size: 13px; font-weight: 400; }
+.vs-history-new { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); cursor: pointer; transition: background .18s, color .18s; }
+.vs-history-new:hover { background: var(--color-bg-subtle); color: var(--ink); }
+:root .paper-app .video-workbench-page .vs-history-head .video-history-close { width: 32px; height: 32px; margin: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.vs-history-list { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; padding-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.vs-history-item { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background .18s; }
+.vs-history-item:hover { background: rgba(44, 62, 80, .04); }
+.vs-history-item.active { background: var(--color-bg-subtle); }
+.vs-history-item strong { overflow: hidden; font-size: 14px; font-weight: 500; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.vs-history-item.active strong { font-weight: 600; }
+.vs-history-item small { overflow: hidden; color: var(--ink-muted); font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.vs-history-item .is-working { color: var(--color-accent-text); }
+.vs-history-item .is-failed { color: var(--color-error); }
+.vs-history-empty { margin: 0; padding: 12px 10px; color: var(--ink-muted); font-size: 13px; }
+:root .paper-app .video-workbench-page .vs-history-list .video-history-more { align-self: center; margin-top: 6px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--color-accent-text); font-size: 13px; cursor: pointer; }
+:root .paper-app .video-workbench-page .vs-history-list .video-history-more:hover { background: var(--color-bg-subtle); }
 
 /* 成片预览的空状态：用品牌图形代替胶片图标 */
 .video-workbench-canvas img.device-film-icon { width: 56px; height: 56px; border-radius: 8px; object-fit: contain; }
