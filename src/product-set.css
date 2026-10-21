@@ -64,8 +64,8 @@
 .product-control-footer .creation-item-error { margin: 0; font-size: 13px; }
 
 /* 右侧展示区 */
-.product-showcase { container-type: inline-size; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: 28px 40px 28px; overflow: hidden; background: var(--night); }
-.product-wall { --wall-gap: 20px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wall-gap); flex: 1; min-width: 0; min-height: 180px; overflow: hidden; }
+.product-showcase { container-type: inline-size; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: 16px 24px; overflow: hidden; background: var(--night); }
+.product-wall { --wall-gap: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--wall-gap); flex: 1; min-width: 0; min-height: 180px; overflow: hidden; }
 .product-wall-column { display: grid; align-content: start; gap: var(--wall-gap); height: max-content; animation: product-wall-up 48s linear infinite; }
 .product-wall-column-2 { animation-name: product-wall-down; animation-duration: 56s; }
 .product-wall-column-3 { animation-duration: 64s; }
@@ -75,7 +75,7 @@
 @media (prefers-reduced-motion: reduce) { .product-wall-column { animation: none; } }
 
 .product-set-studio.creation-product .creation-workspace { flex: 1; min-height: 0; }
-.product-set-studio.creation-product .creation-toolbar { gap: 8px; margin: 0 0 28px; padding: 0; border: 0; }
+.product-set-studio.creation-product .creation-toolbar { gap: 8px; margin: 0 0 16px; padding: 0; border: 0; }
 .product-set-studio.creation-product .creation-view-tabs { gap: 0; padding: 3px; border-radius: 8px; background: var(--pset-fill); }
 .product-set-studio.creation-product .creation-view-tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 18px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-muted); font-size: 13px; font-weight: 400; box-shadow: none; transform: none; }
 .product-set-studio.creation-product .creation-view-tabs button.active { background: var(--night-panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44, 62, 80, .12); }
@@ -83,10 +83,7 @@
 .product-set-studio.creation-product :is(.creation-library-links > button, .creation-library-links > a, .creation-icon-button) { display: grid; place-items: center; width: 36px; min-height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); box-shadow: none; transform: none; }
 .product-set-studio.creation-product :is(.creation-library-links > button, .creation-library-links > a, .creation-icon-button):hover:not(:disabled) { background: var(--pset-fill); color: var(--ink); }
 .product-set-studio.creation-product .creation-library-links > button[aria-expanded="true"] { background: var(--pset-fill); color: var(--ink); }
-.product-set-studio.creation-product .creation-toolbar .image-workspace-switch { position: static; display: flex; gap: 18px; width: auto; margin: 0 0 0 8px; padding: 0 0 0 16px; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
-.product-set-studio.creation-product .creation-toolbar .image-workspace-switch a { flex: none; min-height: 32px; padding: 0; border-radius: 0; background: transparent; color: var(--ink-muted); font-size: 13px; box-shadow: none; transform: none; }
-.product-set-studio.creation-product .creation-toolbar .image-workspace-switch a.active { color: var(--ink); font-weight: 600; }
-.product-set-studio.creation-product .creation-toolbar .image-workspace-switch .material-symbols-outlined { display: none; }
+.product-set-studio.creation-product .creation-library-links > .image-workspace-switch { position: static; margin-left: 8px; }
 
 .product-set-studio.creation-product .creation-history { max-height: 320px; margin: -12px 0 24px; padding: 8px 0; border: 0; border-radius: 8px; background: var(--night-panel); box-shadow: 0 1px 2px rgba(44, 62, 80, .04), 0 8px 24px rgba(44, 62, 80, .08); }
 .product-set-studio.creation-product .creation-history > p { margin: 0; padding: 12px 20px; color: var(--ink-muted); font-size: 13px; }
