@@ -27,6 +27,11 @@ public class BillingStore {
         em.createNativeQuery("SELECT true FROM pg_advisory_xact_lock(hashtextextended(:key,0))")
             .setParameter("key","billing-plan:"+code).getSingleResult();
     }
+    /** 下架同一标识的其他已上架版本。调用方已持有该标识的锁。 */
+    public void unpublishOthers(String code,Long exceptId) {
+        em.createQuery("update BillingPlan p set p.published=false where p.code=:code and p.published=true and (:id is null or p.id<>:id)")
+            .setParameter("code",code).setParameter("id",exceptId).executeUpdate();
+    }
     public boolean publishedPlanExists(String code,Long exceptId) {
         return em.createQuery("select count(p) from BillingPlan p where p.code=:code and p.published=true and (:id is null or p.id<>:id)",Long.class)
             .setParameter("code",code).setParameter("id",exceptId).getSingleResult()>0;

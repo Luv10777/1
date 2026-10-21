@@ -25,7 +25,7 @@ test('business pages remain visible without membership while login and owner per
       await router.push(route.path)
       assert.equal(router.currentRoute.value.name, route.name, route.path)
     }
-    for (const path of ['/copy/extract', '/copy/rewrite', '/notifications', '/help']) {
+    for (const path of ['/copy/extract', '/copy/rewrite', '/help']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.path, '/image/create', `${path} should leave the hidden module`)
     }
@@ -100,7 +100,7 @@ test('expired sessions preserve guest browsing and require login only for privat
     assert.equal(router.currentRoute.value.name, 'image-create', 'a saved login link to the former home opens guest browsing')
     await router.push('/login?redirect=/dashboard')
     assert.equal(router.currentRoute.value.name, 'login', 'opening login from within the app preserves login intent')
-    for (const path of ['/image/create', '/image/create/poster', '/video/analyze', '/digital-human', '/merchant-alliance', '/information?category=supply', '/information/7', '/store/5', '/order/receipt', '/login']) {
+    for (const path of ['/image/create', '/image/create/poster', '/video/analyze', '/digital-human', '/merchant-alliance', '/merchant-alliance/join', '/information?category=supply', '/information/7', '/store/5', '/order/receipt', '/login']) {
       signedIn()
       await router.push(path)
       const previous = router.currentRoute.value.fullPath

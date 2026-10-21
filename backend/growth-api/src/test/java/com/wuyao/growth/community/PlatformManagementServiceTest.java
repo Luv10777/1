@@ -30,7 +30,8 @@ class PlatformManagementServiceTest {
     private final PlatformProperties config = new PlatformProperties();
     private final PlatformManagementService service = new PlatformManagementService(config,
             mock(PlatformAccountDirectory.class), publications, mock(MerchantApplicationRepository.class),
-            mock(RealNameApplicationRepository.class), audits, mock(RealNameCrypto.class), transactions);
+            mock(RealNameApplicationRepository.class), audits, mock(RealNameCrypto.class), transactions,
+            mock(org.springframework.context.ApplicationEventPublisher.class));
     private InformationPublication value;
 
     @BeforeEach

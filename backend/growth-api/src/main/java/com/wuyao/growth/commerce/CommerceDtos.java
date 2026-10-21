@@ -1,5 +1,6 @@
 package com.wuyao.growth.commerce;
 
+import com.wuyao.growth.product.ProductDtos;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,6 +25,15 @@ public final class CommerceDtos {
             @NotBlank @Pattern(regexp = "[0-9+()\\- ]{6,20}") String buyerPhone,
             @NotBlank @Size(max = 500) String shippingAddress,
             @Size(max = 500) String buyerNote) {}
+
+    /** 商户联盟商品墙上的一张卡片。 */
+    public record CatalogItem(Long id, Long storeId, String storeName, String name, String category, BigDecimal price,
+                              String saleUnit, String specification, Integer inventory, Long coverAssetId) {
+        static CatalogItem of(ProductDtos.PublicListing listing, String storeName) {
+            return new CatalogItem(listing.id(), listing.storeId(), storeName, listing.name(), listing.category(),
+                    listing.price(), listing.saleUnit(), listing.specification(), listing.inventory(), listing.coverAssetId());
+        }
+    }
 
     public record Line(Long productId, String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
         static Line of(SalesOrderItem item) {

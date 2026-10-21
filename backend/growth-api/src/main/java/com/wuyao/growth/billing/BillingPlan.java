@@ -17,9 +17,11 @@ public class BillingPlan {
     private boolean imageEnabled;
     private boolean videoEnabled;
     private boolean liveEnabled;
+    /** 每个会员期发放的联盟券额度（分）。 */
+    private long allianceQuotaMinor;
     private boolean published;
     private Instant createdAt = Instant.now();
     public BillingDtos.PlanSnapshot snapshot() {
-        return new BillingDtos.PlanSnapshot(id,code,name,description,priceMinor,durationDays,giftCredits,imageEnabled,videoEnabled,liveEnabled);
+        return new BillingDtos.PlanSnapshot(id,code,name,description,priceMinor,durationDays,giftCredits,imageEnabled,videoEnabled,liveEnabled,allianceQuotaMinor);
     }
 }

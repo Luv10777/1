@@ -126,6 +126,14 @@ public class StoreService {
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "店铺不存在或尚未公开内容"));
     }
 
+    /** 商品墙用：批量取营业中门店的对外名称。已关闭或尚未公开内容的门店不在结果里。 */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, String> publicNames(java.util.Collection<Long> storeIds) {
+        if (storeIds.isEmpty()) return java.util.Map.of();
+        return storeRepository.findAllByIdInAndStatus(storeIds, "ACTIVE").stream()
+                .collect(java.util.stream.Collectors.toMap(Store::getId, Store::getName));
+    }
+
     /** 请求里没带的项（null）保持原样，带了的整项替换。 */
     private StoreDtos.Extras extras(StoreDtos.Extras current, String transportGuide, List<String> amenities,
                                     List<StoreDtos.SpecialHour> specialHours) {

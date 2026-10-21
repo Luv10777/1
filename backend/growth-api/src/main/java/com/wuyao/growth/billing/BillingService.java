@@ -24,6 +24,7 @@ public class BillingService {
     private final BillingProperties config;
     private final WechatPayGateway wechat;
     private final AlipayGateway alipay;
+    private final org.springframework.context.ApplicationEventPublisher events;
     /** Generation writers use one account-first lock order, including cancellation and retries. */
     @Transactional
     public void lockForGeneration() { store.lockAccount(); }
@@ -40,7 +41,7 @@ public class BillingService {
     public List<BillingDtos.PlanSnapshot> plans() { return store.plans(false).stream().map(BillingPlan::snapshot).toList(); }
     @Transactional(readOnly=true)
     public List<BillingDtos.PlanListing> operatorPlans() {
-        return store.plans(true).stream().map(p->new BillingDtos.PlanListing(p.snapshot(),p.isPublished())).toList();
+        return store.plans(true).stream().map(p->new BillingDtos.PlanListing(p.snapshot(),p.isPublished(),p.getCreatedAt())).toList();
     }
 
     @Transactional
@@ -163,6 +164,7 @@ public class BillingService {
             Instant start=a.active(Instant.now())?a.getMemberUntil():Instant.now();
             a.setPlanSnapshot(p); a.setMemberUntil(start.plus(Duration.ofDays(p.durationDays())));
             a.setMembershipOrderId(o.getId()); a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),o.getCredits()));
+            events.publishEvent(new BillingDtos.MembershipActivated(o.getTenantId(),o.getId(),p,start,a.getMemberUntil()));
         } else a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),o.getCredits()));
         o.setReceiptReference(receipt); o.setConfirmedBy(operator); o.setPaidAt(Instant.now()); o.setState("PAID");
         ledger(a,"order:"+o.getId(),"MEMBERSHIP".equals(o.getKind())?"GRANT":"PURCHASE",
@@ -316,22 +318,28 @@ public class BillingService {
     }
     @Transactional
     public BillingDtos.PlanSnapshot createPlan(BillingDtos.NewPlan input) {
-        if(input.published()) requirePublishable(input.code(),null);
+        if(input.published()) requirePublishable(input.code(),null,input.replacePublished());
         var p=new BillingPlan(); p.setCode(input.code()); p.setName(input.name().trim()); p.setDescription(input.description().trim());
         p.setPriceMinor(input.priceMinor()); p.setDurationDays(input.durationDays()); p.setGiftCredits(input.giftCredits());
         p.setImageEnabled(input.imageEnabled()); p.setVideoEnabled(input.videoEnabled()); p.setLiveEnabled(input.liveEnabled());
+        p.setAllianceQuotaMinor(input.allianceQuotaMinor());
         p.setPublished(input.published());
         store.save(p); store.flush(); return p.snapshot();
     }
     @Transactional
-    public void publish(Long id,boolean published) {
+    public void publish(Long id,boolean published) { publish(id,published,false); }
+    /** replace=true：上架这个版本时，同一标识正在上架的版本在同一事务里下架。 */
+    @Transactional
+    public void publish(Long id,boolean published,boolean replace) {
         var p=store.plan(id); if(p==null) throw bad("套餐不存在");
-        if(published) requirePublishable(p.getCode(),id);
+        if(published) requirePublishable(p.getCode(),id,replace);
         p.setPublished(published);
     }
-    private void requirePublishable(String code,Long id) {
+    private void requirePublishable(String code,Long id,boolean replace) {
         store.lockPlanCode(code);
-        if(store.publishedPlanExists(code,id)) throw bad("同一套餐标识已有上架版本，请先下架旧版本");
+        if(!store.publishedPlanExists(code,id)) return;
+        if(!replace) throw bad("同一套餐标识已有上架版本，请先下架旧版本，或选择替换上架");
+        store.unpublishOthers(code,id);
     }
     private Long currentUserId() {
         var authentication=SecurityContextHolder.getContext().getAuthentication();

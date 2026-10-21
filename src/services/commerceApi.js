@@ -1,7 +1,7 @@
 import { get, patch, post } from '../utils/request.js'
 
 export const commerceApi = {
-  featuredListing: () => get('/shop/featured.json'),
+  catalog: params => get('/api/public/products', Object.fromEntries(Object.entries(params || {}).filter(([, value]) => value != null && value !== ''))),
   publicStore: storeId => get(`/api/public/stores/${storeId}`),
   publicProducts: storeId => get(`/api/public/stores/${storeId}/products`),
   publicImageUrl: assetId => get(`/api/public/assets/${assetId}/download-url`),

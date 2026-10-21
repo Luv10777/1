@@ -37,6 +37,13 @@ const MerchantAllianceView = () => import('./views/MerchantAllianceView.vue')
 const InformationPublishingView = () => import('./views/InformationPublishingView.vue')
 const PublicStorefrontView = () => import('./views/PublicStorefrontView.vue')
 const PublicOrderView = () => import('./views/PublicOrderView.vue')
+const MerchantJoinView = () => import('./views/MerchantJoinView.vue')
+const AlliancePoolView = () => import('./views/AlliancePoolView.vue')
+const NoticesView = () => import('./views/NoticesView.vue')
+const AllianceRulesView = () => import('./views/AllianceRulesView.vue')
+const AllianceVouchersView = () => import('./views/AllianceVouchersView.vue')
+const AllianceOffersView = () => import('./views/AllianceOffersView.vue')
+const AllianceRedeemView = () => import('./views/AllianceRedeemView.vue')
 const MerchantOrdersView = () => import('./views/MerchantOrdersView.vue')
 const PublicInformationView = () => import('./views/PublicInformationView.vue')
 const PublicInformationDetailView = () => import('./views/PublicInformationDetailView.vue')
@@ -49,8 +56,8 @@ const routes = [
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/store/:storeId(\\d+)', name: 'public-storefront', component: PublicStorefrontView, meta: { public: true, title: '店铺商品' } },
   { path: '/order/:token', name: 'public-order', component: PublicOrderView, meta: { public: true, title: '订单查询' } },
-  { path: '/information', name: 'public-information', component: PublicInformationView, meta: { public: true, title: '本地商家信息' } },
-  { path: '/information/:id(\\d+)', name: 'public-information-detail', component: PublicInformationDetailView, meta: { public: true, title: '信息详情' } },
+  { path: '/information', name: 'public-information', component: PublicInformationView, meta: { public: true, shellWhenSignedIn: true, title: '本地商家信息', navGroup: 'mall' } },
+  { path: '/information/:id(\\d+)', name: 'public-information-detail', component: PublicInformationDetailView, meta: { public: true, shellWhenSignedIn: true, title: '信息详情', navGroup: 'mall' } },
   { path: '/player', name: 'player', component: PlayerView, meta: { public: true, title: '播报页' } },
   { path: '/app', name: 'app-download', component: AppDownloadView, meta: { public: true, title: '一方志 App' } },
   { path: '/billing', name: 'billing', component: BillingView, meta: { title: '套餐与权益' } },
@@ -92,11 +99,17 @@ const routes = [
   { path: '/geo/services', name: 'geo-services', component: PlaceholderView, meta: { title: '增值服务', icon: '◇', description: '查看品牌在生成式搜索场景中的增长服务。' } },
   { path: '/geo/keywords', name: 'geo-keywords', component: PlaceholderView, meta: { title: '关键词监控', icon: '⌗', description: '持续监控品牌关键词和重点问题的表现变化。' } },
   { path: '/geo/visibility', name: 'geo-visibility', component: PlaceholderView, meta: { title: '可见度报告', icon: '◉', description: '分析品牌在主流生成式搜索回答中的出现频率和引用质量。' } },
-  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商家入驻', navGroup: 'mall' } },
-  { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
+  { path: '/merchant-alliance', name: 'merchant-alliance', component: MerchantAllianceView, meta: { guest: true, title: '商城好物', navGroup: 'mall' } },
+  { path: '/merchant-alliance/join', name: 'merchant-join', component: MerchantJoinView, meta: { guest: true, title: '商家入驻', navGroup: 'alliance' } },
+  { path: '/alliance/pool', name: 'alliance-pool', component: AlliancePoolView, meta: { title: '领券中心', navGroup: 'alliance' } },
+  { path: '/alliance/vouchers', name: 'alliance-vouchers', component: AllianceVouchersView, meta: { title: '我的联盟券', navGroup: 'alliance' } },
+  { path: '/alliance/offers', name: 'alliance-offers', component: AllianceOffersView, meta: { title: '供券管理', navGroup: 'alliance' } },
+  { path: '/alliance/rules', name: 'alliance-rules', component: AllianceRulesView, meta: { guest: true, title: '联盟券规则', navGroup: 'alliance' } },
+  { path: '/alliance/redeem', name: 'alliance-redeem', component: AllianceRedeemView, meta: { title: '门店核销', navGroup: 'alliance' } },
+  { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布', navGroup: 'mall' } },
   // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
   { path: '/identity', alias: '/real-name', name: 'identity', redirect: { name: 'settings', hash: '#identity' } },
-  { path: '/notifications', name: 'notifications', redirect: '/image/create' },
+  { path: '/notifications', name: 'notifications', component: NoticesView, meta: { title: '消息通知' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', icon: '✓', description: '按时间查看创作任务、生成结果与实际烟火消耗。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置', icon: '⌘', description: '查看和修改自己的账号资料、登录密码和实名认证。' } },

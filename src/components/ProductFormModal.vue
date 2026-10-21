@@ -5,10 +5,12 @@ import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui
 import { X, Package, Ticket, Upload, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import ProductImage from './ProductImage.vue'
 import { productApi } from '../services/productApi'
+import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { emptyProduct, normalizeProduct, validateProduct, productCategories, productTypes, getProductImages } from '../services/products'
 import '../products.css'
 
 const props = defineProps({ product: { type: Object, default: null }, error: { type: String, default: '' }, readOnly: { type: Boolean, default: false }, busy: { type: Boolean, default: false } })
+const { approved } = useMerchantApproval()
 const emit = defineEmits(['save', 'close'])
 const isReadOnly = ref(props.readOnly)
 const form = reactive({ ...emptyProduct(), ...props.product, images: getProductImages(props.product) })
@@ -207,8 +209,9 @@ async function submit() {
                       <legend>线上店铺</legend>
                       <div class="product-type-options">
                         <label :class="{ selected: form.onlineStatus === 'DRAFT' }"><input v-model="form.onlineStatus" type="radio" value="DRAFT"><span>暂不上架</span></label>
-                        <label :class="{ selected: form.onlineStatus === 'PUBLISHED' }"><input v-model="form.onlineStatus" type="radio" value="PUBLISHED"><span>公开售卖</span></label>
+                        <label :class="{ selected: form.onlineStatus === 'PUBLISHED' }"><input v-model="form.onlineStatus" type="radio" value="PUBLISHED" :disabled="approved === false && props.product?.onlineStatus !== 'PUBLISHED'"><span>公开售卖</span></label>
                       </div>
+                      <small v-if="approved === false && props.product?.onlineStatus !== 'PUBLISHED'">通过商家入驻审核后才能公开售卖。<RouterLink :to="{ name: 'merchant-join' }">去加入商户联盟</RouterLink></small>
                     </fieldset>
                   </div>
                 </template>

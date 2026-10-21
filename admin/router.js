@@ -5,11 +5,13 @@ import LoginView from './views/LoginView.vue'
 import AccessView from './views/AccessView.vue'
 
 const ManagementView = () => import('../src/views/PlatformManagementView.vue')
+const AllianceView = () => import('../src/views/PlatformAllianceView.vue')
+const PlansView = () => import('../src/views/PlatformPlansView.vue')
 
 export function adminDestination(raw) {
   if (typeof raw !== 'string') return '/information'
   const path = raw.split(/[?#]/)[0]
-  return ['/information', '/merchants', '/identities'].includes(path) ? raw : '/information'
+  return ['/information', '/merchants', '/identities', '/alliance', '/plans'].includes(path) ? raw : '/information'
 }
 
 export function createAdminRouter(history = createWebHistory()) {
@@ -21,6 +23,8 @@ export function createAdminRouter(history = createWebHistory()) {
       { path: '/information', alias: '/admin/information', name: 'admin-information', component: ManagementView, meta: { title: '信息管理', admin: true } },
       { path: '/merchants', name: 'admin-merchants', component: ManagementView, meta: { title: '商家管理', admin: true } },
       { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], name: 'admin-identities', component: ManagementView, meta: { title: '用户实名审核', admin: true } },
+      { path: '/plans', name: 'admin-plans', component: PlansView, meta: { title: '会员套餐', admin: true } },
+      { path: '/alliance', name: 'admin-alliance', component: AllianceView, meta: { title: '联盟券', admin: true } },
       { path: '/403', name: 'admin-forbidden', component: AccessView, meta: { title: '未获授权' } },
       { path: '/unavailable', name: 'admin-unavailable', component: AccessView, meta: { title: '连接暂不可用' } },
       { path: '/:pathMatch(.*)*', name: 'admin-not-found', component: AccessView, meta: { title: '页面不存在' } },

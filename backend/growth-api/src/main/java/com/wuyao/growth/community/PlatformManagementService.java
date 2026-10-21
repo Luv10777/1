@@ -29,6 +29,7 @@ public class PlatformManagementService {
     private final PlatformManagementAuditRepository audits;
     private final RealNameCrypto crypto;
     private final PlatformTransactionManager transactionManager;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public boolean isOperator(AuthPrincipal me) { return me != null && config.getOperatorUserIds().contains(me.userId()); }
 
@@ -144,6 +145,11 @@ public class PlatformManagementService {
             value.setStatus(request.status());
             value.setReviewNote(request.note().trim());
             value.setUpdatedAt(Instant.now());
+            merchants.flush();
+            boolean approved = merchants.findAllByTenantIdOrderByCreatedAtDescIdDesc(tenantId).stream()
+                    .anyMatch(application -> "APPROVED".equals(application.getStatus()));
+            if (!approved) takeInformationOffline(tenantId);
+            events.publishEvent(new MerchantQualificationChanged(tenantId, approved, request.status(), request.note().trim()));
             audit(me.userId(), "MERCHANT", id, request.status(), request.note());
             return null;
         });
@@ -204,6 +210,16 @@ public class PlatformManagementService {
         event.setTenantId(TenantContext.require()); event.setActorUserId(actor); event.setTargetType(type);
         event.setTargetId(id); event.setAction(action); event.setNote(note.trim());
         audits.saveAndFlush(event);
+    }
+
+    /** 入驻被暂停：这家商户已公开和待审核的信息全部下线。不标记为平台下线，恢复入驻后商户可以重新提交。 */
+    private void takeInformationOffline(Long tenantId) {
+        publications.findAllByTenantIdOrderByCreatedAtDescIdDesc(tenantId).stream()
+                .filter(v -> Set.of("PUBLISHED", "PENDING_REVIEW").contains(v.getStatus()))
+                .forEach(v -> {
+                    v.setStatus("OFFLINE");
+                    v.setUpdatedAt(Instant.now());
+                });
     }
 
     private <T> T inScope(Long tenantId, boolean readOnly, Supplier<T> work) {

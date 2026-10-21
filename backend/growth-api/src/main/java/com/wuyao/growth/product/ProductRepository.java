@@ -34,6 +34,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                          @Param("category") String category,
                          Pageable pageable);
 
+    /** 公开商品墙：全平台已上架的实物商品。可见性同时由 products 的公开行级策略兜底。 */
+    @Query("""
+            select p from Product p
+            where p.status = 'ACTIVE' and p.onlineStatus = 'PUBLISHED' and p.deletedAt is null
+              and p.type = 'PHYSICAL'
+              and (cast(:keyword as string) is null
+                   or lower(p.name) like lower(concat('%', cast(:keyword as string), '%'))
+                   or lower(p.category) like lower(concat('%', cast(:keyword as string), '%')))
+            order by p.updatedAt desc, p.id desc
+            """)
+    Page<Product> searchPublicPhysical(@Param("keyword") String keyword, Pageable pageable);
+
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
     List<Product> findAllByStoreIdAndStatusAndOnlineStatusAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(

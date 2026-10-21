@@ -84,3 +84,6 @@
   .public-information-detail-page .information-published-time span { justify-content: flex-start; }
   .information-article-footer > div { flex-wrap: wrap; }
 }
+
+/* 在侧边栏壳里打开时，高度交给壳，不再撑满整屏。 */
+.public-commerce.in-shell { min-height: 0; }

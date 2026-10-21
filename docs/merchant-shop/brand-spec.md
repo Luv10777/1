@@ -8,4 +8,6 @@
 
 品牌素材：`public/images/brand/yifangzhi-mark.png`；字体：`public/fonts/yifangzhi-serif-sc.woff2`、`public/fonts/yifangzhi-sans-sc.woff2`。产品图片由用户提供的 `一方志-32-1.png`、`一方志-32-2.png` 压缩为 JPEG 后通过素材上传接口入库，公开展示使用 API 返回的签名图片地址。
 
-`public/shop/featured.json` 仅保存运营选品的店铺与商品 ID，不保存价格或库存。入驻页允许访客浏览与购买；经营资料提交和申请记录读取仍需认证。下单后由商家确认，目前没有线上付款。
+商城好物页（`/merchant-alliance`）的商品墙读取 `GET /api/public/products`，展示全平台已上架的实物商品，不再依赖手工维护的选品文件。访客可浏览并进入店铺下单；入驻申请在 `/merchant-alliance/join`（侧边栏「商户联盟 → 商家入驻」），提交经营资料和读取申请记录需要认证。
+
+**入驻审核通过才能：** 把商品上架线上售卖、发布商家信息、提供联盟券。未通过时商品只能存草稿，已上架的商品继续编辑不受影响。平台把入驻**暂停**后，这家商户的在线商品撤回草稿、已公开和待审核的信息下线、还没领出的联盟券撤回；已领出的联盟券仍需在门店照常核销。规则由后端执行（`MerchantQualificationService`、`MerchantQualificationChanged` 事件），页面只做提前提示。下单后由商家确认，目前没有线上付款。

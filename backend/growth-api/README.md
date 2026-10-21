@@ -425,8 +425,11 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V50 | 商家申请、信息公开发布、实物商品上架、订单与公开店铺 RLS 策略 | `codex/guest-creation-browsing` |
 | V52 | 信息发布审核、驳回意见与审核后发布时间 | `codex/information-review` |
 | V53 | 个人头像及待确认头像上传凭证 | `codex/scroll-footer-account-avatar` |
+| V55 | 联盟券：套餐联盟券额度、供券单、领取记录、核销尝试、额度、联盟券、结算单 | `feat/alliance-vouchers` |
+| V56 | 联盟券结算折扣改为审核时逐张约定（审核前可为空） | `feat/alliance-vouchers` |
+| V57 | 联盟券结算账户、月度对账单；平台审计表允许 SETTLEMENT_ACCOUNT | `feat/alliance-vouchers` |
 
-下一个可用编号：V54。
+下一个可用编号：V58（V54 直播计费已在主干）。
 
 后端检查：
 

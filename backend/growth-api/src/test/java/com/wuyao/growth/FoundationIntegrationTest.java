@@ -1774,7 +1774,7 @@ class FoundationIntegrationTest {
 
     @Test
     void storeProductKnowledgeAndLiveSessionPersistThroughTheirApis() throws Exception {
-        seedPasswordAccount();
+        com.wuyao.growth.community.MerchantTestFixtures.approveMerchant(owner, tenantA, seedPasswordAccount());
         String token = passwordLogin("integration-password").accessToken();
         long store = apiData(post("/api/stores"), token, Map.of("name", "联调门店")).path("id").asLong();
         long product = apiData(post("/api/stores/" + store + "/products"), token, Map.of(
