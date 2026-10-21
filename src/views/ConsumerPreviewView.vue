@@ -37,7 +37,7 @@ const _cartItems = computed(() => commerce.cart.items)
 
       <div class="concierge-strip">
         <div class="concierge-copy"><strong>“我想找一个适合两个人、不会太甜的周末下午。”</strong><span>已识别：双人 · 周末 · 清爽口感</span></div>
-        <button class="concierge-action" type="button" @click="commerce.selectOffering(commerce.offerings[0])">查看推荐 <span>→</span></button>
+        <button class="concierge-action" type="button" @click="commerce.selectOffering(commerce.offerings[0])">查看推荐</button>
       </div>
 
       <div class="catalog-heading"><div><h2>给你的选择</h2></div><span class="catalog-note">{{ commerce.offerings.length }} 项可用 · 价格与库存实时重算</span></div>
@@ -45,14 +45,14 @@ const _cartItems = computed(() => commerce.cart.items)
         <article v-for="offering in commerce.offerings" :key="offering.id" class="offering-card" :class="`offering-${offering.cover}`" :data-selected="commerce.selectedOffering?.id === offering.id">
           <div class="offering-art"><span>{{ offering.cover === 'tea' ? '双人' : offering.cover === 'peach' ? '冷萃' : '60 MIN' }}</span><i>{{ isService(offering) ? '预约' : '到店' }}</i></div>
           <div class="offering-copy"><p>{{ offering.category }}</p><h3>{{ offering.name }}</h3><span>{{ offering.summary }}</span><div class="offering-foot"><strong>{{ formatPrice(offering.priceMinor) }}</strong><small>{{ isService(offering) ? `${offering.durationMinutes} 分钟 · ${offering.slots.length} 个时段` : `余量 ${offering.inventory}` }}</small></div></div>
-          <button class="offering-select" type="button" @click="commerce.selectOffering(offering)">{{ commerce.selectedOffering?.id === offering.id ? '已选中' : '了解这项' }} <span>↗</span></button>
+          <button class="offering-select" type="button" @click="commerce.selectOffering(offering)">{{ commerce.selectedOffering?.id === offering.id ? '已选中' : '了解这项' }}</button>
         </article>
       </div>
 
       <section v-if="commerce.selectedOffering" class="selection-panel">
         <div><h2>{{ commerce.selectedOffering.name }}</h2><p>{{ commerce.selectedOffering.summary }}</p></div>
         <div v-if="isService(commerce.selectedOffering)" class="slot-picker"><span>选择到店时段</span><button v-for="slot in commerce.selectedOffering.slots" :key="slot" type="button" :class="{ active: commerce.selectedSlot === slot }" @click="commerce.selectedSlot = slot">{{ slot }}</button></div>
-        <div class="selection-actions"><button class="secondary-action" type="button" @click="commerce.addSelected">加入接力单 <span>＋</span></button><button class="primary-action" type="button" :disabled="!commerce.cartCount" @click="commerce.createOrder">创建待支付订单 <span>→</span></button></div>
+        <div class="selection-actions"><button class="secondary-action" type="button" @click="commerce.addSelected">加入接力单 <span>＋</span></button><button class="primary-action" type="button" :disabled="!commerce.cartCount" @click="commerce.createOrder">创建待支付订单</button></div>
       </section>
 
       <section class="handoff-panel" :class="{ visible: commerce.order }">

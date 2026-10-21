@@ -338,9 +338,9 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <video v-if="previewUrl" ref="player" class="analysis-video" :src="previewUrl" :style="{ aspectRatio: previewAspectRatio }" controls playsinline preload="metadata" @loadedmetadata="onMetadata" />
           <div v-else class="skeleton-player" :class="{ scanning: isScanning }"><div v-if="isScanning" class="scan-beam" /><div class="skeleton-grid" /><div class="skeleton-center"><span class="material-symbols-outlined">movie</span><p>{{ statusLabel }}</p><small>选择视频后点击开始分析</small></div></div>
         </section>
-        <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }} <span>↗</span></button>
+        <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }}</button>
         <p class="generation-billing-note">每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火 · 提交时预占，分析成功后扣除，失败或取消退回。重新分析会再次计费。</p>
-        <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员 →</RouterLink>
+        <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员</RouterLink>
         <button v-if="current && !analysisTerminal(current.status)" type="button" class="premium-secondary" :disabled="uploading" @click="cancelScan">取消分析</button>
         <p class="privacy-note"><span class="material-symbols-outlined">lock</span>原视频保留供回看，临时文件自动清理</p>
         <div v-if="error" class="analysis-error" role="alert">{{ error }}<button v-if="pollingInterrupted" type="button" @click="error = ''; poll(current.id)">重新连接</button></div>
@@ -425,7 +425,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <div v-if="result.limitations.length" class="analysis-limitations"><strong>观察限制</strong><p v-for="(item, index) in result.limitations" :key="index">{{ item }}</p></div>
           </details>
           <p class="report-export-hint">导出为排版好的中文报告，双击即可阅读，也可打印或保存为 PDF。{{ reportMode === 'real' ? '实拍报告同时包含两种复刻方案。' : '' }}</p>
-          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame">一键生成同款 <span>↗</span></button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
+          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame">一键生成同款</button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
           <p v-if="showGeneration" class="report-export-hint">已修改的总提示词、分镜脚本和画面设置将自动填入视频创作页，上传自己的商品参考图后即可生成。</p>
         </div>
       </section>

@@ -1,7 +1,7 @@
 <script setup>
 import AppSelect from './AppSelect.vue'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ArrowRight, Volume2 } from 'lucide-vue-next'
+import { Volume2 } from 'lucide-vue-next'
 import { auth } from '../stores/auth'
 import { liveApi, describeAutoScript, describePlayback, toSpeechFeedItem } from '../services/liveApi'
 import { LivePlayerSession } from '../services/livePlayerSession'
@@ -265,13 +265,13 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
       <p class="audio-intro">在抖音 App 内用摄像头开播；播报声音直接在这个网页播放，不需要另外连接设备。</p>
       <p class="audio-help">请按抖音当前规则，在抖音 App 中标识合成语音。</p>
       <ul v-if="sessionStatus === 'DRAFT' && blockers.length" class="audio-blockers" aria-label="开始前还需要完成">
-        <li v-for="item in blockers" :key="item.key"><span>还需要{{ item.label }}</span><button v-if="item.step" type="button" class="audio-text-button" @click="emit('edit-step', item.step)">去完成<ArrowRight :size="13" /></button></li>
+        <li v-for="item in blockers" :key="item.key"><span>还需要{{ item.label }}</span><button v-if="item.step" type="button" class="audio-text-button" @click="emit('edit-step', item.step)">去完成</button></li>
       </ul>
       <p v-if="sessionError" class="audio-error" role="alert">{{ sessionError }}</p>
       <div class="audio-launch-footer">
         <p>{{ sessionStatus === 'DRAFT' ? '开始后配置会锁定，并进入直播工作台。' : sessionStatus === 'ENDED' ? '这一场已结束。' : '本场已开始，可在工作台管理播报。' }}</p>
-        <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="auth.isAuthenticated && (!storeId || blockers.length > 0)" @click="emit('start-session')">开始本场<ArrowRight :size="15" /></button>
-        <button v-else-if="sessionStatus !== 'ENDED'" type="button" class="primary-button compact" :disabled="!storeId" @click="emit('open-workspace')">前往直播工作台<ArrowRight :size="15" /></button>
+        <button v-if="sessionStatus === 'DRAFT'" type="button" class="primary-button compact" :disabled="auth.isAuthenticated && (!storeId || blockers.length > 0)" @click="emit('start-session')">开始本场</button>
+        <button v-else-if="sessionStatus !== 'ENDED'" type="button" class="primary-button compact" :disabled="!storeId" @click="emit('open-workspace')">前往直播工作台</button>
       </div>
       <div v-if="desktopDownloads.android" class="audio-desktop">
         <div class="audio-desktop-head">

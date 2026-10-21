@@ -18,7 +18,7 @@
 .information-stream-heading > span { color: var(--color-text-muted); font-size: 12px; }
 .information-clear { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin-left: auto; border: 0; background: none; color: var(--color-accent-text); font-size: 12px; cursor: pointer; }
 .information-feed-entry { min-width: 0; }
-.public-information-page .public-information-item { grid-template-columns: 82px minmax(0, 1fr) 20px; gap: 16px; padding: 26px 0; }
+.public-information-page .public-information-item { grid-template-columns: 82px minmax(0, 1fr); gap: 16px; padding: 26px 0; }
 .public-information-page .public-information-category, .public-information-detail-page .public-information-category { font-size: 12px; white-space: nowrap; }
 .public-information-page .public-information-item h3 { margin: 0 0 9px; font: 600 18px/1.65 var(--font-serif); overflow-wrap: anywhere; }
 .public-information-page .public-information-item:hover h3 { color: var(--color-accent-text); }
@@ -68,7 +68,7 @@
 }
 @media (max-width: 560px) {
   .information-mobile-break { display: inline; }
-  .public-information-page .public-information-item { grid-template-columns: minmax(0, 1fr) 20px; gap: 12px; padding-block: 22px; }
+  .public-information-page .public-information-item { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-block: 22px; }
   .public-information-page .public-information-category { justify-self: start; }
   .public-information-page .public-information-item h3 { font-size: 18px; }
   .public-information-page .public-information-meta { gap: 8px 12px; }

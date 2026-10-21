@@ -6,14 +6,16 @@ import {
   imageDimensions,
   isImageActive,
 } from "../domain/imageCreation";
-import { POSTER_SCENARIOS } from "../domain/posterScenarios";
+import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from "../domain/posterStyles";
 import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
-import InspirationCard from "./InspirationCard.vue";
+import PosterStyleCard from "./PosterStyleCard.vue";
 import { Check, Pencil, X } from "lucide-vue-next";
 
 const props = defineProps({ studio: { type: Object, required: true } });
 const emit = defineEmits(["choose"]);
 const studio = computed(() => props.studio);
+const moment = upcomingMoment();
+const seasonalStyle = SEASONAL_PREFIX + moment.name;
 const galleryScroll = ref(null);
 const preview = ref(null);
 const previewDialog = ref(null);
@@ -104,6 +106,9 @@ async function saveTitle(entry) {
     titleSaving.value = false;
   }
 }
+function historyDate(value) {
+  return new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
 function turnPrompt(turn) {
   if (!turn.parentId) return turn.brief || "这次海报创作";
   return turn.brief?.split("\n本次修改：").at(-1) || "继续修改海报";
@@ -135,7 +140,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           "
           @click="showTab('inspiration')"
         >
-          灵感画廊</button
+          海报风格</button
         ><button
           type="button"
           :class="{ active: studio.workspaceTab === 'result' }"
@@ -161,7 +166,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
       </nav>
       <div class="poster-toolbar-end">
         <RouterLink to="/works" class="poster-works-link"
-          >作品库 <span aria-hidden="true">↗</span></RouterLink
+          >作品库</RouterLink
         >
         <ImageWorkspaceSwitch />
       </div>
@@ -172,15 +177,30 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-if="studio.workspaceTab === 'inspiration'"
         class="poster-inspiration-view"
       >
-        <div class="poster-inspiration-grid">
-          <InspirationCard
-            v-for="(scenario, index) in POSTER_SCENARIOS"
-            :key="scenario.focus"
-            :scenario="scenario"
-            :index="index"
-            :selected="studio.style === scenario.focus"
+        <button
+          type="button"
+          class="poster-seasonal"
+          :class="{ 'is-selected': studio.style === seasonalStyle }"
+          :disabled="studio.locked"
+          :aria-pressed="studio.style === seasonalStyle"
+          @click="emit('choose', seasonalStyle)"
+        >
+          <span class="poster-seasonal-label">应时</span>
+          <strong>{{ moment.name }}</strong>
+          <span>{{ moment.days ? `${moment.days} 天后 · ${moment.month}/${moment.day}` : "就是今天" }}</span>
+          <small>下一个：{{ moment.next }}</small>
+          <Check v-if="studio.style === seasonalStyle" class="poster-seasonal-check" :size="16" aria-hidden="true" />
+        </button>
+        <div class="poster-style-grid">
+          <PosterStyleCard
+            v-for="style in POSTER_STYLES"
+            :key="style.key"
+            :image="`/images/poster-styles/${style.key}.webp`"
+            :name="style.name"
+            :fit="style.fit"
+            :selected="studio.style === style.name"
             :disabled="studio.locked"
-            @select="emit('choose', $event)"
+            @select="emit('choose', style.name)"
           />
         </div>
       </div>
@@ -189,53 +209,27 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-else-if="studio.workspaceTab === 'history'"
         class="poster-history-view"
       >
-        <div class="poster-view-intro">
-          <strong>留下的每一版，都可以继续编辑。</strong>
-          <p>按时间排列的海报会话，点击可查看图片与继续修改。</p>
-        </div>
-        <p v-if="!studio.history.length" class="poster-empty-history">
-          还没有海报创作记录。
-        </p>
-        <div v-else class="poster-history-list">
-          <div
-            v-for="entry in studio.history"
-            :key="entry.id"
-            class="poster-history-entry"
-          >
-            <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" @click="studio.openCreation(entry.id)">
-            <span class="poster-history-thumb"
-              ><img
-                v-if="entry.previewUrl"
-                :src="entry.previewUrl"
-                :alt="`${entry.title || '海报创作'}缩略图`"
-                loading="lazy"
-              /><span v-else aria-label="暂无成图">待成图</span></span
-            ><span class="poster-history-copy"
-              ><strong>{{ entry.title || "海报创作" }}</strong
-              ><small
-                >{{ new Date(entry.createdAt).toLocaleString() }}</small
-              ></span
-            ><span class="poster-history-status">{{
-              IMAGE_STATUS[entry.status]
-            }}</span
-            ><span aria-hidden="true">↗</span>
+        <p v-if="!studio.history.length" class="poster-empty-history">还没有海报</p>
+        <ul v-else class="poster-history-grid">
+          <li v-for="entry in studio.history" :key="entry.id" class="poster-history-card">
+            <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" :aria-label="`打开${entry.title || '海报创作'}`" @click="studio.openCreation(entry.id)">
+              <img v-if="entry.previewUrl" :src="entry.previewUrl" :alt="`${entry.title || '海报创作'}缩略图`" loading="lazy" />
+              <span v-else class="poster-history-placeholder">待成图</span>
+              <span v-if="entry.status !== 'SUCCEEDED'" class="poster-history-status">{{ IMAGE_STATUS[entry.status] }}</span>
             </button>
             <form v-if="editingTitleId === entry.id" class="poster-history-rename" @submit.prevent="saveTitle(entry)">
               <input v-model="editingTitle" maxlength="100" aria-label="作品名称" @keydown.esc.prevent="editingTitleId = null" />
-              <button type="submit" title="保存名称" aria-label="保存名称" :disabled="titleSaving || !editingTitle.trim()"><Check :size="16" /></button>
-              <button type="button" title="取消" aria-label="取消" @click="editingTitleId = null"><X :size="16" /></button>
+              <button type="submit" title="保存名称" aria-label="保存名称" :disabled="titleSaving || !editingTitle.trim()"><Check :size="14" /></button>
+              <button type="button" title="取消" aria-label="取消" @click="editingTitleId = null"><X :size="14" /></button>
             </form>
-            <button v-else type="button" class="poster-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="16" /></button>
-          </div>
-        </div>
-        <button
-          v-if="studio.historyMore"
-          type="button"
-          class="poster-load-more"
-          @click="studio.refreshHistory(false)"
-        >
-          加载更早的记录 ↓
-        </button>
+            <div v-else class="poster-history-meta">
+              <strong :title="entry.title || '海报创作'">{{ entry.title || "海报创作" }}</strong>
+              <button type="button" class="poster-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="13" /></button>
+            </div>
+            <time class="poster-history-date" :datetime="entry.createdAt">{{ historyDate(entry.createdAt) }}</time>
+          </li>
+        </ul>
+        <button v-if="studio.historyMore" type="button" class="poster-load-more" @click="studio.refreshHistory(false)">加载更多</button>
       </div>
 
       <div v-else class="poster-result-view">
@@ -282,10 +276,10 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           <span class="poster-empty-emblem">志</span>
           <h3>让一张海报，讲好门店的故事。</h3>
           <p>
-            选一个经营场景，写下真实商品和活动。生成后海报会完整出现在这里。
+            写下真实商品和活动，再挑一个海报风格。生成后海报会完整出现在这里。
           </p>
           <button type="button" @click="showTab('inspiration')">
-            浏览灵感方向 ↗
+            挑选海报风格
           </button>
         </div>
         <div class="poster-thread">
@@ -307,7 +301,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                 :disabled="studio.busy"
                 @click="studio.load(turn.id)"
               >
-                刷新进度 ↻
+                刷新进度
               </button>
             </div>
             <h3>{{ turnPrompt(turn) }}</h3>
@@ -366,7 +360,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   @click="showPreview(item)"
                 >
                   <img :src="item.url" :alt="item.role" /><span
-                    >放大查看 ↗</span
+                    >放大查看</span
                   >
                 </button>
                 <div
@@ -410,7 +404,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   </button>
                 </div>
                 <form v-if="item.url && turn.id === studio.current?.id && turn.status === 'SUCCEEDED'" class="poster-conversation-editor" @submit.prevent="submitEditor(item)">
-                  <div class="poster-conversation-heading"><strong>继续修改这张海报</strong><small>可多选，生成后仍在当前会话中</small></div>
+                  <div class="poster-conversation-heading"><strong>继续修改这张海报</strong></div>
                   <div class="poster-conversation-options" role="group" aria-label="选择修改项">
                     <label v-for="option in [{ type: 'TEXT', label: '修改文字' }, { type: 'LAYOUT', label: '换版式' }, { type: 'SCENE', label: '换场景' }, { type: 'MESSAGE', label: '换传播角度' }]" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" />{{ option.label }}</label>
                   </div>
@@ -467,7 +461,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             :disabled="studio.busy || !studio.canUseAsset(preview)"
             @click="studio.download(preview)"
           >
-            下载原图 ↓</button
+            下载原图</button
           ><button
             type="button"
             class="poster-lightbox-close"

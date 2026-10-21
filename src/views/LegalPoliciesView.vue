@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, ExternalLink, Printer, Scale } from 'lucide-vue-next'
+import { ExternalLink, Printer, Scale } from 'lucide-vue-next'
 import { LEGAL_ENTITY, LEGAL_POLICY_NAVIGATION, LEGAL_POLICY_UPDATED_AT, legalPolicies } from '../domain/legalPolicies.js'
 import '../legal.css'
 import { auth } from '../stores/auth'
@@ -45,7 +45,7 @@ function scrollToArticle(index) {
   <main ref="page" class="legal-page">
     <header class="legal-topbar">
       <RouterLink class="legal-brand" :to="returnLocation" aria-label="返回一方志"><span class="legal-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>平台协议与服务规则</small></span></RouterLink>
-      <RouterLink class="legal-return" :to="returnLocation"><ArrowLeft :size="15" aria-hidden="true" />{{ returnLabel }}</RouterLink>
+      <RouterLink class="legal-return" :to="returnLocation">{{ returnLabel }}</RouterLink>
     </header>
 
     <div class="legal-container">
@@ -86,7 +86,7 @@ function scrollToArticle(index) {
             <h2>运营主体与联系渠道</h2>
             <dl><div><dt>运营主体</dt><dd>{{ LEGAL_ENTITY.name }}</dd></div><div><dt>统一社会信用代码</dt><dd>{{ LEGAL_ENTITY.creditCode }}</dd></div><div><dt>注册地址</dt><dd>{{ LEGAL_ENTITY.address }}</dd></div><div><dt>客服、售后与隐私事务联系</dt><dd><a :href="`tel:${LEGAL_ENTITY.phone}`">{{ LEGAL_ENTITY.phone }}</a></dd></div></dl>
             <p>涉及个人信息查询、修改、删除、撤回同意、账号处理、交易售后、侵权通知或内容投诉，可拨打上述公示电话。提出申请时请说明账号和具体问题；无需提供短信验证码、密码或与事项无关的完整身份证照片。</p>
-            <RouterLink class="legal-back-link" :to="returnLocation"><ArrowLeft :size="14" aria-hidden="true" />阅读完毕，{{ returnLabel }}</RouterLink>
+            <RouterLink class="legal-back-link" :to="returnLocation">阅读完毕，{{ returnLabel }}</RouterLink>
           </section>
         </article>
       </div>

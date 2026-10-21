@@ -62,7 +62,7 @@ onBeforeUnmount(() => { requestVersion++ })
     <div class="public-information-content">
       <header class="information-masthead">
         <div><p class="information-eyebrow">一方志 · 商家信息服务</p><h1>商家信息广场</h1><p class="information-intro">新消息，好生意。<br class="information-mobile-break" />门店活动、商品供求与商家公告，在这里看见。</p></div>
-        <RouterLink class="public-button public-button-primary" to="/information-publishing"><FilePenLine :size="16" aria-hidden="true" />发布一条信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink>
+        <RouterLink class="public-button public-button-primary" to="/information-publishing"><FilePenLine :size="16" aria-hidden="true" />发布一条信息</RouterLink>
       </header>
 
       <section class="public-feed-toolbar" aria-label="信息筛选">
@@ -80,17 +80,16 @@ onBeforeUnmount(() => { requestVersion++ })
               <RouterLink :to="{ name: 'public-information-detail', params: { id: item.id }, query: informationQuery(filters) }" class="public-information-item">
                 <span class="public-information-category">{{ informationCategoryNames[item.category] || '商家信息' }}</span>
                 <div class="public-information-item-main"><h3>{{ item.title }}</h3><p>{{ item.summary || item.content }}</p><div class="public-information-meta"><strong><Store :size="14" aria-hidden="true" />{{ item.merchantName }}</strong><span><MapPin :size="13" aria-hidden="true" />{{ item.region }}</span><time :datetime="item.publishedAt || item.createdAt">{{ informationDate(item.publishedAt || item.createdAt) }}</time></div></div>
-                <ArrowRight :size="18" class="public-information-arrow" aria-hidden="true" />
               </RouterLink>
             </article>
           </div>
-          <section v-else class="public-empty"><FileText :size="30" aria-hidden="true" /><h3>{{ filtered || filters.page ? '没有找到相关信息' : '还没有公开的信息' }}</h3><p>{{ filtered ? '试试其他关键词，或查看全部商家信息。' : filters.page ? '这一页暂无内容，可以返回第一页继续浏览。' : '商家发布的信息会按时间显示在这里。' }}</p><button v-if="filtered || filters.page" type="button" class="public-button" @click="changeFilters({ category: '', keyword: '' })">查看全部信息</button><RouterLink v-else to="/information-publishing" class="public-text-link">发布一条信息<ArrowRight :size="14" aria-hidden="true" /></RouterLink></section>
+          <section v-else class="public-empty"><FileText :size="30" aria-hidden="true" /><h3>{{ filtered || filters.page ? '没有找到相关信息' : '还没有公开的信息' }}</h3><p>{{ filtered ? '试试其他关键词，或查看全部商家信息。' : filters.page ? '这一页暂无内容，可以返回第一页继续浏览。' : '商家发布的信息会按时间显示在这里。' }}</p><button v-if="filtered || filters.page" type="button" class="public-button" @click="changeFilters({ category: '', keyword: '' })">查看全部信息</button><RouterLink v-else to="/information-publishing" class="public-text-link">发布一条信息</RouterLink></section>
           <nav v-if="!loading && !error && pages > 1" class="public-pagination" aria-label="信息分页"><button type="button" :disabled="filters.page <= 0" @click="changeFilters({ page: filters.page - 1 })">上一页</button><span>{{ filters.page + 1 }} / {{ pages }}</span><button type="button" :disabled="filters.page + 1 >= pages" @click="changeFilters({ page: filters.page + 1 })">下一页</button></nav>
         </section>
 
         <aside class="information-sidebar" aria-label="商家服务">
-          <section class="information-service-note"><span class="information-note-index">商家来信</span><h2>让你的消息<br />被更多人看见。</h2><p>写清具体内容、所在地区和参与方式。发布后生成独立页面，可分享、编辑与下架。</p><RouterLink to="/information-publishing" class="public-text-link">发布与管理信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink></section>
-          <RouterLink to="/merchant-alliance" class="information-service-link"><Store :size="22" aria-hidden="true" /><div><strong>好物与商家</strong><span>查看联盟商家的实物商品，或申请入驻。</span></div><ArrowRight :size="16" aria-hidden="true" /></RouterLink>
+          <section class="information-service-note"><span class="information-note-index">商家来信</span><h2>让你的消息<br />被更多人看见。</h2><p>写清具体内容、所在地区和参与方式。发布后生成独立页面，可分享、编辑与下架。</p><RouterLink to="/information-publishing" class="public-text-link">发布与管理信息</RouterLink></section>
+          <RouterLink to="/merchant-alliance" class="information-service-link"><Store :size="22" aria-hidden="true" /><div><strong>好物与商家</strong><span>查看联盟商家的实物商品，或申请入驻。</span></div></RouterLink>
           <p class="information-reading-note">点击标题阅读全文。信息详情展示发布商家、发布时间及有效期，内容由发布商家维护。</p>
         </aside>
       </div>

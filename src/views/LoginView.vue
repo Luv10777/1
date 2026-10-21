@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
+import { ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
 import { auth } from '../stores/auth'
 import { theme } from '../stores/theme'
 import { accountError, codeError, passwordError, phoneError, safeRedirect } from '../utils/authValidation.js'
@@ -270,7 +270,7 @@ function useSmsInstead() {
         <div class="access-header-actions">
           <div class="access-register">
             <span>{{ isRegister ? '已有账号？' : '没有账号？' }}</span>
-            <button type="button" :disabled="actionBusy" @click="toggleRegistration">{{ isRegister ? '立即登录' : '立即注册' }}<ArrowUpRight :size="13" aria-hidden="true" /></button>
+            <button type="button" :disabled="actionBusy" @click="toggleRegistration">{{ isRegister ? '立即登录' : '立即注册' }}</button>
           </div>
           <button class="access-theme-toggle" type="button" :aria-label="theme.isLight ? '切换到深色模式' : '切换到浅色模式'" :title="theme.isLight ? '切换到深色模式' : '切换到浅色模式'" @click="theme.toggle()">
             <component :is="theme.isLight ? Moon : Sun" :size="18" aria-hidden="true" />
@@ -295,7 +295,7 @@ function useSmsInstead() {
           </div>
           <p v-if="error" class="access-message is-error" role="alert">{{ error }}</p>
           <p v-if="notice" class="access-message is-success" role="status">{{ notice }}</p>
-          <button class="access-submit w-full" type="submit" :disabled="wechatBusy || wechatSending"><LoaderCircle v-if="wechatBusy" class="access-spinner" :size="18" aria-hidden="true" />{{ wechatBusy ? '正在处理…' : wechatPasswordRequired ? '完成设置并登录' : '验证手机号并继续' }}<ArrowRight v-if="!wechatBusy" :size="18" aria-hidden="true" /></button>
+          <button class="access-submit w-full" type="submit" :disabled="wechatBusy || wechatSending"><LoaderCircle v-if="wechatBusy" class="access-spinner" :size="18" aria-hidden="true" />{{ wechatBusy ? '正在处理…' : wechatPasswordRequired ? '完成设置并登录' : '验证手机号并继续' }}</button>
           <button class="wechat-back" type="button" :disabled="wechatBusy || wechatSending" @click="cancelWechatBinding">返回其他登录方式</button>
         </form>
         <div v-else-if="!isRegister" class="access-tabs" role="tablist" aria-label="登录方式" @keydown="tabKeydown">
@@ -357,7 +357,6 @@ function useSmsInstead() {
           <button class="access-submit w-full transition-colors disabled:cursor-not-allowed" type="submit" :disabled="actionBusy">
             <LoaderCircle v-if="busy" class="access-spinner" :size="18" aria-hidden="true" />
             {{ busy ? '正在登录…' : isRegister ? '注册并登录' : '登录' }}
-            <ArrowRight v-if="!busy" :size="18" aria-hidden="true" />
           </button>
         </form>
         <div v-if="!wechatBinding && !wechatVerifying" class="access-divider"><span>其他登录方式</span></div>
@@ -388,7 +387,7 @@ function useSmsInstead() {
       <LockKeyhole :size="25" class="access-dialog-icon" aria-hidden="true" />
       <h2 id="access-dialog-title">找回账号访问权限</h2>
       <p>忘记密码也可以通过已绑定的手机号登录。若手机号已停用，请联系平台管理员协助处理。</p>
-      <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录<ArrowRight :size="18" /></button>
+      <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录</button>
     </dialog>
   </main>
 </template>

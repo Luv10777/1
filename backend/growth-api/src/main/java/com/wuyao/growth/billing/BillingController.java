@@ -30,6 +30,10 @@ public class BillingController {
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.topUp(input)); }
     @PostMapping("/orders/subscription") public ApiResponse<BillingDtos.OrderView> subscribe(@Valid @RequestBody BillingDtos.Subscribe input,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.subscribe(input)); }
+    @GetMapping("/topups") public ApiResponse<BillingDtos.History<BillingDtos.TopupRecord>> topups(
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,@AuthenticationPrincipal AuthPrincipal me) {
+        requireOwner(me); return ApiResponse.ok(service.topups(page,size));
+    }
     @GetMapping("/orders/{id}") public ApiResponse<BillingDtos.OrderView> order(@PathVariable String id,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(service.order(id)); }
     @PostMapping("/orders/{id}/refresh") public ApiResponse<BillingDtos.OrderView> refresh(@PathVariable String id,

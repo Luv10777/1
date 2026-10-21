@@ -1,7 +1,7 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
 import { onMounted, ref, watch } from 'vue'
-import { ArrowRight, Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
+import { Send, FileCheck2, FilePenLine, CheckCircle2, RefreshCw } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { businessCommunityService } from '../services/businessCommunity'
@@ -32,7 +32,7 @@ watch(() => auth.isAuthenticated, signedIn => {
 
 <template>
   <div class="business-page merchant-alliance-page merchant-join-page">
-    <header class="business-heading"><div><h1>加入商户联盟</h1><p>提交真实经营资料。平台审核通过后，可以线上卖货、发布商家信息、提供联盟券。</p></div><RouterLink :to="{ name: 'alliance-pool' }" class="business-link">去领券中心<ArrowRight :size="15" aria-hidden="true" /></RouterLink></header>
+    <header class="business-heading"><div><h1>加入商户联盟</h1><p>提交真实经营资料。平台审核通过后，可以线上卖货、发布商家信息、提供联盟券。</p></div><RouterLink :to="{ name: 'alliance-pool' }" class="business-link">去领券中心</RouterLink></header>
     <section v-if="auth.isAuthenticated" class="business-records" aria-labelledby="merchant-applications-title">
       <div class="business-records-heading"><div><h2 id="merchant-applications-title">我的入驻申请</h2></div><button type="button" class="business-record-refresh" :disabled="applicationsLoading" aria-label="刷新申请状态" @click="loadApplications"><RefreshCw :size="15" /></button></div>
       <p v-if="applicationsError" class="business-message-error" role="alert">{{ applicationsError }}</p>
@@ -40,11 +40,11 @@ watch(() => auth.isAuthenticated, signedIn => {
       <p v-else-if="!applications.length" class="business-record-empty">提交申请后，可在这里查看平台审核状态和意见。</p>
       <ul v-else class="business-record-list"><li v-for="application in applications" :key="application.id"><div class="business-record-main"><strong>{{ application.merchantName }} · {{ application.companyName }}</strong><small>{{ application.industry }} · {{ application.region }} · {{ new Date(application.createdAt).toLocaleDateString('zh-CN') }}</small><small v-if="application.reviewNote" class="business-review-note">平台意见：{{ application.reviewNote }}</small></div><span class="business-record-status" :class="`status-${application.status.toLowerCase()}`">{{ statusLabel[application.status] || application.status }}</span></li></ul>
     </section>
-    <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料，通过后可以线上卖货、发布商家信息、提供联盟券。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息<ArrowRight :size="15" aria-hidden="true" /></RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
+    <section v-if="receipt" class="business-submission-result" role="status"><CheckCircle2 :size="36" aria-hidden="true" /><h2>入驻申请已提交</h2><p>平台将审核经营主体与商家资料，通过后可以线上卖货、发布商家信息、提供联盟券。请保持联系人电话畅通。</p><span>申请编号：{{ receipt.id }}</span><RouterLink to="/information-publishing" class="business-button business-button-primary">发布商家信息</RouterLink><button class="business-link" type="button" @click="reset">申请其他商家入驻</button></section>
     <template v-else>
       <ol class="business-process" aria-label="商家入驻流程"><li class="is-current"><span>01</span><strong>填写申请</strong></li><li><span>02</span><strong>资料审核</strong></li><li><span>03</span><strong>入驻联盟</strong></li></ol>
       <div class="business-editor-layout">
-        <section v-if="!auth.isAuthenticated" class="merchant-application-login"><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h3>为每一方商家立传</h3><p>登录后填写经营主体与联系人资料，提交入驻申请并查看审核进度。</p><RouterLink :to="{ name: 'login', query: { redirect: '/merchant-alliance/join' } }" class="business-button business-button-primary">登录并申请入驻<ArrowRight :size="16" aria-hidden="true" /></RouterLink><span>浏览和购买联盟商品无需登录</span></section>
+        <section v-if="!auth.isAuthenticated" class="merchant-application-login"><span class="merchant-alliance-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><h3>为每一方商家立传</h3><p>登录后填写经营主体与联系人资料，提交入驻申请并查看审核进度。</p><RouterLink :to="{ name: 'login', query: { redirect: '/merchant-alliance/join' } }" class="business-button business-button-primary">登录并申请入驻</RouterLink><span>浏览和购买联盟商品无需登录</span></section>
         <form v-else ref="editor" class="business-form" :aria-busy="submitting" @submit.prevent="submit" @input="clearFieldError">
           <fieldset class="business-form-fields" :disabled="submitting">
             <section class="business-form-section">
@@ -66,7 +66,7 @@ watch(() => auth.isAuthenticated, signedIn => {
         </form>
         <aside class="business-preview-column">
           <section class="merchant-preparation"><div class="business-section-title"><FileCheck2 :size="19" aria-hidden="true" /><h2>入驻流程</h2></div><ol><li><span>1</span><div><strong>填写商家资料</strong><p>填写经营主体、统一社会信用代码与商家介绍。</p></div></li><li><span>2</span><div><strong>平台审核</strong><p>核对经营主体与申请资料，必要时联系申请人补充材料。</p></div></li><li><span>3</span><div><strong>入驻商家联盟</strong><p>审核通过后建立商家档案，开展信息展示与合作交流。</p></div></li></ol><p class="business-footnote">请确保商家资料与实际经营情况一致，联系电话可正常接通。</p></section>
-          <RouterLink to="/information" class="merchant-next-step"><FilePenLine :size="23" aria-hidden="true" /><div><strong>逛逛商家信息广场</strong><p>了解门店活动、合作机会与供求需求。</p></div><ArrowRight :size="17" aria-hidden="true" /></RouterLink>
+          <RouterLink to="/information" class="merchant-next-step"><FilePenLine :size="23" aria-hidden="true" /><div><strong>逛逛商家信息广场</strong><p>了解门店活动、合作机会与供求需求。</p></div></RouterLink>
         </aside>
       </div>
     </template>

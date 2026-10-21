@@ -87,6 +87,18 @@ button.yanhuo-secondary { background: transparent; font-family: inherit; cursor:
 .yanhuo-topup-dialog .yanhuo-checkout-row { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 16px 32px; }
 .yanhuo-topup-dialog .yanhuo-checkout-row .yanhuo-legal-consent { flex: 1 1 280px; }
 .yanhuo-topup-dialog .yanhuo-checkout-pay { margin-left: auto; }
+.yanhuo-payment.yanhuo-success-dialog { width: min(340px, calc(100vw - 32px)); padding: 28px 24px 24px; text-align: center; }
+.yanhuo-success-mark { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); }
+.yanhuo-success-dialog h2 { margin: 12px 0 4px; font: 500 20px var(--font-serif); }
+.yanhuo-success-time { margin: 0 0 18px; font-size: 12px; color: var(--ink-muted); }
+.yanhuo-success-rows { display: grid; gap: 10px; margin: 0 0 22px; padding: 14px 16px; border-radius: 6px; background: var(--color-bg-subtle); text-align: left; }
+.yanhuo-success-rows > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+.yanhuo-success-rows dt { color: var(--ink-muted); }
+.yanhuo-success-rows dd { display: inline-flex; align-items: center; margin: 0; font-variant-numeric: tabular-nums; }
+.yanhuo-success-rows .added dd { color: var(--color-accent-text); font-weight: 500; }
+.yanhuo-success-rows .total { padding-top: 10px; border-top: 1px solid var(--line); }
+.yanhuo-success-rows .total dd { font-size: 20px; font-weight: 500; color: var(--ink); }
+.yanhuo-success-dialog .yanhuo-primary { width: 100%; }
 .yanhuo-payment[open] { animation: yanhuo-dialog-in .2s cubic-bezier(.2, .8, .2, 1); }
 .yanhuo-payment[open]::backdrop { animation: yanhuo-backdrop-in .2s ease-out; }
 @keyframes yanhuo-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }

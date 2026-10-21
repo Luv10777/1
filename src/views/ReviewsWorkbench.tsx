@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ArrowUpRight,
   Bot,
   Check,
   ChevronDown,
@@ -432,7 +431,6 @@ export default function ReviewsWorkbench() {
           <div className="overview-card-top">
             <span className="overline">全网综合星级</span>
             <span className="metric-note">
-              <ArrowUpRight size={13} />
               较昨日 +0.2
             </span>
           </div>
@@ -488,7 +486,7 @@ export default function ReviewsWorkbench() {
           <div className="overview-foot">
             <span>每一份歉意，由掌柜落印</span>
             <b>
-              查看待决 <ArrowUpRight size={12} />
+              查看待决
             </b>
           </div>
           <div className="alert-rule">
@@ -854,7 +852,6 @@ export default function ReviewsWorkbench() {
                                 {sending.includes(review.id)
                                   ? "正在落印…"
                                   : "确认发出"}
-                                <ArrowUpRight size={15} />
                               </button>
                             </div>
                           </footer>
@@ -1157,7 +1154,6 @@ export default function ReviewsWorkbench() {
               onClick={() => send(selectedReview, editor.text)}
             >
               保存并发出
-              <ArrowUpRight size={14} />
             </button>
           </div>
         </section>

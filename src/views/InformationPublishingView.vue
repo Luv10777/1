@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Eye, MapPin, Store, ArrowRight, Send, Check, CheckCircle2, ExternalLink, Pencil, RefreshCw, X } from 'lucide-vue-next'
+import { Eye, MapPin, Store, Send, Check, CheckCircle2, ExternalLink, Pencil, RefreshCw, X } from 'lucide-vue-next'
 import { selectedStoreRecord } from '../stores/merchantContext'
 import { useBusinessSubmission } from '../composables/useBusinessSubmission'
 import { useMerchantApproval } from '../composables/useMerchantApproval'
@@ -100,7 +100,7 @@ function startInformation() {
   <div class="business-page information-page">
     <header class="business-heading">
       <div><h1>信息发布</h1><p>提交门店活动、商业合作与供求信息，经平台审核通过后公开展示。</p></div>
-      <div class="business-heading-links"><RouterLink to="/information" class="business-link">查看信息广场<ExternalLink :size="14" aria-hidden="true" /></RouterLink><RouterLink :to="{ name: 'merchant-join' }" class="business-link">商家入驻<ArrowRight :size="15" aria-hidden="true" /></RouterLink></div>
+      <div class="business-heading-links"><RouterLink to="/information" class="business-link">查看信息广场</RouterLink><RouterLink :to="{ name: 'merchant-join' }" class="business-link">商家入驻</RouterLink></div>
     </header>
 
     <section class="business-records" aria-labelledby="my-publications-title">
@@ -129,8 +129,8 @@ function startInformation() {
     </section>
 
     <section v-if="receipt" class="business-submission-result" role="status">
-      <CheckCircle2 :size="36" aria-hidden="true" /><h2>{{ editingPublication ? '修改已提交审核' : '信息已提交审核' }}</h2><p>「{{ receipt.title }}」已保存，正在等待平台审核，通过后才会显示在信息广场。可在上方发布记录中查看审核结果。</p><span>提交编号：{{ receipt.id }}</span><RouterLink to="/information" class="business-link">浏览信息广场<ArrowRight :size="15" aria-hidden="true" /></RouterLink>
-      <button class="business-button business-button-primary" type="button" @click="startInformation">继续发布信息<ArrowRight :size="15" aria-hidden="true" /></button>
+      <CheckCircle2 :size="36" aria-hidden="true" /><h2>{{ editingPublication ? '修改已提交审核' : '信息已提交审核' }}</h2><p>「{{ receipt.title }}」已保存，正在等待平台审核，通过后才会显示在信息广场。可在上方发布记录中查看审核结果。</p><span>提交编号：{{ receipt.id }}</span><RouterLink to="/information" class="business-link">浏览信息广场</RouterLink>
+      <button class="business-button business-button-primary" type="button" @click="startInformation">继续发布信息</button>
     </section>
     <template v-else>
       <p v-if="approved === false" class="business-message-error" role="status">通过商家入驻审核后才能发布信息。<RouterLink :to="{ name: 'merchant-join' }" class="business-link">去加入商户联盟</RouterLink></p>

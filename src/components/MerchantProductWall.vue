@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Package, RefreshCw, Search, Store, X } from 'lucide-vue-next'
+import { Package, RefreshCw, Search, Store, X } from 'lucide-vue-next'
 import { commerceApi } from '../services/commerceApi'
 
 const PAGE_SIZE = 12
@@ -88,7 +88,7 @@ onBeforeUnmount(() => { generation++ })
               <small>{{ item.category }}</small>
               <strong>{{ item.name }}</strong>
               <span class="alliance-card-price"><i>¥</i>{{ formatMoney(item.price) }}<small>/ {{ item.saleUnit }}</small></span>
-              <span class="alliance-card-store"><Store :size="13" aria-hidden="true" />{{ item.storeName }}<ArrowRight :size="13" aria-hidden="true" /></span>
+              <span class="alliance-card-store"><Store :size="13" aria-hidden="true" />{{ item.storeName }}</span>
             </span>
           </RouterLink>
         </li>
