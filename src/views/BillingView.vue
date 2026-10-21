@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { Check, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
-import BillingPlanManager from '../components/BillingPlanManager.vue'
 import BillingCheckoutTerms from '../components/BillingCheckoutTerms.vue'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { auth } from '../stores/auth'
@@ -238,7 +237,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         </dl>
         <p class="yanhuo-note">其他模块按正式公布的规则计费。</p>
       </section>
-      <BillingPlanManager v-if="account.operator" @updated="reloadPlans" />
     </template>
     <dialog ref="topupDialog" class="yanhuo-payment yanhuo-topup-dialog" aria-labelledby="topup-title" @cancel.prevent="closeTopup" @click="event => { if (event.target === topupDialog) closeTopup() }">
       <template v-if="account">
