@@ -22,6 +22,16 @@
 .vs-file > span { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vs-file button { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--ink-muted); cursor: pointer; }
 .vs-file button:hover { background: var(--vs-fill); color: var(--ink); }
+/* 数字人素材：一行四格，已选文件统一列在格子下方 */
+.vs-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.vs-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 10px 4px 8px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); font-size: 13px; line-height: 1.5; cursor: pointer; transition: box-shadow .18s; }
+.vs-tile:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--line); }
+.vs-tile svg { margin-bottom: 4px; color: var(--ink-muted); }
+.vs-tile :is(span, small) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-tile small { color: var(--ink-muted); font-size: 12px; }
+.vs-tiles ~ .vs-files { padding: 0; }
+.vs-tiles ~ .vs-files .vs-file { background: var(--vs-fill); }
+.vs-tiles ~ .vs-files .vs-file button:hover { background: var(--night-panel); }
 .vs-textarea { width: 100%; min-height: 110px; padding: 12px 14px; resize: vertical; border: 0; border-radius: 8px; outline: 0; background: var(--vs-fill); color: var(--ink); font: 15px/1.6 var(--font-sans); }
 .vs-textarea::placeholder { color: var(--ink-muted); }
 
@@ -104,6 +114,12 @@
 
 /* 桌面上摄影棚固定在一屏内（见 brand.css），预览区按比例分配剩余高度，图片填满格子。 */
 @media (min-width: 761px) {
+  :root .paper-app .digital-human-page .dh-form-scroll.vs-form { gap: clamp(14px, 2.4vh, 32px); padding: clamp(16px, 2.6vh, 28px) 28px 12px; }
+  /* 描述框在高屏上最高 200px，矮屏上先收缩到两行，保证不用滚动就能看到输出设置 */
+  :root .paper-app .digital-human-page .dh-form-scroll .vs-group.vs-script { flex: 0 1 auto; min-height: 108px; }
+  :root .paper-app .digital-human-page .dh-form-scroll .vs-script .vs-textarea { flex: 1 1 auto; height: 200px; min-height: 0; resize: none; }
+  :root .paper-app .digital-human-page .dh-form-footer.vs-footer { gap: 8px; padding: 12px 28px clamp(16px, 2.6vh, 24px); }
+  :root .paper-app .digital-human-page .dh-form-footer .vs-generate { min-height: 46px; }
   :root .paper-app .digital-human-page .dh-preview-panel.vs-preview { gap: clamp(12px, 2vh, 24px); padding: clamp(14px, 2.2vh, 20px) 28px clamp(16px, 2.6vh, 28px); }
   .vs-stage { flex: 1.25 1 0; }
   .vs-stage figure, .vs-stage.is-portrait figure { aspect-ratio: auto; height: 100%; }
@@ -116,6 +132,7 @@
   :root .paper-app .digital-human-page .dh-form-scroll.vs-form { padding: 22px 18px 18px; gap: 26px; }
   :root .paper-app .digital-human-page .dh-form-footer.vs-footer { padding: 14px 18px 18px; }
   :root .paper-app .digital-human-page .dh-preview-panel.vs-preview { padding: 16px 18px 20px; }
+  .vs-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vs-avatars-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { .vs-row, .vs-segmented button, .vs-chevron, .vs-generate, .vs-avatars-grid img { transition: none; } }

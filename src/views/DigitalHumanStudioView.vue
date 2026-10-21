@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { AudioLines, ChevronRight, Film, Plus, X } from 'lucide-vue-next'
+import { AudioLines, ChevronRight, Film, ImagePlus, UserRound, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
@@ -179,40 +179,28 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           <h1 class="vs-title">数字人摄影棚</h1>
           <section class="vs-group">
             <span class="vs-label">素材<small>均可选</small></span>
-            <div class="vs-list">
-              <div class="vs-item">
-                <button type="button" class="vs-row" @click="avatarInput?.click()"><span>数字人形象</span><small>{{ avatarFile ? '已选择 1 张' : '从本地上传' }}</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
-                <div v-if="avatarFile" class="vs-files"><span class="vs-file"><img :src="avatarFile.url" alt="已选数字人形象"><span>{{ avatarFile.name }}</span><button type="button" aria-label="移除数字人形象" @click="clearUpload('avatar')"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span></div>
-                <input ref="avatarInput" class="video-file-input" type="file" accept="image/*" @change="setUpload('avatar', $event)">
-              </div>
-              <div class="vs-item">
-                <button type="button" class="vs-row" @click="assetsInput?.click()"><span>商品图片</span><small>最多 {{ materialLimits.image }} 张</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
-                <div v-if="productFile || packageFile || extraImages.length" class="vs-files">
-                  <span v-for="asset in [productFile, packageFile].filter(Boolean)" :key="asset.name" class="vs-file"><img :src="asset.url" :alt="asset.name"><span>{{ asset.name }}</span><button type="button" aria-label="移除参考图片" @click="clearUpload(asset === productFile ? 'product' : 'package')"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-                  <span v-for="(asset, index) in extraImages" :key="asset.name + index" class="vs-file"><img :src="asset.url" :alt="asset.name"><span>{{ asset.name }}</span><button type="button" aria-label="移除参考图片" @click="removeExtraImage(index)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-                </div>
-                <input ref="assetsInput" class="video-file-input" type="file" accept="image/*" multiple @change="setUpload('assets', $event)">
-              </div>
-              <div class="vs-item">
-                <button type="button" class="vs-row" @click="referenceVideoInput?.click()"><span>参考视频</span><small>最多 {{ materialLimits.video }} 个</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
-                <div v-if="referenceVideos.length" class="vs-files">
-                  <span v-for="(asset, index) in referenceVideos" :key="asset.name + index" class="vs-file"><Film :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" aria-label="移除参考视频" @click="removeReferenceVideo(index)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-                </div>
-                <input ref="referenceVideoInput" class="video-file-input" type="file" accept="video/*" multiple @change="setUpload('video', $event)">
-              </div>
-              <div class="vs-item">
-                <button type="button" class="vs-row" @click="voiceInput?.click()"><span>音色</span><small>最多 {{ materialLimits.audio }} 个</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
-                <div v-if="voiceFile || extraVoices.length" class="vs-files">
-                  <span v-if="voiceFile" class="vs-file"><AudioLines :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ voiceFile.name }}</span><button type="button" aria-label="移除音色" @click="clearUpload('voice')"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-                  <span v-for="(asset, index) in extraVoices" :key="asset.name + index" class="vs-file"><AudioLines :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" aria-label="移除音色" @click="removeExtraVoice(index)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-                </div>
-                <input ref="voiceInput" class="video-file-input" type="file" accept="audio/*" multiple @change="setUpload('voice', $event)">
-              </div>
+            <div class="vs-tiles">
+              <button type="button" class="vs-tile" @click="avatarInput?.click()"><UserRound :size="18" :stroke-width="1.6" aria-hidden="true" /><span>数字人形象</span><small>{{ avatarFile ? '已选择 1 张' : '从本地上传' }}</small></button>
+              <button type="button" class="vs-tile" @click="assetsInput?.click()"><ImagePlus :size="18" :stroke-width="1.6" aria-hidden="true" /><span>商品图片</span><small>最多 {{ materialLimits.image }} 张</small></button>
+              <button type="button" class="vs-tile" @click="referenceVideoInput?.click()"><Film :size="18" :stroke-width="1.6" aria-hidden="true" /><span>参考视频</span><small>最多 {{ materialLimits.video }} 个</small></button>
+              <button type="button" class="vs-tile" @click="voiceInput?.click()"><AudioLines :size="18" :stroke-width="1.6" aria-hidden="true" /><span>音色</span><small>最多 {{ materialLimits.audio }} 个</small></button>
             </div>
+            <div v-if="avatarFile || productFile || packageFile || extraImages.length || referenceVideos.length || voiceFile || extraVoices.length" class="vs-files">
+              <span v-if="avatarFile" class="vs-file"><img :src="avatarFile.url" alt="已选数字人形象"><span>{{ avatarFile.name }}</span><button type="button" aria-label="移除数字人形象" @click="clearUpload('avatar')"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              <span v-for="asset in [productFile, packageFile].filter(Boolean)" :key="asset.name" class="vs-file"><img :src="asset.url" :alt="asset.name"><span>{{ asset.name }}</span><button type="button" aria-label="移除参考图片" @click="clearUpload(asset === productFile ? 'product' : 'package')"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              <span v-for="(asset, index) in extraImages" :key="asset.name + index" class="vs-file"><img :src="asset.url" :alt="asset.name"><span>{{ asset.name }}</span><button type="button" aria-label="移除参考图片" @click="removeExtraImage(index)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              <span v-for="(asset, index) in referenceVideos" :key="asset.name + index" class="vs-file"><Film :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" aria-label="移除参考视频" @click="removeReferenceVideo(index)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              <span v-if="voiceFile" class="vs-file"><AudioLines :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ voiceFile.name }}</span><button type="button" aria-label="移除音色" @click="clearUpload('voice')"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              <span v-for="(asset, index) in extraVoices" :key="asset.name + index" class="vs-file"><AudioLines :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" aria-label="移除音色" @click="removeExtraVoice(index)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+            </div>
+            <input ref="avatarInput" class="video-file-input" type="file" accept="image/*" @change="setUpload('avatar', $event)">
+            <input ref="assetsInput" class="video-file-input" type="file" accept="image/*" multiple @change="setUpload('assets', $event)">
+            <input ref="referenceVideoInput" class="video-file-input" type="file" accept="video/*" multiple @change="setUpload('video', $event)">
+            <input ref="voiceInput" class="video-file-input" type="file" accept="audio/*" multiple @change="setUpload('voice', $event)">
           </section>
-          <section class="vs-group">
+          <section class="vs-group vs-script">
             <label for="dh-script" class="vs-label">描述内容</label>
-            <textarea id="dh-script" v-model="script" class="vs-textarea" rows="4" maxlength="500" placeholder="输入视频文案或商品描述，例如：今天给大家分享一款适合敏感肌的春日精华，轻薄好吸收，换季也能保持水润光泽。" />
+            <textarea id="dh-script" v-model="script" class="vs-textarea" rows="2" maxlength="500" placeholder="输入视频文案或商品描述，例如：今天给大家分享一款适合敏感肌的春日精华，轻薄好吸收，换季也能保持水润光泽。" />
           </section>
           <section class="vs-settings">
             <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="dh-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ currentModel.label }} · {{ ratioOptions.find(option => option.value === ratio)?.label }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
