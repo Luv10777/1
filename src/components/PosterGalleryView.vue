@@ -9,7 +9,7 @@ import {
 import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from "../domain/posterStyles";
 import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
 import PosterStyleCard from "./PosterStyleCard.vue";
-import { Check, Download, Maximize2, Pencil, X } from "lucide-vue-next";
+import { ArrowUp, Check, Download, Folder, Pencil, RefreshCw, X } from "lucide-vue-next";
 
 const props = defineProps({ studio: { type: Object, required: true } });
 const emit = defineEmits(["choose"]);
@@ -165,9 +165,9 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         </button>
       </nav>
       <div class="poster-toolbar-end">
-        <RouterLink to="/works" class="poster-works-link"
-          >作品库</RouterLink
-        >
+        <RouterLink to="/works" class="poster-works-link" aria-label="作品库" title="作品库"
+          ><Folder :size="18" :stroke-width="1.6" aria-hidden="true"
+        /></RouterLink>
         <ImageWorkspaceSwitch />
       </div>
     </header>
@@ -214,7 +214,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           <li v-for="entry in studio.history" :key="entry.id" class="poster-history-card">
             <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" :aria-label="`打开${entry.title || '海报创作'}`" @click="studio.openCreation(entry.id)">
               <img v-if="entry.previewUrl" :src="entry.previewUrl" :alt="`${entry.title || '海报创作'}缩略图`" loading="lazy" />
-              <span v-else class="poster-history-placeholder">待成图</span>
+              <span v-else class="poster-history-placeholder"><img src="/images/brand/yifangzhi-mark.png" alt="" /><span>待成图</span></span>
               <span v-if="entry.status !== 'SUCCEEDED'" class="poster-history-status">{{ IMAGE_STATUS[entry.status] }}</span>
             </button>
             <form v-if="editingTitleId === entry.id" class="poster-history-rename" @submit.prevent="saveTitle(entry)">
@@ -293,25 +293,16 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             :key="turn.id"
             class="poster-current"
           >
-            <div class="poster-turn-bar">
-              <div class="poster-turn-label">{{ index === 0 ? '初稿' : `第 ${index + 1} 版` }} <time>{{ new Date(turn.createdAt).toLocaleString() }}</time></div>
-              <div class="poster-result-head">
-                <span class="poster-status"
-                  ><i :class="{ live: isImageActive(turn.status) }" />{{
-                    IMAGE_STATUS[turn.status]
-                  }}</span
-                ><span
-                  >{{ turn.completed }}/{{ turn.count }} 张</span
-                ><button v-if="turn.id === studio.current?.id"
-                  type="button"
-                  :disabled="studio.busy"
-                  @click="studio.load(turn.id)"
-                >
-                  刷新进度
-                </button>
+            <div class="poster-turn-head">
+              <div>
+                <h3>{{ turnPrompt(turn) }}</h3>
+                <p class="poster-result-head" role="status">
+                  <span class="poster-status"><i :class="{ live: isImageActive(turn.status) }" />{{ IMAGE_STATUS[turn.status] }}</span>
+                  <span>· {{ turn.completed }}/{{ turn.count }} 张 · {{ index === 0 ? '初稿' : `第 ${index + 1} 版` }} · <time>{{ new Date(turn.createdAt).toLocaleString() }}</time></span>
+                </p>
               </div>
+              <button v-if="turn.id === studio.current?.id" type="button" class="poster-icon-button" aria-label="刷新进度" title="刷新进度" :disabled="studio.busy" @click="studio.load(turn.id)"><RefreshCw :size="17" :stroke-width="1.6" aria-hidden="true" /></button>
             </div>
-            <h3>{{ turnPrompt(turn) }}</h3>
             <p v-if="turn.summary" class="poster-result-summary">
               {{ turn.summary }}
             </p>
@@ -370,36 +361,34 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   :aria-label="`放大查看${item.role}`"
                   @click="showPreview(item)"
                 >
-                  <img :src="item.url" :alt="item.role" /><span
-                    ><Maximize2 :size="13" aria-hidden="true" />放大查看</span
-                  >
+                  <img :src="item.url" :alt="item.role" />
                 </button>
                 <div
                   v-else
                   class="poster-result-placeholder"
                   :style="{ aspectRatio: item.width + '/' + item.height }"
                 >
-                  <span
-                    v-if="isImageActive(item.status)"
-                    class="poster-live-dot"
+                  <img
+                    class="poster-placeholder-mark"
+                    src="/images/brand/yifangzhi-mark.png"
+                    alt=""
                   /><strong>{{ item.role }}</strong
                   ><small>{{ IMAGE_STATUS[item.status] }}</small>
                 </div>
                 <div class="poster-item-details">
                   <div class="poster-item-top">
-                    <div class="poster-item-meta">
-                      <strong
-                        >{{ String(item.ordinal + 1).padStart(2, "0") }} /
-                        {{ item.role }}</strong>
-                    </div>
+                    <span class="poster-item-meta">{{ item.role }}</span>
                     <div class="poster-item-actions">
                       <button
                         v-if="item.url"
                         type="button"
+                        class="poster-icon-button"
+                        :aria-label="`下载${item.role}`"
+                        title="下载图片"
                         :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)"
                         @click="studio.download(item)"
                       >
-                        <Download :size="14" aria-hidden="true" />下载图片</button
+                        <Download :size="16" :stroke-width="1.6" aria-hidden="true" /></button
                       ><button
                         v-if="['FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN'].includes(item.status)"
                         type="button"
@@ -417,19 +406,19 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   {{ item.error }}
                 </p>
                 <form v-if="item.url && turn.id === studio.current?.id && turn.status === 'SUCCEEDED'" class="poster-conversation-editor" @submit.prevent="submitEditor(item)">
-                  <div class="poster-conversation-heading"><strong>继续修改这张海报</strong></div>
+                  <div class="poster-conversation-heading"><strong>继续修改</strong></div>
                   <div class="poster-conversation-options" role="group" aria-label="选择修改项">
                     <label v-for="option in [{ type: 'TEXT', label: '修改文字' }, { type: 'LAYOUT', label: '换版式' }, { type: 'SCENE', label: '换场景' }, { type: 'MESSAGE', label: '换传播角度' }]" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" /><Check v-if="editorOptions.includes(option.type)" :size="12" :stroke-width="2.4" aria-hidden="true" />{{ option.label }}</label>
                   </div>
                   <div v-if="editorOptions.includes('TEXT')" class="poster-conversation-copy">
-                    <label>标题<input v-model="editorHeadline" maxlength="40" /></label>
-                    <label>活动说明<textarea v-model="editorCaption" maxlength="100" rows="2" /></label>
+                    <label><span>标题</span><input v-model="editorHeadline" maxlength="40" /></label>
+                    <label><span>活动说明</span><input v-model="editorCaption" maxlength="100" placeholder="可不填" /></label>
                   </div>
-                  <textarea v-model="editorInstruction" class="poster-conversation-input" maxlength="1000" placeholder="还可以补充一句，例如：背景更清爽，商品保持不变" />
-                  <div class="poster-conversation-footer">
-                    <small>{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火 · ` : '' }}成功交付后扣费</small>
-                    <button type="submit" class="poster-conversation-submit" :disabled="studio.busy || !!studio.pending || !studio.configured || (!editorOptions.length && !editorInstruction.trim())">生成这一版</button>
+                  <div class="poster-conversation-bar">
+                    <input v-model="editorInstruction" class="poster-conversation-input" maxlength="1000" aria-label="补充修改说明" placeholder="还可以补充一句，例如：背景更清爽，商品保持不变" />
+                    <button type="submit" class="poster-conversation-submit" aria-label="生成这一版" title="生成这一版" :disabled="studio.busy || !!studio.pending || !studio.configured || (!editorOptions.length && !editorInstruction.trim())"><ArrowUp :size="18" :stroke-width="2" aria-hidden="true" /></button>
                   </div>
+                  <small class="poster-conversation-note">{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</small>
                 </form>
                 </div>
               </article>
