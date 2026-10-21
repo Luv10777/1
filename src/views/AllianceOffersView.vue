@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { Plus, RefreshCw, X } from 'lucide-vue-next'
 import AppSelect from '../components/AppSelect.vue'
@@ -9,7 +10,9 @@ import { allianceApi, discountLabel, offerStatuses, settlementStates, yuan } fro
 import { stores, selectedStoreId } from '../stores/merchantContext'
 import '../alliance.css'
 
-const tab = ref('offers')
+const route = useRoute()
+const tab = ref(['settlements', 'statements', 'account'].includes(route.query.tab) ? route.query.tab : 'offers')
+watch(() => route.query.tab, value => { if (['offers', 'settlements', 'statements', 'account'].includes(value)) tab.value = value })
 const rules = ref(null)
 const offers = ref([])
 const settlements = ref({ items: [], total: 0 })

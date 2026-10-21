@@ -25,7 +25,7 @@ test('business pages remain visible without membership while login and owner per
       await router.push(route.path)
       assert.equal(router.currentRoute.value.name, route.name, route.path)
     }
-    for (const path of ['/copy/extract', '/copy/rewrite', '/notifications', '/help']) {
+    for (const path of ['/copy/extract', '/copy/rewrite', '/help']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.path, '/image/create', `${path} should leave the hidden module`)
     }

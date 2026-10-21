@@ -8,7 +8,8 @@ import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
-import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown } from 'lucide-vue-next'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, Bell } from 'lucide-vue-next'
+import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
 import { billing, number, refreshBilling } from '../stores/billing'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
@@ -19,6 +20,24 @@ const reloadBalance = () => { if (document.visibilityState === 'visible') refres
 watch(() => [auth.user?.id, auth.tenantId], () => refreshBilling(), { immediate: true })
 onMounted(() => { billingTimer = setInterval(reloadBalance, 30000); window.addEventListener('focus', reloadBalance) })
 onBeforeUnmount(() => { clearInterval(billingTimer); window.removeEventListener('focus', reloadBalance) })
+// 顶栏铃铛的未读数：进页面、切路由、回到窗口和每分钟各读一次；通知页改了已读状态会马上刷新。
+const unreadNotices = ref(0)
+async function loadUnreadNotices() {
+  if (!auth.isAuthenticated) { unreadNotices.value = 0; return }
+  try { unreadNotices.value = (await noticeApi.unread()).unread } catch { /* 读不到就保持原值 */ }
+}
+const noticeTimer = setInterval(loadUnreadNotices, 60000)
+onMounted(() => {
+  loadUnreadNotices()
+  window.addEventListener('focus', loadUnreadNotices)
+  window.addEventListener(NOTICES_CHANGED, loadUnreadNotices)
+})
+onBeforeUnmount(() => {
+  clearInterval(noticeTimer)
+  window.removeEventListener('focus', loadUnreadNotices)
+  window.removeEventListener(NOTICES_CHANGED, loadUnreadNotices)
+})
+watch(() => [route.name, auth.isAuthenticated], loadUnreadNotices)
 const router = useRouter()
 const menuOpen = ref(false)
 const collapsed = ref(false)
@@ -322,6 +341,7 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
             <ThemeToggle />
+            <RouterLink v-if="auth.isAuthenticated" :to="{ name: 'notifications' }" class="topbar-entry topbar-notice" :class="{ 'is-current': route.name === 'notifications' }" :aria-label="unreadNotices ? `消息通知，${unreadNotices} 条未读` : '消息通知'" title="消息通知"><Bell :size="15" aria-hidden="true" /><span v-if="unreadNotices" class="topbar-notice-badge">{{ unreadNotices > 99 ? '99+' : unreadNotices }}</span></RouterLink>
             <button class="top-account" :aria-label="auth.isAuthenticated ? '账户设置' : '登录'" @click="router.push(auth.isAuthenticated ? '/settings' : loginLocation)"><UserAvatar v-if="auth.isAuthenticated" class="small" :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span v-else class="user-avatar small"><UserRound :size="16" aria-hidden="true" /></span><span class="top-account-name">{{ userName }}</span></button>
           </div>
         </div>
@@ -372,6 +392,8 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .topbar-balance { gap: 4px; font-variant-numeric: tabular-nums; font-weight: 500; }
 .topbar-balance .yanhuo-coin { margin-right: 0; }
 .topbar-balance-label { margin-right: 2px; color: var(--color-text-muted); font-weight: 400; }
+.topbar-notice { position: relative; padding: 6px 8px; }
+.topbar-notice-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--color-accent); color: var(--color-on-accent); font: 600 12px/18px var(--font-mono); text-align: center; }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
 .topbar-entry-primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); color: var(--color-on-accent); }
 @media (max-width: 1100px) { .topbar-actions { gap: 8px; } .topbar .header-store { max-width: 105px; } }

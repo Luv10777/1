@@ -39,6 +39,7 @@ const PublicStorefrontView = () => import('./views/PublicStorefrontView.vue')
 const PublicOrderView = () => import('./views/PublicOrderView.vue')
 const MerchantJoinView = () => import('./views/MerchantJoinView.vue')
 const AlliancePoolView = () => import('./views/AlliancePoolView.vue')
+const NoticesView = () => import('./views/NoticesView.vue')
 const AllianceRulesView = () => import('./views/AllianceRulesView.vue')
 const AllianceVouchersView = () => import('./views/AllianceVouchersView.vue')
 const AllianceOffersView = () => import('./views/AllianceOffersView.vue')
@@ -108,7 +109,7 @@ const routes = [
   { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
   // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
   { path: '/identity', alias: '/real-name', name: 'identity', redirect: { name: 'settings', hash: '#identity' } },
-  { path: '/notifications', name: 'notifications', redirect: '/image/create' },
+  { path: '/notifications', name: 'notifications', component: NoticesView, meta: { title: '消息通知' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', icon: '✓', description: '按时间查看创作任务、生成结果与实际烟火消耗。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置', icon: '⌘', description: '查看和修改自己的账号资料、登录密码和实名认证。' } },

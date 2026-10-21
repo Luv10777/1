@@ -116,3 +116,15 @@
   .alliance-dialog-panel { padding: 20px 16px; }
   .alliance-panel { padding: 14px; }
 }
+
+/* 消息通知 */
+.notice-list { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.notice-item { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel); color: var(--ink); text-align: left; cursor: pointer; }
+.notice-item:hover { border-color: var(--color-accent); }
+.notice-dot { flex-shrink: 0; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: transparent; }
+.notice-item.unread .notice-dot { background: var(--color-accent); }
+.notice-main { display: grid; gap: 4px; min-width: 0; }
+.notice-main strong { font-size: 14px; }
+.notice-item:not(.unread) .notice-main strong { font-weight: 500; color: var(--ink-muted); }
+.notice-main span { color: var(--ink); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.notice-main small { color: var(--ink-muted); font-size: 12px; }
