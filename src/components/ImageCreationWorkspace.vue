@@ -43,7 +43,7 @@ async function saveTitle(entry) {
         <button type="button" :class="{ active: studio.workspaceTab === 'inspiration' }" :aria-pressed="studio.workspaceTab === 'inspiration'" @click="studio.workspaceTab = 'inspiration'">{{ studio.product ? '灵感案例' : '场景灵感' }}</button>
         <button type="button" :class="{ active: studio.workspaceTab === 'result' }" :aria-pressed="studio.workspaceTab === 'result'" @click="studio.workspaceTab = 'result'">我的生成 <span v-if="studio.active" class="creation-pulse" /></button>
       </div>
-      <div class="creation-library-links"><button type="button" :aria-expanded="studio.historyOpen" @click="studio.historyOpen = !studio.historyOpen">◷ 历史会话</button><RouterLink to="/works">作品库 ↗</RouterLink></div>
+      <div class="creation-library-links"><button type="button" :aria-expanded="studio.historyOpen" @click="studio.historyOpen = !studio.historyOpen">◷ 历史会话</button><RouterLink to="/works">作品库</RouterLink></div>
     </header>
 
     <div v-if="studio.historyOpen" class="creation-history">
@@ -82,7 +82,7 @@ async function saveTitle(entry) {
           <div v-for="n in studio.current.count" :key="n" class="creation-image-placeholder" :style="{ aspectRatio: placeholders.width + '/' + placeholders.height }"><span class="creation-pulse" /><strong>{{ studio.product ? '正在安排第 ' + n + ' 张画面' : '正在安排文案与画面' }}</strong><small>完成后会自动显示在这里</small></div>
         </template>
         <article v-for="item in studio.current.items" :key="item.id" class="creation-result">
-          <button v-if="item.url" type="button" class="creation-image-button" :aria-label="'放大查看第 ' + (item.ordinal + 1) + ' 张：' + item.role" :style="{ aspectRatio: item.width + '/' + item.height }" @click="showPreview(item)"><img :src="item.url" :alt="item.role" /><span>放大查看 ↗</span></button>
+          <button v-if="item.url" type="button" class="creation-image-button" :aria-label="'放大查看第 ' + (item.ordinal + 1) + ' 张：' + item.role" :style="{ aspectRatio: item.width + '/' + item.height }" @click="showPreview(item)"><img :src="item.url" :alt="item.role" /><span>放大查看</span></button>
           <div v-else class="creation-image-placeholder" :style="{ aspectRatio: item.width + '/' + item.height }"><span v-if="isImageActive(item.status)" class="creation-pulse" /><strong>{{ item.role }}</strong><small>{{ IMAGE_STATUS[item.status] }}</small></div>
           <div class="creation-result-caption"><strong>{{ item.ordinal + 1 }} / {{ item.role }}</strong></div>
           <p v-if="item.similarityWarning" class="creation-item-error">这张与近期海报较相似。可以换一个版式或场景；再次生成会调用图片服务。</p>
@@ -98,7 +98,7 @@ async function saveTitle(entry) {
       <form v-if="!studio.active" class="creation-revision" @submit.prevent="studio.revise"><label for="image-revision">{{ studio.current.status === 'NEEDS_INPUT' ? '补充一句就好' : '哪里想再调整？' }}</label><div><input id="image-revision" v-model="studio.revision" maxlength="1000" :placeholder="studio.current.status === 'NEEDS_INPUT' ? '在这里补充信息' : '例如：背景再清爽一点，商品不要变'" /><button type="submit" class="creation-primary" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">{{ studio.current.status === 'NEEDS_INPUT' ? '继续创作' : '生成新版本' }}</button></div><small>原作品会保留。新版本也会自动保存到作品库。</small></form>
     </div>
     <dialog ref="previewDialog" class="creation-preview" aria-label="图片大图预览" @click.self="previewDialog.close()" @close="preview = null">
-      <template v-if="preview"><header><strong>{{ preview.role }}</strong><button type="button" aria-label="关闭图片预览" autofocus @click="previewDialog.close()">×</button></header><img :src="preview.url" :alt="preview.role" /><footer><button type="button" :disabled="studio.busy || !studio.canUseAsset(preview)" @click="studio.download(preview)">下载原图 ↓</button></footer></template>
+      <template v-if="preview"><header><strong>{{ preview.role }}</strong><button type="button" aria-label="关闭图片预览" autofocus @click="previewDialog.close()">×</button></header><img :src="preview.url" :alt="preview.role" /><footer><button type="button" :disabled="studio.busy || !studio.canUseAsset(preview)" @click="studio.download(preview)">下载原图</button></footer></template>
     </dialog>
   </div>
 </template>

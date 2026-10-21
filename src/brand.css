@@ -70,7 +70,6 @@
 svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 .paper-nav .nav-group-chevron { transform: rotate(-90deg); transition: transform .15s; }
 .paper-nav .nav-group-chevron { flex: none; color: var(--color-text-muted); }
-.account-button .chevron { flex: none; color: var(--color-text-muted); }
 .paper-nav .nav-group-chevron.expanded { transform: rotate(0); }
 /* 二级菜单与一级拉开层次：不带图标，文字和一级的文字左对齐（12 内边距 + 20 图标 + 10 间距 = 42），
    颜色退后一档，行距收紧成一组，组尾留白再接下一个一级。 */

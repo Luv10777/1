@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
-  Archive, ArrowLeft, ArrowUpRight, ChevronDown, FileText, Filter,
+  Archive, ChevronDown, FileText, Filter,
   MessageCircleQuestion, Plus, Search, Trash2, Upload, Pencil,
 } from 'lucide-vue-next'
 import { knowledgeApi } from '../services/knowledgeApi'
@@ -279,7 +279,7 @@ async function changeSetStatus(item, action) {
       <section class="faq-feature-card">
         <div class="faq-feature-mark"><MessageCircleQuestion :size="22" stroke-width="1.8" /></div>
         <div class="faq-feature-copy"><h2>常见问答集</h2><p>把门店经验整理成可复用的问答对，发布后自动用于实景直播的门店通用知识。</p><div class="faq-feature-meta"><span>{{ faqSets.length }} 个问答集</span><i /><span>{{ faqTotal }} 个问答对</span><i /><span>{{ publishedTotal }} 个已发布</span></div></div>
-        <button type="button" class="faq-feature-action" :disabled="loading || saving || !selectedStoreId || !!loadError" @click="activeTab = 'faq'; selectedStatus = 'all'; searchQuery = ''">管理问答集 <ArrowUpRight :size="15" /></button>
+        <button type="button" class="faq-feature-action" :disabled="loading || saving || !selectedStoreId || !!loadError" @click="activeTab = 'faq'; selectedStatus = 'all'; searchQuery = ''">管理问答集</button>
       </section>
       <div class="list-toolbar"><div><strong>{{ filteredKnowledge.length }}</strong> 个知识集 <span>·</span> 最近更新优先</div><button class="view-button" type="button" :disabled="loading" @click="archiveOpen = true"><Archive :size="14" /> 归档管理 <span v-if="archivedKnowledge.length" class="archive-count">{{ archivedKnowledge.length }}</span></button></div>
       <div v-if="loading" class="empty-state" role="status"><strong>正在加载知识库…</strong></div>
@@ -303,7 +303,7 @@ async function changeSetStatus(item, action) {
 
     <main v-else-if="selectedFaq" class="faq-detail-page">
       <div class="faq-detail-header">
-        <button type="button" class="back-button" :disabled="saving" @click="closeFaqDetail"><ArrowLeft :size="16" /> 返回知识库</button>
+        <button type="button" class="back-button" :disabled="saving" @click="closeFaqDetail">返回知识库</button>
         <div class="faq-detail-heading"><div class="faq-detail-icon"><MessageCircleQuestion :size="21" /></div><div><p class="eyebrow">FAQ KNOWLEDGE SET · {{ selectedFaq.statusLabel }}</p><h1>{{ selectedFaq.name }}</h1><p>{{ selectedFaq.description || '维护门店可复用的标准问答。' }}</p></div></div>
         <div class="faq-detail-actions">
           <button type="button" class="ghost-button" :disabled="saving" @click="openSetEditor(selectedFaq)"><Pencil :size="15" /> 编辑说明</button>

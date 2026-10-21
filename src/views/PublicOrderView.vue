@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, Check, Clock3, PackageCheck, RefreshCw, Store, Truck } from 'lucide-vue-next'
+import { Check, Clock3, PackageCheck, RefreshCw, Store, Truck } from 'lucide-vue-next'
 import { commerceApi, orderStatuses } from '../services/commerceApi'
 import { LEGAL_ENTITY } from '../domain/legalPolicies'
 import CommerceAlipayPayment from '../components/CommerceAlipayPayment.vue'
@@ -38,7 +38,7 @@ watch(() => route.params.token, loadOrder, { immediate: true })
 
 <template>
   <main class="public-commerce public-order-page">
-    <header class="public-commerce-topbar"><RouterLink to="/information" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>订单查询</small></span></RouterLink><RouterLink to="/information" class="public-text-link">商家信息<ArrowLeft :size="14" /></RouterLink></header>
+    <header class="public-commerce-topbar"><RouterLink to="/information" class="public-brand"><span class="public-brand-seal"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span><strong>一方志</strong><small>订单查询</small></span></RouterLink><RouterLink to="/information" class="public-text-link">商家信息</RouterLink></header>
     <div class="public-order-content">
       <p v-if="loading" class="public-state" role="status">正在读取订单…</p>
       <section v-else-if="error" class="public-empty" role="alert"><PackageCheck :size="30" /><h1>订单暂时无法读取</h1><p>{{ error }}</p><button type="button" class="public-button" @click="loadOrder"><RefreshCw :size="15" />重新查询</button></section>
@@ -57,7 +57,7 @@ watch(() => route.params.token, loadOrder, { immediate: true })
           <p class="public-payment-note">{{ order.payment ? '本单支持企业支付宝扫码付款。订单提交不代表已付款，付款后请等待商家核实到账；如已付款，请勿重复支付。' : order.status === 'CANCELLED' ? '订单已取消，请勿继续付款。如已经付款，请联系实际收款方核实退款；取消订单不会自动退款。' : '请按与商家约定的方式完成交易。订单状态用于查询商家确认与交付进度，不作为支付或退款凭证。' }}</p>
           <p class="public-payment-note">取消、退换货或退款争议，请先联系实际销售商家；需要平台协助时，可拨打<a :href="`tel:${LEGAL_ENTITY.phone}`">{{ LEGAL_ENTITY.phone }}</a>并提供订单号。<RouterLink to="/policies/aftersales" target="_blank" rel="noopener noreferrer">查看售后与退款规则</RouterLink></p>
         </section>
-        <RouterLink to="/information" class="public-store-footer-link"><Store :size="15" />回到一方志商家信息<ArrowLeft :size="14" /></RouterLink>
+        <RouterLink to="/information" class="public-store-footer-link"><Store :size="15" />回到一方志商家信息</RouterLink>
       </template>
     </div>
   </main>

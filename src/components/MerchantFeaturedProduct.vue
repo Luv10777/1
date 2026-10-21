@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue'
-import { ArrowRight, Check, Minus, Package, Plus, RefreshCw, ShoppingBag, Store, X } from 'lucide-vue-next'
+import { Check, Minus, Package, Plus, RefreshCw, ShoppingBag, Store, X } from 'lucide-vue-next'
 import { commerceApi } from '../services/commerceApi'
 import CommerceAlipayPayment from './CommerceAlipayPayment.vue'
 
@@ -115,9 +115,9 @@ onMounted(loadProduct)
         <p class="merchant-product-specification">{{ product.specification }}</p>
         <div class="merchant-product-price"><span>¥</span><strong>{{ formatMoney(product.price) }}</strong><small>/ {{ product.saleUnit }}</small></div>
         <dl class="merchant-product-facts"><div><dt>销售商家</dt><dd><Store :size="14" aria-hidden="true" />{{ store.name }}</dd></div><div><dt>交付方式</dt><dd>实物交付，商家确认订单后安排</dd></div><div><dt>商品状态</dt><dd>{{ available ? '可提交订单' : '暂时售罄' }}</dd></div></dl>
-        <div class="merchant-product-purchase"><div class="merchant-quantity" aria-label="购买数量"><button type="button" aria-label="减少购买数量" :disabled="quantity <= 1 || !available || !!orderReceipt" @click="quantity--"><Minus :size="15" /></button><output aria-live="polite">{{ quantity }}</output><button type="button" aria-label="增加购买数量" :disabled="quantity >= maxQuantity || !available || !!orderReceipt" @click="quantity++"><Plus :size="15" /></button></div><button type="button" class="business-button business-button-primary merchant-buy-button" :disabled="!available && !orderReceipt" @click="openCheckout"><ShoppingBag :size="17" aria-hidden="true" />{{ orderReceipt ? '查看本次订单' : available ? '立即购买' : '暂时售罄' }}<ArrowRight :size="16" aria-hidden="true" /></button></div>
+        <div class="merchant-product-purchase"><div class="merchant-quantity" aria-label="购买数量"><button type="button" aria-label="减少购买数量" :disabled="quantity <= 1 || !available || !!orderReceipt" @click="quantity--"><Minus :size="15" /></button><output aria-live="polite">{{ quantity }}</output><button type="button" aria-label="增加购买数量" :disabled="quantity >= maxQuantity || !available || !!orderReceipt" @click="quantity++"><Plus :size="15" /></button></div><button type="button" class="business-button business-button-primary merchant-buy-button" :disabled="!available && !orderReceipt" @click="openCheckout"><ShoppingBag :size="17" aria-hidden="true" />{{ orderReceipt ? '查看本次订单' : available ? '立即购买' : '暂时售罄' }}</button></div>
         <p class="merchant-product-order-note"><Check :size="14" aria-hidden="true" />填写收货信息 · 提交订单 · 按订单指引付款</p>
-        <RouterLink :to="`/store/${store.id}`" class="business-link merchant-shop-link">进入店铺<ArrowRight :size="14" aria-hidden="true" /></RouterLink>
+        <RouterLink :to="`/store/${store.id}`" class="business-link merchant-shop-link">进入店铺</RouterLink>
       </div>
     </article>
   </section>
@@ -132,7 +132,7 @@ onMounted(loadProduct)
         <div v-if="orderReceipt" class="merchant-checkout-result">
           <CommerceAlipayPayment v-if="orderReceipt.payment" :order="orderReceipt" />
           <p v-else role="status">订单编号：{{ orderReceipt.orderNumber }}</p>
-          <button type="button" class="business-button business-button-primary" @click="goToOrder">查看订单进度<ArrowRight :size="16" aria-hidden="true" /></button>
+          <button type="button" class="business-button business-button-primary" @click="goToOrder">查看订单进度</button>
           <p>请保存订单查询链接，方便继续付款、查询确认结果与物流进度。</p>
         </div>
         <form v-else ref="orderEditor" :aria-busy="submitting" @submit.prevent="submitOrder" @input="$event.target.setCustomValidity?.('')">

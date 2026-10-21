@@ -237,7 +237,7 @@ const reset = () => {
           <div class="field environment-field"><div class="field-label-row"><span class="field-label">门店环境图 <em>最多 5 张</em></span></div><input ref="environmentInput" type="file" accept="image/*" multiple hidden @change="handleEnvironment" /><div class="environment-grid"><button v-for="(photo, index) in environmentPhotos" :key="photo.url" class="environment-photo" type="button" @click="removeEnvironment(index)"><img :src="photo.url" :alt="`环境图 ${index + 1}`" /><span>移除</span></button><button v-if="environmentPhotos.length < 5" class="environment-add" type="button" @click="environmentInput?.click()"><span>＋</span><small>上传环境图</small></button></div></div>
         </section>
 
-        <div class="form-footer"><p v-if="notice" class="form-notice" :class="{ success: !Object.keys(errors).length }"><span class="material-symbols-outlined">{{ Object.keys(errors).length ? 'info' : 'check_circle' }}</span>{{ notice }}</p><div class="form-actions"><button class="ghost-button" type="button" @click="reset">重置</button><button class="primary-button" type="submit">保存门店信息 <span>→</span></button></div></div>
+        <div class="form-footer"><p v-if="notice" class="form-notice" :class="{ success: !Object.keys(errors).length }"><span class="material-symbols-outlined">{{ Object.keys(errors).length ? 'info' : 'check_circle' }}</span>{{ notice }}</p><div class="form-actions"><button class="ghost-button" type="button" @click="reset">重置</button><button class="primary-button" type="submit">保存门店信息</button></div></div>
       </form>
 
       <aside class="store-info-aside">

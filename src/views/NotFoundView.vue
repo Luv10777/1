@@ -1,1 +1,1 @@
-<template><div class="state-page"><span class="state-code">404</span><h1>这条路径还没有星标。</h1><p>页面可能已移动，或者链接还没有接入第一阶段的工作区。</p><RouterLink to="/image/create" class="primary-button compact">回到内容工具 <span>→</span></RouterLink></div></template>
+<template><div class="state-page"><span class="state-code">404</span><h1>这条路径还没有星标。</h1><p>页面可能已移动，或者链接还没有接入第一阶段的工作区。</p><RouterLink to="/image/create" class="primary-button compact">回到内容工具</RouterLink></div></template>

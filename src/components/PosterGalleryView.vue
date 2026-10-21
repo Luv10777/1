@@ -166,7 +166,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
       </nav>
       <div class="poster-toolbar-end">
         <RouterLink to="/works" class="poster-works-link"
-          >作品库 <span aria-hidden="true">↗</span></RouterLink
+          >作品库</RouterLink
         >
         <ImageWorkspaceSwitch />
       </div>
@@ -279,7 +279,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             写下真实商品和活动，再挑一个海报风格。生成后海报会完整出现在这里。
           </p>
           <button type="button" @click="showTab('inspiration')">
-            挑选海报风格 ↗
+            挑选海报风格
           </button>
         </div>
         <div class="poster-thread">
@@ -301,7 +301,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                 :disabled="studio.busy"
                 @click="studio.load(turn.id)"
               >
-                刷新进度 ↻
+                刷新进度
               </button>
             </div>
             <h3>{{ turnPrompt(turn) }}</h3>
@@ -360,7 +360,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   @click="showPreview(item)"
                 >
                   <img :src="item.url" :alt="item.role" /><span
-                    >放大查看 ↗</span
+                    >放大查看</span
                   >
                 </button>
                 <div
@@ -461,7 +461,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             :disabled="studio.busy || !studio.canUseAsset(preview)"
             @click="studio.download(preview)"
           >
-            下载原图 ↓</button
+            下载原图</button
           ><button
             type="button"
             class="poster-lightbox-close"
