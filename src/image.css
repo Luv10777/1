@@ -51,7 +51,7 @@
 /* Product set uses the same fan interaction with its own case imagery. */
 
 /* Photo Stack / Card Fan — Tailwind-style utility semantics in the project's CSS system. */
-/* 图片创作首页：标题、两个入口，留白和图说话。 */
+/* 图片创作、视频创作入口页共用：标题、两个入口，留白和图说话。 */
 .image-home-head { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 40px; }
 .image-home-head h1 { margin: 0; }
 .image-home-head p { margin: 0; color: var(--ink-muted); font-size: 15px; }
