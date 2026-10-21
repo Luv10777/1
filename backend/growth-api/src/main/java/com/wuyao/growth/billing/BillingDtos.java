@@ -24,17 +24,26 @@ public final class BillingDtos {
                           @NotBlank @Size(max=100) String name, @NotNull @Size(max=600) String description,
                           @Min(1) @Max(100000000) long priceMinor, @Min(1) @Max(3660) int durationDays,
                           @Min(0) @Max(100000000) long giftCredits, boolean imageEnabled, boolean videoEnabled,
-                          boolean liveEnabled, boolean published, @Min(0) @Max(100000000) long allianceQuotaMinor) {
+                          boolean liveEnabled, boolean published, @Min(0) @Max(100000000) long allianceQuotaMinor,
+                          boolean replacePublished) {
         public NewPlan(String code, String name, String description, long priceMinor, int durationDays, long giftCredits,
                        boolean imageEnabled, boolean videoEnabled, boolean liveEnabled, boolean published) {
-            this(code, name, description, priceMinor, durationDays, giftCredits, imageEnabled, videoEnabled, liveEnabled, published, 0);
+            this(code, name, description, priceMinor, durationDays, giftCredits, imageEnabled, videoEnabled, liveEnabled, published, 0, false);
+        }
+        public NewPlan(String code, String name, String description, long priceMinor, int durationDays, long giftCredits,
+                       boolean imageEnabled, boolean videoEnabled, boolean liveEnabled, boolean published, long allianceQuotaMinor) {
+            this(code, name, description, priceMinor, durationDays, giftCredits, imageEnabled, videoEnabled, liveEnabled, published,
+                    allianceQuotaMinor, false);
         }
     }
     /** 会员订单入账、会员期确定后发出，与入账同一事务。联盟券模块据此发放本期额度。 */
     public record MembershipActivated(Long tenantId, String billingOrderId, PlanSnapshot plan,
                                       Instant periodStart, Instant periodEnd) {}
-    public record Publication(boolean published) {}
-    public record PlanListing(PlanSnapshot plan, boolean published) {}
+    /** replacePublished：上架时把同一标识正在上架的版本一起下架，商户那边不断档。 */
+    public record Publication(boolean published, boolean replacePublished) {
+        public Publication(boolean published) { this(published, false); }
+    }
+    public record PlanListing(PlanSnapshot plan, boolean published, Instant createdAt) {}
     public record Confirmation(@Min(1) long receivedAmountMinor,
                                @NotBlank @Size(min=6,max=150) String receiptReference) {}
     public record LedgerView(Long id, String type, String description, long availableDelta, long heldDelta,

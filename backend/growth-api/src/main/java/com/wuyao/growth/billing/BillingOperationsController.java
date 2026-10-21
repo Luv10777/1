@@ -20,7 +20,7 @@ public class BillingOperationsController {
         @AuthenticationPrincipal AuthPrincipal me) { requireOperator(me); return ApiResponse.ok(service.createPlan(input)); }
     @PostMapping("/plans/{id}/publication") public ApiResponse<Void> publish(@PathVariable Long id,
         @RequestBody BillingDtos.Publication input,@AuthenticationPrincipal AuthPrincipal me) {
-        requireOperator(me); service.publish(id,input.published()); return ApiResponse.ok(null);
+        requireOperator(me); service.publish(id,input.published(),input.replacePublished()); return ApiResponse.ok(null);
     }
     @GetMapping("/tenants/{tenantId}/orders/{id}") public ApiResponse<BillingDtos.OrderView> order(
         @PathVariable Long tenantId,@PathVariable String id,@AuthenticationPrincipal AuthPrincipal me) {
