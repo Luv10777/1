@@ -3,13 +3,13 @@
 /* Tailwind semantic tokens are used throughout the account and plan views. */
 .paper-app :is(.account-center-page,.works-library,.knowledge-library,.assets-page,.brands-page){background:var(--color-bg-canvas);color:var(--color-primary);--paper:var(--color-bg-canvas);--surface:var(--color-bg-surface);--ink:var(--color-primary);--muted:var(--color-text-muted);--line:var(--color-border-subtle)}
 .paper-app :is(.panel,.metric-card,.plan-summary,.governance-hero){background:var(--color-bg-surface);color:var(--color-primary);border-color:var(--color-border-subtle);box-shadow:var(--shadow-paper)}
-.paper-app :is(.video-workbench-canvas,.video-workbench-sidebar,.video-workbench-scroll,.video-workbench-action,.video-textarea-shell,.video-create-page,.image-create-page){background:var(--color-bg-canvas);color:var(--color-primary)}
+.paper-app :is(.video-workbench-canvas,.video-workbench-sidebar,.video-workbench-scroll,.video-workbench-action,.video-create-page,.image-create-page){background:var(--color-bg-canvas);color:var(--color-primary)}
 .paper-app :is(.product-showcase-glow,.poster-glow,.device-glow-layer){display:none}.paper-app .video-workbench-canvas{background:var(--color-bg-subtle)}.paper-app .video-workbench-action{background:var(--color-bg-surface)}
-.paper-app :is(.video-generate-button,.premium-primary,.new-work-button){background:var(--color-accent);color:var(--color-on-accent);border-color:transparent;box-shadow:none}
+.paper-app :is(.premium-primary,.new-work-button){background:var(--color-accent);color:var(--color-on-accent);border-color:transparent;box-shadow:none}
 .paper-app :is(input,textarea,:is(select, .app-select-button)):focus-visible{outline-color:var(--color-primary)}
 /* A borderless field inside its own bordered box shows focus on that box, never as a second dark frame inside it. */
-:root :is(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .poster-composer) :is(input, textarea):focus-visible { outline: none; }
-:where(.yanhuo-money-input, .product-count-input, .quick-search-head, .video-textarea-shell, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .dh-textarea-shell, .poster-composer):focus-within { border-color: var(--color-primary); }
+:root :is(.yanhuo-money-input, .product-count-input, .quick-search-head, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .poster-composer) :is(input, textarea):focus-visible { outline: none; }
+:where(.yanhuo-money-input, .product-count-input, .quick-search-head, .mg-search, .products-search, .public-feed-search, .knowledge-search, .conversation-search, .search-field, .url-row, .url-box, .compact-url, .poster-composer):focus-within { border-color: var(--color-primary); }
 /* The publishing state aliases come from the same paper/ink system in both modes. */
 :root .paper-app:has(.publishing-page){
  --pub-canvas:var(--color-bg-canvas);--pub-input:var(--color-bg-surface);--pub-surface:var(--color-bg-surface);--pub-panel:var(--color-bg-surface);--pub-card:var(--color-bg-surface);--pub-muted-surface:var(--color-bg-subtle);--pub-hover-surface:var(--color-bg-subtle);
@@ -105,7 +105,7 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
   .paper-topbar .header-store { font-size: 12px; }
   .paper-app :is(.page-intro,.creation-copy > p:not(.eyebrow)) { font-size: 13px; }
 }
-:root .paper-app .premium-primary,:root .paper-app .video-generate-button{background:var(--color-accent);color:var(--color-on-accent)}
+:root .paper-app .premium-primary{background:var(--color-accent);color:var(--color-on-accent)}
 
 @media(max-width:860px){.paper-sidebar{visibility:hidden}.paper-sidebar.is-open{visibility:visible}}
 /* The shell owns page spacing. Editors fill its remaining width and height. */
@@ -134,7 +134,7 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
   --an-ink:var(--ink); --an-muted:var(--ink-muted); --an-line:var(--line); --an-cinnabar:var(--color-accent-text);
 }
 /* Specialist tools share the same type hierarchy and paper surfaces. */
-.paper-app :is(.poster-studio-header h1,.library-heading h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
+.paper-app :is(.poster-studio-header h1,.library-heading h2,.dh-page-header h1,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
 .paper-app :is(.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
 .paper-app :is(.history-dropdown,.upload-modal) { border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--night-panel); box-shadow: var(--shadow-paper-elevated); backdrop-filter: none; }
 .paper-app :is(.filter-chip,.history-trigger) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); }
@@ -184,24 +184,19 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 /* Video tools: readable controls and consistent actions, with no teal sub-theme. */
 :root .paper-app :is(.premium-analyze,.digital-human-page) { container:tool-content / inline-size; background:var(--night); margin-top:0; color:var(--ink); }
 :root .paper-app .premium-analyze { --premium-accent:var(--color-accent-text); --premium-accent-strong:var(--color-accent-hover); --premium-cool:var(--color-info); --premium-ink:var(--ink); --premium-muted:var(--ink-muted); --premium-line:var(--line); }
-:root .paper-app :is(.premium-analyze::before,.premium-analyze .premium-console::before,.dh-banner-glow) { display:none; }
+:root .paper-app :is(.premium-analyze::before,.premium-analyze .premium-console::before) { display:none; }
 :root .paper-app :is(.premium-panel,.premium-console,.dh-form-panel,.dh-preview-panel,.dh-avatar-modal-card,.confidence-card,.radar-card,.keyframes-card,.code-editor,.parameter-grid,.reuse-script) { border:1px solid var(--line); border-radius:8px; background:var(--night-panel); color:var(--ink); box-shadow:var(--shadow-paper); }
 :root .paper-app :is(.premium-analyze,.digital-human-page,.video-workbench-page) :is(button,input,textarea,:is(select, .app-select-button),p,label,strong) { font-family:var(--font-sans); }
 :root .paper-app :is(.premium-analyze,.digital-human-page,.video-workbench-page) :is(h1,h2,h3) { font-family:var(--font-serif); color:var(--ink); font-weight:600; }
-:root .paper-app :is(.dh-preview-intro h2 em,.dh-source-button .material-symbols-outlined,.dh-inspiration-heading button,.editor-bar button,.history-open) { color:var(--color-accent-text); }
-:root .paper-app .dh-preview-intro h2 { font-size:clamp(26px,2.5vw,36px); line-height:1.5; }
-:root .paper-app :is(.dh-preview-intro > p:last-child,.dh-field-hint,.dh-form-footer > small,.video-canvas-hint) { color:var(--ink-muted); }
-:root .paper-app :is(.dh-form-footer,.dh-form-scroll,.dh-textarea-shell,.video-textarea-shell,.editor-bar) { background:var(--night-panel); border-color:var(--line); }
-:root .paper-app :is(.dh-form-section,.video-workbench-section) { border-color:var(--line); }
-:root .paper-app :is(.dh-source-button,.dh-textarea-shell,.video-upload-zone,.video-textarea-shell,.compact-drop,.compact-tabs,.pill-switch) { border-color:var(--line); border-radius:4px; background:var(--night); box-shadow:none; }
-:root .paper-app :is(.dh-source-button,.dh-duration-options button,.dh-ratio-options button,.video-ratio-grid button,.video-duration-options button,.premium-analyze .history-trigger) { border-color:var(--line); border-radius:4px; color:var(--ink); }
+:root .paper-app :is(.editor-bar button,.history-open) { color:var(--color-accent-text); }
+:root .paper-app :is(.dh-form-footer > small) { color:var(--ink-muted); }
+:root .paper-app :is(.dh-form-footer,.dh-form-scroll,.editor-bar) { background:var(--night-panel); border-color:var(--line); }
+:root .paper-app :is(.video-workbench-section) { border-color:var(--line); }
+:root .paper-app :is(.compact-drop,.compact-tabs,.pill-switch) { border-color:var(--line); border-radius:4px; background:var(--night); box-shadow:none; }
+:root .paper-app :is(.dh-duration-options button,.dh-ratio-options button,.video-ratio-grid button,.video-duration-options button,.premium-analyze .history-trigger) { border-color:var(--line); border-radius:4px; color:var(--ink); }
 :root .paper-app :is(.dh-duration-options button.selected,.dh-ratio-options button.selected,.video-ratio-grid button.selected,.video-duration-options button.selected,.compact-tabs button.active,.pill-switch button.active) { border-color:var(--color-accent); color:var(--color-accent-text); background:color-mix(in srgb,var(--color-accent) 6%,var(--night-panel)); box-shadow:none; }
-:root .paper-app :is(.dh-generate-button,.video-generate-button,.studio-primary-button,.premium-analyze .analyze-trigger,.premium-analyze .premium-primary) { border-radius:4px; background:var(--color-accent); color:var(--color-on-accent); box-shadow:none; }
-:root .paper-app .video-generate-button .rb-shiny-text { color:var(--color-on-accent); }
-:root .paper-app :is(.dh-generate-button,.video-generate-button,.studio-primary-button,.premium-analyze .analyze-trigger,.premium-analyze .premium-primary):hover { background:var(--color-accent-hover); }
-:root .paper-app .dh-banner { border-color:var(--line); border-radius:8px; background:var(--night); }
-:root .paper-app .dh-banner-tag { color:#fff; background:rgba(44,62,80,.8); border-radius:2px; }
-:root .paper-app :is(.dh-banner-image,.dh-inspiration-card img) { border-radius:4px; }
+:root .paper-app :is(.studio-primary-button,.premium-analyze .analyze-trigger,.premium-analyze .premium-primary) { border-radius:4px; background:var(--color-accent); color:var(--color-on-accent); box-shadow:none; }
+:root .paper-app :is(.studio-primary-button,.premium-analyze .analyze-trigger,.premium-analyze .premium-primary):hover { background:var(--color-accent-hover); }
 :root .paper-app .premium-grid { grid-template-columns:minmax(260px,.75fr) minmax(0,2fr); }
 :root .paper-app .premium-grid > *, :root .paper-app .insight-grid > * { min-width:0; }
 :root .paper-app .premium-analyze .insight-grid { grid-template-columns:minmax(160px,.7fr) minmax(0,1fr); }
@@ -225,7 +220,6 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 }
 @container tool-content (max-width:540px) {
   :root .paper-app .premium-analyze .insight-grid { grid-template-columns:1fr; }
-  :root .paper-app .dh-inspiration-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 /* Form rows wrap before the navigation rail makes their controls too narrow. */
 :root .paper-app .store-info-page { container:store-content / inline-size; }
@@ -287,36 +281,12 @@ body:has(.app-frame) { overflow:hidden; }
     padding:clamp(16px,2.5vh,25px) clamp(18px,2vw,30px);
   }
   :root .paper-app .digital-human-page .dh-studio-switcher { position:static; justify-self:end; }
-  :root .paper-app .digital-human-page .dh-preview-intro { margin:0; padding:0; }
-  :root .paper-app .digital-human-page .dh-preview-intro h2 { margin:0 0 6px; line-height:1.3; }
-  :root .paper-app .digital-human-page .dh-banner { height:auto; min-height:0; }
-  :root .paper-app .digital-human-page .dh-inspiration {
-    display:flex; flex-direction:column; min-height:0; margin:0;
-  }
-  :root .paper-app .digital-human-page .dh-inspiration-heading {
-    flex-shrink:0; align-items:center; margin-bottom:10px;
-  }
-  :root .paper-app .digital-human-page .dh-inspiration-heading > div { min-width:0; }
-  :root .paper-app .digital-human-page .dh-inspiration-heading button { flex-shrink:0; white-space:nowrap; }
-  :root .paper-app .digital-human-page .dh-inspiration-grid {
-    flex:1; min-height:0; grid-template-columns:repeat(4,minmax(0,1fr));
-  }
-  :root .paper-app .digital-human-page .dh-inspiration-card {
-    display:grid; grid-template-rows:minmax(0,1fr) auto; min-width:0; min-height:0;
-  }
-  :root .paper-app .digital-human-page .dh-inspiration-thumb { height:100%; min-height:0; aspect-ratio:auto; }
-}
-@media(min-width:761px) and (max-height:700px) {
-  :root .paper-app .digital-human-page .dh-preview-intro h2 { font-size:26px; }
-  :root .paper-app .digital-human-page .dh-inspiration-heading h3 { font-size:14px; }
 }
 :root .paper-app .digital-human-page fieldset.dh-form-scroll { margin:0; border:0; min-width:0; }
 :root .paper-app .digital-human-page .dh-preview-panel.dh-result-panel {
   display:flex; flex-direction:column; align-items:center; gap:12px;
   padding:24px 24px 16px; min-height:0;
 }
-:root .paper-app .digital-human-page .dh-generate-button:disabled { opacity:.65; cursor:wait; transform:none; }
-:root .paper-app .digital-human-page .dh-notice.is-error { color:var(--color-error); }
 @media(max-width:760px) {
   :root .paper-app .digital-human-page .dh-preview-panel.dh-result-panel { height:480px; min-height:480px; }
 }
