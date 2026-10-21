@@ -134,13 +134,12 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
   --an-ink:var(--ink); --an-muted:var(--ink-muted); --an-line:var(--line); --an-cinnabar:var(--color-accent-text);
 }
 /* Specialist tools share the same type hierarchy and paper surfaces. */
-.paper-app :is(.image-heading h1,.workflow-card-copy h3,.poster-studio-header h1,.library-heading h2,.video-create-title-row h1,.video-entry-copy h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
-.paper-app :is(.workflow-card,.video-entry-card,.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
-.paper-app :is(.workflow-card,.video-entry-card):hover { border-color: var(--color-brand-muted); transform: translateY(-2px); }
-.paper-app :is(.workflow-card-cyan,.workflow-card-cinnabar) { background: var(--night-panel); }
-.paper-app :is(.workflow-card::before,.video-entry-orb) { display: none; }
-.paper-app :is(.workflow-tags span,.video-entry-icon) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night); }
-.paper-app :is(.workflow-card-cyan .workflow-arrow,.video-entry-card-cyan .video-entry-cta,.video-entry-icon-cyan) { color: var(--color-accent-text); }
+.paper-app :is(.poster-studio-header h1,.library-heading h2,.video-create-title-row h1,.video-entry-copy h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
+.paper-app :is(.video-entry-card,.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
+.paper-app :is(.video-entry-card):hover { border-color: var(--color-brand-muted); transform: translateY(-2px); }
+.paper-app :is(.video-entry-orb) { display: none; }
+.paper-app :is(.video-entry-icon) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night); }
+.paper-app :is(.video-entry-card-cyan .video-entry-cta,.video-entry-icon-cyan) { color: var(--color-accent-text); }
 .paper-app :is(.history-dropdown,.upload-modal) { border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--night-panel); box-shadow: var(--shadow-paper-elevated); backdrop-filter: none; }
 .paper-app :is(.filter-chip,.history-trigger) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); }
 .paper-app :is(.upload-button,.primary-action) { border-color: var(--color-accent); border-radius: 4px; color: var(--color-on-accent); background: var(--color-accent); }
