@@ -1,44 +1,32 @@
 <script setup>
 import { RouterLink } from 'vue-router'
+import { ChevronRight, Play } from 'lucide-vue-next'
+
+// 与图片创作入口页共用卡片样式：每个入口三张示意图，前两张在后，第三张居中在前。
+const flows = [
+  { to: '/video/workbench', name: '视频生成', intro: '文本、图片或素材，剪成营销短视频。', cta: '进入创作台', video: true, images: ['/images/publishing/restaurant.jpg', '/images/product-wall/pasta-special.png', '/images/product-wall/fur-coat.png'] },
+  { to: '/digital-human/studio', name: '数字人视频生成', intro: '输入文案或语音，生成数字人播报视频。', cta: '进入录影棚', video: false, images: ['/images/digital-human/avatar-8.png', '/images/digital-human/avatar-9.png', '/images/digital-human/avatar-7.png'] },
+]
 </script>
 
 <template>
   <div class="video-create-page">
-    <header class="video-create-header">
-      <div class="video-create-title-row">
-        <div>
-          <h1>视频创作</h1>
-          <p class="video-create-subtitle">把脚本、商品信息和品牌资产组合成高转化短视频，或一键唤醒专属数字人。</p>
-        </div>
-      </div>
+    <header class="image-home-head">
+      <h1>视频创作</h1>
+      <p>把文案、商品与素材，做成能发布的短视频。</p>
     </header>
 
-    <main>
-      <section class="video-entry-grid" aria-label="视频创作入口">
-        <RouterLink to="/video/workbench" class="video-entry-card video-entry-card-cinnabar">
-          <div class="video-entry-orb" aria-hidden="true" />
-          <div class="video-entry-card-top">
-            <div class="video-entry-icon video-entry-icon-cinnabar"><span class="material-symbols-outlined">movie_edit</span></div>
-          </div>
-          <div class="video-entry-copy">
-            <h2>视频生成</h2>
-            <p>支持文本生视频、图生视频与智能混剪。将零散素材一键自动包装为极具网感的营销短视频。</p>
-          </div>
-          <span class="video-entry-cta">进入创作台</span>
-        </RouterLink>
-
-        <RouterLink to="/digital-human/studio" class="video-entry-card video-entry-card-cyan">
-          <div class="video-entry-orb" aria-hidden="true" />
-          <div class="video-entry-card-top">
-            <div class="video-entry-icon video-entry-icon-cyan"><span class="material-symbols-outlined">record_voice_over</span></div>
-          </div>
-          <div class="video-entry-copy">
-            <h2>数字人视频生成</h2>
-            <p>输入文案或语音，一键生成唇形同步、情感丰富的真人级数字人播报视频，支持多国语言。</p>
-          </div>
-          <span class="video-entry-cta">进入录影棚</span>
-        </RouterLink>
-      </section>
-    </main>
+    <section class="image-home-grid" aria-label="视频创作入口">
+      <RouterLink v-for="flow in flows" :key="flow.to" :to="flow.to" class="image-home-tile">
+        <div class="image-home-stage" aria-hidden="true">
+          <img v-for="(image, index) in flow.images" :key="image" :src="image" alt="" :class="`image-home-shot image-home-shot-${index + 1}`" />
+          <span v-if="flow.video" class="video-home-play"><Play :size="20" fill="currentColor" :stroke-width="0" /></span>
+        </div>
+        <div class="image-home-copy">
+          <div><h2>{{ flow.name }}</h2><p>{{ flow.intro }}</p></div>
+          <span class="image-home-link">{{ flow.cta }}<ChevronRight :size="16" :stroke-width="2" aria-hidden="true" /></span>
+        </div>
+      </RouterLink>
+    </section>
   </div>
 </template>

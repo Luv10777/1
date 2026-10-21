@@ -116,7 +116,7 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 .paper-app .page-scroll-workspace > .image-create-page { display: flex; }
 .paper-app .video-workbench-page { width: 100%; min-height: 0; height: 100%; margin: 0; padding: 0; border: 0; }
 .paper-app :is(.video-create-page,.studio-page,.digital-human-page) { width: 100%; margin: 0; padding: 0; min-height: 100%; background: var(--night); }
-.paper-app :is(.video-create-header,.video-entry-grid,.studio-header,.studio-workspace,.dh-page-header,.dh-workspace) { width: 100%; max-width: none; }
+.paper-app :is(.studio-header,.studio-workspace,.dh-page-header,.dh-workspace) { width: 100%; max-width: none; }
 .paper-app .poster-studio-page { min-height: 100%; background: var(--night); }
 .paper-app:has(.poster-studio-page) .main-area { position: relative; }
 .paper-app :is(.video-workbench-sidebar,.video-workbench-action) { border-color: var(--line); background: var(--night-panel); box-shadow: none; }
@@ -134,12 +134,8 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
   --an-ink:var(--ink); --an-muted:var(--ink-muted); --an-line:var(--line); --an-cinnabar:var(--color-accent-text);
 }
 /* Specialist tools share the same type hierarchy and paper surfaces. */
-.paper-app :is(.poster-studio-header h1,.library-heading h2,.video-create-title-row h1,.video-entry-copy h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
-.paper-app :is(.video-entry-card,.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
-.paper-app :is(.video-entry-card):hover { border-color: var(--color-brand-muted); transform: translateY(-2px); }
-.paper-app :is(.video-entry-orb) { display: none; }
-.paper-app :is(.video-entry-icon) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night); }
-.paper-app :is(.video-entry-card-cyan .video-entry-cta,.video-entry-icon-cyan) { color: var(--color-accent-text); }
+.paper-app :is(.poster-studio-header h1,.library-heading h2,.dh-page-header h1,.dh-inspiration-heading h3,.analyze-header h1,.premium-header h1,.billing-hero h2) { font-family: var(--font-serif); font-weight: 600; letter-spacing: .02em; color: var(--ink); }
+.paper-app :is(.template-card,.dh-control-panel,.dh-preview-panel,.premium-card,.analyze-card) { border-color: var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); }
 .paper-app :is(.history-dropdown,.upload-modal) { border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--night-panel); box-shadow: var(--shadow-paper-elevated); backdrop-filter: none; }
 .paper-app :is(.filter-chip,.history-trigger) { border-color: var(--line); border-radius: 4px; color: var(--ink-muted); background: var(--night-panel); }
 .paper-app :is(.upload-button,.primary-action) { border-color: var(--color-accent); border-radius: 4px; color: var(--color-on-accent); background: var(--color-accent); }
