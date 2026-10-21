@@ -2,7 +2,9 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ChevronRight, Film, Plus, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
+import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { get, post } from '../utils/request'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
@@ -23,6 +25,7 @@ const capabilities = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
 const historyOpen = ref(false)
+const settingsOpen = ref(false)
 const historyLoading = ref(false)
 const historyError = ref('')
 const historyPage = ref(0)
@@ -341,7 +344,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
     <button v-if="historyOpen" class="video-history-backdrop" aria-label="关闭创作记录" type="button" @click="historyOpen = false" />
     <aside class="video-conversation-sidebar" :class="{ 'is-open': historyOpen }" aria-label="视频创作记录">
       <div class="video-conversation-head">
-        <div class="video-conversation-kicker"><span class="video-seal-glyph">志</span><span>视频工作台</span></div>
+        <div class="video-conversation-kicker"><img class="video-seal-glyph" src="/images/brand/yifangzhi-mark.png" alt="" /><span>视频工作台</span></div>
         <button class="video-new-conversation" type="button" aria-label="新建对话" @click="startNewConversation"><span>＋</span> 新对话</button>
       </div>
       <div class="video-conversation-title-row">
@@ -371,98 +374,53 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         <div v-else-if="historyError" class="video-history-message" role="status"><span>{{ historyError }}</span><button type="button" @click="loadHistory(historyPage)">重新加载</button></div>
         <button v-else-if="historyHasMore" class="video-history-more" type="button" @click="loadHistory(historyPage + 1)">加载更早的创作</button>
       </div>
-      <p class="video-conversation-footnote">每次生成，记录一段故事。<br>已提交的创作会自动保留。</p>
     </aside>
     <div class="video-workbench-sidebar w-[420px] h-full flex flex-col bg-white border-r border-gray-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
       <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
-      <fieldset class="video-workbench-scroll flex-1 overflow-y-auto p-8 space-y-8" :disabled="isGenerating || activeConversation?.loading">
-        <div class="video-form-section">
-          <div class="video-form-heading flex justify-between items-center mb-3">
-            <h2 class="text-sm font-semibold text-gray-800">添加参考图 <em>可选</em></h2>
-            <span class="text-xs text-gray-400">{{ referenceImages.length }} 张</span>
-          </div>
-          <div class="video-upload-actions">
-            <button class="video-upload-source" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleImageDrop"><span class="material-symbols-outlined">upload</span><strong>从本地上传</strong><small>JPG、PNG · 可拖拽上传</small></button>
-          </div>
-          <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleImageChange">
-          <div v-if="referenceImages.length" class="video-asset-strip flex overflow-x-auto gap-2 mt-3">
-            <div v-for="asset in referenceImages" :key="asset.id" class="video-asset-thumb relative">
-              <img v-if="asset.url" :src="asset.url" :alt="asset.name">
-              <span v-else class="video-reference-missing">素材不可用</span>
-              <button type="button" aria-label="删除参考图" @click="removeImage(asset)">×</button>
+      <fieldset class="video-workbench-scroll vs-form flex-1 overflow-y-auto" :disabled="isGenerating || activeConversation?.loading">
+        <section class="vs-group">
+          <span class="vs-label">素材<small>均可选</small></span>
+          <div class="vs-list">
+            <div class="vs-item">
+              <button class="vs-row" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleImageDrop"><span>参考图</span><small>{{ referenceImages.length ? `已选 ${referenceImages.length} 张` : '可拖入图片' }}</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
+              <div v-if="referenceImages.length" class="vs-files">
+                <span v-for="asset in referenceImages" :key="asset.id" class="vs-file"><img v-if="asset.url" :src="asset.url" :alt="asset.name"><span v-else>素材不可用</span><button type="button" aria-label="删除参考图" @click="removeImage(asset)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              </div>
+              <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleImageChange">
+            </div>
+            <div class="vs-item">
+              <button class="vs-row" type="button" :disabled="!!referenceVideo" @click="videoInput?.click()"><span>参考视频</span><small>{{ referenceVideo ? '已选 1 个' : '最多 1 个' }}</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
+              <div v-if="referenceVideo" class="vs-files">
+                <span class="vs-file"><Film :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ referenceVideo.name }}</span><button type="button" aria-label="删除参考视频" @click="removeVideo"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+              </div>
+              <input ref="videoInput" class="video-file-input" type="file" accept="video/*" @change="handleVideoChange">
             </div>
           </div>
-        </div>
+        </section>
 
-        <div class="video-form-section">
-          <div class="video-form-heading flex justify-between items-center mb-3">
-            <h2 class="text-sm font-semibold text-gray-800">添加参考视频 <em>可选</em></h2>
-            <span class="text-xs text-gray-400">{{ referenceVideo ? '1 个' : '未添加' }}</span>
-          </div>
-          <button v-if="!referenceVideo" class="video-upload-zone video-upload-video w-full h-24 bg-gray-50 rounded-2xl border border-gray-200 hover:border-cinnabar-300 hover:bg-cinnabar-50/30 transition-all flex flex-col items-center justify-center gap-1 group" type="button" @click="videoInput?.click()">
-            <span class="material-symbols-outlined text-cinnabar-500">movie</span>
-            <strong class="text-sm font-medium text-gray-600">+ 添加参考视频</strong>
-            <small class="text-xs text-gray-400">MP4、MOV、WebM</small>
-          </button>
-          <input ref="videoInput" class="video-file-input" type="file" accept="video/*" @change="handleVideoChange">
-          <div v-if="referenceVideo" class="video-reference-file">
-            <span class="material-symbols-outlined">movie</span><span>{{ referenceVideo.name }}</span>
-            <button type="button" aria-label="删除参考视频" @click="removeVideo">×</button>
-          </div>
-        </div>
+        <section class="vs-group">
+          <label for="video-prompt" class="vs-label">描述你的成片需求</label>
+          <textarea id="video-prompt" v-model="prompt" class="vs-textarea" rows="5" placeholder="例如：为这份双人海鲜套餐制作一段诱人的展示视频，镜头从特写拉远，强调食材的新鲜与就餐的松弛感。" />
+        </section>
 
-        <div class="video-form-section">
-          <div class="video-form-heading flex justify-between items-center mb-3">
-            <h2 class="text-sm font-semibold text-gray-800">描述你的成片需求</h2>
-            <span class="text-xs text-gray-400">{{ prompt.length }} 字</span>
+        <section class="vs-settings">
+          <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="video-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ currentCapability.label }} · {{ ratioOptions.find(option => option.value === format)?.label }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
+          <div v-show="settingsOpen" id="video-settings" class="vs-settings-body">
+            <div class="vs-segmented vs-models" role="group" aria-label="视频模型"><button v-for="model in (capabilities.length ? capabilities : fallbackCapabilities)" :key="model.id" type="button" :aria-pressed="selectedModel === model.id" :class="{ active: selectedModel === model.id }" @click="selectModel(model.id)">{{ model.label }}</button></div>
+            <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="format" class="vs-row-select" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
+            <div class="vs-setting-row vs-duration"><label for="video-duration">视频时长</label><strong>{{ duration }} 秒</strong><input id="video-duration" v-model.number="duration" class="vs-range" type="range" min="5" :max="durationMax" step="1"></div>
+            <div class="vs-setting-row"><span>分辨率</span><div class="vs-segmented" role="group" aria-label="分辨率"><button v-for="item in availableResolutions" :key="item" type="button" :aria-pressed="resolution === item" :class="{ active: resolution === item }" @click="resolution = item">{{ item }}</button></div></div>
           </div>
-          <div class="video-textarea-shell bg-gray-50/80 rounded-xl p-1 border border-gray-100 focus-within:border-cinnabar-400 focus-within:ring-4 focus-within:ring-cinnabar-500/10 focus-within:bg-white transition-all">
-            <textarea v-model="prompt" class="w-full h-32 bg-transparent resize-none outline-none p-3 text-sm text-gray-800 placeholder-gray-400" placeholder="例如：为这份双人海鲜套餐制作一段诱人的展示视频，镜头从特写拉远，强调食材的新鲜与就餐的松弛感。" />
-          </div>
-        </div>
-
-        <div class="video-form-section video-settings-section">
-          <div class="video-form-heading flex justify-between items-center mb-3">
-            <h2 class="text-sm font-semibold text-gray-800">模型与输出</h2>
-            <span>{{ currentCapability.label }}</span>
-          </div>
-          <div class="video-model-grid">
-            <button v-for="model in (capabilities.length ? capabilities : fallbackCapabilities)" :key="model.id" type="button" :class="{ selected: selectedModel === model.id }" @click="selectModel(model.id)">
-              <strong>{{ model.label }}</strong>
-            </button>
-          </div>
-          <label class="video-ratio-select">
-            <span class="video-setting-label">画面比例</span>
-            <AppSelect v-model="format" aria-label="选择画面比例">
-              <option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </AppSelect>
-          </label>
-          <div class="video-setting-block">
-            <div class="video-duration-label flex items-center justify-between">
-              <span class="video-setting-label">视频时长</span>
-              <strong>{{ duration }} 秒</strong>
-            </div>
-            <input v-model.number="duration" class="video-duration-range" :style="{ '--duration-progress': `${((duration - 5) / Math.max(1, durationMax - 5)) * 100}%` }" type="range" min="5" :max="durationMax" step="1">
-            <div class="video-range-meta flex justify-between"><span>5s</span><span>{{ durationMax }}s</span></div>
-          </div>
-          <div class="video-setting-block">
-            <span class="video-setting-label">分辨率</span>
-            <div class="video-resolution-grid">
-              <button v-for="item in availableResolutions" :key="item" type="button" :class="{ selected: resolution === item }" @click="resolution = item">{{ item }}</button>
-            </div>
-          </div>
-        </div>
+        </section>
       </fieldset>
 
-      <div class="video-workbench-action p-6 border-t border-gray-100">
-        <p class="generation-billing-note">视频按模型、分辨率与时长预估费用，确认后预占烟火。</p>
+      <div class="video-workbench-action vs-footer">
+        <p v-if="notice" class="vs-notice" :class="{ 'is-error': activeConversation?.error }" role="status">{{ notice }}</p>
         <RouterLink v-if="billing.summary && !member" to="/billing" class="generation-billing-link">{{ billing.summary.memberActive ? '当前套餐未开放视频创作' : '请先开通会员' }}</RouterLink>
-        <button class="video-generate-button w-full py-3.5 bg-[#18181B] hover:bg-black text-white text-sm font-medium rounded-xl shadow-lg shadow-black/20 ring-1 ring-inset ring-white/10 transition-all flex justify-center items-center gap-2" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">
-          <span>{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</span>
-        </button>
-        <p v-if="notice" class="video-generate-notice" :class="{ 'is-error': activeConversation?.error }" role="status">{{ notice }}</p>
-        <p v-if="workflow?.chargedCredits != null" class="generation-billing-note">本次交付消耗 {{ number(workflow.chargedCredits) }} 烟火。</p>
+        <button class="vs-generate" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</button>
+        <small>先预估烟火，确认后开始生成</small>
+        <p v-if="workflow?.chargedCredits != null" class="vs-notice">本次交付消耗 {{ number(workflow.chargedCredits) }} 烟火。</p>
         <button v-if="workflow?.retryable" class="generation-billing-link" type="button" :disabled="activeConversation?.submitting" @click="retryVideo">预估恢复费用</button>
         <button v-if="isGenerating && workflow?.id" class="generation-billing-link" type="button" :disabled="activeConversation?.submitting" @click="cancelVideo">取消生成，退回未消耗烟火</button>
       </div>

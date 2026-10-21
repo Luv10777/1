@@ -69,9 +69,7 @@ defineEmits(['switch-workspace'])
           </div>
 
           <div class="device-state-content relative z-20 flex flex-col items-center gap-4 mt-8">
-            <span class="device-film-icon text-cinnabar-400/80 transition-transform duration-700 hover:scale-110">
-              <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
-            </span>
+            <img class="device-film-icon" src="/images/brand/yifangzhi-mark.png" alt="" />
             <div class="device-copy text-center space-y-2">
               <strong class="text-lg font-medium text-gray-200 tracking-wide"><span>{{ error ? '视频生成失败' : '你的故事将在这里成片' }}</span></strong>
               <p class="text-xs text-gray-500">{{ error || '添加素材并描述需求，开始生成' }}</p>
@@ -81,6 +79,5 @@ defineEmits(['switch-workspace'])
       </div>
     </div>
 
-    <div class="video-canvas-hint absolute bottom-8 z-10 text-xs text-gray-600 tracking-wider pointer-events-none"><span>把商家的日常，写成值得记住的影像。</span></div>
   </div>
 </template>

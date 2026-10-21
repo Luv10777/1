@@ -1,0 +1,102 @@
+/* 数字人摄影棚、视频工作台共用：与图片工作台同一套简约语言——少字、留白、浅底控件、一个主按钮。 */
+:root .paper-app :is(.digital-human-page, .video-workbench-page) { --vs-fill: var(--color-bg-subtle); --vs-shadow: 0 1px 2px rgba(44, 62, 80, .04), 0 8px 24px rgba(44, 62, 80, .06); }
+
+/* 左侧表单 */
+:root .paper-app .digital-human-page .dh-form-panel { border: 0; border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
+:root .paper-app .digital-human-page .dh-form-scroll.vs-form { display: flex; flex-direction: column; gap: 32px; padding: 28px 28px 24px; border: 0; background: transparent; }
+.vs-title { margin: 0; }
+.vs-group { display: flex; flex-direction: column; gap: 12px; }
+.vs-label { display: flex; align-items: baseline; gap: 8px; color: var(--ink); font-size: 15px; font-weight: 600; }
+.vs-label small { color: var(--ink-muted); font-size: 13px; font-weight: 400; }
+.vs-list { display: flex; flex-direction: column; overflow: hidden; border-radius: 8px; background: var(--vs-fill); }
+.vs-item + .vs-item { border-top: 1px solid var(--line); }
+.vs-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 14px 0 16px; border: 0; background: transparent; color: var(--ink); font-size: 15px; text-align: left; cursor: pointer; transition: background .18s; }
+.vs-row:hover:not(:disabled) { background: rgba(44, 62, 80, .04); }
+.vs-row > span { flex: 1; }
+.vs-row small { color: var(--ink-muted); font-size: 13px; }
+.vs-row svg { flex: 0 0 auto; color: var(--ink-muted); }
+.vs-files { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+.vs-file { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 32px; padding: 3px 4px 3px 4px; border-radius: 6px; background: var(--night-panel); color: var(--ink); font-size: 12px; }
+.vs-file img { width: 26px; height: 26px; border-radius: 4px; object-fit: cover; }
+.vs-file > svg { margin-left: 4px; color: var(--ink-muted); }
+.vs-file > span { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-file button { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.vs-file button:hover { background: var(--vs-fill); color: var(--ink); }
+.vs-textarea { width: 100%; min-height: 110px; padding: 12px 14px; resize: vertical; border: 0; border-radius: 8px; outline: 0; background: var(--vs-fill); color: var(--ink); font: 15px/1.6 var(--font-sans); }
+.vs-textarea::placeholder { color: var(--ink-muted); }
+
+.vs-settings { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.vs-settings-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 0; border: 0; background: transparent; color: var(--ink); font-size: 15px; text-align: left; cursor: pointer; }
+.vs-settings-toggle > span { flex: 0 0 auto; }
+.vs-settings-toggle small { flex: 1; min-width: 0; overflow: hidden; color: var(--ink-muted); font-size: 13px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.vs-chevron { flex: 0 0 auto; color: var(--ink-muted); transition: transform .18s; }
+.vs-chevron.open { transform: rotate(90deg); }
+.vs-settings-body { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 14px; }
+.vs-segmented { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; padding: 3px; border-radius: 8px; background: var(--vs-fill); }
+.vs-segmented.vs-models { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 4px; }
+.vs-segmented button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-muted); font-size: 13px; cursor: pointer; transition: background .18s, color .18s; }
+.vs-segmented button.active { background: var(--night-panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44, 62, 80, .12); }
+.vs-segmented button:disabled { opacity: .45; cursor: not-allowed; }
+.vs-setting-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 48px; color: var(--ink); font-size: 15px; }
+.vs-setting-row > .vs-segmented { min-width: 160px; }
+.vs-row-select .app-select-button { min-height: 32px; padding: 0 4px 0 10px; border: 0; background: transparent; color: var(--ink-muted); font-size: 13px; }
+.vs-duration strong { color: var(--ink-muted); font-size: 13px; font-weight: 400; }
+.vs-duration label { flex: 1; }
+.vs-range { flex: 0 0 100%; width: 100%; margin: 0 0 6px; accent-color: var(--color-accent); }
+.vs-setting-note { color: var(--ink-muted); font-size: 12px; }
+
+:root .paper-app .digital-human-page .dh-form-footer.vs-footer { display: flex; flex-direction: column; gap: 10px; padding: 16px 28px 24px; border: 0; background: transparent; }
+.vs-generate { min-height: 50px; border: 0; border-radius: 8px; background: var(--color-accent); color: var(--color-on-accent); font-size: 16px; font-weight: 600; letter-spacing: .04em; cursor: pointer; transition: background .18s; }
+.vs-generate:hover:not(:disabled) { background: var(--color-accent-hover); }
+.vs-generate:disabled { opacity: .65; cursor: wait; }
+.vs-footer small { color: var(--ink-muted); font-size: 13px; text-align: center; }
+.vs-notice { margin: 0; color: var(--ink-muted); font-size: 13px; text-align: center; }
+.vs-notice.is-error { color: var(--color-error); }
+
+/* 视频工作台：表单栏沿用原来的宽度和滚动，只换内部样式 */
+:root .paper-app .video-workbench-page .video-workbench-scroll.vs-form { display: flex; flex-direction: column; gap: 32px; min-width: 0; margin: 0; padding: 20px 28px 24px; border: 0; background: var(--night-panel); }
+:root .paper-app .video-workbench-page .video-workbench-action.vs-footer { display: flex; flex-direction: column; gap: 10px; padding: 16px 28px 24px; border: 0; background: var(--night-panel); }
+:root .paper-app .video-workbench-page .video-workbench-action .generation-billing-link { align-self: center; font-size: 13px; }
+:root .paper-app .video-workbench-page img.video-seal-glyph { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 0; object-fit: contain; transform: none; }
+:root:not([data-theme="dark"]) .video-workbench-page img.video-seal-glyph { mix-blend-mode: multiply; }
+
+/* 成片预览的空状态：用品牌图形代替胶片图标 */
+.video-workbench-canvas img.device-film-icon { width: 56px; height: 56px; border-radius: 8px; object-fit: contain; }
+:root:not([data-theme="dark"]) .video-workbench-canvas img.device-film-icon { mix-blend-mode: multiply; }
+
+/* 右侧预览（未开始生成时） */
+:root .paper-app .digital-human-page .dh-preview-panel.vs-preview { display: flex; flex-direction: column; gap: 24px; padding: 20px 28px 28px; border: 0; border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
+.vs-preview-bar { display: flex; justify-content: flex-end; }
+:root .paper-app .digital-human-page .vs-preview-bar .dh-studio-switcher { position: static; }
+.vs-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-height: 0; }
+.vs-stage figure { position: relative; margin: 0; overflow: hidden; aspect-ratio: 4 / 3; border-radius: 8px; background: var(--vs-fill); }
+.vs-stage.is-portrait figure { aspect-ratio: 3 / 4; }
+.vs-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.vs-stage figcaption { position: absolute; left: 12px; bottom: 12px; padding: 0 8px; border-radius: 4px; background: rgba(255, 255, 255, .92); color: #2c3e50; font-size: 12px; line-height: 24px; }
+.vs-avatars { display: flex; flex-direction: column; gap: 12px; }
+.vs-avatars-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); font-size: 15px; font-weight: 600; }
+.vs-avatars-head button { padding: 0; border: 0; background: transparent; color: var(--color-accent-text); font-size: 13px; font-weight: 400; cursor: pointer; }
+.vs-avatars-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.vs-avatars-grid button { display: flex; flex-direction: column; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--ink-muted); font-size: 13px; text-align: left; cursor: pointer; }
+.vs-avatars-grid img { display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 8px; object-fit: cover; background: var(--vs-fill); transition: box-shadow .18s; }
+.vs-avatars-grid button:hover img { box-shadow: 0 8px 24px rgba(44, 62, 80, .12); }
+.vs-avatars-grid button.active { color: var(--ink); font-weight: 600; }
+.vs-avatars-grid button.active img { box-shadow: 0 0 0 2px var(--night-panel), 0 0 0 4px var(--color-accent); }
+
+/* 桌面上摄影棚固定在一屏内（见 brand.css），预览区按比例分配剩余高度，图片填满格子。 */
+@media (min-width: 761px) {
+  :root .paper-app .digital-human-page .dh-preview-panel.vs-preview { gap: clamp(12px, 2vh, 24px); padding: clamp(14px, 2.2vh, 20px) 28px clamp(16px, 2.6vh, 28px); }
+  .vs-stage { flex: 1.25 1 0; }
+  .vs-stage figure, .vs-stage.is-portrait figure { aspect-ratio: auto; height: 100%; }
+  .vs-avatars { flex: 1 1 0; min-height: 0; }
+  .vs-avatars-grid { flex: 1; min-height: 0; }
+  .vs-avatars-grid button { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+  .vs-avatars-grid img { height: 100%; aspect-ratio: auto; }
+}
+@media (max-width: 760px) {
+  :root .paper-app .digital-human-page .dh-form-scroll.vs-form { padding: 22px 18px 18px; gap: 26px; }
+  :root .paper-app .digital-human-page .dh-form-footer.vs-footer { padding: 14px 18px 18px; }
+  :root .paper-app .digital-human-page .dh-preview-panel.vs-preview { padding: 16px 18px 20px; }
+  .vs-avatars-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .vs-row, .vs-segmented button, .vs-chevron, .vs-generate, .vs-avatars-grid img { transition: none; } }
