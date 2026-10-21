@@ -52,21 +52,22 @@
 
 /* Photo Stack / Card Fan — Tailwind-style utility semantics in the project's CSS system. */
 /* 图片创作、视频创作入口页共用：标题、两个入口，留白和图说话。 */
-.image-home-head { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 40px; }
+.image-home-head { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 28px; }
 .image-home-head h1 { margin: 0; }
 .image-home-head p { margin: 0; color: var(--ink-muted); font-size: 15px; }
 .image-home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; }
 .image-home-tile { display: flex; flex-direction: column; overflow: hidden; border-radius: 8px; background: var(--night-panel); color: var(--ink); box-shadow: 0 1px 2px rgba(44, 62, 80, .04), 0 8px 24px rgba(44, 62, 80, .06); transition: box-shadow .2s; }
 .image-home-tile:hover { box-shadow: 0 2px 4px rgba(44, 62, 80, .04), 0 16px 40px rgba(44, 62, 80, .1); }
-.image-home-stage { position: relative; height: 400px; overflow: hidden; background: var(--color-bg-subtle); }
-.image-home-shot { position: absolute; left: 50%; top: 84px; width: 168px; height: 224px; border-radius: 8px; object-fit: cover; box-shadow: 0 8px 24px rgba(44, 62, 80, .1); transition: transform .3s ease; }
-.image-home-shot-1 { margin-left: -214px; }
-.image-home-shot-2 { margin-left: 46px; }
-.image-home-shot-3 { top: 52px; width: 216px; height: 288px; margin-left: -108px; box-shadow: 0 16px 40px rgba(44, 62, 80, .18); }
+/* 展示区随窗口高度收缩，常见笔记本屏幕不用下拉也能看到整张卡片；三张图按展示区高度等比缩放。 */
+.image-home-stage { --stage: clamp(240px, calc(100vh - 330px), 400px); position: relative; height: var(--stage); overflow: hidden; background: var(--color-bg-subtle); }
+.image-home-shot { position: absolute; left: 50%; top: calc(var(--stage) * .21); width: calc(var(--stage) * .42); height: calc(var(--stage) * .56); border-radius: 8px; object-fit: cover; box-shadow: 0 8px 24px rgba(44, 62, 80, .1); transition: transform .3s ease; }
+.image-home-shot-1 { margin-left: calc(var(--stage) * -.535); }
+.image-home-shot-2 { margin-left: calc(var(--stage) * .115); }
+.image-home-shot-3 { top: calc(var(--stage) * .13); width: calc(var(--stage) * .54); height: calc(var(--stage) * .72); margin-left: calc(var(--stage) * -.27); box-shadow: 0 16px 40px rgba(44, 62, 80, .18); }
 .image-home-tile:hover .image-home-shot-1 { transform: translateX(-8px); }
 .image-home-tile:hover .image-home-shot-2 { transform: translateX(8px); }
-.image-home-copy { display: flex; align-items: flex-end; gap: 16px; padding: 28px 32px 30px; }
-.image-home-copy > div { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; }
+.image-home-copy { display: flex; align-items: flex-end; gap: 16px; padding: 22px 28px 24px; }
+.image-home-copy > div { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
 .image-home-copy h2 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.4; }
 .image-home-copy p { margin: 0; color: var(--ink-muted); font-size: 15px; line-height: 1.6; }
 .image-home-link { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 2px; color: var(--color-accent-text); font-size: 15px; font-weight: 600; transition: color .2s; }
@@ -74,7 +75,7 @@
 @media (max-width: 760px) {
   .image-home-head { margin: 4px 0 24px; }
   .image-home-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .image-home-stage { height: 210px; }
+  .image-home-stage { --stage: 210px; }
   .image-home-shot { top: 42px; width: 96px; height: 128px; border-radius: 6px; }
   .image-home-shot-1 { margin-left: -128px; }
   .image-home-shot-2 { margin-left: 32px; }

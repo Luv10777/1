@@ -6,5 +6,5 @@
 /* AI 视频创作入口页的深色主题：保持卡片层次，同时降低大面积纯黑的压迫感 */
 [data-theme='dark'] .video-create-page{--video-ink:#f4f4f5;--video-muted:#a1a1aa;--video-line:#332c2a;background:var(--color-bg-subtle);color:var(--video-ink)}
 /* 视频生成入口的播放标记：压在居中那张示意图上。 */
-.video-home-play{position:absolute;left:50%;top:196px;display:grid;place-items:center;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(20,24,28,.55);color:#fff;backdrop-filter:blur(8px)}
+.video-home-play{position:absolute;left:50%;top:calc(var(--stage) * .49);display:grid;place-items:center;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(20,24,28,.55);color:#fff;backdrop-filter:blur(8px)}
 @media(max-width:760px){.video-home-play{top:106px;width:40px;height:40px;margin:-20px 0 0 -20px}}
