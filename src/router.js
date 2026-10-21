@@ -106,7 +106,7 @@ const routes = [
   { path: '/alliance/offers', name: 'alliance-offers', component: AllianceOffersView, meta: { title: '供券管理', navGroup: 'alliance' } },
   { path: '/alliance/rules', name: 'alliance-rules', component: AllianceRulesView, meta: { guest: true, title: '联盟券规则', navGroup: 'alliance' } },
   { path: '/alliance/redeem', name: 'alliance-redeem', component: AllianceRedeemView, meta: { title: '门店核销', navGroup: 'alliance' } },
-  { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布' } },
+  { path: '/information-publishing', name: 'information-publishing', component: InformationPublishingView, meta: { title: '信息发布', navGroup: 'mall' } },
   // 实名已并入系统设置；旧链接跳过去并定位到实名那一块。
   { path: '/identity', alias: '/real-name', name: 'identity', redirect: { name: 'settings', hash: '#identity' } },
   { path: '/notifications', name: 'notifications', component: NoticesView, meta: { title: '消息通知' } },

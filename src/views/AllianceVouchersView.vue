@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue'
 import { Clock, MapPin, Phone, QrCode, RefreshCw, Store, Ticket, X } from 'lucide-vue-next'
 import { allianceApi, voucherStatuses, yuan } from '../services/allianceApi'
+import AllianceHolderTabs from '../components/AllianceHolderTabs.vue'
 import '../alliance.css'
 
 const PAGE_SIZE = 20
@@ -93,12 +94,12 @@ onBeforeUnmount(() => { generation++ })
 <template>
   <div class="business-page alliance-vouchers-page">
     <header class="business-heading">
-      <div><h1>我的联盟券</h1><p>到券上的门店出示券码，由店员核销后当场交付。</p></div>
+      <div><h1>领券中心</h1><p>到券上的门店出示券码，由店员核销后当场交付。</p></div>
       <div class="business-heading-links">
         <RouterLink :to="{ name: 'alliance-rules' }" class="business-link">联盟券规则</RouterLink>
-        <RouterLink :to="{ name: 'alliance-pool' }" class="business-button business-button-primary"><Ticket :size="15" aria-hidden="true" />去领券中心</RouterLink>
       </div>
     </header>
+    <AllianceHolderTabs />
     <nav class="alliance-tabs" aria-label="按状态筛选">
       <button v-for="item in filters" :key="item.value" type="button" :class="{ active: filter === item.value }" :aria-pressed="filter === item.value" @click="filter = item.value">{{ item.label }}</button>
     </nav>

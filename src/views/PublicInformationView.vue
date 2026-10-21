@@ -62,7 +62,7 @@ onBeforeUnmount(() => { requestVersion++ })
     <div class="public-information-content">
       <header class="information-masthead">
         <div><p class="information-eyebrow">一方志 · 商家信息服务</p><h1>商家信息广场</h1><p class="information-intro">新消息，好生意。<br class="information-mobile-break" />门店活动、商品供求与商家公告，在这里看见。</p></div>
-        <RouterLink class="public-button public-button-primary" to="/information-publishing"><FilePenLine :size="16" aria-hidden="true" />发布一条信息</RouterLink>
+        <RouterLink class="public-button public-button-primary" to="/information-publishing"><FilePenLine :size="16" aria-hidden="true" />{{ inShell ? '发布与管理' : '发布一条信息' }}</RouterLink>
       </header>
 
       <section class="public-feed-toolbar" aria-label="信息筛选">

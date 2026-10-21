@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { businessCommunityService } from '../services/businessCommunity'
+import { auth } from '../stores/auth'
 
 /**
  * 本商户的入驻是否审核通过：线上卖货、发布信息、提供联盟券都要求通过。
@@ -8,6 +9,7 @@ import { businessCommunityService } from '../services/businessCommunity'
 export function useMerchantApproval() {
   const approved = ref(null)
   async function load() {
+    if (!auth.isAuthenticated) { approved.value = null; return }
     try {
       const applications = await businessCommunityService.applications()
       approved.value = (applications || []).some(item => item.status === 'APPROVED')

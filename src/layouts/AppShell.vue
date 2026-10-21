@@ -10,6 +10,7 @@ import StoreFormModal from '../components/StoreFormModal.vue'
 import { auth } from '../stores/auth'
 import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, Bell } from 'lucide-vue-next'
 import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
+import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { billing, number, refreshBilling } from '../stores/billing'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
@@ -152,7 +153,6 @@ const navGroups = [
       { name: 'merchant-alliance', label: '商城好物', path: '/merchant-alliance' },
       { name: 'merchant-orders', label: '订单管理', path: '/orders' },
       { name: 'public-information', label: '信息广场', path: '/information' },
-      { name: 'information-publishing', label: '我的发布', path: '/information-publishing' },
     ],
   },
   {
@@ -160,12 +160,11 @@ const navGroups = [
     key: 'alliance',
     label: '商户联盟',
     items: [
-      { name: 'merchant-join', label: '商家入驻', path: '/merchant-alliance/join' },
+      // 入驻是一次性的事：通过后就不占侧边栏位置，入口留在商城好物和各处提示里。
+      { name: 'merchant-join', label: '商家入驻', path: '/merchant-alliance/join', hideWhenApproved: true },
       { name: 'alliance-pool', label: '领券中心', path: '/alliance/pool' },
-      { name: 'alliance-vouchers', label: '我的联盟券', path: '/alliance/vouchers' },
       { name: 'alliance-redeem', label: '门店核销', path: '/alliance/redeem' },
       { name: 'alliance-offers', label: '供券管理', path: '/alliance/offers', ownerOnly: true },
-      { name: 'alliance-rules', label: '联盟券规则', path: '/alliance/rules' },
     ],
   },
   {
@@ -208,7 +207,9 @@ const getInitialExpandedGroups = () => {
 }
 
 const expandedGroups = ref(getInitialExpandedGroups())
-const isActive = (name) => route.name === name
+// 不在侧边栏的页面，打开时高亮它所属的入口：我的发布 → 信息广场，我的联盟券 → 领券中心。
+const ACTIVE_ALSO = { 'public-information': ['information-publishing', 'public-information-detail'], 'alliance-pool': ['alliance-vouchers'] }
+const isActive = (name) => route.name === name || (ACTIVE_ALSO[name] || []).includes(route.name)
 const isGroupActive = (group) => isActive(group.name) || route.meta.navGroup === group.key || group.items?.some(item => isActive(item.name))
 const isGroupExpanded = (key) => expandedGroups.value.has(key)
 const saveExpandedGroups = () => {
@@ -241,7 +242,9 @@ const expandActiveGroup = () => {
 }
 
 // 只有管理员能用的入口对店员收起；接口本身也会拒绝。
-const canSee = item => !item.ownerOnly || auth.isOwner
+const { approved: merchantApproved, reload: reloadMerchantApproval } = useMerchantApproval()
+watch(() => auth.user?.id, reloadMerchantApproval)
+const canSee = item => (!item.ownerOnly || auth.isOwner) && !(item.hideWhenApproved && merchantApproved.value === true)
 const closeMenu = () => { menuOpen.value = false }
 // 清掉会话后返回可直接浏览的功能首页。
 const loginLocation = computed(() => ({ name: 'login', query: { redirect: route.fullPath } }))
