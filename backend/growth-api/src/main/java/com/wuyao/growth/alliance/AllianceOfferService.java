@@ -36,6 +36,7 @@ public class AllianceOfferService {
     private final ProductService products;
     private final MerchantQualificationService qualification;
     private final AllianceAccountService settlementAccounts;
+    private final com.wuyao.growth.notice.NoticeService notices;
 
     /** 领券第 2 步需要的信息：由领券方第 1 步生成，供券方只拿到券码的哈希。 */
     record ClaimTicket(UUID ref, Long supplierTenantId, Long offerId, Long holderTenantId, String holderName,
@@ -129,6 +130,11 @@ public class AllianceOfferService {
         offer.setReviewedAt(Instant.now());
         offer.setUpdatedAt(Instant.now());
         if (!approved) products.restoreInventory(offer.getProductId(), offer.getTotalQty());
+        notices.notifyOwners("ALLIANCE", approved ? "供券单已上架" : "供券单被驳回",
+                approved ? "「" + offer.getProductName() + "」× " + offer.getTotalQty() + " 已上架到券库，约定按面值 "
+                        + AllianceText.discount(offer.getSettleRateBp()) + "结算，每张 " + AllianceText.yuan(offer.getSettleAmountMinor()) + "。"
+                        : "「" + offer.getProductName() + "」没有通过审核。平台意见：" + offer.getReviewNote() + "。预留的库存已经还回。",
+                "/alliance/offers", "offer-reviewed:" + offer.getId());
         return AllianceDtos.OfferView.of(offer, 0);
     }
 

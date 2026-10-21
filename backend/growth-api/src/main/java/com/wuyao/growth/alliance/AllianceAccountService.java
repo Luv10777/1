@@ -31,6 +31,7 @@ public class AllianceAccountService {
     private final RealNameCrypto crypto;
     private final PlatformAuditLog audit;
     private final MerchantQualificationService qualification;
+    private final com.wuyao.growth.notice.NoticeService notices;
 
     @Transactional(readOnly = true)
     public Optional<AllianceDtos.AccountView> mine() {
@@ -111,6 +112,10 @@ public class AllianceAccountService {
         account.setReviewNote(note == null || note.isBlank() ? null : note.trim());
         account.setReviewedBy(operatorId);
         account.setReviewedAt(Instant.now());
+        notices.notifyOwners("ALLIANCE", approved ? "收款账户已核对通过" : "收款账户需要修改",
+                approved ? "尾号 " + account.getAccountNumberLast4() + " 的收款账户已通过平台核对，可以确认对账单了。"
+                        : "平台意见：" + account.getReviewNote() + "。请在「供券管理 → 收款账户」修改后重新提交。",
+                "/alliance/offers?tab=account", "account-reviewed:" + account.getId() + ":" + account.getReviewedAt().toEpochMilli());
         return AllianceDtos.AccountView.of(account);
     }
 

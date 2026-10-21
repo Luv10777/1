@@ -76,6 +76,14 @@ public class AccountService {
         return AccountDtos.Profile.of(user, avatars.url(user.getAvatarKey()));
     }
 
+    /** 当前商户在用的管理员账号，站内通知发给他们。 */
+    @Transactional(readOnly = true)
+    public List<Long> activeOwnerIds() {
+        return users.findAllByTenantIdAndStatusNotOrderByIdAsc(TenantContext.require(), REMOVED).stream()
+                .filter(user -> OWNER.equals(user.getRole()) && ACTIVE.equals(user.getStatus()))
+                .map(com.wuyao.growth.iam.entity.User::getId).toList();
+    }
+
     /** 当前商户未移除的账号，管理员在前。 */
     @Transactional(readOnly = true)
     public List<AccountDtos.Account> members() {

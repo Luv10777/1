@@ -149,7 +149,7 @@ public class PlatformManagementService {
             boolean approved = merchants.findAllByTenantIdOrderByCreatedAtDescIdDesc(tenantId).stream()
                     .anyMatch(application -> "APPROVED".equals(application.getStatus()));
             if (!approved) takeInformationOffline(tenantId);
-            events.publishEvent(new MerchantQualificationChanged(tenantId, approved));
+            events.publishEvent(new MerchantQualificationChanged(tenantId, approved, request.status(), request.note().trim()));
             audit(me.userId(), "MERCHANT", id, request.status(), request.note());
             return null;
         });

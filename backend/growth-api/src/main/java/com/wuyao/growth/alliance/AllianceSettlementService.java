@@ -23,6 +23,7 @@ public class AllianceSettlementService {
     private final AllianceOfferClaimRepository claims;
     private final AllianceOfferRepository offers;
     private final ProductService products;
+    private final com.wuyao.growth.notice.NoticeService notices;
 
     @Transactional(readOnly = true)
     public PageResult<AllianceDtos.SettlementView> mine(int page, int size) {
@@ -57,9 +58,12 @@ public class AllianceSettlementService {
     /** 领券方申诉：结算单冻结，平台处理前不能结算。 */
     @Transactional
     public void freeze(UUID ref) {
-        settlements.findForUpdate(ref).filter(s -> "HOLDING".equals(s.getStatus())).ifPresent(s -> {
+        settlements.findForUpdate(ref).filter(s -> "HOLDING".equals(s.getStatus()) && !s.isFrozen()).ifPresent(s -> {
             s.setFrozen(true);
             s.setUpdatedAt(Instant.now());
+            notices.notifyOwners("ALLIANCE", "有一笔核销被申诉",
+                    "领券商户对「" + s.getProductName() + "」的核销提出申诉，这笔结算暂时冻结，平台核实后处理。",
+                    "/alliance/offers?tab=settlements", "settlement-frozen:" + ref + ":" + s.getUpdatedAt().toEpochMilli());
         });
     }
 
@@ -73,10 +77,17 @@ public class AllianceSettlementService {
         if (settlement == null || !"HOLDING".equals(settlement.getStatus())) return;
         Instant now = Instant.now();
         settlement.setUpdatedAt(now);
+        String key = "settlement-dispute-resolved:" + ref + ":" + now.toEpochMilli();
         if (valid) {
             settlement.setFrozen(false);
+            notices.notifyOwners("ALLIANCE", "申诉已处理：核销有效",
+                    "平台核实「" + settlement.getProductName() + "」这次核销有效，这笔结算恢复正常。",
+                    "/alliance/offers?tab=settlements", key);
             return;
         }
+        notices.notifyOwners("ALLIANCE", "申诉已处理：核销无效",
+                "平台判定「" + settlement.getProductName() + "」这次核销无效，这笔结算作废。",
+                "/alliance/offers?tab=settlements", key);
         settlement.setStatus("VOID");
         settlement.setFrozen(false);
         claims.findForUpdate(ref).filter(c -> "REDEEMED".equals(c.getStatus())).ifPresent(c -> {

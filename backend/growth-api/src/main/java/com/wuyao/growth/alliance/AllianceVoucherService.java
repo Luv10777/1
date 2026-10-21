@@ -41,6 +41,7 @@ public class AllianceVoucherService {
     private final TenantDirectory tenants;
     private final MerchantQualificationService qualification;
     private final TaskService tasks;
+    private final com.wuyao.growth.notice.NoticeService notices;
 
     /**
      * 领券第 1 步：校验、扣本期额度、写一张「领取中」的券并生成券码，同时登记一个收尾任务。
@@ -175,6 +176,10 @@ public class AllianceVoucherService {
             v.setDisputeNote(null);
             v.setDisputeResolvedAt(null);
             v.setUpdatedAt(Instant.now());
+            notices.notifyOwners("ALLIANCE", "联盟券已核销",
+                    "「" + v.getProductName() + "」在「" + v.getStoreName() + "」核销了。如果没拿到商品，可以在 "
+                            + config.getDisputeDays() + " 天内到「我的联盟券」申诉。",
+                    "/alliance/vouchers", "voucher-redeemed:" + ref + ":" + redeemedAt.toEpochMilli());
         });
     }
 
@@ -224,6 +229,11 @@ public class AllianceVoucherService {
             v.setDisputeNote(note == null || note.isBlank() ? null : note.trim());
             v.setDisputeResolvedAt(now);
             v.setUpdatedAt(now);
+            String noteText = v.getDisputeNote() == null ? "" : "平台说明：" + v.getDisputeNote() + "。";
+            notices.notifyOwners("ALLIANCE", "申诉已处理",
+                    valid ? "平台核实「" + v.getProductName() + "」这次核销有效。" + noteText
+                          : "平台判定「" + v.getProductName() + "」这次核销无效，" + ("ACTIVE".equals(v.getStatus()) ? "券已恢复可用。" : "券已过期作废。") + noteText,
+                    "/alliance/vouchers", "voucher-dispute-resolved:" + ref + ":" + now.toEpochMilli());
         });
     }
 

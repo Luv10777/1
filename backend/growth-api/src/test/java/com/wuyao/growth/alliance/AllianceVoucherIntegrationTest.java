@@ -168,6 +168,13 @@ class AllianceVoucherIntegrationTest {
         runSyncTasks();
         var voucher = data(get("/api/alliance/vouchers/" + ref), holderToken, 200);
         assertThat(voucher.path("status").asText()).isEqualTo("REDEEMED");
+        assertThat(noticeTitles(holderToken)).containsExactly("联盟券已核销");
+        handledTasks.clear();
+        runSyncTasks();
+        assertThat(noticeTitles(holderToken)).as("同步任务重复执行也只通知一次").containsExactly("联盟券已核销");
+        assertThat(data(get("/api/notices/unread"), holderToken, 200).path("unread").asLong()).isEqualTo(1);
+        data(post("/api/notices/read-all"), holderToken, null, 200);
+        assertThat(data(get("/api/notices/unread"), holderToken, 200).path("unread").asLong()).isZero();
         assertThat(voucher.path("canDispute").asBoolean()).isTrue();
         assertThat(voucher.path("code").isTextual()).isFalse();
 
@@ -201,6 +208,9 @@ class AllianceVoucherIntegrationTest {
         assertThat(data(post(statementPath + "/paid"), operatorToken,
                 Map.of("reference", "BANK-0001", "paidDate", java.time.LocalDate.now().toString()), 200).path("status").asText()).isEqualTo("PAID");
         assertThat(data(get("/api/alliance/settlements"), supplierToken, 200).path("items").get(0).path("state").asText()).isEqualTo("PAID");
+        assertThat(noticeTitles(supplierToken)).contains("供券单已上架", "收款账户已核对通过",
+                previousMonth() + " 对账单待确认", previousMonth() + " 对账单已打款");
+        assertThat(noticeTitles(staffToken)).as("通知只发给管理员").isEmpty();
 
         var rules = json.readTree(mvc.perform(get("/api/public/alliance/rules")).andReturn().getResponse()
                 .getContentAsString(java.nio.charset.StandardCharsets.UTF_8)).path("data");
@@ -373,6 +383,7 @@ class AllianceVoucherIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM products WHERE tenant_id = ? AND online_status = 'PUBLISHED'", Integer.class, supplier)).isZero();
         assertThat(owner.queryForList("SELECT status FROM information_publications WHERE tenant_id = ?", String.class, supplier)).containsOnly("OFFLINE");
         assertThat(owner.queryForObject("SELECT status FROM alliance_offers WHERE id = ?", String.class, offerId)).isEqualTo("WITHDRAWN");
+        assertThat(noticeTitles(supplierToken)).contains("商家入驻已被平台暂停");
         assertThat(inventory()).isEqualTo(reserved + 2);
         assertThat(message(post("/api/stores/" + store + "/products"), supplierToken, published, 403)).contains("入驻审核");
         // 已经领出去的券照常能在门店核销。
@@ -460,6 +471,12 @@ class AllianceVoucherIntegrationTest {
     }
 
     @Autowired AllianceStatementService statementService;
+
+    private List<String> noticeTitles(String token) throws Exception {
+        List<String> titles = new ArrayList<>();
+        data(get("/api/notices"), token, 200).path("items").forEach(n -> titles.add(n.path("title").asText()));
+        return titles;
+    }
 
     // ---------- 工具 ----------
 

@@ -31,7 +31,9 @@ public class WebConfig implements WebMvcConfigurer {
                         // 会员过期也要能撤回供券单、对已核销的券申诉。
                         "/api/alliance/offers/*/withdraw", "/api/alliance/vouchers/*/dispute",
                         // 已经发生的结算要能收到钱：收款账户和对账单不受会员状态影响。
-                        "/api/alliance/settlement-account", "/api/alliance/statements/**");
+                        "/api/alliance/settlement-account", "/api/alliance/statements/**",
+                        // 站内通知谁都要能看、能标已读，不受会员状态影响。
+                        "/api/notices/**");
     }
 
     @Bean

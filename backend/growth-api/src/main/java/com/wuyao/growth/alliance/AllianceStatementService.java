@@ -32,6 +32,7 @@ public class AllianceStatementService {
     private final AllianceProperties config;
     private final AccountService users;
     private final PlatformAuditLog audit;
+    private final com.wuyao.growth.notice.NoticeService notices;
 
     /**
      * 给当前商户生成某个月的对账单。这个月已有有效对账单、或没有符合条件的结算单时不生成。
@@ -60,6 +61,10 @@ public class AllianceStatementService {
             s.setStatementId(statement.getId());
             s.setUpdatedAt(now);
         });
+        notices.notifyOwners("ALLIANCE", key + " 对账单待确认",
+                statement.getItemCount() + " 张券，结算 " + AllianceText.yuan(statement.getSettleTotalMinor()) + "。请在 "
+                        + config.getStatementConfirmDays() + " 天内核对确认，到期不处理视为确认。",
+                "/alliance/offers?tab=statements", "statement-generated:" + statement.getId());
         return Optional.of(AllianceDtos.StatementView.of(statement));
     }
 
@@ -115,6 +120,9 @@ public class AllianceStatementService {
             var statement = lockMine(id);
             if (!"PENDING_CONFIRM".equals(statement.getStatus())) continue;
             markConfirmed(statement, null, true);
+            notices.notifyOwners("ALLIANCE", statement.getPeriod() + " 对账单已自动确认",
+                    "到期没有处理，已按尾号 " + statement.getPayeeAccountLast4() + " 的收款账户自动确认，平台会线下打款。",
+                    "/alliance/offers?tab=statements", "statement-auto-confirmed:" + statement.getId());
             confirmed++;
         }
         return confirmed;
@@ -140,6 +148,9 @@ public class AllianceStatementService {
         statement.setStatus("VOID");
         statement.setPlatformNote(note.trim());
         statement.setUpdatedAt(now);
+        notices.notifyOwners("ALLIANCE", statement.getPeriod() + " 对账单已作废",
+                "平台核实了你的异议：" + note.trim() + "。里面的结算会重新生成对账单。",
+                "/alliance/offers?tab=statements", "statement-void:" + statement.getId());
         return AllianceDtos.StatementView.of(statement);
     }
 
@@ -150,6 +161,9 @@ public class AllianceStatementService {
         if (!"OBJECTED".equals(statement.getStatus())) throw BizException.of(ErrorCode.CONFLICT, "只有有异议的对账单可以核实处理");
         statement.setPlatformNote(note.trim());
         markConfirmed(statement, operatorId, false);
+        notices.notifyOwners("ALLIANCE", statement.getPeriod() + " 对账单异议已处理",
+                "平台核实无误：" + note.trim() + "。对账单已转为确认，平台会线下打款。",
+                "/alliance/offers?tab=statements", "statement-resolved:" + statement.getId());
         return AllianceDtos.StatementView.of(statement);
     }
 
@@ -173,6 +187,10 @@ public class AllianceStatementService {
         statement.setPaidBy(operatorId);
         statement.setPaidAt(now);
         statement.setUpdatedAt(now);
+        notices.notifyOwners("ALLIANCE", statement.getPeriod() + " 对账单已打款",
+                "平台已于 " + paidDate + " 打款 " + AllianceText.yuan(statement.getSettleTotalMinor()) + " 到尾号 "
+                        + statement.getPayeeAccountLast4() + " 的账户，流水号 " + reference.trim() + "。",
+                "/alliance/offers?tab=statements", "statement-paid:" + statement.getId());
         return AllianceDtos.StatementView.of(statement);
     }
 
