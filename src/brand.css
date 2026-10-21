@@ -258,13 +258,13 @@ svg:is(.lucide-chevron-down, .lucide-chevrons-up-down) { stroke-width: 1.75; }
 /* The application shell, not the document, owns scrolling. */
 body:has(.app-frame) { overflow:hidden; }
 :root .paper-app .page-scroll:has(.digital-human-page) { overflow-y:auto; }
-/* Keep the studio in one desktop viewport; only its configuration pane scrolls. */
+/* Keep the studio in one desktop viewport; only its configuration pane scrolls. The site footer sits below the fold, as on the image pages. */
 @media(min-width:761px) {
   :root .paper-app .page-scroll:has(.digital-human-page) {
-    display:flex; flex-direction:column; overflow:hidden;
+    display:flex; flex-direction:column; overflow-y:auto;
     padding:clamp(12px,2.5vh,28px) var(--shell-inline);
   }
-  :root .paper-app .digital-human-page { flex:1; height:100%; min-height:0; overflow:hidden; }
+  :root .paper-app .digital-human-page { flex:none; height:100%; min-height:0; overflow:hidden; }
   :root .paper-app .digital-human-page .dh-workspace {
     height:100%; min-height:0; overflow:hidden;
     grid-template-columns:clamp(300px,32%,410px) minmax(0,1fr);
