@@ -8,8 +8,7 @@
   --studio-ease: cubic-bezier(.22, 1, .36, 1);
 }
 
-.poster-toolbar-end > .studio-mode-switch.video-mode-switch,
-.product-showcase-head > .studio-mode-switch.video-mode-switch {
+.poster-toolbar-end > .studio-mode-switch.video-mode-switch {
   border-color: var(--studio-line);
   border-radius: 11px;
   background: #fff;
@@ -31,7 +30,7 @@
 .poster-workbench :is(.poster-works-link, .poster-gallery-tabs button, .poster-load-more, .poster-result-error button, .poster-result-note button),
 .poster-workbench .poster-edit-form > div > button:not(.poster-small-primary),
 .poster-lightbox header .poster-lightbox-download,
-.product-set-studio :is(.creation-toolbar button, .creation-library-links a, .creation-result-actions button, .creation-progress button, .creation-message button, .creation-text-edit button:not(.creation-primary)),
+.product-set-studio .creation-message button,
 .creation-product .creation-preview footer button {
   display: inline-flex;
   align-items: center;
@@ -53,7 +52,7 @@
 .poster-workbench :is(.poster-works-link, .poster-gallery-tabs button, .poster-load-more, .poster-result-error button, .poster-result-note button):hover:not(:disabled),
 .poster-workbench .poster-edit-form > div > button:not(.poster-small-primary):hover:not(:disabled),
 .poster-lightbox header .poster-lightbox-download:hover:not(:disabled),
-.product-set-studio :is(.creation-toolbar button, .creation-library-links a, .creation-result-actions button, .creation-progress button, .creation-message button, .creation-text-edit button:not(.creation-primary)):hover:not(:disabled),
+.product-set-studio .creation-message button:hover:not(:disabled),
 .creation-product .creation-preview footer button:hover:not(:disabled) {
   border-color: #d9c6bb;
   background: var(--studio-wash);
@@ -61,13 +60,11 @@
   box-shadow: 0 3px 9px rgb(55 37 28 / 7%);
   transform: translateY(-1px);
 }
-.poster-workbench :is(.poster-works-link, .poster-gallery-tabs button, .poster-load-more):active,
-.product-set-studio :is(.creation-toolbar button, .creation-library-links a, .creation-result-actions button, .creation-progress button):active { transform: translateY(0); box-shadow: none; }
+.poster-workbench :is(.poster-works-link, .poster-gallery-tabs button, .poster-load-more):active { transform: translateY(0); box-shadow: none; }
 
 .poster-workbench .poster-gallery-tabs { gap: 7px; flex-wrap: wrap; }
 .poster-workbench .poster-gallery-tabs button { min-height: 34px; font-size: 12px; }
-.poster-workbench .poster-gallery-tabs button.active,
-.product-set-studio .creation-view-tabs button.active {
+.poster-workbench .poster-gallery-tabs button.active {
   border-color: #e9d5cc;
   background: #faf2ef;
   color: var(--studio-ink);
@@ -76,49 +73,12 @@
 }
 .poster-workbench .poster-gallery-tabs button.active::after { display: none; }
 .poster-workbench .poster-gallery-toolbar { gap: 9px 14px; }
-.product-set-studio .creation-view-tabs,
-.product-set-studio .creation-library-links { gap: 7px; flex-wrap: wrap; }
-.product-set-studio .creation-toolbar button,
-.product-set-studio .creation-library-links a { font-size: 12px; }
-
-.product-set-studio .creation-result-actions { gap: 8px; margin-top: 14px; }
-.product-set-studio .creation-result-actions button { min-height: 35px; padding: 8px 12px; font-size: 12px; }
-.product-set-studio .creation-result-actions button:first-child {
-  border-color: #e9d6cf;
-  background: #faf1ed;
-  color: #963a30;
-}
-.product-set-studio .creation-result-actions button:first-child:hover:not(:disabled) { background: #f7e8e2; }
-.product-set-studio .creation-progress button { margin-left: 8px; }
 .poster-workbench .poster-load-more { margin: 20px auto 0; }
 
 
-.product-set-studio .platform-group-tabs { border-radius: 10px; background: #f8f6f3; }
-.product-set-studio .platform-group-tabs button { border-radius: 7px; transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
-.product-set-studio :is(.product-type-tabs button, .platform-card, .product-reset, .product-generate) {
-  border-radius: 9px;
-  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s var(--studio-ease);
-}
-.product-set-studio :is(.product-type-tabs button, .platform-card, .product-reset, .product-generate):hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgb(55 37 28 / 7%); }
-.product-set-studio :is(.product-type-tabs button, .platform-card, .product-reset, .product-generate):active { transform: translateY(0); box-shadow: none; }
-.product-set-studio .product-upload-action { border-radius: 8px; }
-.product-set-studio .creation-history { border-radius: 11px; }
-.product-set-studio .creation-history > .creation-history-entry {
-  padding: 12px;
-  border: 1px solid var(--studio-line);
-  border-radius: 9px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(55 37 28 / 4%);
-  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s var(--studio-ease);
-}
-.product-set-studio .creation-history > .creation-history-entry:hover { border-color: #e4d0c6; background: #faf5f1; box-shadow: inset 3px 0 var(--studio-red), 0 3px 10px rgb(55 37 28 / 5%); transform: translateY(-1px); }
-
-.poster-workbench .poster-small-primary,
-.product-set-studio :is(.product-generate, .creation-primary) { border-radius: 9px; box-shadow: 0 4px 12px rgb(136 54 40 / 12%); transition: background .18s ease, box-shadow .18s ease, transform .18s var(--studio-ease); }
-.poster-workbench .poster-small-primary:hover:not(:disabled),
-.product-set-studio :is(.product-generate, .creation-primary):hover:not(:disabled) { box-shadow: 0 6px 16px rgb(136 54 40 / 17%); transform: translateY(-1px); }
+.poster-workbench .poster-small-primary { border-radius: 9px; box-shadow: 0 4px 12px rgb(136 54 40 / 12%); transition: background .18s ease, box-shadow .18s ease, transform .18s var(--studio-ease); }
+.poster-workbench .poster-small-primary:hover:not(:disabled) { box-shadow: 0 6px 16px rgb(136 54 40 / 17%); transform: translateY(-1px); }
 .poster-workbench .poster-edit-form > div > button:not(.poster-small-primary) { min-height: 36px; }
-.product-set-studio .creation-text-edit button:not(.creation-primary) { padding-inline: 12px; }
 .poster-lightbox header .poster-lightbox-close,
 .creation-product .creation-preview header button {
   display: grid;
@@ -135,11 +95,8 @@
 .poster-lightbox header .poster-lightbox-close:hover,
 .creation-product .creation-preview header button:hover { background: var(--studio-wash); color: var(--studio-ink); }
 
-.product-set-studio .creation-output { padding-right: 24px; scrollbar-gutter: stable; }
-.poster-workbench .poster-revision-row,
-.product-set-studio .creation-revision > div { min-width: 0; }
-.poster-workbench .poster-revision-row input,
-.product-set-studio .creation-revision input { min-width: 0; }
+.poster-workbench .poster-revision-row { min-width: 0; }
+.poster-workbench .poster-revision-row input { min-width: 0; }
 
 .image-create-page > :is(.poster-workbench, .product-set-studio) { view-transition-name: image-studio; }
 @keyframes image-studio-out { to { opacity: 0; transform: translateX(-8px) scale(.995); } }
