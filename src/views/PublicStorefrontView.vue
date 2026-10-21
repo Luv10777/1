@@ -1,7 +1,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Minus, Plus, RefreshCw, ShoppingBag, Store } from 'lucide-vue-next'
+import { Minus, Plus, RefreshCw, ShoppingBag, Store } from 'lucide-vue-next'
 import { commerceApi } from '../services/commerceApi'
 import '../public-commerce.css'
 
@@ -94,14 +94,14 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
     </header>
 
     <div class="public-commerce-content">
-      <div class="public-breadcrumb"><RouterLink to="/information"><ArrowLeft :size="14" />信息广场</RouterLink><span>/</span><span>实体商品店铺</span></div>
+      <div class="public-breadcrumb"><RouterLink to="/information">信息广场</RouterLink><span>/</span><span>实体商品店铺</span></div>
       <p v-if="loading" class="public-state" role="status">正在读取店铺资料…</p>
       <section v-else-if="error" class="public-empty" role="alert"><Store :size="28" /><h1>店铺暂时无法打开</h1><p>{{ error }}</p><button type="button" class="public-button" @click="loadStorefront"><RefreshCw :size="15" />重新加载</button></section>
       <template v-else-if="store">
         <header class="public-store-heading">
           <div class="public-store-mark"><Store :size="24" /></div>
           <div class="public-store-title"><p>一方志 · 实体商品售卖</p><h1>{{ store.name }}</h1><div class="public-store-meta"><span v-if="store.address">{{ store.address }}</span><span v-if="store.businessHours">营业时间：{{ store.businessHours }}</span><a v-if="store.phone" :href="`tel:${store.phone}`">{{ store.phone }}</a></div></div>
-          <RouterLink class="public-text-link" to="/information">浏览商家信息<ArrowRight :size="14" /></RouterLink>
+          <RouterLink class="public-text-link" to="/information">浏览商家信息</RouterLink>
         </header>
 
         <div class="public-store-layout">
@@ -118,7 +118,7 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
                 <div class="public-quantity" :aria-label="`${product.name}购买数量`"><button type="button" :aria-label="`减少${product.name}数量`" :disabled="!quantities[product.id]" @click="setQuantity(product, (quantities[product.id] || 0) - 1)"><Minus :size="14" /></button><span>{{ quantities[product.id] || 0 }}</span><button type="button" :aria-label="`增加${product.name}数量`" :disabled="product.inventory === 0 || quantities[product.id] >= (product.inventory ?? 99)" @click="setQuantity(product, (quantities[product.id] || 0) + 1)"><Plus :size="14" /></button></div>
               </article>
             </div>
-            <RouterLink to="/information" class="public-store-footer-link">了解本地商家活动与合作信息<ArrowRight :size="14" /></RouterLink>
+            <RouterLink to="/information" class="public-store-footer-link">了解本地商家活动与合作信息</RouterLink>
           </section>
 
           <aside class="public-checkout" aria-labelledby="checkout-title">

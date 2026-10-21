@@ -41,7 +41,7 @@ onBeforeUnmount(() => { alive = false; sequence++; clearTimeout(timer) })
 
 <template>
   <section class="image-records">
-    <header><div><h2>{{ mode === 'works' ? '我的图片作品' : '图片创作任务' }}</h2><p>{{ mode === 'works' ? '已经完成并保存的海报和产品套图。' : '查看真实进度，打开创作继续修改或恢复任务。' }}</p></div><RouterLink to="/image/create">新建图片创作 ↗</RouterLink></header>
+    <header><div><h2>{{ mode === 'works' ? '我的图片作品' : '图片创作任务' }}</h2><p>{{ mode === 'works' ? '已经完成并保存的海报和产品套图。' : '查看真实进度，打开创作继续修改或恢复任务。' }}</p></div><RouterLink to="/image/create">新建图片创作</RouterLink></header>
     <div class="records-toolbar"><label v-if="mode === 'tasks'">创作类型 <AppSelect v-model="workflow" @change="load(0)"><option value="POSTER">营销海报</option><option value="PRODUCT_SET">产品套图</option></AppSelect></label><button type="button" :disabled="loading" @click="load()">{{ loading ? '正在读取…' : '刷新记录' }}</button></div>
     <p v-if="error" class="records-error" role="alert">{{ error }}</p>
     <p v-else-if="!records.length && !loading" class="records-empty">{{ mode === 'works' ? '还没有完成的图片作品。去说一句需求，开始第一次创作。' : '还没有这类创作任务。' }}</p>

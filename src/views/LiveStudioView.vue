@@ -3,7 +3,7 @@ import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { auth } from '../stores/auth'
-import { ArrowRight, Check, ChevronDown, MessageSquare, Package, BarChart3 } from 'lucide-vue-next'
+import { Check, ChevronDown, MessageSquare, Package, BarChart3 } from 'lucide-vue-next'
 import { selectedStoreId, stores } from '../stores/merchantContext'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import VoiceLibraryPanel from '../components/VoiceLibraryPanel.vue'
@@ -982,8 +982,8 @@ onBeforeUnmount(() => {
           <div><dt>节奏</dt><dd>{{ urgencyLabel.split(' · ')[0] }}</dd></div>
           <div><dt>问答</dt><dd>{{ qaPairs.length }} 条</dd></div>
         </dl>
-        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场<ArrowRight :size="15" aria-hidden="true" /></button>
-        <button v-else-if="hasWorkbench && currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台<ArrowRight :size="15" aria-hidden="true" /></button>
+        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场</button>
+        <button v-else-if="hasWorkbench && currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台</button>
         <p v-else-if="currentStatus !== 'ENDED'" class="ls-precheck-live">本场正在一方志软件里直播。</p>
       </aside>
     </div>
@@ -1001,7 +1001,7 @@ onBeforeUnmount(() => {
         <article class="panel ls-selected-products">
           <div class="panel-heading"><div><h3>本场商品</h3></div><Package :size="20" aria-hidden="true" /></div>
           <ol v-if="productQueue.length" class="ls-workspace-products"><li v-for="(product, index) in productQueue" :key="product.id"><span class="ls-product-index">{{ index + 1 }}</span><span><strong>{{ product.name }}</strong><small>{{ product.tag }} · {{ product.price }}</small></span></li></ol>
-          <p v-else class="ls-section-note">还没有选择本场商品。</p><button type="button" class="ls-text-action" @click="editStep('script')">{{ readOnlySession ? '查看商品配置' : '管理本场商品' }} →</button>
+          <p v-else class="ls-section-note">还没有选择本场商品。</p><button type="button" class="ls-text-action" @click="editStep('script')">{{ readOnlySession ? '查看商品配置' : '管理本场商品' }}</button>
         </article>
         <article class="panel ls-platform-summary"><div class="panel-heading"><h3>直播间数据</h3><span class="ls-pending-badge">未接入</span></div><div class="ls-platform-metrics"><span>在线人数<strong>—</strong></span><span>点赞<strong>—</strong></span><span>新增关注<strong>—</strong></span></div><p class="ls-card-note">等待平台数据接入后展示真实统计。</p></article>
       </aside>

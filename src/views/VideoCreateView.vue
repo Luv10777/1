@@ -24,7 +24,7 @@ import { RouterLink } from 'vue-router'
             <h2>视频生成</h2>
             <p>支持文本生视频、图生视频与智能混剪。将零散素材一键自动包装为极具网感的营销短视频。</p>
           </div>
-          <span class="video-entry-cta">进入创作台 <span aria-hidden="true">→</span></span>
+          <span class="video-entry-cta">进入创作台</span>
         </RouterLink>
 
         <RouterLink to="/digital-human/studio" class="video-entry-card video-entry-card-cyan">
@@ -36,7 +36,7 @@ import { RouterLink } from 'vue-router'
             <h2>数字人视频生成</h2>
             <p>输入文案或语音，一键生成唇形同步、情感丰富的真人级数字人播报视频，支持多国语言。</p>
           </div>
-          <span class="video-entry-cta">进入录影棚 <span aria-hidden="true">→</span></span>
+          <span class="video-entry-cta">进入录影棚</span>
         </RouterLink>
       </section>
     </main>

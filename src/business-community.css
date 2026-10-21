@@ -124,7 +124,6 @@
 .merchant-preparation li p { margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.8; }
 .merchant-next-step { display: flex; align-items: flex-start; gap: 12px; padding: 20px 5px; }
 .merchant-next-step > svg { flex-shrink: 0; color: var(--ink-muted); }
-.merchant-next-step > svg:last-child { margin-left: auto; }
 .merchant-next-step strong { font-size: 13px; font-weight: 500; }
 .merchant-next-step p { margin: 7px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
 .merchant-next-step:hover strong { color: var(--color-accent-text); }

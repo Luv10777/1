@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
-import { Plus, Search, Package, Pencil, Trash2, X, ArrowUpRight, ClipboardList, ExternalLink } from 'lucide-vue-next'
+import { Plus, Search, Package, Pencil, Trash2, X, ClipboardList, ExternalLink } from 'lucide-vue-next'
 import ProductFormModal from '../components/ProductFormModal.vue'
 import ProductImage from '../components/ProductImage.vue'
 import { selectedStore, selectedStoreId, storeLoading, storeError } from '../stores/merchantContext'
@@ -187,7 +187,7 @@ async function deleteProduct() {
       <Package :size="36" :stroke-width="1.2" />
       <h2>{{ products.length ? '没有找到匹配的商品' : '把第一件好物收入商品库' }}</h2>
       <p>{{ products.length ? '试试其他关键词，或查看全部商品。' : '录入商品信息与卖点，让每一次讲解都有据可循。' }}</p>
-      <button v-if="products.length" type="button" class="product-button" @click="search = ''; activeType = 'all'">清除筛选<ArrowUpRight :size="15" /></button>
+      <button v-if="products.length" type="button" class="product-button" @click="search = ''; activeType = 'all'">清除筛选</button>
       <button v-else type="button" class="product-button product-button-primary" @click="openForm()"><Plus :size="16" />新建商品</button>
     </div>
 

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Check, RefreshCw, Wallet, X } from 'lucide-vue-next'
+import { Check, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
 import BillingPlanManager from '../components/BillingPlanManager.vue'
@@ -182,7 +182,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>
     <div v-if="route.query.membership && !account?.memberActive" class="yanhuo-alert" role="status">{{ route.query.membership === 'unavailable' ? '暂时无法确认会员状态，请重新读取账户后继续。' : `使用${route.query.module || '平台功能'}需要先开通会员。充值烟火不会自动开通会员。` }}</div>
-    <RouterLink v-if="route.query.membership && account?.memberActive" :to="returnTo" class="generation-billing-link">会员已生效，继续使用{{ route.query.module || '平台功能' }} →</RouterLink>
+    <RouterLink v-if="route.query.membership && account?.memberActive" :to="returnTo" class="generation-billing-link">会员已生效，继续使用{{ route.query.module || '平台功能' }}</RouterLink>
     <div v-if="billing.error" class="yanhuo-alert" role="alert">{{ billing.error }}<button type="button" @click="refresh">重新读取</button></div>
     <div v-else-if="!account" class="yanhuo-empty" role="status">正在读取烟火账户...</div>
     <template v-if="account">
@@ -200,7 +200,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <li :class="{ enabled: account.memberActive && account.plan?.videoEnabled }"><Check :size="14" />视频创作</li>
             <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />直播</li>
           </ul>
-          <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '选择套餐' }}<ArrowUpRight :size="15" /></a>
+          <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '选择套餐' }}</a>
         </article>
         <article class="yanhuo-card yanhuo-balance-card">
           <div class="yanhuo-card-head">
@@ -208,7 +208,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           </div>
           <p class="yanhuo-number"><YanhuoIcon :size="30" />{{ number(account.available) }}</p>
           <dl class="yanhuo-sources"><div><dt>会员赠送</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
-          <button type="button" class="yanhuo-secondary" @click="openTopup">充值烟火<ArrowUpRight :size="15" /></button>
+          <button type="button" class="yanhuo-secondary" @click="openTopup">充值烟火</button>
         </article>
       </section>
 
@@ -222,7 +222,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p>
             <p class="yanhuo-plan-description">{{ plan.description }}</p>
             <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li></ul>
-            <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="choosePlan(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}<ArrowUpRight :size="16" /></button>
+            <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="choosePlan(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}</button>
           </article>
         </div>
       </section>
@@ -288,7 +288,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <div class="yanhuo-qr"><img v-if="qr" :src="qr" width="240" height="240" alt="微信支付二维码"><span v-else>正在读取收款码...</span></div><p class="yanhuo-payment-caption">微信扫码支付</p>
           </template>
           <template v-else-if="payment.paymentMethod === 'ALIPAY'">
-            <button class="yanhuo-primary" type="button" :disabled="paymentLoading" @click="openAlipay">前往支付宝付款<ArrowUpRight :size="16" /></button>
+            <button class="yanhuo-primary" type="button" :disabled="paymentLoading" @click="openAlipay">前往支付宝付款</button>
             <p class="yanhuo-payment-caption">在新窗口完成付款后回到这里，到账后自动更新</p>
           </template>
           <template v-else>
