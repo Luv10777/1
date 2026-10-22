@@ -96,6 +96,23 @@ export function useDigitalHumanVideo() {
     if (workflow.value) quoted.value = null
   }
   const closeQuote = () => { if (!submitting.value) { quoted.value = null; quotedInput = null } }
+  // 从创作记录打开一条已提交的任务：在预览区展示它，未结束的继续轮询。
+  const open = result => {
+    if (submitting.value || disposed) return
+    window.clearTimeout(timer)
+    previewStarted.value = true
+    submittedForm.value = { model: result.model, ratio: result.ratio, durationSeconds: result.durationSeconds, resolution: result.resolution }
+    updateWorkflow(result)
+    if (isVideoInProgress(result)) schedulePoll()
+  }
+  const reset = () => {
+    if (submitting.value) return
+    window.clearTimeout(timer)
+    previewStarted.value = false
+    submittedForm.value = null
+    workflow.value = null
+    error.value = ''
+  }
   onBeforeUnmount(() => { disposed = true; window.clearTimeout(timer) })
-  return { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice, error, start, quoted, quoting, estimate, confirmQuote, closeQuote }
+  return { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice, error, start, quoted, quoting, estimate, confirmQuote, closeQuote, open, reset }
 }

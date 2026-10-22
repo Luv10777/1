@@ -95,7 +95,7 @@
 
 /* 右侧预览（未开始生成时） */
 :root .paper-app .digital-human-page .dh-preview-panel.vs-preview { display: flex; flex-direction: column; gap: 24px; padding: 20px 28px 28px; border: 0; border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
-.vs-preview-bar { display: flex; justify-content: flex-end; }
+.vs-preview-bar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 :root .paper-app .digital-human-page .vs-preview-bar .dh-studio-switcher { position: static; }
 .vs-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-height: 0; }
 .vs-stage figure { position: relative; margin: 0; overflow: hidden; aspect-ratio: 4 / 3; border-radius: 8px; background: var(--vs-fill); }
@@ -112,8 +112,41 @@
 .vs-avatars-grid button.active { color: var(--ink); font-weight: 600; }
 .vs-avatars-grid button.active img { box-shadow: 0 0 0 2px var(--night-panel), 0 0 0 4px var(--color-accent); }
 
+/* 数字人创作记录：预览区右上角的入口，点开后抽屉盖在预览区右侧（与预览区同一个网格格子） */
+:root .paper-app .digital-human-page .dh-history-toggle { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); font-size: 13px; white-space: nowrap; cursor: pointer; pointer-events: auto; transition: box-shadow .18s; }
+:root .paper-app .digital-human-page .dh-history-toggle:hover { box-shadow: inset 0 0 0 1px var(--line); }
+.dh-history-toggle i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
+:root .paper-app .digital-human-page .video-canvas-heading > .dh-history-toggle { margin-left: auto; }
+:root .paper-app .digital-human-page .video-canvas-heading > .dh-history-toggle + .video-mode-switch { margin-left: 0; }
+.dh-history-backdrop { grid-area: 1 / 2; z-index: 20; border-radius: 8px; background: rgba(44, 62, 80, .18); }
+.dh-history-drawer { grid-area: 1 / 2; justify-self: end; z-index: 21; display: flex; flex-direction: column; width: min(340px, 100%); min-height: 0; padding: 20px 12px 16px; border-radius: 0 8px 8px 0; background: var(--night-panel); box-shadow: -16px 0 40px rgba(44, 62, 80, .14); }
+.dh-history-head { display: flex; align-items: center; gap: 4px; padding: 0 4px 12px 10px; }
+.dh-history-head > span { display: flex; flex: 1; align-items: baseline; gap: 8px; color: var(--ink); font-size: 15px; font-weight: 600; }
+.dh-history-head small { color: var(--ink-muted); font-size: 13px; font-weight: 400; }
+.dh-history-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); cursor: pointer; transition: background .18s, color .18s; }
+.dh-history-icon:hover:not(:disabled) { background: var(--vs-fill); color: var(--ink); }
+.dh-history-list { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.dh-history-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background .18s; }
+.dh-history-item:hover:not(:disabled) { background: rgba(44, 62, 80, .04); }
+.dh-history-item.active { background: var(--vs-fill); }
+.dh-history-item:disabled { cursor: wait; }
+.dh-history-thumb { display: grid; flex: 0 0 auto; place-items: center; width: 52px; height: 52px; overflow: hidden; border-radius: 6px; background: var(--vs-fill); color: var(--ink-muted); }
+.dh-history-item.active .dh-history-thumb { background: var(--night-panel); }
+.dh-history-thumb video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.dh-history-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.dh-history-text strong { overflow: hidden; font-size: 14px; font-weight: 500; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.dh-history-item.active strong { font-weight: 600; }
+.dh-history-text small { overflow: hidden; color: var(--ink-muted); font-size: 12px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.dh-history-text .is-working { color: var(--color-accent-text); }
+.dh-history-text .is-failed { color: var(--color-error); }
+.dh-history-empty { margin: 0; padding: 12px 10px; color: var(--ink-muted); font-size: 13px; }
+.dh-history-empty.is-error { color: var(--color-error); }
+.dh-history-more { align-self: center; margin-top: 6px; padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--color-accent-text); font-size: 13px; cursor: pointer; }
+.dh-history-more:hover { background: var(--vs-fill); }
+
 /* 桌面上摄影棚固定在一屏内（见 brand.css），预览区按比例分配剩余高度，图片填满格子。 */
 @media (min-width: 761px) {
+  :root .paper-app .digital-human-page .dh-workspace > .dh-preview-panel { grid-area: 1 / 2; }
   :root .paper-app .digital-human-page .dh-form-scroll.vs-form { gap: clamp(14px, 2.4vh, 32px); padding: clamp(16px, 2.6vh, 28px) 28px 12px; }
   /* 描述框在高屏上最高 200px，矮屏上先收缩到两行，保证不用滚动就能看到输出设置 */
   :root .paper-app .digital-human-page .dh-form-scroll .vs-group.vs-script { flex: 0 1 auto; min-height: 108px; }
@@ -133,6 +166,9 @@
   :root .paper-app .digital-human-page .dh-form-footer.vs-footer { padding: 14px 18px 18px; }
   :root .paper-app .digital-human-page .dh-preview-panel.vs-preview { padding: 16px 18px 20px; }
   .vs-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* 与视频工作台的记录栏一样，避开顶栏和底部导航 */
+  .dh-history-backdrop { position: fixed; top: 56px; right: 0; bottom: 64px; left: 0; border-radius: 0; }
+  .dh-history-drawer { position: fixed; top: 56px; right: 0; bottom: 64px; width: min(340px, 88vw); border-radius: 0; }
   .vs-avatars-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (prefers-reduced-motion: reduce) { .vs-row, .vs-segmented button, .vs-chevron, .vs-generate, .vs-avatars-grid img { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .vs-row, .vs-segmented button, .vs-chevron, .vs-generate, .vs-avatars-grid img, .dh-history-toggle, .dh-history-icon, .dh-history-item { transition: none; } }
