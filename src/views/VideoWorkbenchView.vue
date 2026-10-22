@@ -2,12 +2,12 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ChevronRight, Film, Plus, X } from 'lucide-vue-next'
+import { ChevronRight, Film, History, Plus, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { get, post } from '../utils/request'
-import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
+import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoHistoryTime, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 import { billing, dateTime, number, refreshBilling, requireMembership } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
@@ -92,6 +92,7 @@ const statusTone = (item) => {
   if (status === '生成失败' || status === '提交失败') return 'failed'
   return 'muted'
 }
+const historyRunning = computed(() => conversations.value.some(item => statusTone(item) === 'working'))
 const createConversation = (form = null) => {
   const item = {
     id: newConversationId(),
@@ -348,36 +349,6 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
 <template>
   <div class="video-workbench-page flex h-[calc(100vh-64px)] w-full overflow-hidden border-t border-gray-200 bg-white">
-    <button v-if="historyOpen" class="video-history-backdrop" aria-label="关闭创作记录" type="button" @click="historyOpen = false" />
-    <aside class="video-conversation-sidebar" :class="{ 'is-open': historyOpen }" aria-label="视频创作记录">
-      <div class="vs-history-head">
-        <span>创作记录<small v-if="conversations.length">{{ conversations.length }}</small></span>
-        <button class="vs-history-new" type="button" aria-label="新对话" title="新对话" @click="startNewConversation"><Plus :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
-        <button class="video-history-close" type="button" aria-label="关闭创作记录" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
-      </div>
-      <div class="vs-history-list">
-        <button
-          v-for="item in conversations"
-          :key="item.id"
-          class="vs-history-item"
-          :class="{ active: item.id === activeConversationId }"
-          :aria-current="item.id === activeConversationId ? 'true' : undefined"
-          :title="`${item.title} · ${videoModelLabel(item.selectedModel)} · ${item.resolution}`"
-          type="button"
-          @click="selectConversation(item)"
-        >
-          <strong>{{ item.title }}</strong>
-          <small><span :class="`is-${statusTone(item)}`">{{ conversationStatus(item) }}</span> · {{ item.duration }} 秒</small>
-        </button>
-        <p v-if="!conversations.length" class="vs-history-empty">从一段新的商家故事开始。</p>
-        <p v-if="historyLoading" class="video-history-message" role="status">正在读取创作记录…</p>
-        <div v-else-if="historyError" class="video-history-message" role="status">
-          <span>{{ historyError }}</span>
-          <button type="button" @click="loadHistory(historyPage)">重新加载</button>
-        </div>
-        <button v-else-if="historyHasMore" class="video-history-more" type="button" @click="loadHistory(historyPage + 1)">加载更早的创作</button>
-      </div>
-    </aside>
     <div class="video-workbench-sidebar w-[420px] h-full flex flex-col bg-white border-r border-gray-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
       <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
@@ -441,7 +412,41 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       :resolution="workflow?.resolution || resolution"
       :stage-label="stageLabel"
       @switch-workspace="switchWorkspace"
-    />
+    >
+      <template #actions>
+        <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="video-history" @click="historyOpen = !historyOpen"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
+      </template>
+      <div v-if="historyOpen" class="vs-drawer-backdrop" aria-hidden="true" @click="historyOpen = false" />
+      <aside v-if="historyOpen" id="video-history" class="vs-drawer" aria-label="视频创作记录" @keydown.esc="historyOpen = false">
+        <div class="vs-drawer-head">
+          <span>创作记录<small v-if="conversations.length">{{ conversations.length }}</small></span>
+          <button type="button" class="vs-drawer-icon" aria-label="新对话" title="新对话" @click="startNewConversation"><Plus :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+          <button type="button" class="vs-drawer-icon" aria-label="关闭创作记录" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+        </div>
+        <div class="vs-drawer-list">
+          <button
+            v-for="item in conversations"
+            :key="item.id"
+            class="vs-drawer-item"
+            :class="{ active: item.id === activeConversationId }"
+            :aria-current="item.id === activeConversationId ? 'true' : undefined"
+            :title="`${item.title} · ${videoModelLabel(item.selectedModel)} · ${item.resolution}`"
+            type="button"
+            @click="selectConversation(item)"
+          >
+            <span class="vs-drawer-thumb"><video v-if="item.workflow?.outputUrl" :src="`${item.workflow.outputUrl}#t=0.1`" muted playsinline preload="metadata" aria-hidden="true" /><Film v-else :size="18" :stroke-width="1.6" aria-hidden="true" /></span>
+            <span class="vs-drawer-text"><strong>{{ item.title }}</strong><small><span :class="`is-${statusTone(item)}`">{{ conversationStatus(item) }}</span> · {{ item.duration }} 秒<template v-if="item.updatedAt"> · {{ videoHistoryTime(item.updatedAt) }}</template></small></span>
+          </button>
+          <p v-if="!conversations.length" class="vs-drawer-empty">从一段新的商家故事开始。</p>
+          <p v-if="historyLoading" class="vs-drawer-empty" role="status">正在读取创作记录…</p>
+          <template v-else-if="historyError">
+            <p class="vs-drawer-empty is-error" role="status">{{ historyError }}</p>
+            <button type="button" class="vs-drawer-more" @click="loadHistory(historyPage)">重新加载</button>
+          </template>
+          <button v-else-if="historyHasMore" type="button" class="vs-drawer-more" @click="loadHistory(historyPage + 1)">加载更早的创作</button>
+        </div>
+      </aside>
+    </VideoPreviewPanel>
     <dialog ref="quoteDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="video-price-title" @cancel.prevent="closeQuote">
       <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !member || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="!member || (billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
     </dialog>
