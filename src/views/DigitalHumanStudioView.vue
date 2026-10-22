@@ -2,13 +2,14 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { AudioLines, ChevronRight, Film, ImagePlus, UserRound, X } from 'lucide-vue-next'
+import { AudioLines, ChevronRight, Film, History, ImagePlus, Plus, UserRound, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { useDigitalHumanVideo } from '../composables/useDigitalHumanVideo'
 import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
-import { videoModels, videoModelLabel } from '../services/videoConversations'
+import { isVideoInProgress, videoConversationTitle, videoModels, videoModelLabel } from '../services/videoConversations'
+import { get } from '../utils/request'
 import { billing, number, refreshBilling, requireMembership } from '../stores/billing'
 import { auth } from '../stores/auth'
 
@@ -28,7 +29,7 @@ const duration = ref(10)
 const ratio = ref('auto')
 const selectedModel = ref('SEEDANCE_2_5')
 const resolution = ref('720p')
-const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, quoted, quoting, estimate, confirmQuote, closeQuote } = useDigitalHumanVideo()
+const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, quoted, quoting, estimate, confirmQuote, closeQuote, open: openWorkflow, reset: resetPreview } = useDigitalHumanVideo()
 const priceDialog = ref(null)
 watch(quoted, async value => { await nextTick(); if (value) priceDialog.value?.showModal(); else priceDialog.value?.close() })
 const notice = ref('')
@@ -166,6 +167,61 @@ const clampSettings = () => {
   duration.value = Math.min(currentModel.value.maxDurationSeconds, Math.max(5, duration.value))
   if (!availableResolutions.value.includes(resolution.value)) resolution.value = availableResolutions.value[0]
 }
+// 创作记录：视频接口不区分来源，数字人任务的提示词都以固定的第一行开头（见 digitalHumanVideoInput），按它筛出来。
+const DIGITAL_HUMAN_PROMPT = '生成数字人口播带货视频。'
+const historyOpen = ref(false)
+const historyItems = ref([])
+const historyLoading = ref(false)
+const historyError = ref('')
+const historyPage = ref(-1)
+const historyHasMore = ref(true)
+const openingRecord = ref(null)
+const historyRunning = computed(() => historyItems.value.some(isVideoInProgress) || isGenerating.value)
+const historyTitle = prompt => {
+  const text = prompt.match(/口播文案与画面要求：(.*)/)?.[1] || ''
+  return text ? videoConversationTitle(text) : '数字人视频'
+}
+const historyStatus = status => ({ SUCCEEDED: '已完成', FAILED: '生成失败', CANCELLED: '已取消' }[status] || '生成中')
+const historyTone = status => status === 'FAILED' ? 'failed' : isVideoInProgress({ status }) ? 'working' : 'muted'
+const historyTime = value => {
+  const date = new Date(value)
+  const pad = n => String(n).padStart(2, '0')
+  return date.toDateString() === new Date().toDateString() ? `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}` : `${date.getMonth() + 1}月${date.getDate()}日`
+}
+const loadHistory = async (reset = false) => {
+  if (historyLoading.value || !auth.isAuthenticated) return
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const nextPage = reset ? 0 : historyPage.value + 1
+    const page = await get('/api/video/workflows', { page: nextPage, size: 20 })
+    const items = (page.items || []).filter(item => item.prompt?.startsWith(DIGITAL_HUMAN_PROMPT))
+    historyItems.value = reset ? items : [...historyItems.value, ...items.filter(item => !historyItems.value.some(old => old.id === item.id))]
+    historyPage.value = nextPage
+    historyHasMore.value = nextPage + 1 < page.totalPages
+  } catch (error) {
+    historyError.value = error.message || '创作记录暂时无法加载'
+  } finally {
+    historyLoading.value = false
+  }
+}
+const toggleHistory = () => {
+  historyOpen.value = !historyOpen.value
+  if (historyOpen.value) loadHistory(true)
+}
+const openRecord = async item => {
+  if (openingRecord.value) return
+  openingRecord.value = item.id
+  try {
+    openWorkflow(await get(`/api/video/workflows/${item.id}`))
+    historyOpen.value = false
+  } catch (error) {
+    historyError.value = error.message || '这条记录暂时无法打开'
+  } finally {
+    openingRecord.value = null
+  }
+}
+const newVideo = () => { resetPreview(); historyOpen.value = false }
 const selectModel = model => { selectedModel.value = model; clampSettings(); enforceMaterialLimits() }
 watch(selectedModel, () => { clampSettings(); enforceMaterialLimits() })
 onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, ...extraImages.value, ...referenceVideos.value, voiceFile.value, ...extraVoices.value].forEach(revokeBlob))
@@ -236,9 +292,14 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         active-workspace="digital-human"
         continue-text="生成完成后可直接播放，成片将保存到作品库。"
         @switch-workspace="switchWorkspace"
-      />
+      >
+        <template #actions>
+          <button type="button" class="dh-history-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
+        </template>
+      </VideoPreviewPanel>
       <section v-else class="dh-preview-panel vs-preview" aria-label="数字人视频预览">
         <div class="vs-preview-bar">
+          <button type="button" class="dh-history-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
           <div class="dh-studio-switcher video-mode-switch" role="group" aria-label="切换工作台">
             <button type="button" @click="switchWorkspace('/video/workbench')">视频工作台</button>
             <button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/digital-human/studio')"><span class="material-symbols-outlined">record_voice_over</span>数字人摄影棚</button>
@@ -255,6 +316,25 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           </div>
         </div>
       </section>
+      <div v-if="historyOpen" class="dh-history-backdrop" aria-hidden="true" @click="historyOpen = false" />
+      <aside v-if="historyOpen" id="dh-history" class="dh-history-drawer" aria-label="数字人创作记录" @keydown.esc="historyOpen = false">
+        <div class="dh-history-head">
+          <span>创作记录<small v-if="historyItems.length">{{ historyItems.length }}</small></span>
+          <button type="button" class="dh-history-icon" aria-label="新建数字人视频" title="新建数字人视频" :disabled="isGenerating && !workflow" @click="newVideo"><Plus :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+          <button type="button" class="dh-history-icon" aria-label="关闭创作记录" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+        </div>
+        <div class="dh-history-list">
+          <button v-for="item in historyItems" :key="item.id" type="button" class="dh-history-item" :class="{ active: workflow?.id === item.id }" :aria-current="workflow?.id === item.id ? 'true' : undefined" :disabled="!!openingRecord || (isGenerating && !workflow)" @click="openRecord(item)">
+            <span class="dh-history-thumb"><video v-if="item.outputUrl" :src="`${item.outputUrl}#t=0.1`" muted playsinline preload="metadata" aria-hidden="true" /><Film v-else :size="18" :stroke-width="1.6" aria-hidden="true" /></span>
+            <span class="dh-history-text"><strong>{{ historyTitle(item.prompt) }}</strong><small><span :class="`is-${historyTone(item.status)}`">{{ openingRecord === item.id ? '正在打开…' : historyStatus(item.status) }}</span> · {{ item.durationSeconds }} 秒 · {{ historyTime(item.createdAt) }}</small></span>
+          </button>
+          <p v-if="!auth.isAuthenticated" class="dh-history-empty">登录后查看创作记录。</p>
+          <p v-else-if="historyError" class="dh-history-empty is-error" role="alert">{{ historyError }}</p>
+          <p v-else-if="historyLoading && !historyItems.length" class="dh-history-empty">正在加载…</p>
+          <p v-else-if="!historyItems.length && !historyHasMore" class="dh-history-empty">还没有数字人视频，生成后会出现在这里。</p>
+          <button v-if="auth.isAuthenticated && historyHasMore && !historyLoading" type="button" class="dh-history-more" @click="loadHistory()">加载更多</button>
+        </div>
+      </aside>
     </main>
     <dialog ref="priceDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="dh-price-title" @cancel.prevent="closeQuote">
       <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" width="32" height="32" alt=""><h2 id="dh-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="isGenerating" @click="closeQuote">×</button></header><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p><p class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</p><button class="yanhuo-primary" type="button" :disabled="isGenerating || !billing.summary?.memberActive || !billing.summary?.plan?.videoEnabled || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink><p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p></template>

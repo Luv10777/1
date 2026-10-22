@@ -106,6 +106,31 @@ test('digital human task lifecycle follows the real video API', async t => {
         assert.equal(timers.size, 0)
       } finally { app.unmount() }
     })
+    await t.test('opening a record shows it in the preview, keeps polling a running one, and reset returns to the studio', async () => {
+      const gets = []
+      globalThis.fetch = async (url, options) => {
+        assert.notEqual(options.method, 'POST')
+        gets.push(url)
+        return response({ id: 80, status: 'SUCCEEDED', stage: 'DONE', outputUrl: '/test/record.mp4' })
+      }
+      const { app, studio } = mount()
+      try {
+        studio.open({ id: 80, status: 'RUNNING', stage: 'POLL', model: 'SEEDANCE_2_0', ratio: '9:16', durationSeconds: 8, resolution: '480p' })
+        assert.equal(studio.previewStarted.value, true)
+        assert.equal(studio.isGenerating.value, true)
+        assert.deepEqual(studio.submittedForm.value, { model: 'SEEDANCE_2_0', ratio: '9:16', durationSeconds: 8, resolution: '480p' })
+        const [id, callback] = timers.entries().next().value
+        timers.delete(id)
+        await callback()
+        assert.deepEqual(gets, ['/api/video/workflows/80'])
+        assert.equal(studio.outputUrl.value, '/test/record.mp4')
+        assert.equal(timers.size, 0)
+        studio.reset()
+        assert.equal(studio.previewStarted.value, false)
+        assert.equal(studio.workflow.value, null)
+        assert.equal(studio.submittedForm.value, null)
+      } finally { app.unmount() }
+    })
     await t.test('an uncertain submission reuses its key while a known failed task starts a fresh generation', async () => {
       const posts = []
       globalThis.fetch = async (url, options) => {
