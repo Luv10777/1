@@ -186,7 +186,6 @@
 @media(prefers-reduced-motion:reduce){::view-transition-group(workspace-shell),::view-transition-old(workspace-shell),::view-transition-new(workspace-shell){animation:none}}
 
 /* 一方志视频工作台：创作记录、方印加载状态与纸本文脉 */
-.video-conversation-sidebar{display:flex;flex:0 0 218px;width:218px;height:100%;flex-direction:column;padding:22px 12px 16px;border-right:1px solid var(--line);background:var(--color-bg-canvas);color:var(--ink);font-family:var(--font-sans)}
 .video-render-stage{display:flex;flex:1;min-height:0;width:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:36px 16px}
 .video-seal-loader{position:relative;display:grid;place-items:center;width:76px;height:76px;margin-bottom:28px;color:var(--color-accent-text)}
 .video-seal-loader svg{position:absolute;inset:0;width:100%;height:100%;stroke:currentColor;stroke-width:1.4}
@@ -203,30 +202,25 @@
 .video-render-continue{margin:12px 0 0;color:var(--ink-muted);font-size:12px;line-height:1.7}
 @keyframes video-seal-write{to{stroke-dashoffset:-276}}
 @keyframes video-seal-breathe{0%,100%{opacity:.62;transform:scale(.97)}50%{opacity:1;transform:scale(1)}}
-@media(max-width:1180px){.video-conversation-sidebar{flex-basis:194px;width:194px}.video-workbench-sidebar{width:360px!important;flex-basis:360px!important}}
-@media(max-width:860px){.video-conversation-sidebar{display:none}.video-workbench-sidebar{width:min(100%,420px)!important;flex-basis:min(100%,420px)!important}}
+@media(max-width:1180px){.video-workbench-sidebar{width:360px!important;flex-basis:360px!important}}
+@media(max-width:860px){.video-workbench-sidebar{width:min(100%,420px)!important;flex-basis:min(100%,420px)!important}}
 @media(prefers-reduced-motion:reduce){.video-seal-stroke,.video-seal-loader img{animation:none}}
 
 .video-workbench-page .video-workbench-scroll{margin:0;border:0;min-width:0}
 .video-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:22px 28px 0}
 .video-editor-heading span{color:var(--color-text-muted);font-size:12px}
 .video-editor-heading h1{margin:6px 0 0;font:600 24px/1.5 var(--font-serif);letter-spacing:.04em}
-.video-workbench-page .video-history-trigger,.video-history-close,.video-history-backdrop{display:none}
+.video-workbench-page .video-history-trigger{display:none}
 .video-history-message{display:grid;gap:8px;margin:0;padding:14px 8px;color:var(--color-text-muted);font-size:12px;line-height:1.8}
-.video-history-message button,.video-history-more{padding:8px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--color-accent-text);font-size:12px}
 .video-workbench-page .video-workbench-canvas{background:var(--color-bg-canvas)}
 .video-workbench-canvas .device-screen{background:var(--color-bg-surface)}
 .video-result-stage{display:grid;place-items:center;flex:1 1 0;width:100%;min-height:0;padding:24px;container-type:size}
 .video-result-player{display:block;width:min(640px,100cqw,calc(100cqh * var(--video-aspect-ratio)),calc(560px * var(--video-aspect-ratio)));height:auto;aspect-ratio:var(--video-aspect-ratio);border-radius:10px;object-fit:contain;background:transparent}
 .video-workbench-page .video-workbench-sidebar{flex-shrink:0}
 @media(max-width:1100px){
-  .video-conversation-sidebar{position:absolute;inset:0 auto 0 0;z-index:35;display:none;width:250px;max-width:80%;background:var(--color-bg-canvas)}
-  .video-conversation-sidebar.is-open{display:flex}
   .video-workbench-page{position:relative}
   .video-workbench-page .video-history-trigger{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:4px;padding:8px;background:var(--color-bg-surface);font-size:12px;white-space:nowrap}
   .video-history-trigger .material-symbols-outlined{font-size:16px}
-  .video-history-close{display:block;margin-left:auto;border:0;background:transparent;font-size:22px}
-  .video-history-backdrop{display:block;position:absolute;inset:0;z-index:34;border:0;background:rgba(20,24,28,.28)}
 }
 @media(max-width:760px){
   .paper-app .page-scroll.page-scroll-workspace:has(.video-workbench-page){overflow:auto;display:block;padding-bottom:64px}
@@ -234,6 +228,5 @@
   .paper-app .video-workbench-page .video-workbench-sidebar{width:100%!important;flex-basis:auto!important;height:auto;border-right:0}
   .video-workbench-page .video-workbench-scroll{overflow:visible}
   .video-workbench-page .video-workbench-canvas{flex:none;height:480px;min-height:480px}
-  .video-history-backdrop,.video-conversation-sidebar.is-open{position:fixed;top:56px;bottom:64px}
   .video-generating-copy strong{font-size:24px}
 }

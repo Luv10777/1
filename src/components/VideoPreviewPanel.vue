@@ -80,5 +80,6 @@ defineEmits(['switch-workspace'])
       </div>
     </div>
 
+    <slot />
   </div>
 </template>

@@ -8,7 +8,7 @@ import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { useDigitalHumanVideo } from '../composables/useDigitalHumanVideo'
 import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
-import { isVideoInProgress, videoConversationTitle, videoModels, videoModelLabel } from '../services/videoConversations'
+import { isVideoInProgress, videoConversationTitle, videoHistoryTime, videoModels, videoModelLabel } from '../services/videoConversations'
 import { get } from '../utils/request'
 import { billing, number, refreshBilling, requireMembership } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -183,11 +183,6 @@ const historyTitle = prompt => {
 }
 const historyStatus = status => ({ SUCCEEDED: '已完成', FAILED: '生成失败', CANCELLED: '已取消' }[status] || '生成中')
 const historyTone = status => status === 'FAILED' ? 'failed' : isVideoInProgress({ status }) ? 'working' : 'muted'
-const historyTime = value => {
-  const date = new Date(value)
-  const pad = n => String(n).padStart(2, '0')
-  return date.toDateString() === new Date().toDateString() ? `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}` : `${date.getMonth() + 1}月${date.getDate()}日`
-}
 const loadHistory = async (reset = false) => {
   if (historyLoading.value || !auth.isAuthenticated) return
   historyLoading.value = true
@@ -294,12 +289,12 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         @switch-workspace="switchWorkspace"
       >
         <template #actions>
-          <button type="button" class="dh-history-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
+          <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
         </template>
       </VideoPreviewPanel>
       <section v-else class="dh-preview-panel vs-preview" aria-label="数字人视频预览">
         <div class="vs-preview-bar">
-          <button type="button" class="dh-history-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
+          <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
           <div class="dh-studio-switcher video-mode-switch" role="group" aria-label="切换工作台">
             <button type="button" @click="switchWorkspace('/video/workbench')">视频工作台</button>
             <button type="button" class="active" aria-pressed="true" @click="switchWorkspace('/digital-human/studio')"><span class="material-symbols-outlined">record_voice_over</span>数字人摄影棚</button>
@@ -316,23 +311,23 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           </div>
         </div>
       </section>
-      <div v-if="historyOpen" class="dh-history-backdrop" aria-hidden="true" @click="historyOpen = false" />
-      <aside v-if="historyOpen" id="dh-history" class="dh-history-drawer" aria-label="数字人创作记录" @keydown.esc="historyOpen = false">
-        <div class="dh-history-head">
+      <div v-if="historyOpen" class="vs-drawer-backdrop" aria-hidden="true" @click="historyOpen = false" />
+      <aside v-if="historyOpen" id="dh-history" class="vs-drawer" aria-label="数字人创作记录" @keydown.esc="historyOpen = false">
+        <div class="vs-drawer-head">
           <span>创作记录<small v-if="historyItems.length">{{ historyItems.length }}</small></span>
-          <button type="button" class="dh-history-icon" aria-label="新建数字人视频" title="新建数字人视频" :disabled="isGenerating && !workflow" @click="newVideo"><Plus :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
-          <button type="button" class="dh-history-icon" aria-label="关闭创作记录" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+          <button type="button" class="vs-drawer-icon" aria-label="新建数字人视频" title="新建数字人视频" :disabled="isGenerating && !workflow" @click="newVideo"><Plus :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+          <button type="button" class="vs-drawer-icon" aria-label="关闭创作记录" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
         </div>
-        <div class="dh-history-list">
-          <button v-for="item in historyItems" :key="item.id" type="button" class="dh-history-item" :class="{ active: workflow?.id === item.id }" :aria-current="workflow?.id === item.id ? 'true' : undefined" :disabled="!!openingRecord || (isGenerating && !workflow)" @click="openRecord(item)">
-            <span class="dh-history-thumb"><video v-if="item.outputUrl" :src="`${item.outputUrl}#t=0.1`" muted playsinline preload="metadata" aria-hidden="true" /><Film v-else :size="18" :stroke-width="1.6" aria-hidden="true" /></span>
-            <span class="dh-history-text"><strong>{{ historyTitle(item.prompt) }}</strong><small><span :class="`is-${historyTone(item.status)}`">{{ openingRecord === item.id ? '正在打开…' : historyStatus(item.status) }}</span> · {{ item.durationSeconds }} 秒 · {{ historyTime(item.createdAt) }}</small></span>
+        <div class="vs-drawer-list">
+          <button v-for="item in historyItems" :key="item.id" type="button" class="vs-drawer-item" :class="{ active: workflow?.id === item.id }" :aria-current="workflow?.id === item.id ? 'true' : undefined" :disabled="!!openingRecord || (isGenerating && !workflow)" @click="openRecord(item)">
+            <span class="vs-drawer-thumb"><video v-if="item.outputUrl" :src="`${item.outputUrl}#t=0.1`" muted playsinline preload="metadata" aria-hidden="true" /><Film v-else :size="18" :stroke-width="1.6" aria-hidden="true" /></span>
+            <span class="vs-drawer-text"><strong>{{ historyTitle(item.prompt) }}</strong><small><span :class="`is-${historyTone(item.status)}`">{{ openingRecord === item.id ? '正在打开…' : historyStatus(item.status) }}</span> · {{ item.durationSeconds }} 秒 · {{ videoHistoryTime(item.createdAt) }}</small></span>
           </button>
-          <p v-if="!auth.isAuthenticated" class="dh-history-empty">登录后查看创作记录。</p>
-          <p v-else-if="historyError" class="dh-history-empty is-error" role="alert">{{ historyError }}</p>
-          <p v-else-if="historyLoading && !historyItems.length" class="dh-history-empty">正在加载…</p>
-          <p v-else-if="!historyItems.length && !historyHasMore" class="dh-history-empty">还没有数字人视频，生成后会出现在这里。</p>
-          <button v-if="auth.isAuthenticated && historyHasMore && !historyLoading" type="button" class="dh-history-more" @click="loadHistory()">加载更多</button>
+          <p v-if="!auth.isAuthenticated" class="vs-drawer-empty">登录后查看创作记录。</p>
+          <p v-else-if="historyError" class="vs-drawer-empty is-error" role="alert">{{ historyError }}</p>
+          <p v-else-if="historyLoading && !historyItems.length" class="vs-drawer-empty">正在加载…</p>
+          <p v-else-if="!historyItems.length && !historyHasMore" class="vs-drawer-empty">还没有数字人视频，生成后会出现在这里。</p>
+          <button v-if="auth.isAuthenticated && historyHasMore && !historyLoading" type="button" class="vs-drawer-more" @click="loadHistory()">加载更多</button>
         </div>
       </aside>
     </main>

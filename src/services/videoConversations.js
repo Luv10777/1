@@ -8,6 +8,12 @@ export const videoModels = [
 export const videoModelLabel = id => videoModels.find(model => model.id === id)?.label || id
 export const isVideoInProgress = workflow => Boolean(workflow && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(workflow.status))
 export const videoConversationTitle = prompt => prompt.trim().replace(/\s+/g, ' ').slice(0, 28) || '新的视频创作'
+// 创作记录里的时间：当天显示「今天 14:20」，更早的显示「10月20日」。
+export const videoHistoryTime = value => {
+  const date = new Date(value)
+  const pad = n => String(n).padStart(2, '0')
+  return date.toDateString() === new Date().toDateString() ? `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}` : `${date.getMonth() + 1}月${date.getDate()}日`
+}
 
 export const videoCompletionNotice = () => '视频已完成并保存到作品库。'
 
