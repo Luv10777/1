@@ -4,7 +4,7 @@ import globals from 'globals'
 import tsParser from '@typescript-eslint/parser'
 
 export default [
-  { ignores: ['dist/**', 'dist-admin/**', 'node_modules/**'] },
+  { ignores: ['dist/**', 'dist-admin/**', 'node_modules/**', '.claude/worktrees/**'] },
   js.configs.recommended,
   ...vue.configs['flat/recommended'],
   {

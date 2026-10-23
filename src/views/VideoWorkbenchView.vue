@@ -2,8 +2,9 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ChevronRight, Film, History, Plus, X } from 'lucide-vue-next'
+import { ChevronRight, Film, History, Plus, Sparkles, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
+import VideoPlanPanel from '../components/VideoPlanPanel.vue'
 import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { get, post } from '../utils/request'
@@ -25,6 +26,8 @@ const capabilities = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
 const historyOpen = ref(false)
+const rightTab = ref('preview')
+const canvas = ref(null)
 const settingsOpen = ref(false)
 const historyLoading = ref(false)
 const historyError = ref('')
@@ -325,6 +328,23 @@ const cancelVideo = async () => {
   catch (e) { item.notice = e.message || '取消失败，请刷新任务后重试' }
   finally { item.submitting = false; refreshBilling() }
 }
+const openPlan = async () => {
+  rightTab.value = 'plan'
+  historyOpen.value = false
+  await nextTick()
+  // 手机上预览区在表单下方，点了入口直接滚过去。
+  if (window.matchMedia('(max-width: 760px)').matches) canvas.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+const applyPlan = (form, letter) => {
+  prompt.value = form.prompt
+  format.value = form.format
+  duration.value = form.duration
+  saveActiveConversation()
+  activeConversation.value.error = false
+  activeConversation.value.notice = form.shortened
+    ? `已填入方案 ${letter}；当前模型最长 ${durationMax.value} 秒，时长已缩短，提示词里的分镜可能需要再改。`
+    : `已填入方案 ${letter}，可以再改字后生成。`
+}
 const switchWorkspace = (path) => {
   if (path === router.currentRoute.value.path) return
   if (typeof document.startViewTransition === 'function') {
@@ -350,7 +370,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 <template>
   <div class="video-workbench-page flex h-[calc(100vh-64px)] w-full overflow-hidden border-t border-gray-200 bg-white">
     <div class="video-workbench-sidebar w-[420px] h-full flex flex-col bg-white border-r border-gray-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
-      <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
+      <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="vp-entry" type="button" :aria-pressed="rightTab === 'plan'" @click="openPlan"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />帮我出方案</button><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
       <fieldset class="video-workbench-scroll vs-form flex-1 overflow-y-auto" :disabled="isGenerating || activeConversation?.loading">
         <section class="vs-group">
@@ -401,6 +421,8 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
     </div>
 
     <VideoPreviewPanel
+      ref="canvas"
+      :class="{ 'is-planning': rightTab === 'plan' }"
       :is-generating="isGenerating"
       :is-morphing="isMorphing"
       :output-url="outputUrl"
@@ -413,9 +435,25 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       :stage-label="stageLabel"
       @switch-workspace="switchWorkspace"
     >
+      <template #title>
+        <div class="vp-tabs" role="tablist" aria-label="右侧内容">
+          <button type="button" role="tab" :aria-selected="rightTab === 'preview'" :class="{ active: rightTab === 'preview' }" @click="rightTab = 'preview'">成片预览</button>
+          <button type="button" role="tab" :aria-selected="rightTab === 'plan'" :class="{ active: rightTab === 'plan' }" @click="rightTab = 'plan'">视频方案</button>
+        </div>
+      </template>
       <template #actions>
         <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="video-history" @click="historyOpen = !historyOpen"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
       </template>
+      <VideoPlanPanel
+        v-show="rightTab === 'plan'"
+        :images="referenceImages"
+        :video="referenceVideo"
+        :upload="uploadAsset"
+        :max-duration="durationMax"
+        :ratios="ratioOptions.map(option => option.value)"
+        :locked="isGenerating || Boolean(activeConversation?.loading)"
+        @apply="applyPlan"
+      />
       <div v-if="historyOpen" class="vs-drawer-backdrop" aria-hidden="true" @click="historyOpen = false" />
       <aside v-if="historyOpen" id="video-history" class="vs-drawer" aria-label="视频创作记录" @keydown.esc="historyOpen = false">
         <div class="vs-drawer-head">

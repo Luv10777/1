@@ -7,6 +7,12 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 60 秒 / 100 MB 的 MP4、MOV 视频，以及公开 HTTPS 视频文件直链。配置、两条 worker 队列、
 接口和画面分析边界见 [视频反推接入文档](../../docs/video-analysis.md)。
 
+2026-10-23 新增视频工作台「帮我出方案」（可选，商家仍可自己写提示词）：OnlyRouter `gemini-3.8-flash-ab`
+看最多 6 张参考图（缩到长边 1024 的 JPEG），按风格和一句话需求出 3 个方案，每个方案自己判断每张图的用途并写进中文提示词和分镜。
+每次（含「换一批」）预占 1 烟火，结果校验通过才扣除，失败或校验不过退回。任务 `VIDEO_PLAN_GENERATE` 走 `DEFAULT` 队列。
+接口：`GET /api/video/plans/config`、`POST /api/video/plans`（`requestKey` 幂等，`previousPlanId` 表示换一批）、`GET /api/video/plans/{id}`。
+服务端配置 `VIDEO_PLAN_API_KEY`（必填）、`VIDEO_PLAN_BASE_URL`、`VIDEO_PLAN_MODEL`、`VIDEO_PLAN_TIMEOUT_SECONDS`、`VIDEO_PLAN_MAX_TOKENS`；未配置密钥时入口显示未开放。
+
 2026-09-22 新增 AI 图片创作模块：营销海报、产品套图、结构化规划、逐张生成任务、
 480P–4K 画质、作品记录与版本修改。New API / OpenAI 协议配置、可选桥接协议与运行边界见
 [图片工作流接入文档](../../docs/image-workflow.md)。真实模型需在服务端单独配置。
@@ -432,8 +438,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V57 | 联盟券结算账户、月度对账单；平台审计表允许 SETTLEMENT_ACCOUNT | `feat/alliance-vouchers` |
 
 | V59 | 平台停用账号：`users` 停用前状态与停用时间，审计表允许 `USER` | `claude/admin-users` |
+| V60 | 视频工作台「帮我出方案」：`video_plans`（参考图、风格、一句话、3 个方案、预占烟火） | `claude/video-plan` |
 
-下一个可用编号：V60（V54 直播计费、V58 消息通知已在主干）。
+下一个可用编号：V61（V54 直播计费、V58 消息通知已在主干）。
 
 后端检查：
 

@@ -126,6 +126,74 @@
 .video-workbench-canvas > .vs-drawer-backdrop { position: absolute; inset: 0; border-radius: 0; }
 .video-workbench-canvas > .vs-drawer { position: absolute; top: 0; right: 0; bottom: 0; border-radius: 0; }
 
+/* 视频工作台「帮我出方案」：表单标题旁的入口、预览区标题处的两个页签，以及盖在预览区上的方案面板。 */
+:root .paper-app .video-workbench-page .vp-entry { display: inline-flex; align-items: center; gap: 6px; height: 34px; margin-left: auto; padding: 0 12px; border: 0; border-radius: 17px; background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-accent-text); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .18s, color .18s; }
+:root .paper-app .video-workbench-page .vp-entry:hover, :root .paper-app .video-workbench-page .vp-entry[aria-pressed="true"] { background: var(--color-accent); color: var(--color-on-accent); }
+.video-editor-heading > div:first-child { flex: 1; }
+.vp-tabs { display: flex; padding: 3px; border-radius: 8px; background: var(--vs-fill); pointer-events: auto; }
+.vp-tabs button { height: 32px; padding: 0 16px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-muted); font-size: 13px; cursor: pointer; transition: background .18s, color .18s; }
+.vp-tabs button.active { background: var(--night-panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44, 62, 80, .12); }
+.video-workbench-canvas.is-planning > :is(.video-device-stage, .video-result-stage, .video-render-stage) { display: none; }
+.video-workbench-canvas > .vp-panel { flex: 1 1 auto; align-self: stretch; display: flex; flex-direction: column; gap: 22px; min-height: 0; padding: 12px 6px 8px; overflow-y: auto; color: var(--ink); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.vp-intro, .vp-muted, .vp-results-head p { margin: 0; color: var(--ink-muted); font-size: 14px; line-height: 1.6; }
+.vp-section { display: flex; flex-direction: column; gap: 10px; }
+.vp-heading { display: flex; align-items: baseline; gap: 8px; color: var(--ink); font-size: 14px; font-weight: 600; }
+.vp-heading small { color: var(--ink-muted); font-size: 12px; font-weight: 400; }
+.vp-materials { display: flex; flex-wrap: wrap; gap: 10px; }
+.vp-materials figure { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; color: var(--ink-muted); font-size: 12px; }
+.vp-materials img { width: 64px; height: 64px; border-radius: 6px; object-fit: cover; background: var(--vs-fill); }
+.vp-materials .is-video { flex-direction: row; align-self: flex-start; gap: 8px; height: 64px; padding: 0 12px; border-radius: 6px; background: var(--vs-fill); }
+.vp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.vp-chips button { height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: var(--vs-fill); color: var(--ink); font-size: 13px; cursor: pointer; transition: background .18s, color .18s; }
+.vp-chips button.is-custom { border: 1px dashed var(--line-strong); background: transparent; color: var(--ink-muted); }
+.vp-chips button.active { border-color: transparent; background: var(--ink); color: var(--night-panel); }
+.vp-input { height: 42px; padding: 0 14px; border: 0; border-radius: 8px; outline: 0; background: var(--vs-fill); color: var(--ink); font: 14px var(--font-sans); }
+.vp-input::placeholder { color: var(--ink-muted); }
+.vp-input:focus-visible { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.vp-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.vp-footer.is-center { justify-content: center; }
+.vp-footer small { color: var(--ink-muted); font-size: 13px; }
+.vp-primary, .vp-secondary { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background .18s, box-shadow .18s; }
+.vp-primary { height: 44px; padding: 0 20px; background: var(--color-accent); color: var(--color-on-accent); font-size: 15px; }
+.vp-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+.vp-secondary { height: 38px; padding: 0 16px; background: var(--vs-fill); color: var(--ink); font-size: 14px; font-weight: 400; }
+.vp-secondary:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--line); }
+:is(.vp-primary, .vp-secondary):disabled { opacity: .65; cursor: wait; }
+.vp-cost { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px 0 3px; border-radius: 10px; background: rgba(255, 255, 255, .22); font-size: 12px; line-height: 20px; }
+.vp-cost.is-plain { padding: 0; background: transparent; color: var(--color-accent-text); }
+.vp-link { align-self: flex-start; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--color-accent-text); font-size: 13px; cursor: pointer; }
+.vp-link:hover:not(:disabled) { background: var(--vs-fill); }
+.vp-results-head { display: flex; align-items: center; gap: 8px; }
+.vp-results-head p { flex: 1; }
+.vp-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; transition: opacity .18s; }
+.vp-cards.is-working { opacity: .55; }
+.vp-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 18px 16px 16px; border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
+.vp-letter { display: flex; align-items: center; gap: 8px; color: var(--color-accent-text); font-size: 12px; font-weight: 600; }
+.vp-letter small { padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); font-size: 11px; font-weight: 400; line-height: 18px; }
+.vp-card h3 { margin: 0; font: 600 17px/1.4 var(--font-serif); }
+.vp-idea { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.6; }
+.vp-meta { margin: 0; color: var(--ink-muted); font-size: 12px; }
+.vp-uses, .vp-shots { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.vp-uses li { display: flex; align-items: center; gap: 8px; color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+.vp-uses img { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
+.vp-uses b { margin-right: 4px; color: var(--ink); font-weight: 600; }
+.vp-shots li { display: grid; grid-template-columns: 52px 1fr; gap: 8px; font-size: 12px; line-height: 1.55; }
+.vp-shots time { color: var(--ink-muted); font-family: var(--font-mono); }
+.vp-prompt { color: var(--ink-muted); font-size: 12px; }
+.vp-prompt summary { cursor: pointer; }
+.vp-prompt p { margin: 6px 0 0; color: var(--ink); line-height: 1.65; white-space: pre-wrap; }
+.vp-use { margin-top: auto; height: 40px; border: 0; border-radius: 8px; background: var(--color-accent); color: var(--color-on-accent); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .18s; }
+.vp-use:hover:not(:disabled) { background: var(--color-accent-hover); }
+.vp-use.active { background: var(--vs-fill); color: var(--ink); }
+.vp-use:disabled { opacity: .55; cursor: not-allowed; }
+.vp-status { margin: 0; color: var(--ink-muted); font-size: 13px; }
+.vp-status.is-error { color: var(--color-error); }
+.vp-billing { align-self: flex-start; font-size: 13px; }
+@media (max-width: 1180px) { .vp-cards { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .video-canvas-heading .vp-tabs button { padding: 0 12px; }
+}
+
 /* 桌面上摄影棚固定在一屏内（见 brand.css），预览区按比例分配剩余高度，图片填满格子。 */
 @media (min-width: 761px) {
   /* 视频工作台在桌面上只用预览区右上角的入口；表单标题旁的按钮留给手机 */

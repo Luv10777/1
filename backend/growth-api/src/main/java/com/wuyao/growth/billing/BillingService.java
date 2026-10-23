@@ -17,6 +17,7 @@ import java.util.Objects;
 public class BillingService {
     public static final int IMAGE_CREDITS = 3;
     public static final int VIDEO_ANALYSIS_CREDITS = 1;
+    public static final int VIDEO_PLAN_CREDITS = 1;
     /** Live sessions reserve one hour at a time and settle by the minute. */
     public static final int LIVE_CREDITS_PER_HOUR = 35;
     public static final int CREDITS_PER_YUAN = 10;
@@ -252,7 +253,7 @@ public class BillingService {
     private void requireEntitlement(BillingAccount a,String capability) {
         requireActiveMembership(a);
         var p=a.getPlanSnapshot();
-        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); case "LIVE"->p.liveEnabled(); case "VIDEO_ANALYSIS"->true; default->false; };
+        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); case "LIVE"->p.liveEnabled(); case "VIDEO_ANALYSIS"->true; case "VIDEO_PLAN"->p.videoEnabled(); default->false; };
         if(!enabled) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,
             "LIVE".equals(capability)?"当前套餐不含直播功能，请订阅包含直播的套餐":"当前套餐尚未开放此项创作功能");
     }

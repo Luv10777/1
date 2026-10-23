@@ -6,6 +6,7 @@ import com.wuyao.growth.creative.image.ImageCreationService;
 import com.wuyao.growth.iam.service.TenantDirectory;
 import com.wuyao.growth.video.VideoWorkflowService;
 import com.wuyao.growth.video.analysis.VideoAnalysisService;
+import com.wuyao.growth.video.plan.VideoPlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ public class BillingRecovery {
     private final ImageCreationService images;
     private final VideoWorkflowService videos;
     private final VideoAnalysisService analyses;
+    private final VideoPlanService plans;
     private final BillingService billing;
     private final BillingCheckoutService checkout;
     public void recover() {
@@ -48,10 +50,12 @@ public class BillingRecovery {
             var ids=new ArrayList<Long>(images.billingRecoveryTaskIds(reservations));
             ids.addAll(videos.billingRecoveryTaskIds(reservations));
             ids.addAll(analyses.billingRecoveryTaskIds(reservations));
+            ids.addAll(plans.billingRecoveryTaskIds(reservations));
             for(var event:tasks.terminalFailures(ids.stream().distinct().toList())) {
                 try {
                     if(event.type().startsWith("IMAGE_")) images.taskFailed(event);
                     else if(event.type().startsWith("VIDEO_ANALYSIS_")) analyses.taskFailed(event);
+                    else if(event.type().startsWith("VIDEO_PLAN_")) plans.taskFailed(event);
                     else if(event.type().startsWith("VIDEO_")) videos.taskFailed(event);
                 } catch(RuntimeException e) { log.warn("烟火释放等待重试: tenant={} task={}",tenant,event.taskId(),e); }
             }

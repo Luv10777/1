@@ -60,6 +60,12 @@ growth:
     operator-user-ids: ${PLATFORM_OPERATOR_USER_IDS:}
   identity:
     encryption-key: ${REAL_NAME_ENCRYPTION_KEY:}
+  video-plan:
+    base-url: ${VIDEO_PLAN_BASE_URL:https://api.onlyrouter.ai/v1}
+    api-key: ${VIDEO_PLAN_API_KEY:}
+    model: ${VIDEO_PLAN_MODEL:gemini-3.8-flash-ab}
+    timeout-seconds: ${VIDEO_PLAN_TIMEOUT_SECONDS:120}
+    max-tokens: ${VIDEO_PLAN_MAX_TOKENS:8000}
   video-analysis:
     base-url: ${VIDEO_ANALYSIS_BASE_URL:https://api.onlyrouter.ai/v1}
     api-key: ${VIDEO_ANALYSIS_API_KEY:}
