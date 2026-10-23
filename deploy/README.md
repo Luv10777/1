@@ -122,6 +122,10 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build web
 ```
 
+## 监控（可选）
+
+Prometheus + Grafana 看运行状况，按需用 `--profile monitoring` 开启，见 [monitoring/README.md](monitoring/README.md)。
+
 ## 备份
 
 测试服的数据不重要，但养成习惯：

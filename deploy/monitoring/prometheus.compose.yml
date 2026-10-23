@@ -1,0 +1,15 @@
+# Docker Compose 测试栈用：api / worker 在 docker 内网里，按服务名抓取。
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: growth
+    metrics_path: /actuator/prometheus
+    authorization:
+      credentials_file: /prometheus/metrics-token  # 启动时由 METRICS_TOKEN 写入
+    static_configs:
+      - targets: ["api:8080"]
+        labels: { service: api }
+      - targets: ["worker:8090"]
+        labels: { service: worker }

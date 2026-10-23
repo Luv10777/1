@@ -68,7 +68,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         properties = {"growth.worker.enabled=false", "spring.data.redis.client-type=jedis", "logging.level.root=WARN",
         "logging.level.com.wuyao.growth=WARN", "spring.config.import=", "growth.image.max-output-pixels=0",
         "management.endpoint.health.show-details=always", "growth.video.health.snapshot-cache-seconds=0",
-        "growth.video.provider.api-key=test-only-video-key"})
+        "growth.video.provider.api-key=test-only-video-key",
+        "management.endpoints.web.exposure.include=health,prometheus", "management.prometheus.metrics.export.enabled=true",
+        "growth.metrics.token=test-metrics-token"})
 @AutoConfigureMockMvc
 @org.springframework.context.annotation.Import(FoundationIntegrationTest.HttpTestServer.class)
 @Testcontainers
@@ -191,6 +193,19 @@ class FoundationIntegrationTest {
         }
     }
 
+
+    @Test
+    void prometheusMetricsNeedTheScrapeTokenAndAUserLoginIsNotEnough() throws Exception {
+        String token = jwt.issueAccessToken(seedPasswordAccount(), tenantA, null);
+        mvc.perform(get("/actuator/prometheus")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/actuator/prometheus").header("Authorization", "Bearer wrong-token"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/actuator/prometheus").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        String body = mvc.perform(get("/actuator/prometheus").header("Authorization", "Bearer test-metrics-token"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(body).contains("jvm_memory_used_bytes", "video_workflow_stuck", "image_queue_pending");
+    }
 
     @Test
     void nonmembersCanBrowseBusinessApisButCannotStartWorkOrChangeData() throws Exception {
