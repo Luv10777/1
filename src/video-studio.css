@@ -1,5 +1,5 @@
 /* 数字人摄影棚、视频工作台共用：与图片工作台同一套简约语言——少字、留白、浅底控件、一个主按钮。 */
-:root .paper-app :is(.digital-human-page, .video-workbench-page) { --vs-fill: var(--color-bg-subtle); --vs-shadow: 0 1px 2px rgba(44, 62, 80, .04), 0 8px 24px rgba(44, 62, 80, .06); }
+:root .paper-app :is(.digital-human-page, .video-workbench-page, .va-page) { --vs-fill: var(--color-bg-subtle); --vs-shadow: 0 1px 2px rgba(44, 62, 80, .04), 0 8px 24px rgba(44, 62, 80, .06); }
 
 /* 左侧表单 */
 :root .paper-app .digital-human-page .dh-form-panel { border: 0; border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
@@ -93,8 +93,8 @@
 
 /* 创作记录（数字人摄影棚、视频工作台共用）：成片预览右上角的入口，点开后抽屉盖在预览区右侧。
    摄影棚里抽屉与预览区同在一个网格格子；视频工作台里抽屉放在 VideoPreviewPanel 的插槽中，绝对定位。 */
-:root .paper-app :is(.digital-human-page, .video-workbench-page) .vs-drawer-toggle { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); font-size: 13px; white-space: nowrap; cursor: pointer; pointer-events: auto; transition: box-shadow .18s; }
-:root .paper-app :is(.digital-human-page, .video-workbench-page) .vs-drawer-toggle:hover { box-shadow: inset 0 0 0 1px var(--line); }
+:root .paper-app :is(.digital-human-page, .video-workbench-page, .va-page) .vs-drawer-toggle { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); font-size: 13px; white-space: nowrap; cursor: pointer; pointer-events: auto; transition: box-shadow .18s; }
+:root .paper-app :is(.digital-human-page, .video-workbench-page, .va-page) .vs-drawer-toggle:hover { box-shadow: inset 0 0 0 1px var(--line); }
 .vs-drawer-toggle i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); }
 :root .paper-app :is(.digital-human-page, .video-workbench-page) .video-canvas-heading > .vs-drawer-toggle { margin-left: auto; }
 :root .paper-app :is(.digital-human-page, .video-workbench-page) .video-canvas-heading > .vs-drawer-toggle + .video-mode-switch { margin-left: 0; }

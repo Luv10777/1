@@ -388,6 +388,8 @@ const logout = async () => { await auth.logout(); accountOpen.value = false; rou
 .tenant-switcher .tenant-copy small { color: var(--color-text-muted); font-size: 12px; letter-spacing: 0; }
 .tenant-switcher .tenant-copy strong { overflow: hidden; color: var(--color-primary); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .tenant-chevron { flex: none; color: var(--color-text-muted); }
+/* 宽屏顶栏已有门店切换，侧栏不再重复；顶栏切换在 860px 以下隐藏，届时侧栏卡片仍是唯一入口。 */
+@media (min-width: 861px) { .tenant-switcher { display: none; } }
 :deep(.tenant-select) { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; opacity: 0; cursor: pointer; appearance: none; }
 .sidebar-footer .account-wrap { margin-top: 14px; }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
