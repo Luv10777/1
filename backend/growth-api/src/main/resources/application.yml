@@ -53,6 +53,9 @@ server:
 
 # ---- 平台自有配置 ----
 growth:
+  metrics:
+    # Prometheus 抓取 /actuator/prometheus 时带的口令（Authorization: Bearer）。为空则一律拒绝抓取
+    token: ${METRICS_TOKEN:}
   platform:
     operator-user-ids: ${PLATFORM_OPERATOR_USER_IDS:}
   identity:
@@ -276,6 +279,8 @@ growth:
 
 management:
   endpoints.web.exposure.include: ${MANAGEMENT_EXPOSURE_INCLUDE:health}
+  # 接口耗时导出分桶，Grafana 才能算 P95
+  metrics.distribution.percentiles-histogram.http.server.requests: true
   endpoint.health.show-details: when_authorized
   endpoint.health.roles: ACTUATOR
 

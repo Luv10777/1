@@ -1,0 +1,26 @@
+# 线上 systemd 部署用：install-host.sh 装到 /etc/prometheus/prometheus.yml，抓本机各进程。
+# 端口和 deploy/systemd/ 里的 unit 一一对应，新增 worker 时这里也要加。
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: growth
+    metrics_path: /actuator/prometheus
+    authorization:
+      credentials_file: /etc/prometheus/metrics-token  # install-host.sh 从 METRICS_TOKEN 写入
+    static_configs:
+      - targets: ["127.0.0.1:8080"]
+        labels: { service: api }
+      - targets: ["127.0.0.1:8090"]
+        labels: { service: worker }
+      - targets: ["127.0.0.1:8091"]
+        labels: { service: image-worker-1 }
+      - targets: ["127.0.0.1:8092"]
+        labels: { service: image-worker-2 }
+      - targets: ["127.0.0.1:8093"]
+        labels: { service: image-worker-3 }
+      - targets: ["127.0.0.1:8094"]
+        labels: { service: video-worker }
+      - targets: ["127.0.0.1:8095"]
+        labels: { service: media-worker }

@@ -184,8 +184,10 @@ WHERE tenant_id = 1;
 但不能超过视频全局许可上限。
 
 生产启动应使用 `--spring.profiles.active=prod`。该 profile 会拒绝本地对象存储、
-开发数据库密码和默认 MinIO 凭证，并默认不公开 Prometheus；监控采集需通过内网或
-受保护的管理入口开启 `MANAGEMENT_EXPOSURE_INCLUDE=health,prometheus`。
+开发数据库密码和默认 MinIO 凭证，并默认不公开 Prometheus。开启监控需同时设置
+`MANAGEMENT_EXPOSURE_INCLUDE=health,prometheus` 和 `METRICS_TOKEN`：`/actuator/prometheus`
+只认 `Authorization: Bearer <METRICS_TOKEN>`，口令为空时一律拒绝，业务 JWT 也读不到。
+Prometheus 和 Grafana 的部署见 [deploy/monitoring](../../deploy/monitoring/README.md)。
 
 租约必须大于两个心跳间隔。调度器为执行、续租、回收分别保留线程容量。
 `FOR UPDATE SKIP LOCKED` 保护领取事务；它不提供外部业务“恰好执行一次”的保证。
@@ -336,7 +338,7 @@ Gauge 按采集时拉取，不放在视频业务请求路径上。工作流统�
 基础配置使用 `management.endpoint.health.show-details=when_authorized` 和 ACTUATOR 角色限制，
 `prod` profile 进一步设为 `never`；当前 JWT filter 未赋予角色，普通业务 JWT 无法看到详情，
 需要受保护的管理接入单独处理。
-默认只公开 health。Prometheus 的开启仍按前面的受保护管理入口要求操作。
+默认只公开 health。Prometheus 的开启按前面的 `METRICS_TOKEN` 要求操作。
 测试使用临时 RANDOM_PORT 服务、测试凭据和测试专属 `show-details=always`，实际通过 HTTP
 访问 health 验证结构。测试专属 Tomcat NIO2 避免本机 Windows/JDK 的 NIO 回环连接异常，
 没有改变生产的 HTTP 协议配置或详情公开策略。
