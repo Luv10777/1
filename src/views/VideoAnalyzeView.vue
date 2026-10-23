@@ -7,6 +7,10 @@ import { customizeAnalysisRecreation, analysisRecreationRoute } from '../domain/
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
 import { billing, refreshBilling, requireMembership } from '../stores/billing'
 import { auth } from '../stores/auth'
+import { ChevronRight, Download, History, Upload, Video, X } from 'lucide-vue-next'
+import { videoHistoryTime } from '../services/videoConversations'
+import '../video-studio.css'
+import '../video-analyze-simple.css'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,6 +102,9 @@ const realMetrics = computed(() => [
   { label: '分析画面', value: String(current.value?.frames?.length || 0), delta: '实际抽取图片' },
   { label: '源视频尺寸', value: `${current.value?.width || 0} × ${current.value?.height || 0}`, delta: '实际媒体信息' },
 ])
+
+const historyStatus = status => ({ SUCCEEDED: '已完成', FAILED: '未完成' }[status] || '分析中')
+const historyTone = status => status === 'FAILED' ? 'failed' : analysisTerminal(status) ? 'muted' : 'working'
 
 function stopPolling() { window.clearTimeout(pollTimer); pollGeneration += 1 }
 
@@ -299,69 +306,68 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 </script>
 
 <template>
-  <div class="analyze-page premium-analyze live-analysis">
-    <main class="premium-grid">
-      <aside class="premium-left">
-        <section class="premium-panel input-panel">
-          <div class="panel-head"><div><span class="step-index">01</span><strong>输入素材</strong></div><small>输入方式</small></div>
-          <div class="compact-tabs">
-            <button type="button" :disabled="isScanning" :class="{ active: inputMode === 'upload' }" @click="inputMode = 'upload'"><span class="material-symbols-outlined">upload_file</span>本地上传</button>
-            <button type="button" :disabled="isScanning" :class="{ active: inputMode === 'url' }" @click="inputMode = 'url'"><span class="material-symbols-outlined">link</span>视频地址</button>
-          </div>
-          <div
-            v-if="inputMode === 'upload'" class="compact-drop" role="button" :tabindex="isScanning ? -1 : 0" :aria-disabled="Boolean(isScanning)"
-            @click="!isScanning && fileInput?.click()" @keydown.enter.prevent="!isScanning && fileInput?.click()"
-            @keydown.space.prevent="!isScanning && fileInput?.click()" @dragover.prevent @drop.prevent="onDrop"
-          >
-            <input ref="fileInput" type="file" accept=".mp4,.mov,video/mp4,video/quicktime" hidden :disabled="isScanning" @change="onFile">
-            <span class="material-symbols-outlined">movie</span><strong :title="selectedName || '拖拽或点击上传'">{{ selectedName || '拖拽或点击上传' }}</strong>
-            <small>MP4 / MOV · 最长 {{ limits.maxDurationSeconds }} 秒 · 最大 {{ Math.floor(limits.maxBytes / 1024 / 1024) }} MB</small>
-          </div>
-          <div v-else class="compact-url"><span class="material-symbols-outlined">link</span><input v-model="videoUrl" :disabled="isScanning" aria-label="公开视频文件地址" placeholder="粘贴 HTTPS 视频直链"></div>
-          <p v-if="inputMode === 'url'" class="mode-hint">支持公开的视频文件直链；平台分享页请先下载再上传。</p>
-        </section>
-        <section class="premium-panel type-panel">
-          <div class="panel-head"><div><span class="step-index">02</span><strong>视频类型</strong></div><small>分析模式</small></div>
-          <div class="pill-switch">
-            <button type="button" :disabled="isScanning" :class="{ active: videoType === 'ai' }" @click="videoType = 'ai'">生成视频</button>
-            <button type="button" :disabled="isScanning" :class="{ active: videoType === 'real' }" @click="videoType = 'real'"><span class="material-symbols-outlined">videocam</span>实拍视频</button>
-          </div>
-          <p class="mode-hint">{{ modeHint }}</p>
-          <p v-if="result && reportMode !== videoType" class="mode-hint">当前报告为{{ reportMode === 'ai' ? '生成视频' : '实拍视频' }}拆解，点击“重新分析”生成所选类型的报告。</p>
-          <div class="need-field">
-            <label for="reverse-need">反推需求 <em>可选</em></label><textarea id="reverse-need" v-model="reverseNeed" :disabled="isScanning" maxlength="2000" :placeholder="needPlaceholder"></textarea>
-            <div><button v-for="focus in quickFocus" :key="focus.label" type="button" :disabled="isScanning" @click="reverseNeed = focus.text">{{ focus.label }}</button></div>
-          </div>
-        </section>
-        <section class="premium-panel preview-panel">
-          <div class="panel-head"><div><span class="material-symbols-outlined panel-icon">play_circle</span><strong>视频预览</strong></div><small>{{ duration ? analysisTime(duration) : '等待输入' }}</small></div>
-          <video v-if="previewUrl" ref="player" class="analysis-video" :src="previewUrl" :style="{ aspectRatio: previewAspectRatio }" controls playsinline preload="metadata" @loadedmetadata="onMetadata" />
-          <div v-else class="skeleton-player" :class="{ scanning: isScanning }"><div v-if="isScanning" class="scan-beam" /><div class="skeleton-grid" /><div class="skeleton-center"><span class="material-symbols-outlined">movie</span><p>{{ statusLabel }}</p><small>选择视频后点击开始分析</small></div></div>
-        </section>
-        <button type="button" class="analyze-trigger" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }}</button>
-        <p class="generation-billing-note">每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火 · 提交时预占，分析成功后扣除，失败或取消退回。重新分析会再次计费。</p>
-        <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员</RouterLink>
-        <button v-if="current && !analysisTerminal(current.status)" type="button" class="premium-secondary" :disabled="uploading" @click="cancelScan">取消分析</button>
-        <p class="privacy-note"><span class="material-symbols-outlined">lock</span>原视频保留供回看，临时文件自动清理</p>
-        <div v-if="error" class="analysis-error" role="alert">{{ error }}<button v-if="pollingInterrupted" type="button" @click="error = ''; poll(current.id)">重新连接</button></div>
+  <div class="analyze-page premium-analyze live-analysis va-page">
+    <main class="va-grid">
+      <aside class="va-form" aria-label="视频反推设置">
+        <div class="va-form-scroll">
+          <h1 class="vs-title">视频反推</h1>
+          <section class="vs-group">
+            <div class="vs-segmented" role="group" aria-label="输入方式">
+              <button type="button" :disabled="isScanning" :aria-pressed="inputMode === 'upload'" :class="{ active: inputMode === 'upload' }" @click="inputMode = 'upload'">本地上传</button>
+              <button type="button" :disabled="isScanning" :aria-pressed="inputMode === 'url'" :class="{ active: inputMode === 'url' }" @click="inputMode = 'url'">视频地址</button>
+            </div>
+            <div
+              v-if="inputMode === 'upload'" class="va-drop" role="button" :tabindex="isScanning ? -1 : 0" :aria-disabled="Boolean(isScanning)"
+              @click="!isScanning && fileInput?.click()" @keydown.enter.prevent="!isScanning && fileInput?.click()"
+              @keydown.space.prevent="!isScanning && fileInput?.click()" @dragover.prevent @drop.prevent="onDrop"
+            >
+              <input ref="fileInput" type="file" accept=".mp4,.mov,video/mp4,video/quicktime" hidden :disabled="isScanning" @change="onFile">
+              <Upload :size="20" :stroke-width="1.6" aria-hidden="true" />
+              <strong :title="selectedName || '拖入视频，或点击选择'">{{ selectedName || '拖入视频，或点击选择' }}</strong>
+              <small>MP4 / MOV · 最长 {{ limits.maxDurationSeconds }} 秒 · 最大 {{ Math.floor(limits.maxBytes / 1024 / 1024) }} MB</small>
+            </div>
+            <template v-else>
+              <input v-model="videoUrl" class="va-input" :disabled="isScanning" aria-label="公开视频文件地址" placeholder="粘贴 HTTPS 视频直链">
+              <small class="va-hint">支持公开的视频文件直链；平台分享页请先下载再上传。</small>
+            </template>
+          </section>
+          <section class="vs-group">
+            <span class="vs-label">视频类型</span>
+            <div class="vs-segmented" role="group" aria-label="视频类型">
+              <button type="button" :disabled="isScanning" :aria-pressed="videoType === 'ai'" :class="{ active: videoType === 'ai' }" @click="videoType = 'ai'">生成视频</button>
+              <button type="button" :disabled="isScanning" :aria-pressed="videoType === 'real'" :class="{ active: videoType === 'real' }" @click="videoType = 'real'">实拍视频</button>
+            </div>
+            <small class="va-hint">{{ modeHint }}</small>
+            <small v-if="result && reportMode !== videoType" class="va-hint">当前报告为{{ reportMode === 'ai' ? '生成视频' : '实拍视频' }}拆解，点击“重新分析”生成所选类型的报告。</small>
+          </section>
+          <section class="vs-group">
+            <div class="va-need-head">
+              <label for="reverse-need" class="vs-label">反推需求<small>可选</small></label>
+              <span class="va-chips"><button v-for="focus in quickFocus" :key="focus.label" type="button" :disabled="isScanning" @click="reverseNeed = focus.text">{{ focus.label }}</button></span>
+            </div>
+            <textarea id="reverse-need" v-model="reverseNeed" class="vs-textarea va-need" :disabled="isScanning" maxlength="2000" rows="2" :placeholder="needPlaceholder"></textarea>
+          </section>
+        </div>
+        <div class="vs-footer va-footer">
+          <div v-if="error" class="va-error" role="alert">{{ error }}<button v-if="pollingInterrupted" type="button" @click="error = ''; poll(current.id)">重新连接</button></div>
+          <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员</RouterLink>
+          <button type="button" class="vs-generate" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }}</button>
+          <button v-if="current && !analysisTerminal(current.status)" type="button" class="va-text-button" :disabled="uploading" @click="cancelScan">取消分析</button>
+          <small>每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火，成功后扣除，失败或取消退回{{ current ? '；重新分析会再次计费' : '' }}</small>
+        </div>
       </aside>
 
-      <section class="premium-console" :aria-busy="Boolean(isScanning || loadingHistory)">
-        <div class="console-head">
-          <div><h2>{{ reportMode === 'ai' ? '提示词与分镜复刻' : '实拍拆解与复刻方案' }}</h2></div>
-          <div class="console-tools history-tools">
-            <button type="button" class="history-trigger" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen; historyOpen && refreshHistory()"><span class="material-symbols-outlined">history</span><span>反推历史</span><span class="material-symbols-outlined history-chevron">expand_more</span></button>
-            <div v-if="historyOpen" class="history-menu">
-              <div class="history-menu-head"><strong>反推历史</strong><small>最近 {{ reverseHistories.length }} 条记录</small></div><p v-if="!reverseHistories.length" class="analysis-history-empty">暂无分析记录</p>
-              <div v-for="item in reverseHistories" :key="item.id" class="history-item"><input v-model="item.name" maxlength="200" aria-label="重命名历史记录" @change="renameHistory(item)"><time>{{ new Date(item.createdAt).toLocaleDateString('zh-CN') }}</time><button type="button" class="history-open" aria-label="打开此条反推历史" :disabled="Boolean(isScanning && current?.id !== item.id)" @click="openHistory(item)"><span class="material-symbols-outlined">arrow_forward</span></button></div>
-            </div>
-          </div>
+      <section class="premium-console va-console" :aria-busy="Boolean(isScanning || loadingHistory)">
+        <div class="va-console-head">
+          <h2>{{ reportMode === 'ai' ? '提示词与分镜复刻' : '实拍拆解与复刻方案' }}</h2>
+          <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="va-history" @click="historyOpen = !historyOpen; historyOpen && refreshHistory()"><History :size="16" :stroke-width="1.7" aria-hidden="true" />反推历史</button>
         </div>
-        <div v-if="loadingHistory || isScanning" class="analysis-state" role="status" aria-live="polite"><span class="material-symbols-outlined">frame_inspect</span><h3>{{ loadingHistory ? '正在读取分析记录' : statusLabel }}</h3><p>分析完成后，将在这里显示关键帧、镜头拆解、声音报告和复刻提示词。</p><progress v-if="!loadingHistory" :value="progress" max="100" :aria-label="statusLabel" /><small v-if="current?.frames?.length">已提取 {{ current.frames.length }} 张画面</small></div>
-        <div v-else-if="!result" class="analysis-state"><span class="material-symbols-outlined">movie_filter</span><h3>{{ current?.status === 'FAILED' ? '本次分析未完成' : '从一条视频开始' }}</h3><p>{{ current?.status === 'FAILED' ? current.errorMessage || '请重新提交分析。' : '上传视频并选择分析模式，提炼画面风格与可复用的镜头语言。' }}</p></div>
+        <div v-if="previewUrl" class="va-video-wrap"><video ref="player" class="analysis-video va-video" :src="previewUrl" :style="{ aspectRatio: previewAspectRatio }" controls playsinline preload="metadata" @loadedmetadata="onMetadata" /></div>
+        <div v-if="loadingHistory || isScanning" class="analysis-state" role="status" aria-live="polite"><h3>{{ loadingHistory ? '正在读取分析记录' : statusLabel }}</h3><p>分析完成后，将在这里显示关键帧、镜头拆解、声音报告和复刻提示词。</p><progress v-if="!loadingHistory" :value="progress" max="100" :aria-label="statusLabel" /><small v-if="current?.frames?.length">已提取 {{ current.frames.length }} 张画面</small></div>
+        <div v-else-if="!result && (!previewUrl || current?.status === 'FAILED')" class="analysis-state"><img v-if="!previewUrl" class="va-mark" src="/images/brand/yifangzhi-mark.png" alt=""><h3>{{ current?.status === 'FAILED' ? '本次分析未完成' : '从一条视频开始' }}</h3><p>{{ current?.status === 'FAILED' ? current.errorMessage || '请重新提交分析。' : '上传视频并选择分析模式，提炼画面风格与可复用的镜头语言。原视频保留供回看，临时文件自动清理。' }}</p></div>
         <div v-else class="console-body" :class="{ 'real-console': reportMode === 'real' }">
           <div v-if="reportMode === 'real'" class="recreation-tabs" role="group" aria-label="选择复刻方式">
-            <button type="button" :aria-pressed="recreationRoute === 'filming'" :class="{ active: recreationRoute === 'filming' }" @click="recreationRoute = 'filming'"><span class="material-symbols-outlined">videocam</span>照着实拍</button>
+            <button type="button" :aria-pressed="recreationRoute === 'filming'" :class="{ active: recreationRoute === 'filming' }" @click="recreationRoute = 'filming'"><Video :size="16" :stroke-width="1.7" aria-hidden="true" />照着实拍</button>
             <button type="button" :aria-pressed="recreationRoute === 'ai'" :class="{ active: recreationRoute === 'ai' }" @click="recreationRoute = 'ai'">重新生成</button>
           </div>
           <p v-if="reportMode === 'real'" class="analysis-method">{{ showGeneration ? '上传自己的商品参考图，把口播改成你想说的话，复制总提示词和简短分镜生成相似视频。' : '按下面的相机位置、灯光和动作步骤，准备拍摄并逐镜复刻。' }}</p>
@@ -425,9 +431,26 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <div v-if="result.limitations.length" class="analysis-limitations"><strong>观察限制</strong><p v-for="(item, index) in result.limitations" :key="index">{{ item }}</p></div>
           </details>
           <p class="report-export-hint">导出为排版好的中文报告，双击即可阅读，也可打印或保存为 PDF。{{ reportMode === 'real' ? '实拍报告同时包含两种复刻方案。' : '' }}</p>
-          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame">一键生成同款</button><button type="button" class="premium-secondary" @click="exportReport"><span class="material-symbols-outlined">download</span>导出拆解报告</button></div>
+          <div class="console-footer"><button v-if="showGeneration" type="button" class="premium-primary" @click="generateSame">一键生成同款</button><button type="button" class="premium-secondary" @click="exportReport"><Download :size="16" :stroke-width="1.7" aria-hidden="true" />导出拆解报告</button></div>
           <p v-if="showGeneration" class="report-export-hint">已修改的总提示词、分镜脚本和画面设置将自动填入视频创作页，上传自己的商品参考图后即可生成。</p>
         </div>
+        <!-- .va-page 是尺寸容器，会困住 fixed 定位，所以抽屉挂到应用外框上 -->
+        <Teleport v-if="historyOpen" to=".app-frame">
+          <div class="vs-drawer-backdrop va-drawer-backdrop" aria-hidden="true" @click="historyOpen = false" />
+          <aside id="va-history" class="vs-drawer va-drawer" aria-label="反推历史" @keydown.esc="historyOpen = false">
+            <div class="vs-drawer-head">
+              <span>反推历史<small v-if="reverseHistories.length">{{ reverseHistories.length }}</small></span>
+              <button type="button" class="vs-drawer-icon" aria-label="关闭反推历史" @click="historyOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+            </div>
+            <div class="vs-drawer-list">
+              <div v-for="item in reverseHistories" :key="item.id" class="va-history-item" :class="{ active: current?.id === item.id }">
+                <span class="va-history-text"><input v-model="item.name" maxlength="200" aria-label="重命名历史记录" @change="renameHistory(item)"><small><span :class="`is-${historyTone(item.status)}`">{{ historyStatus(item.status) }}</span> · {{ item.mode === 'real' ? '实拍视频' : '生成视频' }} · {{ videoHistoryTime(item.createdAt) }}</small></span>
+                <button type="button" class="vs-drawer-icon" aria-label="打开此条反推历史" :disabled="Boolean(isScanning && current?.id !== item.id)" @click="openHistory(item)"><ChevronRight :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
+              </div>
+              <p v-if="!reverseHistories.length" class="vs-drawer-empty">暂无分析记录</p>
+            </div>
+          </aside>
+        </Teleport>
       </section>
     </main>
   </div>
@@ -437,10 +460,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 .console-footer { flex-wrap: wrap; }
 @media (max-width: 720px) { .console-footer .premium-secondary { width: 100%; min-width: 0; } }
 .analysis-video { display: block; width: 100%; height: auto; min-height: 220px; max-height: 420px; object-fit: contain; border-radius: 10px; background: #171b1d; }
-.analysis-error { padding: 12px; border: 1px solid var(--color-border-subtle); border-radius: 10px; color: var(--color-accent-text); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
-.analysis-error button { display: block; margin-top: 8px; color: var(--color-success); background: transparent; border: 0; cursor: pointer; }
 .analysis-state { display: flex; min-height: 380px; padding: 50px 20px; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--color-primary); }
-.analysis-state > .material-symbols-outlined { font-size: 44px; color: var(--an-cinnabar); }
 .analysis-state h3 { margin: 16px 0 8px; font-size: 18px; }
 .analysis-state p, .analysis-state small { max-width: 380px; font-size: 12px; line-height: 1.8; }
 .analysis-state progress { width: min(300px, 90%); margin: 18px 0; accent-color: var(--an-cinnabar); }
@@ -506,44 +526,12 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
 @media (max-width: 720px) { .audio-segment { flex-direction: column; gap: 2px; } }
 .analysis-limitations { margin-top: 18px; padding: 14px; border-radius: 10px; background: var(--color-bg-subtle); font-size: 12px; line-height: 1.7; color: var(--color-primary); }
 .analysis-limitations p { margin: 7px 0 0; }
-.analysis-history-empty { padding: 10px; font-size: 12px; color: var(--color-primary); }
 .live-analysis .frame-art { width: 100%; padding: 0; border: 0; cursor: pointer; }
 .live-analysis .frame-art img { width: 100%; height: 100%; object-fit: cover; }
-.live-analysis .compact-drop strong { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
 .live-analysis .metric-card strong { font-size: clamp(15px, 1.4vw, 23px); overflow-wrap: anywhere; }
 .live-analysis .table-row { align-items: start; overflow-wrap: anywhere; }
 .live-analysis .parameter-row strong { overflow-wrap: anywhere; }
 .live-analysis button:disabled { cursor: not-allowed; opacity: .5; }
 .live-analysis :is(button, [role='button'], input, textarea, summary):focus-visible { outline: 2px solid var(--an-cinnabar); outline-offset: 3px; }
-@media (min-width: 721px) {
-  /* Scroll the controls on short screens so the video keeps a usable size. */
-  .live-analysis .premium-left { position: sticky; top: 0; max-height: calc(100dvh - 112px); overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; gap: 8px; }
-  .live-analysis .premium-panel { flex-shrink: 0; padding: 12px; }
-  .live-analysis .panel-head, .live-analysis .type-panel .panel-head { margin-bottom: 8px; }
-  .live-analysis .compact-tabs button, .live-analysis .pill-switch button { height: 28px; }
-  .live-analysis .compact-drop { min-height: 72px; margin-top: 8px; }
-  .live-analysis .compact-drop strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .live-analysis .need-field { position: relative; margin-top: 8px; }
-  .live-analysis .need-field label { margin-bottom: 4px; }
-  .live-analysis .need-field > div { position: absolute; top: 0; right: 0; margin-top: 0; }
-  .live-analysis .need-field button { padding: 2px 5px; font-size: 12px; line-height: 1.5; }
-  .live-analysis .need-field textarea { display: block; height: 56px; min-height: 56px; resize: none; }
-  .live-analysis .preview-panel { flex: 0 0 auto; }
-  .live-analysis .analyze-trigger, .live-analysis .privacy-note, .live-analysis .analysis-error { flex-shrink: 0; }
-  .live-analysis .privacy-note { font-size: 12px; line-height: 1.5; }
-}
-@media (min-width: 721px) and (max-height: 740px) {
-  .live-analysis .premium-panel { padding: 10px; }
-  .live-analysis .compact-drop { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 2px 8px; min-height: 54px; padding: 8px 10px; }
-  .live-analysis .compact-drop > .material-symbols-outlined { grid-row: span 2; }
-  .live-analysis .compact-drop strong, .live-analysis .compact-drop small { margin-top: 0; text-align: left; }
-  .live-analysis .need-field textarea { height: 48px; min-height: 48px; }
-  .live-analysis .skeleton-center > .material-symbols-outlined { font-size: 24px; }
-  .live-analysis .skeleton-center p { margin: 4px 0 0; }
-  .live-analysis .skeleton-center small { display: none; }
-}
-@media (min-width: 721px) and (max-height: 660px) {
-  .live-analysis .type-panel > .panel-head { display: none; }
-}
 @media (max-width: 700px) { .live-analysis .deep-table { overflow-x: auto; } .live-analysis .table-row, .live-analysis .table-head { min-width: 650px; } }
 </style>

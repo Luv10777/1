@@ -1,0 +1,91 @@
+/* 视频反推：与视频工作台同一套简约语言——左侧一张设置卡片，右侧原视频与拆解报告，反推历史用右侧抽屉。 */
+.va-grid { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 20px; align-items: start; }
+
+/* 左侧设置 */
+.va-form { position: sticky; top: 0; display: flex; flex-direction: column; max-height: calc(100dvh - 112px); border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
+.va-form-scroll { display: flex; flex: 1; flex-direction: column; gap: clamp(16px, 2.6vh, 28px); min-height: 0; overflow-y: auto; padding: clamp(18px, 3vh, 28px) 28px 12px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.va-footer { display: flex; flex: none; flex-direction: column; gap: 8px; padding: 12px 28px clamp(16px, 2.6vh, 24px); }
+:root .paper-app .va-page .va-footer .vs-generate { min-height: 46px; }
+.va-drop { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 12px; padding: 12px 16px; border-radius: 8px; background: var(--vs-fill); color: var(--ink); text-align: center; cursor: pointer; transition: box-shadow .18s; }
+.va-drop:hover { box-shadow: inset 0 0 0 1px var(--line); }
+.va-drop[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
+.va-drop svg { grid-row: span 2; color: var(--ink-muted); }
+.va-drop strong { text-align: left; max-width: 100%; overflow: hidden; font-size: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.va-drop small { color: var(--ink-muted); font-size: 12px; text-align: left; }
+.va-input { width: 100%; height: 44px; padding: 0 14px; border: 0; border-radius: 8px; outline: 0; background: var(--vs-fill); color: var(--ink); font-size: 14px; }
+.va-input::placeholder { color: var(--ink-muted); }
+.va-hint { color: var(--ink-muted); font-size: 12px; line-height: 1.7; }
+.va-need-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.va-chips { display: flex; gap: 2px; }
+.va-chips button { padding: 2px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--color-accent-text); font-size: 12px; cursor: pointer; }
+.va-chips button:hover:not(:disabled) { background: var(--vs-fill); }
+:root .paper-app .va-page .va-need { min-height: 72px; }
+.va-text-button { align-self: center; padding: 4px 8px; border: 0; background: transparent; color: var(--ink-muted); font-size: 13px; cursor: pointer; }
+.va-text-button:hover:not(:disabled) { color: var(--ink); }
+.va-error { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--color-error) 8%, transparent); color: var(--color-error); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.va-error button { display: block; margin-top: 6px; padding: 0; border: 0; background: transparent; color: var(--color-accent-text); font-size: 13px; cursor: pointer; }
+
+/* 右侧：原视频、状态与报告 */
+:root .paper-app .va-page .va-console::before { display: none; }
+:root .paper-app .va-page .va-console { position: relative; min-width: 0; margin: 0; padding: 24px 32px 32px; border: 0; border-radius: 8px; background: var(--night-panel); box-shadow: var(--vs-shadow); }
+.va-console-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+:root .paper-app .va-page .va-console-head h2 { margin: 0; font-size: 22px; line-height: 1.4; }
+.va-video-wrap { display: grid; place-items: center; margin-bottom: 24px; padding: 16px; border-radius: 8px; background: var(--vs-fill); }
+:root .paper-app .va-page .va-video { width: auto; max-width: 100%; height: min(360px, 48vh); min-height: 0; max-height: none; border-radius: 6px; }
+:root .paper-app .va-page .analysis-state { min-height: 320px; padding: 40px 20px; color: var(--ink); }
+:root .paper-app .va-page .analysis-state h3 { margin: 12px 0 6px; font-size: 18px; }
+:root .paper-app .va-page .analysis-state :is(p, small) { color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
+:root .paper-app .va-page .analysis-state progress { accent-color: var(--color-accent); }
+.va-mark { width: 56px; height: 56px; border-radius: 8px; object-fit: contain; }
+:root:not([data-theme="dark"]) .va-mark { mix-blend-mode: multiply; }
+
+/* 报告：可复制的正文用浅底，其余段落只用细线分隔，不再层层描边 */
+:root .paper-app .va-page :is(.readable-prompt, .reuse-script) { margin: 0 0 20px; padding: 18px 20px; border: 0; border-radius: 8px; background: var(--vs-fill); box-shadow: none; }
+:root .paper-app .va-page .reuse-script-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ink); font-size: 15px; font-weight: 600; }
+:root .paper-app .va-page :is(.reuse-script-head, .section-caption) > span { color: var(--ink); font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+:root .paper-app .va-page .section-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--ink); font-size: 15px; font-weight: 600; }
+:root .paper-app .va-page .section-caption small { color: var(--ink-muted); font-size: 12px; font-weight: 400; }
+:root .paper-app .va-page :is(.reuse-script-head, .section-caption, .audio-transcript-head) button { padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--color-accent-text); font-size: 13px; font-weight: 400; cursor: pointer; }
+:root .paper-app .va-page :is(.reuse-script-head, .section-caption, .audio-transcript-head) button:hover { background: var(--night-panel); }
+:root .paper-app .va-page .copyable-content { color: var(--ink); font-size: 14px; line-height: 1.9; }
+:root .paper-app .va-page :is(.merchant-editor, .recreation-plan, .audio-report) { margin: 28px 0 0; padding: 24px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
+:root .paper-app .va-page .shot-guide-item { padding: 16px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+:root .paper-app .va-page .merchant-edit-row textarea { border: 0; border-radius: 8px; background: var(--vs-fill); padding: 10px 12px; font-size: 13px; }
+:root .paper-app .va-page .recreation-tabs { display: inline-flex; gap: 0; padding: 3px; border-radius: 8px; background: var(--vs-fill); }
+:root .paper-app .va-page .recreation-tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-muted); font-size: 13px; }
+:root .paper-app .va-page .recreation-tabs button.active { background: var(--night-panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44, 62, 80, .12); }
+:root .paper-app .va-page .analysis-reference > summary { padding: 14px 0; border-top: 1px solid var(--line); color: var(--ink); font-size: 14px; }
+/* 参考区里的卡片、参数和亮点：统一浅底、无描边、正文墨色 */
+:root .paper-app .va-page :is(.insight-card, .metric-card, .insight-good, .insight-warn) { border: 0; border-radius: 8px; background: var(--vs-fill); box-shadow: none; color: var(--ink); }
+:root .paper-app .va-page :is(.insight-good, .insight-warn) h3 { color: var(--ink); font-size: 15px; }
+:root .paper-app .va-page :is(.insight-good, .insight-warn) p { color: var(--ink); }
+:root .paper-app .va-page .parameter-grid { gap: 8px; border: 0; background: transparent; box-shadow: none; }
+:root .paper-app .va-page .parameter-row { border: 0; border-radius: 8px; background: var(--vs-fill); }
+:root .paper-app .va-page .parameter-row span { color: var(--ink-muted); }
+:root .paper-app .va-page .console-footer { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+:root .paper-app .va-page .console-footer .premium-primary { min-height: 46px; padding: 0 24px; border: 0; border-radius: 8px; background: var(--color-accent); color: var(--color-on-accent); font-size: 15px; font-weight: 600; letter-spacing: .04em; }
+:root .paper-app .va-page .console-footer .premium-primary:hover { background: var(--color-accent-hover); }
+:root .paper-app .va-page .console-footer .premium-secondary { display: inline-flex; align-items: center; gap: 6px; min-height: 46px; padding: 0 20px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); font-size: 15px; }
+
+/* 反推历史：抽屉固定在视口右侧（报告很长，跟着页面滚动会看不到）；它被 Teleport 到 .app-frame */
+:root .paper-app .va-drawer-backdrop { position: fixed; top: 56px; right: 0; bottom: 0; left: 0; border-radius: 0; }
+:root .paper-app .va-drawer { --vs-fill: var(--color-bg-subtle); position: fixed; top: 56px; right: 0; bottom: 0; border-radius: 0; }
+.va-history-item { display: flex; align-items: center; gap: 8px; padding: 8px 4px 8px 10px; border-radius: 8px; transition: background .18s; }
+.va-history-item:hover { background: rgba(44, 62, 80, .04); }
+.va-history-item.active { background: var(--vs-fill); }
+.va-history-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.va-history-text input { width: 100%; margin-left: -4px; padding: 2px 4px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 500; text-overflow: ellipsis; }
+.va-history-text input:focus { background: var(--night-panel); }
+.va-history-text small { overflow: hidden; color: var(--ink-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.va-history-text .is-working { color: var(--color-accent-text); }
+.va-history-text .is-failed { color: var(--color-error); }
+
+@media (max-width: 760px) {
+  .va-grid { grid-template-columns: minmax(0, 1fr); }
+  .va-form { position: static; max-height: none; }
+  .va-form-scroll { overflow: visible; padding: 22px 18px 12px; gap: 24px; }
+  .va-footer { padding: 12px 18px 18px; }
+  :root .paper-app .va-page .va-console { padding: 20px 18px 24px; }
+  :root .paper-app :is(.va-drawer-backdrop, .va-drawer) { bottom: 64px; }
+}
+@media (prefers-reduced-motion: reduce) { .va-drop, .va-history-item { transition: none; } }
