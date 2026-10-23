@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FileText, Store, ShieldCheck, LogOut, PanelLeftClose, PanelLeftOpen, Ticket, Layers } from 'lucide-vue-next'
+import { FileText, Store, ShieldCheck, LogOut, PanelLeftClose, PanelLeftOpen, Ticket, Layers, Users } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
 import { platform } from '../src/stores/platform.js'
 
@@ -14,6 +14,7 @@ const navigation = [
   { name: 'admin-information', label: '信息管理', description: '平台发布内容', icon: FileText },
   { name: 'admin-merchants', label: '商家管理', description: '商家档案与入驻', icon: Store },
   { name: 'admin-identities', label: '用户实名', description: '实名资料与审核', icon: ShieldCheck },
+  { name: 'admin-users', label: '用户管理', description: '账号状态与停用', icon: Users },
   { name: 'admin-alliance', label: '联盟券', description: '供券审核、申诉与结算', icon: Ticket },
   { name: 'admin-plans', label: '会员套餐', description: '套餐版本与上架', icon: Layers },
 ]

@@ -98,16 +98,17 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
         <div class="member-row member-head" aria-hidden="true">
           <span>成员</span><span>角色</span><span>可进入的门店</span><span>状态</span><span>最近登录</span><span />
         </div>
-        <article v-for="member in members" :key="member.id" class="member-row" :class="{ disabled: member.status === 'DISABLED' }">
+        <article v-for="member in members" :key="member.id" class="member-row" :class="{ disabled: member.status !== 'ACTIVE' }">
           <div class="member-who">
             <UserAvatar class="member-avatar" :src="(member.self && auth.user?.avatarUrl) || member.avatarUrl || ''" :name="member.name || '员'" />
             <div><strong>{{ member.name || '未填写姓名' }}<em v-if="member.self">当前账号</em></strong><small>{{ member.phone || '未绑定手机号' }}</small></div>
           </div>
           <span class="role-badge" :class="{ owner: member.role === 'OWNER' }">{{ member.role === 'OWNER' ? '管理员' : '店员' }}</span>
           <span class="member-scope" :class="{ empty: !member.allStores && !member.storeIds.length }">{{ scopeOf(member) }}</span>
-          <span class="member-status" :class="{ off: member.status === 'DISABLED' }">{{ member.status === 'DISABLED' ? '已停用' : '正常' }}</span>
+          <span class="member-status" :class="{ off: member.status !== 'ACTIVE' }">{{ member.status === 'SUSPENDED' ? '平台停用' : member.status === 'DISABLED' ? '已停用' : '正常' }}</span>
           <span class="member-login">{{ lastLogin(member) }}</span>
-          <div v-if="member.role === 'STAFF'" class="member-actions">
+          <div v-if="member.role === 'STAFF' && member.status === 'SUSPENDED'" class="member-actions"><span class="member-locked" title="该账号已被平台停用，如有疑问请联系平台">请联系平台</span></div>
+          <div v-else-if="member.role === 'STAFF'" class="member-actions">
             <button class="link-button" :disabled="busyId === member.id" @click="openEdit(member)">编辑</button>
             <button v-if="member.status === 'DISABLED'" class="link-button" :disabled="busyId === member.id" @click="enable(member)">启用</button>
             <button v-else class="link-button" :disabled="busyId === member.id" @click="disable(member)">停用</button>
@@ -197,6 +198,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
 .member-scope.empty { color: var(--color-text-muted); }
 .member-status { color: var(--color-success); font-size: 12px; font-weight: 700; }
 .member-status.off { color: var(--color-text-muted); }
+.member-locked { color: var(--color-text-muted); font-size: 12px; }
 .member-login { color: var(--color-text-muted); font-size: 12px; }
 .member-actions { display: flex; justify-content: flex-end; }
 .member-empty { margin: 0; padding: 26px 20px; border-top: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 13px; text-align: center; }

@@ -163,7 +163,8 @@ public class WechatLoginService {
                 smsCodes.lockPhone(phone);
                 User user = users.findByPhone(phone).orElse(null);
                 if (user != null && !"ACTIVE".equals(user.getStatus())) {
-                    throw BizException.of(ErrorCode.WECHAT_LOGIN_FAILED, "账号已停用，请联系商户管理员");
+                    throw BizException.of(ErrorCode.WECHAT_LOGIN_FAILED, PlatformAccountDirectory.SUSPENDED.equals(user.getStatus())
+                            ? "账号已被平台停用，如有疑问请联系客服" : "账号已停用，请联系商户管理员");
                 }
                 boolean passwordRequired = user == null || !StringUtils.hasText(user.getPasswordHash());
                 if (passwordRequired && !StringUtils.hasText(request.password())) {

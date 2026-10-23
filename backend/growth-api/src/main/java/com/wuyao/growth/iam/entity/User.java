@@ -45,9 +45,16 @@ public class User {
     @Column(name = "avatar_upload_expires_at")
     private Instant avatarUploadExpiresAt;
 
-    /** ACTIVE / DISABLED / REMOVED。只有 ACTIVE 能登录和通过请求校验。 */
+    /** ACTIVE / DISABLED / REMOVED / SUSPENDED（平台停用）。只有 ACTIVE 能登录和通过请求校验。 */
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
+
+    /** 平台停用前的状态，解除停用时恢复成它。 */
+    @Column(name = "status_before_suspension", length = 20)
+    private String statusBeforeSuspension;
+
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
 
     /** 商户级角色：OWNER 能进全部门店并管理商户，STAFF 只能进分配给他的门店。 */
     @Column(nullable = false, length = 20)

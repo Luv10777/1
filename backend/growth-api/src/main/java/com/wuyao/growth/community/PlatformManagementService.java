@@ -201,7 +201,7 @@ public class PlatformManagementService {
 
     public List<PlatformManagementAudit> auditTrail(AuthPrincipal me, Long tenantId, String type, Long id) {
         requireOperator(me);
-        if (!Set.of("INFORMATION", "MERCHANT", "IDENTITY").contains(type)) throw BizException.of(ErrorCode.BAD_REQUEST, "记录类型无效");
+        if (!Set.of("INFORMATION", "MERCHANT", "IDENTITY", "USER").contains(type)) throw BizException.of(ErrorCode.BAD_REQUEST, "记录类型无效");
         return inScope(tenantId, true, () -> audits.findTop10ByTenantIdAndTargetTypeAndTargetIdOrderByCreatedAtDescIdDesc(tenantId, type, id));
     }
 

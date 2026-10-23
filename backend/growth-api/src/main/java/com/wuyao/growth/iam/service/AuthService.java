@@ -151,7 +151,8 @@ public class AuthService {
             smsCodeRepository.lockPhone(phone);
             User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
             if (!"ACTIVE".equals(user.getStatus())) {
-                throw BizException.of(ErrorCode.UNAUTHORIZED, "账号已停用，请联系商户管理员");
+                throw BizException.of(ErrorCode.UNAUTHORIZED, PlatformAccountDirectory.SUSPENDED.equals(user.getStatus())
+                        ? "账号已被平台停用，如有疑问请联系客服" : "账号已停用，请联系商户管理员");
             }
             user.setLastLoginAt(Instant.now());
             return issueTokens(user, ip, userAgent, deviceId);

@@ -3,7 +3,9 @@ export const managementStatuses = {
   PUBLISHED: '已发布', OFFLINE: '已下线', EXPIRED: '已过期', PENDING_REVIEW: '待审核',
   APPROVED: '已入驻', REJECTED: '已驳回', SUSPENDED: '已暂停', VERIFIED: '人工审核通过',
 }
-export const auditActions = { ...managementStatuses, REVEAL: '查阅完整资料', SUBMITTED: '本人提交实名申请' }
+export const userStatuses = { ACTIVE: '正常', DISABLED: '商户已停用', SUSPENDED: '平台停用', REMOVED: '已移除' }
+export const userRoles = { OWNER: '管理员', STAFF: '店员' }
+export const auditActions = { ...managementStatuses, REVEAL: '查阅完整资料', SUBMITTED: '本人提交实名申请', SUSPEND_USER: '平台停用账号', RESTORE_USER: '解除平台停用' }
 
 export function managementDate(value) {
   if (!value) return '—'

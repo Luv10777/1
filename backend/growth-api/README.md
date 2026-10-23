@@ -429,7 +429,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V56 | 联盟券结算折扣改为审核时逐张约定（审核前可为空） | `feat/alliance-vouchers` |
 | V57 | 联盟券结算账户、月度对账单；平台审计表允许 SETTLEMENT_ACCOUNT | `feat/alliance-vouchers` |
 
-下一个可用编号：V58（V54 直播计费已在主干）。
+| V59 | 平台停用账号：`users` 停用前状态与停用时间，审计表允许 `USER` | `claude/admin-users` |
+
+下一个可用编号：V60（V54 直播计费、V58 消息通知已在主干）。
 
 后端检查：
 
@@ -517,6 +519,17 @@ V40 建表并启用强制 RLS。`stores` 到 `brands` 是 `(tenant_id, brand_id)
 - `/api/auth/me` 和登录响应里的 `user.role` 供前端决定显示哪些入口，不是权限依据。
 
 V41 同时删除了 `store_members.role`，并清掉管理员名下的成员记录。
+
+平台停用（V59）与商户停用分开：平台运营在管理后台停用账号时，状态记为 `SUSPENDED`，
+停用前的状态存在 `users.status_before_suspension`，令牌版本加一并作废全部刷新令牌。
+商户管理员不能启用或移除被平台停用的店员（返回 1409），解除停用后回到停用前的状态。
+接口在 `/api/platform/users` 下，只有平台运营名单里的账号能调用：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/platform/users` | 全平台用户，可按 `status`、`role`、`keyword` 筛选；默认不含已移除账号；带所属商户的会员与烟火余额 |
+| `GET /api/platform/users/summary` | 用户总数、近 7 天登录、近 7 天新增、平台停用数 |
+| `POST /api/platform/users/{id}/suspension` | `{suspended, note}` 停用或解除，处理依据 5–500 字，写入平台审计表（`target_type=USER`）；不能停用自己和运营账号 |
 
 ### 声音样本的归属
 
