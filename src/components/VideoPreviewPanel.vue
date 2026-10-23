@@ -35,7 +35,7 @@ defineEmits(['switch-workspace'])
 <template>
   <div class="video-workbench-canvas relative flex-1 bg-[#0A0A0B] flex flex-col items-center justify-center overflow-hidden" aria-label="成片预览">
     <div class="video-canvas-heading absolute top-6 z-10 flex justify-between items-center pointer-events-none">
-      <h2 class="text-gray-400 font-medium">成片预览</h2>
+      <slot name="title"><h2 class="text-gray-400 font-medium">成片预览</h2></slot>
       <slot name="actions" />
       <div class="video-mode-switch" role="group" aria-label="切换工作台">
         <button type="button" :class="{ active: activeWorkspace === 'video' }" :aria-pressed="activeWorkspace === 'video'" @click="$emit('switch-workspace', '/video/workbench')">视频工作台</button>

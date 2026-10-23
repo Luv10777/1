@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BillingLedgerReport {
     static final Set<String> TYPES = Set.of("RESERVE", "CAPTURE", "RELEASE", "PURCHASE", "GRANT");
-    static final Set<String> CAPABILITIES = Set.of("IMAGE", "VIDEO", "VIDEO_ANALYSIS", "LIVE");
+    static final Set<String> CAPABILITIES = Set.of("IMAGE", "VIDEO", "VIDEO_ANALYSIS", "VIDEO_PLAN", "LIVE");
     private static final int PER_TENANT_LIMIT = 2000;
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 

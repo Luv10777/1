@@ -141,6 +141,8 @@ class FoundationIntegrationTest {
     @Autowired VideoWorkflowService videoWorkflows;
     @Autowired BillingService billingService;
     @Autowired com.wuyao.growth.video.analysis.VideoAnalysisService videoAnalyses;
+    @Autowired com.wuyao.growth.video.plan.VideoPlanService videoPlans;
+    @Autowired com.wuyao.growth.video.plan.VideoPlanGenerateHandler videoPlanHandler;
     @Autowired com.wuyao.growth.billing.BillingRecovery billingRecovery;
     @Autowired BillingProperties billingConfig;
     @Autowired VideoPricingProperties pricingConfig;
@@ -330,6 +332,64 @@ class FoundationIntegrationTest {
         assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(1);
         TenantContext.runAs(tenantA, () -> videoAnalyses.cancel(first.id()));
         assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before);
+    }
+
+    @Test
+    void videoPlanChargesOneYanhuoPerBatchAndReturnsItWhenARoundFails() {
+        when(imageGateway.configured(ModelAlias.VIDEO_PLANNER)).thenReturn(true);
+        String key = "t" + tenantA + "/test-video-plan/" + UUID.randomUUID();
+        byte[] png;
+        try (var output = new ByteArrayOutputStream()) {
+            ImageIO.write(new java.awt.image.BufferedImage(1200, 600, java.awt.image.BufferedImage.TYPE_INT_ARGB), "png", output);
+            png = output.toByteArray();
+        } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+        imageStorage.put(key, png, "image/png");
+        Long image = TenantContext.runAs(tenantA, () -> transactions.execute(status -> {
+            var asset = new Asset(); asset.setTenantId(tenantA); asset.setName("product.png"); asset.setType("IMAGE");
+            asset.setMimeType("image/png"); asset.setStatus("READY"); asset.setStorageKey(key); asset.setSizeBytes((long) png.length);
+            return assetRepository.saveAndFlush(asset).getId();
+        }));
+        long before = TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available());
+        var request = new com.wuyao.growth.video.plan.VideoPlanDtos.Create("plan-first", List.of(image), false, "高级质感", "突出补水", null);
+        var first = TenantContext.runAs(tenantA, () -> videoPlans.create(request, -1L));
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlans.create(request, -1L)).id()).isEqualTo(first.id());
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(1);
+        assertThat(code(() -> TenantContext.runAs(tenantB, () -> videoPlans.get(first.id())))).isEqualTo(1404);
+        var task = tasks.claim("DEFAULT", 1).getFirst();
+        assertThat(task.getType()).isEqualTo("VIDEO_PLAN_GENERATE");
+        var shots = List.of(Map.of("start", 0, "end", 4, "description", "商品特写", "images", List.of(1)),
+                Map.of("start", 4, "end", 10, "description", "镜头缓缓拉远", "images", List.of(1)));
+        var plans = List.of("晨光", "窗边", "静物").stream().map(title -> Map.<String, Object>of(
+                "title", title, "idea", "突出补水", "prompt", "如图1中的商品", "ratio", "9:16", "durationSeconds", 10,
+                "shots", shots, "materials", List.of(Map.of("index", 1, "use", "商品主体")))).toList();
+        when(imageGateway.invokeReal(any())).thenReturn(new ProviderResult(true, "TEST", null, Map.of("plans", plans), null, null));
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(task))).containsEntry("status", "SUCCEEDED");
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(task))).containsEntry("status", "STALE");
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlans.get(first.id()).plans())).hasSize(3);
+        var sent = ArgumentCaptor.forClass(ProviderRequest.class);
+        verify(imageGateway).invokeReal(sent.capture());
+        assertThat(sent.getValue().alias()).isEqualTo(ModelAlias.VIDEO_PLANNER);
+        assertThat(sent.getValue().idempotencyKey()).isEqualTo("video-plan-" + first.id());
+        String dataUrl = (String) ((List<?>) sent.getValue().options().get("images")).getFirst();
+        assertThat(dataUrl).startsWith("data:image/jpeg;base64,");
+        try {
+            var imageSent = ImageIO.read(new ByteArrayInputStream(Base64.getDecoder().decode(dataUrl.substring(dataUrl.indexOf(',') + 1))));
+            assertThat(imageSent.getWidth()).isEqualTo(1024);
+            assertThat(imageSent.getHeight()).isEqualTo(512);
+        } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+
+        var again = TenantContext.runAs(tenantA, () -> videoPlans.create(new com.wuyao.growth.video.plan.VideoPlanDtos.Create(
+                "plan-again", List.of(image), false, "高级质感", "突出补水", first.id()), -1L));
+        var retry = tasks.claim("DEFAULT", 1).getFirst();
+        when(imageGateway.invokeReal(any())).thenReturn(new ProviderResult(true, "TEST", null, Map.of("plans", List.of()), null, null));
+        assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(retry)))
+                .isInstanceOf(NonRetryableTaskException.class).hasMessageContaining("烟火已退回");
+        tasks.failPermanently(retry.getId(), retry.getAttempts(), "VIDEO_PLAN_OUTPUT", "test failure");
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlans.get(again.id()).status())).isEqualTo("FAILED");
+        var balance = TenantContext.runAs(tenantA, () -> billingService.summary(true, false));
+        assertThat(balance.available()).isEqualTo(before - 1);
+        assertThat(balance.held()).isZero();
+        assertThat(owner.queryForObject("select relrowsecurity and relforcerowsecurity from pg_class where oid='public.video_plans'::regclass", Boolean.class)).isTrue();
     }
 
     private Long videoAnalysisAsset() {
