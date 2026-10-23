@@ -47,6 +47,9 @@ Prometheus 抓本机 `8080`（api）、`8090`（worker）、`8091-8093`（图片
 
    以后再跑可以不带 `GRAFANA_ADMIN_PASSWORD`，密码保持不变。脚本最后打印每个进程的抓取状态，应全部为 `up`。
 
+   线上主机从 dl.grafana.com 下载 .deb 只有几十 KB/s。先在本机下载
+   `grafana_<版本>_amd64.deb` 和同名 `.sha256`，和本目录一起传上去，脚本会优先用它们，照样校验 sha256。
+
 Prometheus 在 `127.0.0.1:19090`，Grafana 在 `127.0.0.1:13000`。
 占用：Prometheus 约 200 MB 内存，Grafana 约 100 MB，磁盘 15 天约 1 GB 以内。
 
@@ -82,4 +85,8 @@ ssh -N -L 13000:127.0.0.1:13000 ubuntu@<服务器IP>
 2026-10-23 在本机验证：后端带口令启动，Prometheus 抓取成功；不带口令、口令错误、
 普通用户登录访问 `/actuator/prometheus` 分别返回 401、401、403（集成测试
 `prometheusMetricsNeedTheScrapeTokenAndAUserLoginIsNotEnough`）；Grafana 自动加载数据源和看板，
-各面板有数据，没配口令的进程显示为掉线。`install-host.sh` 尚未在线上执行过。
+各面板有数据，没配口令的进程显示为掉线。
+
+2026-10-23 线上执行：后端发布 `20261023-monitoring-5130ee4`，7 个进程不带口令访问
+`/actuator/prometheus` 返回 401，带口令返回 200；`install-host.sh` 安装 Prometheus 2.45.3 和
+Grafana 12.0.2，两者只监听 127.0.0.1，7 个抓取目标全部 `up`；未登录访问 Grafana API 返回 401。

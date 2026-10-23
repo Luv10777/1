@@ -35,8 +35,13 @@ if [ "$(dpkg-query -W -f='${Version}' grafana 2>/dev/null || true)" != "$GRAFANA
   arch="$(dpkg --print-architecture)"
   deb="grafana_${GRAFANA_VERSION}_${arch}.deb"
   tmp="$(mktemp -d)"
-  curl -fsSL --retry 3 -o "$tmp/$deb" "https://dl.grafana.com/oss/release/$deb"
-  curl -fsSL --retry 3 -o "$tmp/$deb.sha256" "https://dl.grafana.com/oss/release/$deb.sha256"
+  if [ -f "$HERE/$deb" ] && [ -f "$HERE/$deb.sha256" ]; then
+    # 境内主机从 dl.grafana.com 下载很慢，可以先在别处下好放到本目录
+    cp "$HERE/$deb" "$HERE/$deb.sha256" "$tmp/"
+  else
+    curl -fsSL --retry 3 -o "$tmp/$deb" "https://dl.grafana.com/oss/release/$deb"
+    curl -fsSL --retry 3 -o "$tmp/$deb.sha256" "https://dl.grafana.com/oss/release/$deb.sha256"
+  fi
   echo "$(cat "$tmp/$deb.sha256")  $tmp/$deb" | sha256sum -c -
   DEBIAN_FRONTEND=noninteractive apt-get install -y "$tmp/$deb" >/dev/null
   rm -rf "$tmp"
