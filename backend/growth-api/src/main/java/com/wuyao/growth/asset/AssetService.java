@@ -122,6 +122,30 @@ public class AssetService {
         return storage.presignGet(reference.storageKey(), referencePresignLifetime());
     }
 
+    /** Upper bound for a document read into memory; a brand manual or menu stays well below it. */
+    public static final int MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+    /** For modules that read uploaded documents: checks the upload finished and fits {@link #MAX_DOCUMENT_BYTES}. */
+    @Transactional(readOnly = true)
+    public DocumentReference documentReference(Long id) {
+        Asset asset = repository.findById(id)
+                .orElseThrow(() -> BizException.of(ErrorCode.ASSET_NOT_FOUND, "素材不存在"));
+        if (!"READY".equals(asset.getStatus()) || !"DOCUMENT".equals(asset.getType())
+                || asset.getSizeBytes() == null || asset.getSizeBytes() <= 0 || asset.getSizeBytes() > MAX_DOCUMENT_BYTES) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "请使用已上传完成且小于 10 MB 的文档");
+        }
+        return new DocumentReference(asset.getId(), asset.getName(), asset.getMimeType());
+    }
+
+    /** The document's bytes, after the same checks as {@link #documentReference}. */
+    @Transactional(readOnly = true)
+    public byte[] readDocument(Long id) {
+        documentReference(id);
+        return storage.read(repository.findById(id).orElseThrow().getStorageKey(), MAX_DOCUMENT_BYTES);
+    }
+
+    public record DocumentReference(Long id, String name, String mimeType) {}
+
     public record MediaReference(Long id, String storageKey, String mimeType, Integer durationMs) {}
 
     public record ImageReference(Long id, String storageKey, String name) {}

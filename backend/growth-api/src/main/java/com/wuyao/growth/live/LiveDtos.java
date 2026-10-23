@@ -95,7 +95,7 @@ public final class LiveDtos {
     }
 
     public record View(Long id, Long storeId, String name, String roomId, String status,
-                       Integer knowledgeVersion, Long version, Instant startedAt, Instant endedAt,
+                       Long version, Instant startedAt, Instant endedAt,
                        List<Long> productIds, List<SnapshotView> knowledge, Config config,
                        String audioRoute, String audioTestStatus, boolean playerPaired,
                        Instant playerLastHeartbeatAt) {

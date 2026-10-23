@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -43,6 +41,24 @@ public class KnowledgeController {
         return ApiResponse.ok(knowledgeService.createSet(storeId, request, me.userId()));
     }
 
+    @GetMapping("/brands/{brandId}/knowledge-sets")
+    public ApiResponse<PageResult<KnowledgeDtos.SetView>> listBrandSets(
+            @PathVariable Long brandId,
+            @RequestParam(required = false) String kind,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(knowledgeService.listBrandSets(brandId, kind, page, size, me.userId()));
+    }
+
+    @PostMapping("/brands/{brandId}/knowledge-sets")
+    public ApiResponse<KnowledgeDtos.SetView> createBrandSet(
+            @PathVariable Long brandId,
+            @Valid @RequestBody KnowledgeDtos.CreateSetRequest request,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(knowledgeService.createBrandSet(brandId, request, me.userId()));
+    }
+
     @GetMapping("/knowledge-sets/{id}")
     public ApiResponse<KnowledgeDtos.SetView> getSet(@PathVariable Long id,
                                                      @AuthenticationPrincipal AuthPrincipal me) {
@@ -55,12 +71,6 @@ public class KnowledgeController {
             @Valid @RequestBody KnowledgeDtos.UpdateSetRequest request,
             @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(knowledgeService.updateSet(id, request, me.userId()));
-    }
-
-    @DeleteMapping("/knowledge-sets/{id}")
-    public ApiResponse<KnowledgeDtos.SetView> archiveSet(@PathVariable Long id,
-                                                         @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(knowledgeService.archive(id, me.userId()));
     }
 
     @GetMapping("/knowledge-sets/{id}/entries")
@@ -95,29 +105,22 @@ public class KnowledgeController {
         return ApiResponse.ok();
     }
 
-    @PostMapping("/knowledge-sets/{id}/publish")
-    public ApiResponse<KnowledgeDtos.SetView> publish(@PathVariable Long id,
-                                                      @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(knowledgeService.publish(id, me.userId()));
-    }
-
-    @PostMapping("/knowledge-sets/{id}/disable")
-    public ApiResponse<KnowledgeDtos.SetView> disable(@PathVariable Long id,
-                                                      @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(knowledgeService.disable(id, me.userId()));
-    }
-
     @PostMapping("/knowledge-sets/{id}/archive")
     public ApiResponse<KnowledgeDtos.SetView> archive(@PathVariable Long id,
                                                       @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(knowledgeService.archive(id, me.userId()));
     }
 
+    @PostMapping("/knowledge-sets/{id}/restore")
+    public ApiResponse<KnowledgeDtos.SetView> restore(@PathVariable Long id,
+                                                      @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(knowledgeService.restore(id, me.userId()));
+    }
+
     @GetMapping("/stores/{storeId}/knowledge-context")
     public ApiResponse<KnowledgeDtos.KnowledgeContext> context(
             @PathVariable Long storeId,
-            @RequestParam(required = false, name = "productId") List<Long> productIds,
             @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(knowledgeService.context(storeId, productIds, me.userId()));
+        return ApiResponse.ok(knowledgeService.context(storeId, me.userId()));
     }
 }

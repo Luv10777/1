@@ -1,5 +1,4 @@
 <script setup>
-import { FilePenLine, Store, Ticket } from 'lucide-vue-next'
 import MerchantProductWall from '../components/MerchantProductWall.vue'
 </script>
 
@@ -13,8 +12,5 @@ import MerchantProductWall from '../components/MerchantProductWall.vue'
       </div>
     </header>
     <MerchantProductWall />
-    <RouterLink :to="{ name: 'alliance-pool' }" class="merchant-next-step alliance-join-strip"><Ticket :size="23" aria-hidden="true" /><div><strong>会员每期可领联盟券</strong><p>用会员额度领取其他联盟商户的商品兑换券，到店出示券码使用。</p></div></RouterLink>
-    <RouterLink :to="{ name: 'merchant-join' }" class="merchant-next-step"><Store :size="23" aria-hidden="true" /><div><strong>想把自家商品放进来？</strong><p>加入商户联盟：提交经营资料，审核通过后可以线上卖货、发布商家信息、提供联盟券。</p></div></RouterLink>
-    <RouterLink to="/information" class="merchant-next-step"><FilePenLine :size="23" aria-hidden="true" /><div><strong>逛逛商家信息广场</strong><p>了解门店活动、合作机会与供求需求。</p></div></RouterLink>
   </div>
 </template>

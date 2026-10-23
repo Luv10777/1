@@ -1789,9 +1789,9 @@ class FoundationIntegrationTest {
         long entry = apiData(post("/api/knowledge-sets/" + set + "/entries"), token,
                 Map.of("question", "营业时间", "answer", "每天 9 点至 18 点"))
                 .path("id").asLong();
+        // 新问答默认启用，不需要再单独发布。
         assertThat(apiData(get("/api/stores/" + store + "/knowledge-context"), token, null)
-                .path("entries").size()).isZero();
-        apiData(post("/api/knowledge-sets/" + set + "/publish"), token, null);
+                .path("entries").size()).isEqualTo(1);
         Map<String, Object> configuration = new LinkedHashMap<>(Map.of(
                 "tone", Map.of("opening", "直接报价", "pain", List.of("需求场景代入", "顾虑问题拆解"),
                         "detail", List.of("核心特点讲解", "售后与保障")),
@@ -1853,7 +1853,7 @@ class FoundationIntegrationTest {
         assertThat(apiData(get("/api/stores/" + store + "/live-sessions"), token, null).size()).isEqualTo(1);
         var started = apiData(post(path + "/start"), token, null);
         assertThat(started.path("status").asText()).isEqualTo("LIVE");
-        // 3 本场问答 + 2 商品问答 + 1 已发布门店规则；沉淀到门店的新草稿不会自动发布。
+        // 3 本场问答 + 2 商品问答 + 1 条门店规则；直播中存进知识库的问答是停用的，不进快照。
         assertThat(started.path("knowledge").size()).isEqualTo(6);
         assertThat(started.path("knowledge").get(0).path("priority").asInt()).isEqualTo(1);
         assertThat(started.path("knowledge").get(5).path("priority").asInt()).isEqualTo(3);

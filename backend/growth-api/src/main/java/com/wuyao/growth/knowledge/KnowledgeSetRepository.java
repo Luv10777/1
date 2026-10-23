@@ -12,5 +12,11 @@ public interface KnowledgeSetRepository extends JpaRepository<KnowledgeSet, Long
 
     Page<KnowledgeSet> findByStoreIdAndKindOrderByUpdatedAtDesc(Long storeId, String kind, Pageable pageable);
 
+    Page<KnowledgeSet> findByBrandIdOrderByUpdatedAtDesc(Long brandId, Pageable pageable);
+
+    Page<KnowledgeSet> findByBrandIdAndKindOrderByUpdatedAtDesc(Long brandId, String kind, Pageable pageable);
+
+    List<KnowledgeSet> findByBrandIdAndKindAndStatusOrderByIdAsc(Long brandId, String kind, String status);
+
     List<KnowledgeSet> findByStoreIdAndKindAndStatusOrderByIdAsc(Long storeId, String kind, String status);
 }

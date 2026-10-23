@@ -12,7 +12,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/** A store-owned collection of FAQ entries or documents. */
+/** A collection of FAQ entries owned by one store, or by a brand and shared by all of its stores. */
 @Entity
 @Table(name = "knowledge_sets")
 @Getter
@@ -23,9 +23,7 @@ public class KnowledgeSet {
     public static final String KIND_FAQ = "FAQ";
     public static final String KIND_DOCUMENT = "DOCUMENT";
 
-    public static final String STATUS_DRAFT = "DRAFT";
-    public static final String STATUS_PUBLISHED = "PUBLISHED";
-    public static final String STATUS_DISABLED = "DISABLED";
+    public static final String STATUS_ACTIVE = "ACTIVE";
     public static final String STATUS_ARCHIVED = "ARCHIVED";
 
     @Id
@@ -35,8 +33,11 @@ public class KnowledgeSet {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(name = "store_id", nullable = false)
+    @Column(name = "store_id")
     private Long storeId;
+
+    @Column(name = "brand_id")
+    private Long brandId;
 
     @Column(nullable = false, length = 120)
     private String name;
@@ -45,19 +46,13 @@ public class KnowledgeSet {
     private String kind = KIND_FAQ;
 
     @Column(nullable = false, length = 20)
-    private String status = STATUS_DRAFT;
+    private String status = STATUS_ACTIVE;
 
     @Column(length = 500)
     private String description;
 
-    @Column(name = "current_version", nullable = false)
-    private Integer currentVersion = 0;
-
     @Column(name = "created_by")
     private Long createdBy;
-
-    @Column(name = "published_at")
-    private Instant publishedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

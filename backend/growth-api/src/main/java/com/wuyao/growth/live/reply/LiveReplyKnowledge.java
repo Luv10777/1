@@ -28,7 +28,7 @@ public class LiveReplyKnowledge {
 
     public record Candidate(String question, String answer, String source) { }
 
-    /** Saved questions and answers in priority order: session, then product, then store. */
+    /** Saved questions and answers in priority order: session, then product, then store, then brand. */
     public List<Candidate> candidates(LiveSession session, Long userId) {
         if (!"DRAFT".equals(session.getStatus())) {
             return snapshots.findBySessionIdOrderByPriorityAscIdAsc(session.getId()).stream()
@@ -50,11 +50,8 @@ public class LiveReplyKnowledge {
                 if ("ACTIVE".equals(faq.status())) result.add(new Candidate(faq.question(), faq.answer(), "PRODUCT_FAQ"));
             }
         }
-        var entries = knowledge.context(session.getStoreId(), ids, userId).entries();
-        entries.stream().filter(entry -> "PRODUCT".equals(entry.scope())).forEach(entry ->
-                result.add(new Candidate(entry.question(), entry.answer(), "PRODUCT")));
-        entries.stream().filter(entry -> "STORE".equals(entry.scope())).forEach(entry ->
-                result.add(new Candidate(entry.question(), entry.answer(), "STORE")));
+        knowledge.context(session.getStoreId(), userId).entries().forEach(entry ->
+                result.add(new Candidate(entry.question(), entry.answer(), entry.brandId() == null ? "STORE" : "BRAND")));
         return result;
     }
 
