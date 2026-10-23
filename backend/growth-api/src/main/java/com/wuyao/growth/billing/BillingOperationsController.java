@@ -13,6 +13,18 @@ import org.springframework.web.bind.annotation.*;
 public class BillingOperationsController {
     private final BillingProperties config;
     private final BillingService service;
+    private final BillingLedgerReport ledger;
+    /** 全平台烟火流水：days 为 1（今天）至 90；type、capability 可选；keyword 按商户名或编号筛选。 */
+    @GetMapping("/ledger") public ApiResponse<com.wuyao.growth.common.web.PageResult<BillingDtos.PlatformLedgerEntry>> ledger(
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,@RequestParam(defaultValue="7") int days,
+        @RequestParam(required=false) String type,@RequestParam(required=false) String capability,
+        @RequestParam(required=false) String keyword,@AuthenticationPrincipal AuthPrincipal me) {
+        requireOperator(me); return ApiResponse.ok(ledger.entries(page,size,days,type,capability,keyword));
+    }
+    @GetMapping("/ledger/summary") public ApiResponse<BillingDtos.PlatformLedgerSummary> ledgerSummary(
+        @RequestParam(defaultValue="7") int days,@AuthenticationPrincipal AuthPrincipal me) {
+        requireOperator(me); return ApiResponse.ok(ledger.summary(days));
+    }
     @GetMapping("/plans") public ApiResponse<java.util.List<BillingDtos.PlanListing>> plans(@AuthenticationPrincipal AuthPrincipal me) {
         requireOperator(me); return ApiResponse.ok(service.operatorPlans());
     }

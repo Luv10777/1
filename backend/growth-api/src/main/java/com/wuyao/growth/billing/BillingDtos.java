@@ -56,4 +56,13 @@ public final class BillingDtos {
     public record TopupRecord(String orderId, Instant paidAt, long amountMinor, long credits, String paymentMethod,
                               long balanceBefore, long balanceAfter) {}
     public record History<T>(List<T> items, boolean hasMore) {}
+
+    /** 全平台烟火流水的一行；availableDelta 是可用烟火变动（赠送 + 购买），heldDelta 是预占变动。 */
+    public record PlatformLedgerEntry(Long id, Long tenantId, String tenantName, Long actorUserId, String actorName,
+                                      String type, String capability, String description, long availableDelta,
+                                      long heldDelta, long availableAfter, Instant createdAt) {}
+
+    /** 时间窗口内的全平台合计；consumed 只算实际扣除（CAPTURE），预占不算消耗。 */
+    public record PlatformLedgerSummary(int days, long consumed, long consumedToday, long refunded, long purchased,
+                                        long granted, java.util.Map<String, Long> consumedByCapability) {}
 }
