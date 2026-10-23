@@ -22,6 +22,18 @@ public final class PlatformDtos {
 
     public record MerchantDetailView(Long id, String creditCode, String contactPhone) {}
 
+    /** 平台用户列表的一行；手机号脱敏，会员与烟火取自用户所属商户。 */
+    public record UserView(Long id, Long tenantId, String tenantName, String name, String phoneMasked, String username,
+                           String role, String status, Instant lastLoginAt, Instant createdAt, Instant suspendedAt,
+                           boolean memberActive, Instant memberUntil, String planName, long creditsAvailable,
+                           boolean operator) {}
+
+    public record UserSummary(long users, long activeLast7Days, long newLast7Days, long suspended) {}
+
+    public record UserSuspensionRequest(
+            @jakarta.validation.constraints.NotNull Boolean suspended,
+            @jakarta.validation.constraints.Size(max = 500) String note) {}
+
     public record ReviewRequest(
             @jakarta.validation.constraints.NotBlank
             @jakarta.validation.constraints.Pattern(regexp = "PUBLISHED|REJECTED|OFFLINE", message = "信息状态不正确") String status,

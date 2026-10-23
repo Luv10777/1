@@ -37,6 +37,14 @@ test('platform controls send authenticated requests and identity values are only
       ['/api/platform/tenants/3/identities/8/review', 'POST'],
       ['/api/platform/tenants/3/audit/IDENTITY/8', 'GET'],
     ])
+    await api.users({ page: 0, size: 20, keyword: '林', status: '', role: 'STAFF' })
+    assert.equal(calls.at(-1).url, '/api/platform/users?page=0&size=20&keyword=%E6%9E%97&role=STAFF')
+    await api.userSummary()
+    assert.equal(calls.at(-1).url, '/api/platform/users/summary')
+    await api.userSuspension({ id: 9, tenantId: 3 }, { suspended: true, note: '多次发布违规信息' })
+    assert.equal(calls.at(-1).url, '/api/platform/users/9/suspension')
+    assert.equal(calls.at(-1).options.method, 'POST')
+    assert.deepEqual(JSON.parse(calls.at(-1).options.body), { suspended: true, note: '多次发布违规信息' })
     for (const call of calls) {
       assert.equal(call.options.headers.Authorization, 'Bearer test-platform-token')
       assert.ok(!call.url.includes(values.idNumber))

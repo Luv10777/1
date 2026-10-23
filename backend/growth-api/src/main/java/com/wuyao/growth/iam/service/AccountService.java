@@ -138,6 +138,7 @@ public class AccountService {
     @Transactional
     public AccountDtos.Account setStaffEnabled(Long userId, boolean enabled) {
         User user = staffForUpdate(userId);
+        requireNotSuspended(user);
         if (enabled == ACTIVE.equals(user.getStatus())) return account(user);
         user.setStatus(enabled ? ACTIVE : DISABLED);
         user.setUpdatedAt(Instant.now());
@@ -153,6 +154,7 @@ public class AccountService {
     @Transactional
     public void removeStaff(Long userId) {
         User user = staffForUpdate(userId);
+        requireNotSuspended(user);
         user.setStatus(REMOVED);
         user.setPhone(null);
         user.setUpdatedAt(Instant.now());
@@ -180,6 +182,13 @@ public class AccountService {
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "成员不存在"));
         if (!STAFF.equals(user.getRole())) throw BizException.of(ErrorCode.BAD_REQUEST, "管理员的账号不能在这里修改");
         return user;
+    }
+
+    /** 平台停用的账号商户不能启用，也不能移除（移除会释放手机号，等于绕过停用重新注册）。 */
+    private static void requireNotSuspended(User user) {
+        if (PlatformAccountDirectory.SUSPENDED.equals(user.getStatus())) {
+            throw BizException.of(ErrorCode.CONFLICT, "该账号已被平台停用，暂时不能修改，如有疑问请联系平台");
+        }
     }
 
     private AccountDtos.Account account(User user) {
