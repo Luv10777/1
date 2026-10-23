@@ -47,9 +47,6 @@ public class LiveSession {
     @Column(name = "player_last_heartbeat_at")
     private Instant playerLastHeartbeatAt;
 
-    @Column(name = "knowledge_version", nullable = false)
-    private Integer knowledgeVersion = 0;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
     private LiveDtos.Config config = new LiveDtos.Config(null, null, null, null, null, null, null);

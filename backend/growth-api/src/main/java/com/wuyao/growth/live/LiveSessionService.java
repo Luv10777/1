@@ -28,6 +28,7 @@ public class LiveSessionService {
     private static final int SESSION_PRIORITY = 1;
     private static final int PRODUCT_PRIORITY = 2;
     private static final int STORE_PRIORITY = 3;
+    private static final int BRAND_PRIORITY = 4;
 
     private final LiveSessionRepository sessions;
     private final LiveSessionProductRepository sessionProducts;
@@ -254,9 +255,9 @@ public class LiveSessionService {
                 if (!"FAQ".equals(set.kind()) || "ARCHIVED".equals(set.status())) {
                     throw BizException.of(ErrorCode.BAD_REQUEST, "请选择未归档的问答知识集");
                 }
-                // Persist as a draft; publishing is an explicit knowledge-library operation.
+                // Saved switched off: the merchant reviews it and switches it on in the knowledge library.
                 knowledge.createEntry(targetId, new KnowledgeDtos.CreateEntryRequest(
-                        question, answer, "STORE", null, "LIVE_DRAFT", "DRAFT"), userId);
+                        question, answer, "LIVE", "DISABLED"), userId);
             }
             default -> throw BizException.of(ErrorCode.BAD_REQUEST, "问答保存方式不合法");
         }
@@ -408,7 +409,7 @@ public class LiveSessionService {
 
     private void buildSnapshot(LiveSession session, List<LiveSessionProduct> selected, Long userId) {
         List<Long> productIds = selected.stream().map(LiveSessionProduct::getProductId).toList();
-        KnowledgeDtos.KnowledgeContext context = knowledge.context(session.getStoreId(), productIds, userId);
+        KnowledgeDtos.KnowledgeContext context = knowledge.context(session.getStoreId(), userId);
         snapshots.deleteBySessionId(session.getId());
         for (LiveSessionQa qa : qas.findBySessionIdOrderByIdAsc(session.getId())) {
             // A product-scoped override must stop participating when its product is removed.
@@ -424,10 +425,10 @@ public class LiveSessionService {
             }
         }
         for (KnowledgeDtos.EntryView entry : context.entries()) {
-            int priority = "PRODUCT".equals(entry.scope()) ? PRODUCT_PRIORITY : STORE_PRIORITY;
-            saveSnapshot(session, entry.scope(), entry.id(), entry.question(), entry.answer(), priority);
+            boolean brand = entry.brandId() != null;
+            saveSnapshot(session, brand ? "BRAND" : "STORE", entry.id(), entry.question(), entry.answer(),
+                    brand ? BRAND_PRIORITY : STORE_PRIORITY);
         }
-        session.setKnowledgeVersion(context.version());
     }
 
     private void saveSnapshot(LiveSession session, String sourceType, Long sourceId,
@@ -454,7 +455,7 @@ public class LiveSessionService {
 
     private LiveDtos.View view(LiveSession session) {
         return new LiveDtos.View(session.getId(), session.getStoreId(), session.getName(), session.getRoomId(),
-                session.getStatus(), session.getKnowledgeVersion(), session.getVersion(), session.getStartedAt(),
+                session.getStatus(), session.getVersion(), session.getStartedAt(),
                 session.getEndedAt(), selectedProducts(session.getId()).stream()
                         .map(LiveSessionProduct::getProductId).toList(),
                 snapshots.findBySessionIdOrderByPriorityAscIdAsc(session.getId()).stream()

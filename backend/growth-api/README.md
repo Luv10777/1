@@ -430,10 +430,12 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V55 | 联盟券：套餐联盟券额度、供券单、领取记录、核销尝试、额度、联盟券、结算单 | `feat/alliance-vouchers` |
 | V56 | 联盟券结算折扣改为审核时逐张约定（审核前可为空） | `feat/alliance-vouchers` |
 | V57 | 联盟券结算账户、月度对账单；平台审计表允许 SETTLEMENT_ACCOUNT | `feat/alliance-vouchers` |
-
 | V59 | 平台停用账号：`users` 停用前状态与停用时间，审计表允许 `USER` | `claude/admin-users` |
+| V60 | 知识库简化：问答集只有启用/归档，问答只有启用/停用；去掉商品专属问答、命中次数等无用字段 | `refactor/knowledge-simplify` |
+| V61 | 问答集可以挂在品牌上，品牌下所有门店共用；问答来源增加 DOCUMENT | `refactor/knowledge-simplify` |
+| V62 | 知识库文档：`knowledge_documents`、`knowledge_suggestions`（文档整理出的待确认建议） | `refactor/knowledge-simplify` |
 
-下一个可用编号：V60（V54 直播计费、V58 消息通知已在主干）。
+下一个可用编号：V63（V54 直播计费、V58 消息通知已在主干）。
 
 后端检查：
 
@@ -576,12 +578,26 @@ V41 同时删除了 `store_members.role`，并清掉管理员名下的成员记�
 自动讲解（话术）不使用门店资料。这部分用替身模型验证了提示词内容和校验结果，没有用真实模型验证回答效果。
 商品从 `/api/stores/{storeId}/products` 创建、分页查询，
 通过 `/api/products/{id}` 读取、修改和软删除，图片绑定素材 ID，商品 FAQ 使用 `/faqs`。
-知识集从 `/api/stores/{storeId}/knowledge-sets` 创建，问答保存后显式发布才进入门店知识上下文。
+知识集从 `/api/stores/{storeId}/knowledge-sets` 创建。问答集只有启用（`ACTIVE`）和归档（`ARCHIVED`），
+问答只有启用和停用（`DISABLED`）；两者都启用的问答进入门店知识上下文，改动从下一次开播起生效，没有单独的发布步骤（V60）。
+归档的集只读，`POST /api/knowledge-sets/{id}/restore` 恢复后问答保持归档前的状态。商品相关的问答写在商品 FAQ 里，知识库只放门店通用问答。
+
+问答集挂在门店上（`/api/stores/{storeId}/knowledge-sets`），或者挂在品牌上（`/api/brands/{brandId}/knowledge-sets`，V61），
+品牌的问答由这个品牌下所有门店共用。门店的问答谁能进店谁能改；品牌的问答所有成员可读，只有管理员能改，和品牌本身一致。
+`knowledge-context` 先列本店的问答，再列门店当前品牌的（条目带 `brandId`）；开播快照里品牌问答记为 `BRAND`，优先级排在门店之后。
+
+文档（V62）：前端按素材流程上传 `DOCUMENT` 类型文件后，`POST /api/stores/{id}/knowledge-documents` 或 `/api/brands/{id}/knowledge-documents`
+登记，任务 `KNOWLEDGE_DOCUMENT_DIGEST` 读出文字（PDF、.docx、UTF-8 的 TXT / Markdown，10 MB 以内，最多读前 3 万字），
+交给 `TEXT_WRITER` 整理成建议：品牌文档建议品牌口号、简介、定位、人群、语气、历程、故事、团队、文化，门店文档建议地址、电话、营业时间、交通指引，
+两者都可以建议问答。和现有内容一样的字段不提。建议在 `POST /api/knowledge-suggestions/{id}/accept`（可带改过的内容，问答需指定同归属的问答集）
+之前不改动任何东西；采纳时通过品牌、门店、知识库各自的服务写入，权限照各自的规则。`retry` 重新整理时只替换还没处理的建议。
+读不了文件、模型没配置、模型返回无法识别时，文档标为 `FAILED` 并记下原因，不自动重试。整理目前不扣烟火。
+这部分用替身模型验证了落库和采纳流程，没有用真实模型验证整理质量。
 
 直播配置从 `/api/stores/{storeId}/live-sessions` 创建，
 场次操作使用 `/api/live-sessions/{id}` 下的 `start / pause / resume / end / qa`。
 新增问答的 `persistMode` 默认 `SESSION`；`PRODUCT_FAQ` 的 `targetId` 是本场已选商品 ID，
-`STORE_KNOWLEDGE` 的 `targetId` 是当前门店 FAQ 知识集 ID（保存为草稿，需在知识库发布）。
+`STORE_KNOWLEDGE` 的 `targetId` 是当前门店（不含品牌）未归档的 FAQ 知识集 ID（以停用状态存入，需在知识库启用）。
 本场副本始终保留，开播按本场、商品、门店顺序生成快照，暂停恢复不会重读资产库。
 
 `parse-link` 目前仅设置房间标识；真实平台连接、弹幕接入、语义匹配与 AI 回答尚未接入。

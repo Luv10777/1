@@ -12,11 +12,5 @@ public interface KnowledgeEntryRepository extends JpaRepository<KnowledgeEntry, 
 
     Page<KnowledgeEntry> findByKnowledgeSetIdOrderByUpdatedAtDesc(Long knowledgeSetId, Pageable pageable);
 
-    List<KnowledgeEntry> findByKnowledgeSetIdAndStatusOrderByIdAsc(Long knowledgeSetId, String status);
-
-    List<KnowledgeEntry> findByStoreIdAndKnowledgeSetIdInAndScopeAndStatusOrderByIdAsc(
-            Long storeId, List<Long> knowledgeSetIds, String scope, String status);
-
-    List<KnowledgeEntry> findByStoreIdAndKnowledgeSetIdInAndScopeAndProductIdInAndStatusOrderByIdAsc(
-            Long storeId, List<Long> knowledgeSetIds, String scope, List<Long> productIds, String status);
+    List<KnowledgeEntry> findByKnowledgeSetIdInAndStatusOrderByIdAsc(List<Long> knowledgeSetIds, String status);
 }

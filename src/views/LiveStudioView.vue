@@ -169,17 +169,16 @@ const switchLocked = computed(() => !!runningSession.value)
 
 const inheritedKnowledge = ref([])
 const knowledgeSets = ref([])
-const storeQaPairs = computed(() => inheritedKnowledge.value.filter(entry => entry.scope === 'STORE').map(entry => ({ id: `store-${entry.id}`, q: entry.question, a: entry.answer, scope: 'store', source: '门店通用', sourceType: 'store' })))
+const storeQaPairs = computed(() => inheritedKnowledge.value.map(entry => ({ id: `store-${entry.id}`, q: entry.question, a: entry.answer, scope: 'store', source: entry.brandId ? '品牌通用' : '门店通用', sourceType: 'store' })))
 const sessionQaPairs = ref([])
-const productQaPairs = computed(() => productQueue.value.flatMap(product => [
-  ...(product.faqs || []).filter(pair => pair.status === 'active' || pair.status === 'ACTIVE').map(pair => ({ id: `product-${product.id}-${pair.id}`, q: pair.question, a: pair.answer, scope: product.id, source: product.name, sourceType: 'product' })),
-  ...inheritedKnowledge.value.filter(entry => entry.scope === 'PRODUCT' && entry.productId === product.id).map(entry => ({ id: `knowledge-product-${entry.id}`, q: entry.question, a: entry.answer, scope: product.id, source: product.name, sourceType: 'product' })),
-]))
+const productQaPairs = computed(() => productQueue.value.flatMap(product => (product.faqs || [])
+  .filter(pair => pair.status === 'active' || pair.status === 'ACTIVE')
+  .map(pair => ({ id: `product-${product.id}-${pair.id}`, q: pair.question, a: pair.answer, scope: product.id, source: product.name, sourceType: 'product' }))))
 const qaPairs = computed(() => {
   if (readOnlySession.value) return (currentSession.value.knowledge || []).map(row => ({
     id: `snapshot-${row.id}`, q: row.question, a: row.answer, sourceType: 'snapshot',
-    scope: row.sourceType === 'STORE' ? 'store' : row.sourceType === 'SESSION' ? 'session' : 'product-snapshot',
-    source: row.sourceType === 'STORE' ? '门店通用 · 开播快照' : row.sourceType === 'SESSION' ? '本场通用 · 开播快照' : '商品问答 · 开播快照',
+    scope: ['STORE', 'BRAND'].includes(row.sourceType) ? 'store' : row.sourceType === 'SESSION' ? 'session' : 'product-snapshot',
+    source: { STORE: '门店通用 · 开播快照', BRAND: '品牌通用 · 开播快照', SESSION: '本场通用 · 开播快照' }[row.sourceType] || '商品问答 · 开播快照',
   }))
   return [...sessionQaPairs.value.map(pair => ({ ...pair, source: pair.scope !== 'session' && !productQueue.value.some(product => product.id === pair.scope) ? '已移除商品 · 不参与本场' : pair.source })), ...productQaPairs.value, ...storeQaPairs.value]
 })
@@ -187,7 +186,7 @@ const qaFilter = ref('all')
 const qaFilters = computed(() => [
   { value: 'all', label: '全部', count: qaPairs.value.length },
   { value: 'session', label: '本场', count: qaPairs.value.filter(pair => pair.scope === 'session').length },
-  { value: 'store', label: '门店通用', count: qaPairs.value.filter(pair => pair.scope === 'store').length },
+  { value: 'store', label: '门店与品牌', count: qaPairs.value.filter(pair => pair.scope === 'store').length },
   ...(readOnlySession.value ? [{ value: 'product-snapshot', label: '商品问答', count: qaPairs.value.filter(pair => pair.scope === 'product-snapshot').length }] : productQueue.value.map(product => ({ value: product.id, label: product.name, count: qaPairs.value.filter(pair => pair.scope === product.id).length }))),
 ])
 const visibleQaPairs = computed(() => qaFilter.value === 'all' ? qaPairs.value : qaPairs.value.filter(pair => pair.scope === qaFilter.value))
@@ -259,7 +258,7 @@ const addQa = async () => {
     else sessionQaPairs.value.push(pair)
     cancelQaEdit()
     qaFilter.value = 'all'
-    qaNotice.value = editing ? '本场问答已更新；已沉淀的知识库或商品问答不受本次修改影响。' : ({ SESSION: '已添加，仅用于本场直播。', PRODUCT_FAQ: '已添加，并保存至关联商品的问答中。', STORE_KNOWLEDGE: '已添加，并保存为门店知识库草稿；在知识库中启用后用于后续场次。' }[mode])
+    qaNotice.value = editing ? '本场问答已更新；已沉淀的知识库或商品问答不受本次修改影响。' : ({ SESSION: '已添加，仅用于本场直播。', PRODUCT_FAQ: '已添加，并保存至关联商品的问答中。', STORE_KNOWLEDGE: '已添加，并存入门店知识库（停用）；在知识库中启用后用于之后的场次。' }[mode])
     // The write has succeeded. Refresh failures must not invite a duplicate submission.
     try {
       await refreshSessionVersion(ticket, storeId)
@@ -598,7 +597,7 @@ const reloadKnowledge = async () => {
   const ticket = ++contextTicket
   contextError.value = ''
   try {
-    const context = await knowledgeApi.context(storeId, productQueue.value.map(product => product.id).filter(id => libraryProducts.value.some(product => product.id === id)))
+    const context = await knowledgeApi.context(storeId)
     if (ticket === contextTicket && storeId === selectedStoreId.value) inheritedKnowledge.value = context.entries
   } catch (error) {
     if (ticket === contextTicket && storeId === selectedStoreId.value) {
@@ -607,7 +606,6 @@ const reloadKnowledge = async () => {
     }
   }
 }
-watch(() => productQueue.value.map(product => product.id).join(','), reloadKnowledge)
 const loadStore = async () => {
   const ticket = ++screenTicket
   contextTicket++
@@ -911,7 +909,7 @@ onBeforeUnmount(() => {
               <template v-else>
                 <div class="ls-qa-row-copy"><strong>{{ item.q }}</strong><p>{{ item.a }}</p></div>
                 <div class="ls-qa-row-side">
-                  <span class="ls-qa-tag">{{ item.source }}{{ item.persistMode === 'PRODUCT_FAQ' ? ' · 已存商品库' : item.persistMode === 'STORE_KNOWLEDGE' ? ' · 已存知识库草稿' : '' }}</span>
+                  <span class="ls-qa-tag">{{ item.source }}{{ item.persistMode === 'PRODUCT_FAQ' ? ' · 已存商品库' : item.persistMode === 'STORE_KNOWLEDGE' ? ' · 已存知识库' : '' }}</span>
                   <div v-if="item.sourceType === 'session'" class="ls-qa-row-actions">
                     <button type="button" :aria-label="`编辑 ${item.q}`" @click="editQa(item)">编辑</button>
                     <button type="button" :aria-label="`删除 ${item.q}`" @click="removeQa(item)">删除</button>
@@ -938,7 +936,7 @@ onBeforeUnmount(() => {
               </AppSelect>
               <button type="button" class="primary-button compact" @click="addQa">添加</button>
             </div>
-            <small v-if="qaPersistMode === 'STORE_KNOWLEDGE'">{{ knowledgeSets.length ? '保存为草稿，需前往知识库启用。' : '请先到资产中心 / 知识库新建问答知识集。' }}</small>
+            <small v-if="qaPersistMode === 'STORE_KNOWLEDGE'">{{ knowledgeSets.length ? '存入后默认停用，到知识库确认并启用后才会用于之后的场次。' : '请先到「资产中心 / 知识库」新建问答集。' }}</small>
           </div>
           <p v-if="qaNotice" class="ls-qa-notice" role="status">{{ qaNotice }}</p>
           <p v-if="qaError" class="ls-qa-error" role="alert">{{ qaError }}</p>
