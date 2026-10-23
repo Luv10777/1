@@ -167,7 +167,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
 
 <style scoped>
 :global(.page-scroll.team-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
-.team-page { max-width: 1200px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
+.team-page { padding-bottom: 72px; font-family: var(--font-sans); color: var(--color-primary); }
 .team-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 28px; }
 .eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .team-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
@@ -229,7 +229,7 @@ const remove = member => act(member, teamApi.remove, `移除“${member.name}”
 .team-dialog-enter-from, .team-dialog-leave-to { opacity: 0; }
 
 @media (max-width: 900px) {
-  .team-page { padding: 22px 20px 58px; }
+  .team-page { padding-bottom: 58px; }
   .team-header { display: block; }
   .team-header .primary-button { margin-top: 16px; }
   .member-head { display: none; }

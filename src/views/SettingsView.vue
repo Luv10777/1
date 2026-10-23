@@ -296,7 +296,7 @@ async function savePassword() {
 <template>
   <div class="settings-page">
     <header class="settings-header">
-      <h1>系统设置</h1>
+      <h1>设置</h1>
       <p class="header-desc">查看和修改你自己的账号资料、登录密码、实名认证和外观。账号设置只影响当前登录的这个账号。</p>
     </header>
 
@@ -534,9 +534,8 @@ async function savePassword() {
 
 <style scoped>
 :global(.page-scroll.settings-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
-.settings-page { max-width: 760px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
-.settings-header { margin-bottom: 28px; }
-.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
+.settings-page { padding-bottom: 72px; font-family: var(--font-sans); color: var(--color-primary); }
+.settings-header { margin-bottom: 28px; }.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .settings-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
 .header-desc { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.75; }
 .primary-button, .ghost-button, .link-button { font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -618,7 +617,7 @@ async function savePassword() {
 @media (max-width: 640px) {
   .avatar-section { gap: 12px; }
   .profile-avatar { width: 56px; height: 56px; font-size: 24px; }
-  .settings-page { padding: 22px 16px 58px; }
+  .settings-page { padding-bottom: 58px; }
   .settings-header h1 { font-size: 30px; }
   .settings-card { padding: 18px 16px; }
   .card-header { flex-direction: column-reverse; gap: 10px; }

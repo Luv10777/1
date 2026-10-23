@@ -13,7 +13,7 @@
 .ls-section{margin-top:13px;scroll-margin-top:20px}
 .ls-section-note{margin:14px 0 0;color:var(--ink-muted);font-size:13px;line-height:1.8}
 .ls-step-heading-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ls-ghost.compact{height:32px;padding:0 12px;font-size:12px}
+.ls-ghost.compact{height:36px;padding:0 12px;font-size:12px}
 
 /* 通用控件 */
 .ls-switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer}
@@ -25,9 +25,9 @@
 .ls-switch input:disabled+span{opacity:.5}
 .ls-switch input:focus-visible+span{outline:2px solid var(--cinnabar-bright);outline-offset:2px}
 .ls-switch em{color:var(--ink-soft);font-size:13px;font-style:normal}
-.ls-ghost{height:38px;padding:0 16px;border:1px solid var(--line-strong);border-radius:8px;color:var(--ink-soft);background:transparent;font-size:13px;white-space:nowrap;transition:color .18s ease,border-color .18s ease,background .18s ease}
+.ls-ghost{height:42px;padding:0 16px;border:1px solid var(--line-strong);border-radius:8px;color:var(--ink-soft);background:transparent;font-size:13px;white-space:nowrap;transition:color .18s ease,border-color .18s ease,background .18s ease}
 .ls-ghost:hover{color:var(--color-primary);border-color:rgba(194,153,143,.45);background:rgba(194,153,143,.1)}
-.ls-danger{height:38px;padding:0 16px;border:1px solid rgba(244,119,134,.35);border-radius:8px;color:var(--color-accent-text);background:rgba(244,119,134,.08);font-size:13px}
+.ls-danger{height:42px;padding:0 16px;border:1px solid rgba(244,119,134,.35);border-radius:8px;color:var(--color-accent-text);background:rgba(244,119,134,.08);font-size:13px}
 .ls-danger:hover{color:var(--color-primary);background:rgba(244,119,134,.2)}
 .ls-field{display:grid;gap:7px}
 .ls-field>span{color:var(--ink-soft);font-size:12px}
@@ -369,8 +369,8 @@
 .ls-page .page-heading h1{font-size:clamp(28px,2.7vw,36px)}
 .ls-page .eyebrow{font-size:12px;letter-spacing:.13em}
 .ls-page .panel-heading h3{font-size:17px}
-.ls-page .primary-button{min-height:48px;font-size:14px}
-.ls-page .primary-button.compact{min-height:40px;font-size:13px}
+.ls-page .primary-button{min-height:42px;font-size:14px}
+.ls-page .primary-button.compact{min-height:36px;font-size:13px}
 .ls-page .metric-header{font-size:12px}
 .ls-page .metric-foot{font-size:12px}
 .ls-page .metric-number small{font-size:13px}

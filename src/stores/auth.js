@@ -143,7 +143,7 @@ export const auth = {
     }
   },
 
-  /** 系统设置里改了名字，右上角和侧栏要跟着变。 */
+  /** 设置页里改了名字，右上角和侧栏要跟着变。 */
   rename(name) {
     if (!state.user) return
     state.user = { ...state.user, name }
