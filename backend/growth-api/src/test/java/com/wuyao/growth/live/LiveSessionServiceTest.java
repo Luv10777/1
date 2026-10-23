@@ -112,20 +112,19 @@ class LiveSessionServiceTest {
     }
 
     @Test
-    void storeKnowledgeIsSavedAsDraftInAnExplicitSameStoreFaqSet() {
-        when(knowledge.getSet(40L, 4L)).thenReturn(knowledgeSet(2L, "FAQ", "PUBLISHED"));
+    void storeKnowledgeIsSavedSwitchedOffInAnExplicitSameStoreFaqSet() {
+        when(knowledge.getSet(40L, 4L)).thenReturn(knowledgeSet(2L, "FAQ", "ACTIVE"));
 
         service.addQa(20L, new LiveDtos.QaRequest("停车？", "可免费停车。", "STORE_KNOWLEDGE", 40L), 4L);
 
         verify(knowledge).createEntry(40L, new KnowledgeDtos.CreateEntryRequest(
-                "停车？", "可免费停车。", "STORE", null, "LIVE_DRAFT", "DRAFT"), 4L);
-        verify(knowledge, never()).publish(anyLong(), anyLong());
+                "停车？", "可免费停车。", "LIVE", "DISABLED"), 4L);
         verify(qas).save(any());
     }
 
     @Test
     void storeKnowledgeRejectsOtherStoreAndArchivedTargetsBeforeWriting() {
-        when(knowledge.getSet(40L, 4L)).thenReturn(knowledgeSet(99L, "FAQ", "PUBLISHED"));
+        when(knowledge.getSet(40L, 4L)).thenReturn(knowledgeSet(99L, "FAQ", "ACTIVE"));
         var request = new LiveDtos.QaRequest("停车？", "可免费停车。", "STORE_KNOWLEDGE", 40L);
         assertThatThrownBy(() -> service.addQa(20L, request, 4L))
                 .isInstanceOf(BizException.class).hasMessageContaining("当前门店");
@@ -149,21 +148,22 @@ class LiveSessionServiceTest {
         when(products.listFaqs(30L, 4L)).thenReturn(List.of(
                 new ProductDtos.FaqListView(60L, 30L, longQuestion, "商品答案", "ACTIVE", 0, 0L, null, null),
                 new ProductDtos.FaqListView(61L, 30L, "停用问题", "停用答案", "DISABLED", 1, 0L, null, null)));
-        when(knowledge.context(2L, List.of(30L), 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
-                2L, 7, List.of(entry(70L, "PRODUCT", 30L), entry(80L, "STORE", null)), Instant.now()));
+        when(knowledge.context(2L, 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
+                2L, 9L, List.of(entry(80L), brandEntry(81L)), Instant.now()));
 
         LiveDtos.View result = service.start(20L, 4L);
 
         assertThat(result.status()).isEqualTo("LIVE");
         assertThat(result.startedAt()).isNotNull();
-        assertThat(result.knowledgeVersion()).isEqualTo(7);
-        verify(knowledge).context(2L, List.of(30L), 4L);
+        verify(knowledge).context(2L, 4L);
         ArgumentCaptor<LiveKnowledgeSnapshot> captured = ArgumentCaptor.forClass(LiveKnowledgeSnapshot.class);
         verify(snapshots, times(4)).save(captured.capture());
         assertThat(captured.getAllValues()).extracting(LiveKnowledgeSnapshot::getPriority)
-                .containsExactly(1, 2, 2, 3);
+                .containsExactly(1, 2, 3, 4);
         assertThat(captured.getAllValues()).extracting(LiveKnowledgeSnapshot::getSourceId)
-                .containsExactly(90L, 60L, 70L, 80L);
+                .containsExactly(90L, 60L, 80L, 81L);
+        assertThat(captured.getAllValues()).extracting(LiveKnowledgeSnapshot::getSourceType)
+                .containsExactly("SESSION", "PRODUCT_FAQ", "STORE", "BRAND");
         assertThat(captured.getAllValues().get(1).getQuestion()).isEqualTo(longQuestion);
     }
 
@@ -275,8 +275,8 @@ class LiveSessionServiceTest {
     void startDoesNotRequireARoomLink() {
         session.setRoomId(null);
         selectProduct(30L);
-        when(knowledge.context(2L, List.of(30L), 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
-                2L, 1, List.of(), Instant.now()));
+        when(knowledge.context(2L, 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
+                2L, null, List.of(), Instant.now()));
 
         assertThat(service.start(20L, 4L).status()).isEqualTo("LIVE");
         assertThat(session.getRoomId()).isNull();
@@ -287,14 +287,12 @@ class LiveSessionServiceTest {
         Instant start = Instant.parse("2026-09-28T01:00:00Z");
         session.setStatus("PAUSED");
         session.setStartedAt(start);
-        session.setKnowledgeVersion(5);
         assertThatThrownBy(() -> service.start(20L, 4L)).isInstanceOf(BizException.class);
 
         LiveDtos.View resumed = service.resume(20L, 4L);
 
         assertThat(resumed.status()).isEqualTo("LIVE");
         assertThat(resumed.startedAt()).isEqualTo(start);
-        assertThat(resumed.knowledgeVersion()).isEqualTo(5);
         verifyNoInteractions(products, knowledge);
         verify(snapshots, never()).deleteBySessionId(anyLong());
         verify(snapshots, never()).save(any());
@@ -453,8 +451,8 @@ class LiveSessionServiceTest {
         LiveSessionQa qa = existingQa();
         qa.setTargetId(31L);
         when(qas.findBySessionIdOrderByIdAsc(20L)).thenReturn(List.of(qa));
-        when(knowledge.context(2L, List.of(30L), 4L)).thenReturn(
-                new KnowledgeDtos.KnowledgeContext(2L, 1, List.of(), Instant.now()));
+        when(knowledge.context(2L, 4L)).thenReturn(
+                new KnowledgeDtos.KnowledgeContext(2L, null, List.of(), Instant.now()));
         service.start(20L, 4L);
         verify(snapshots, never()).save(any());
     }
@@ -480,8 +478,8 @@ class LiveSessionServiceTest {
     @Test
     void startReservesTheFirstLiveHourAndAPlanWithoutLiveLeavesTheDraft() {
         selectProduct(30L);
-        when(knowledge.context(2L, List.of(30L), 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
-                2L, 1, List.of(), Instant.now()));
+        when(knowledge.context(2L, 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
+                2L, null, List.of(), Instant.now()));
         when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(35L), anyString()))
                 .thenThrow(BizException.of(ErrorCode.ENTITLEMENT_REQUIRED, "当前套餐不含直播功能"))
                 .thenReturn("reservation-1");
@@ -593,11 +591,14 @@ class LiveSessionServiceTest {
     }
 
     private KnowledgeDtos.SetView knowledgeSet(Long storeId, String kind, String status) {
-        return new KnowledgeDtos.SetView(40L, storeId, "门店规则", kind, status, null, 1, null, null, null);
+        return new KnowledgeDtos.SetView(40L, storeId, null, "门店规则", kind, status, null, null, null);
     }
 
-    private KnowledgeDtos.EntryView entry(Long id, String scope, Long productId) {
-        return new KnowledgeDtos.EntryView(id, 40L, 2L, productId, scope, "MANUAL", "ACTIVE",
-                "问题" + id, "回答" + id, 0L, 0, 1, null, null);
+    private KnowledgeDtos.EntryView entry(Long id) {
+        return new KnowledgeDtos.EntryView(id, 40L, 2L, null, "MANUAL", "ACTIVE", "问题" + id, "回答" + id, null, null);
+    }
+
+    private KnowledgeDtos.EntryView brandEntry(Long id) {
+        return new KnowledgeDtos.EntryView(id, 41L, null, 9L, "MANUAL", "ACTIVE", "问题" + id, "回答" + id, null, null);
     }
 }

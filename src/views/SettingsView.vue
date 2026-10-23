@@ -6,6 +6,12 @@ import UserAvatar from '../components/UserAvatar.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
 import { identityValidation, managementDate } from '../domain/platformManagement'
 import { auth } from '../stores/auth'
+import { theme } from '../stores/theme'
+
+const themeOptions = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+]
 
 const route = useRoute()
 const router = useRouter()
@@ -290,9 +296,21 @@ async function savePassword() {
 <template>
   <div class="settings-page">
     <header class="settings-header">
-      <h1>系统设置</h1>
-      <p class="header-desc">查看和修改你自己的账号资料、登录密码和实名认证。只影响当前登录的这个账号。</p>
+      <h1>设置</h1>
+      <p class="header-desc">查看和修改你自己的账号资料、登录密码、实名认证和外观。账号设置只影响当前登录的这个账号。</p>
     </header>
+
+    <section class="settings-card" aria-labelledby="appearance-title">
+      <header class="card-header">
+        <div>
+          <h2 id="appearance-title">外观</h2>
+          <p>只在这台设备的这个浏览器里生效。</p>
+        </div>
+      </header>
+      <div class="theme-options" role="radiogroup" aria-labelledby="appearance-title">
+        <button v-for="option in themeOptions" :key="option.value" type="button" role="radio" class="theme-option" :class="{ active: theme.current.value === option.value }" :aria-checked="theme.current.value === option.value" @click="theme.set(option.value)">{{ option.label }}</button>
+      </div>
+    </section>
 
     <div v-if="loading" class="loading-state">正在加载账号资料…</div>
     <div v-else-if="loadError" class="page-notice" role="alert">
@@ -516,9 +534,8 @@ async function savePassword() {
 
 <style scoped>
 :global(.page-scroll.settings-scroll) { background: var(--color-bg-canvas); color: var(--color-primary); }
-.settings-page { max-width: 760px; margin: 0 auto; padding: 24px 32px 72px; font-family: var(--font-sans); color: var(--color-primary); }
-.settings-header { margin-bottom: 28px; }
-.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
+.settings-page { padding-bottom: 72px; font-family: var(--font-sans); color: var(--color-primary); }
+.settings-header { margin-bottom: 28px; }.eyebrow { margin: 0; color: var(--color-text-muted); font-size: 12px; font-weight: 700; letter-spacing: .14em; }
 .settings-header h1 { margin: 8px 0 6px; font-family: var(--font-serif); font-size: 36px; font-weight: 750; line-height: 1.18; }
 .header-desc { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.75; }
 .primary-button, .ghost-button, .link-button { font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -538,6 +555,10 @@ async function savePassword() {
 .role-badge, .state-badge { flex: none; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 12px; font-weight: 700; }
 .role-badge.owner { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); }
 .state-badge.on { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
+
+.theme-options { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--color-border-subtle); border-radius: 6px; background: var(--color-bg-subtle); }
+.theme-option { min-width: 72px; padding: 8px 14px; border: 0; border-radius: 4px; color: var(--color-text-muted); background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
+.theme-option.active { color: var(--color-primary); background: var(--color-bg-surface); box-shadow: 0 1px 2px color-mix(in srgb, var(--color-primary) 12%, transparent); }
 
 .name-row { display: flex; align-items: flex-end; gap: 10px; }
 .avatar-section { display: flex; align-items: flex-start; gap: 18px; padding-bottom: 22px; margin-bottom: 20px; border-bottom: 1px solid var(--color-border-subtle); }
@@ -596,7 +617,7 @@ async function savePassword() {
 @media (max-width: 640px) {
   .avatar-section { gap: 12px; }
   .profile-avatar { width: 56px; height: 56px; font-size: 24px; }
-  .settings-page { padding: 22px 16px 58px; }
+  .settings-page { padding-bottom: 58px; }
   .settings-header h1 { font-size: 30px; }
   .settings-card { padding: 18px 16px; }
   .card-header { flex-direction: column-reverse; gap: 10px; }

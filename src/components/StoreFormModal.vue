@@ -9,7 +9,8 @@ import { AMENITY_PRESETS, AMENITY_MAX_LENGTH, SPECIAL_HOUR_MAX_COUNT, WEEKDAYS, 
 
 // full：除了四项基本资料，还编辑门店档案（交通指引、配套服务、特殊营业安排）。
 // 不带 full 的是"先建一家店"的快捷表单，它不提交档案，已有的档案也不会被它改动。
-const props = defineProps({ store: { type: Object, default: null }, full: { type: Boolean, default: false } })
+// brandId：在某个品牌下新开门店时预先选好这个品牌。
+const props = defineProps({ store: { type: Object, default: null }, full: { type: Boolean, default: false }, brandId: { type: Number, default: null } })
 const emit = defineEmits(['close'])
 const form = reactive({ name: props.store?.name || '', address: props.store?.address || '', phone: props.store?.phone || '', businessHours: props.store?.businessHours || '' })
 const profile = reactive(profileForm(props.store))
@@ -18,7 +19,7 @@ const busy = ref(false)
 const error = ref('')
 // 只有一个品牌（或还没有品牌）时不用选：后端会把门店归到默认品牌。门店归哪个品牌由管理员决定，店员看不到这一项。
 const brands = ref([])
-const brandId = ref(props.store?.brandId ?? null)
+const brandId = ref(props.store?.brandId ?? props.brandId ?? null)
 onMounted(async () => {
   if (!auth.isOwner) return
   try {

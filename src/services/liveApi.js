@@ -173,7 +173,7 @@ const COMMENT_STATES = {
   // 投诉、说吃了不舒服、要退款、问是不是真人：AI 不回，但一定要让人看到。
   ATTENTION: { label: '需要人工处理', tone: 'failed' },
 }
-const ANSWER_SOURCES = { SESSION: '本场问答', PRODUCT_FAQ: '商品问答', PRODUCT: '商品知识', STORE: '门店知识库', AI: '依据资料回答' }
+const ANSWER_SOURCES = { SESSION: '本场问答', PRODUCT_FAQ: '商品问答', PRODUCT: '商品知识', STORE: '门店知识库', BRAND: '品牌知识库', AI: '依据资料回答' }
 const COMMENT_PROVIDERS = { MOCK: '模拟弹幕', DOUYIN_WEB: '直播间弹幕' }
 
 /** 弹幕流里的一条：观众问了什么、回了什么、回答出自哪里；没回的要说明原因。 */

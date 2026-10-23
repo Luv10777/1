@@ -1,413 +1,709 @@
 <script setup>
-import AppSelect from '../components/AppSelect.vue'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import {
-  Archive, ChevronDown, FileText, Filter,
-  MessageCircleQuestion, Plus, Search, Trash2, Upload, Pencil,
-} from 'lucide-vue-next'
-import { knowledgeApi } from '../services/knowledgeApi'
-import { selectedStoreId, selectedStore } from '../stores/merchantContext'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Archive, ArchiveRestore, ChevronDown, FileText, MessageCircleQuestion, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-vue-next'
+import KnowledgeDocumentPanel from '../components/KnowledgeDocumentPanel.vue'
+import { brandApi } from '../services/brandApi'
+import { DOCUMENT_TYPES, knowledgeApi } from '../services/knowledgeApi'
+import { auth } from '../stores/auth'
+import { selectedStoreId, selectedStore, selectedStoreRecord } from '../stores/merchantContext'
 
-const activeTab = ref('all')
-const searchQuery = ref('')
-const filterOpen = ref(false)
-const createOpen = ref(false)
-const selectedStatus = ref('all')
-const faqDetailOpen = ref(false)
-const selectedFaqId = ref(null)
-const faqPairModalOpen = ref(false)
-const faqSetModalOpen = ref(false)
-const editingFaqPair = ref(null)
-const editingSetId = ref(null)
-const faqNotice = ref('')
-const loadError = ref('')
-const formError = ref('')
-const loading = ref(false)
-const saving = ref(false)
-const faqSetForm = ref({ name: '', description: '' })
-const faqForm = ref({ question: '', answer: '', status: 'DRAFT' })
-const archiveOpen = ref(false)
+// 规则只有一条：问答集没归档、问答是启用的，之后开播的直播就会用它回答观众。
+// 问答集挂在本店，或挂在品牌上由品牌下所有门店共用；文档上传后整理成建议，逐条确认才写进去。
+// 页面左边选问答集或文档，右边直接处理，不再跳详情页。
 const sets = ref([])
-const entrySets = ref({})
+const brand = ref(null)
+const documents = ref([])
+const selectedDocId = ref(null)
+const uploadForm = ref(null)
+const entriesBySet = ref({})
+const selectedSetId = ref(null)
+const loading = ref(false)
+const loadError = ref('')
+const saving = ref(false)
+const notice = ref('')
+const error = ref('')
+const showArchived = ref(false)
+const search = ref('')
+const entryFilter = ref('all')
+// 正在编辑的问答：'new' 表示新增，数字是问答 ID。
+const editingEntryId = ref(null)
+const entryForm = ref({ question: '', answer: '' })
+const setForm = ref(null)
+const confirming = ref(null)
 let requestVersion = 0
 
-const formatDate = (value) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
-const visibleEntries = (setId) => (entrySets.value[setId] || []).filter(entry => entry.status !== 'DISABLED')
-const statusLabels = { DRAFT: '草稿', PUBLISHED: '已发布', DISABLED: '已停用', ARCHIVED: '已归档' }
-const allKnowledge = computed(() => [...sets.value].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(item => ({
-  ...item,
-  type: item.kind === 'FAQ' ? 'faq' : 'rag',
-  icon: item.kind === 'FAQ' ? MessageCircleQuestion : FileText,
-  tone: item.kind === 'FAQ' ? 'cinnabar' : 'blue',
-  meta: `KB-${item.id} · 更新于 ${formatDate(item.updatedAt)}`,
-  metric: item.kind === 'FAQ' ? `${visibleEntries(item.id).length} 个问答对` : '文档解析未开放',
-  statusLabel: statusLabels[item.status] || item.status,
-  sync: item.status === 'PUBLISHED' ? `已发布 · 第 ${item.currentVersion} 版` : statusLabels[item.status],
-})))
-const currentKnowledge = computed(() => allKnowledge.value.filter(item => item.status !== 'ARCHIVED'))
-const archivedKnowledge = computed(() => allKnowledge.value.filter(item => item.status === 'ARCHIVED'))
-const selectedFaq = computed(() => allKnowledge.value.find(item => item.id === selectedFaqId.value))
-const faqPairs = computed(() => visibleEntries(selectedFaqId.value))
-const faqSets = computed(() => currentKnowledge.value.filter(item => item.kind === 'FAQ'))
-const faqTotal = computed(() => faqSets.value.reduce((sum, item) => sum + visibleEntries(item.id).length, 0))
-const publishedTotal = computed(() => faqSets.value.filter(item => item.status === 'PUBLISHED').length)
-const tabs = computed(() => [
-  { id: 'all', label: '全部', count: currentKnowledge.value.length },
-  { id: 'rag', label: '文档资料', suffix: 'RAG', count: currentKnowledge.value.filter(item => item.kind === 'DOCUMENT').length },
-  { id: 'faq', label: '常见问答', suffix: 'FAQ', count: faqSets.value.length },
+const byUpdated = (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
+const faqSets = computed(() => sets.value.filter(set => set.kind === 'FAQ').sort(byUpdated))
+const activeSets = computed(() => faqSets.value.filter(set => set.status !== 'ARCHIVED'))
+const archivedSets = computed(() => faqSets.value.filter(set => set.status === 'ARCHIVED'))
+const storeSets = computed(() => activeSets.value.filter(set => set.storeId))
+const brandSets = computed(() => activeSets.value.filter(set => set.brandId))
+const selectedSet = computed(() => faqSets.value.find(set => set.id === selectedSetId.value) || null)
+const isArchived = computed(() => selectedSet.value?.status === 'ARCHIVED')
+// 品牌的问答由管理员维护；这里只决定显示哪些按钮，权限以后端为准。
+const canEditOwner = (owner) => !owner?.brandId || auth.isOwner
+const readOnly = computed(() => isArchived.value || !canEditOwner(selectedSet.value))
+const ownerLabel = (owner) => owner?.brandId ? `品牌「${brand.value?.name || ''}」` : `本店「${selectedStore.value || ''}」`
+const selectedDoc = computed(() => documents.value.find(doc => doc.id === selectedDocId.value) || null)
+const docSets = computed(() => selectedDoc.value?.brandId ? brandSets.value : storeSets.value)
+const docStatus = (doc) => doc.status === 'PROCESSING' ? '整理中…' : doc.status === 'FAILED' ? '没整理出来'
+  : doc.pendingCount ? `${doc.pendingCount} 条待确认` : '已处理完'
+const entriesOf = (setId) => entriesBySet.value[setId] || []
+const countOn = (setId) => entriesOf(setId).filter(entry => entry.status === 'ACTIVE').length
+const entries = computed(() => entriesOf(selectedSetId.value))
+const pendingCount = computed(() => entries.value.filter(entry => entry.source === 'LIVE' && entry.status !== 'ACTIVE').length)
+const filters = computed(() => [
+  { value: 'all', label: '全部', count: entries.value.length },
+  { value: 'ACTIVE', label: '启用中', count: entries.value.filter(entry => entry.status === 'ACTIVE').length },
+  { value: 'DISABLED', label: '已停用', count: entries.value.filter(entry => entry.status !== 'ACTIVE').length },
 ])
-const filteredKnowledge = computed(() => currentKnowledge.value.filter((item) => {
-  const query = searchQuery.value.trim().toLowerCase()
-  return (activeTab.value === 'all' || item.type === activeTab.value)
-    && (!query || [item.name, item.description, item.meta].join(' ').toLowerCase().includes(query))
-    && (selectedStatus.value === 'all' || item.status === selectedStatus.value)
-}))
-const statusClass = (status) => ({ PUBLISHED: 'status-active', DISABLED: 'status-draft', DRAFT: 'status-draft' }[status])
-const toneClass = (tone) => `tone-${tone}`
-
-function closePopovers() {
-  filterOpen.value = false
-  createOpen.value = false
-}
-onMounted(() => document.addEventListener('click', closePopovers))
-onBeforeUnmount(() => {
-  requestVersion += 1
-  document.removeEventListener('click', closePopovers)
+const visibleEntries = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  return entries.value.filter(entry => (entryFilter.value === 'all' || entry.status === entryFilter.value)
+    && (!query || `${entry.question} ${entry.answer}`.toLowerCase().includes(query)))
 })
+
+function resetSelectionView() {
+  search.value = ''
+  entryFilter.value = 'all'
+  editingEntryId.value = null
+}
 
 async function loadKnowledge() {
   const version = ++requestVersion
   const storeId = selectedStoreId.value
+  const brandId = selectedStoreRecord.value?.brandId ?? null
   sets.value = []
-  entrySets.value = {}
+  entriesBySet.value = {}
+  documents.value = []
+  brand.value = null
+  selectedSetId.value = null
+  selectedDocId.value = null
+  uploadForm.value = null
   loadError.value = ''
-  faqNotice.value = ''
-  formError.value = ''
+  notice.value = ''
+  error.value = ''
   saving.value = false
-  closeFaqDetail()
-  archiveOpen.value = false
-  closePopovers()
-  if (!storeId) {
-    loading.value = false
-    return
-  }
+  setForm.value = null
+  confirming.value = null
+  resetSelectionView()
+  if (!storeId) { loading.value = false; return }
   loading.value = true
   try {
-    const loadedSets = await knowledgeApi.listSets(storeId)
-    const loadedEntries = await Promise.all(loadedSets
-      .filter(item => item.kind === 'FAQ' && item.status !== 'ARCHIVED')
-      .map(async item => [item.id, await knowledgeApi.listEntries(item.id)]))
+    const [storeLoaded, brandLoaded, brandNames, storeDocs, brandDocs] = await Promise.all([
+      knowledgeApi.listSets(storeId),
+      brandId ? knowledgeApi.listBrandSets(brandId) : [],
+      brandId ? brandApi.names() : [],
+      knowledgeApi.listDocuments({ storeId }),
+      brandId ? knowledgeApi.listDocuments({ brandId }) : [],
+    ])
+    const loaded = [...storeLoaded, ...brandLoaded]
+    const active = loaded.filter(set => set.kind === 'FAQ' && set.status !== 'ARCHIVED')
+    const loadedEntries = await Promise.all(active.map(async set => [set.id, await knowledgeApi.listEntries(set.id)]))
     if (version !== requestVersion || storeId !== selectedStoreId.value) return
-    sets.value = loadedSets
-    entrySets.value = Object.fromEntries(loadedEntries)
-  } catch (error) {
-    if (version === requestVersion) loadError.value = error.message || '知识库加载失败，请重试。'
+    sets.value = loaded
+    entriesBySet.value = Object.fromEntries(loadedEntries)
+    brand.value = brandId ? (brandNames.find(item => item.id === brandId) || { id: brandId, name: '' }) : null
+    documents.value = [...storeDocs, ...brandDocs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    selectedSetId.value = activeSets.value[0]?.id ?? null
+  } catch (failure) {
+    if (version === requestVersion) loadError.value = failure.message || '知识库加载失败，请重试。'
   } finally {
     if (version === requestVersion) loading.value = false
   }
 }
 watch(selectedStoreId, loadKnowledge, { immediate: true })
 
-// A request that finishes after a store switch must never alter the new store's UI.
-async function mutate(task, applyResult, notice) {
-  if (saving.value || !selectedStoreId.value || loading.value) return
+// A request that finishes after a store switch must never alter the new store's page.
+async function mutate(task, apply, message) {
+  if (saving.value || loading.value || !selectedStoreId.value) return false
   const version = requestVersion
   const storeId = selectedStoreId.value
   saving.value = true
-  formError.value = ''
-  faqNotice.value = ''
+  error.value = ''
+  notice.value = ''
   try {
     const result = await task()
-    if (version !== requestVersion || storeId !== selectedStoreId.value) return
-    applyResult(result)
-    faqNotice.value = notice
-  } catch (error) {
-    if (version === requestVersion) formError.value = error.message || '保存失败，请重试。'
+    if (version !== requestVersion || storeId !== selectedStoreId.value) return false
+    apply(result)
+    notice.value = typeof message === 'function' ? message(result) : message
+    return true
+  } catch (failure) {
+    if (version === requestVersion) error.value = failure.message || '保存失败，请重试。'
+    return false
   } finally {
     if (version === requestVersion) saving.value = false
   }
 }
 
-function replaceSet(item) {
-  const index = sets.value.findIndex(set => set.id === item.id)
-  if (index >= 0) sets.value.splice(index, 1, item)
-  else sets.value.unshift(item)
+function replaceSet(set) {
+  const index = sets.value.findIndex(item => item.id === set.id)
+  if (index >= 0) sets.value.splice(index, 1, set)
+  else sets.value.unshift(set)
 }
-function chooseCreate(type) {
-  createOpen.value = false
-  if (type !== 'faq') return
-  editingSetId.value = null
-  faqSetForm.value = { name: '', description: '' }
-  formError.value = ''
-  faqSetModalOpen.value = true
+
+async function selectSet(set) {
+  if (saving.value || set.id === selectedSetId.value) return
+  selectedSetId.value = set.id
+  selectedDocId.value = null
+  resetSelectionView()
+  notice.value = ''
+  error.value = ''
+  if (entriesBySet.value[set.id]) return
+  const version = requestVersion
+  try {
+    const loaded = await knowledgeApi.listEntries(set.id)
+    if (version === requestVersion) entriesBySet.value = { ...entriesBySet.value, [set.id]: loaded }
+  } catch (failure) {
+    if (version === requestVersion) error.value = failure.message || '问答读取失败，请重试。'
+  }
 }
-function openSetEditor(item) {
+
+// owner：新建时放在本店还是品牌；fromDocument 表示从文档页过来，建好后回到文档继续采纳。
+function openSetForm(set = null, { owner = 'store', fromDocument = false } = {}) {
   if (saving.value) return
-  editingSetId.value = item.id
-  faqSetForm.value = { name: item.name, description: item.description || '' }
-  formError.value = ''
-  faqSetModalOpen.value = true
+  error.value = ''
+  setForm.value = { id: set?.id ?? null, name: set?.name || '', description: set?.description || '', owner, fromDocument }
 }
-function openFaqDetail(item) {
-  if (!item || saving.value) return
-  selectedFaqId.value = item.id
-  faqDetailOpen.value = true
-  faqNotice.value = ''
-  formError.value = ''
-}
-function closeFaqDetail() {
-  if (saving.value) return
-  faqDetailOpen.value = false
-  selectedFaqId.value = null
-  faqPairModalOpen.value = false
-  faqSetModalOpen.value = false
-  editingFaqPair.value = null
-}
-function closeEditor(kind) {
-  if (saving.value) return
-  if (kind === 'set') faqSetModalOpen.value = false
-  else faqPairModalOpen.value = false
-  formError.value = ''
-}
-async function saveFaqSet() {
-  const name = faqSetForm.value.name.trim()
-  const description = faqSetForm.value.description.trim()
-  if (!name) { formError.value = '请填写知识集名称。'; return }
-  const setId = editingSetId.value
-  await mutate(
-    () => setId ? knowledgeApi.updateSet(setId, { name, description }) : knowledgeApi.createSet(selectedStoreId.value, { name, description, kind: 'FAQ' }),
-    item => {
-      replaceSet(item)
-      entrySets.value[item.id] ||= []
-      faqSetModalOpen.value = false
-      selectedFaqId.value = item.kind === 'FAQ' ? item.id : null
-      faqDetailOpen.value = item.kind === 'FAQ'
-    },
-    setId ? '知识集已保存。' : '知识集已创建，添加问答后即可发布。',
-  )
-}
-function openFaqPairEditor(pair = null) {
-  if (saving.value) return
-  editingFaqPair.value = pair
-  faqForm.value = pair ? { question: pair.question, answer: pair.answer, status: pair.status } : { question: '', answer: '', status: 'DRAFT' }
-  faqPairModalOpen.value = true
-  formError.value = ''
-}
-async function saveFaqPair() {
-  const question = faqForm.value.question.trim()
-  const answer = faqForm.value.answer.trim()
-  if (!question || !answer) { formError.value = '请先填写问题和标准答案。'; return }
-  const setId = selectedFaqId.value
-  const pairId = editingFaqPair.value?.id
-  const body = { question, answer, status: faqForm.value.status }
-  await mutate(
-    () => pairId ? knowledgeApi.updateEntry(pairId, body) : knowledgeApi.createEntry(setId, { ...body, scope: 'STORE', source: 'MANUAL' }),
-    pair => {
-      const entries = entrySets.value[setId] || []
-      entrySets.value[setId] = [pair, ...entries.filter(entry => entry.id !== pair.id)]
-      faqPairModalOpen.value = false
-      editingFaqPair.value = null
-    },
-    '问答已保存；已发布知识集中的已启用问答会供后续直播使用。',
-  )
-}
-async function toggleFaqPair(pair) {
-  await mutate(
-    () => knowledgeApi.updateEntry(pair.id, { status: pair.status === 'ACTIVE' ? 'DRAFT' : 'ACTIVE' }),
-    updated => { entrySets.value[pair.knowledgeSetId] = entrySets.value[pair.knowledgeSetId].map(entry => entry.id === pair.id ? updated : entry) },
-    pair.status === 'ACTIVE' ? '问答已转为草稿。' : '问答已启用；知识集发布后生效。',
-  )
-}
-async function removeFaqPair(pair) {
-  if (saving.value || !window.confirm(`确定删除“${pair.question}”吗？`)) return
-  await mutate(
-    () => knowledgeApi.deleteEntry(pair.id),
-    () => { entrySets.value[pair.knowledgeSetId] = entrySets.value[pair.knowledgeSetId].filter(entry => entry.id !== pair.id) },
-    '问答已删除。',
-  )
-}
-async function changeSetStatus(item, action) {
-  if (saving.value) return
-  if (action === 'archive' && !window.confirm(`确定归档“${item.name}”吗？归档后将不再用于新的直播。`)) return
-  await mutate(
-    () => knowledgeApi[action](item.id),
-    updated => {
-      replaceSet(updated)
-      if (action === 'publish') {
-        entrySets.value[item.id] = (entrySets.value[item.id] || []).map(entry => entry.status === 'DRAFT' ? { ...entry, status: 'ACTIVE' } : entry)
-      }
-      if (action === 'archive' && selectedFaqId.value === item.id) {
-        faqDetailOpen.value = false
-        selectedFaqId.value = null
+async function saveSet() {
+  const { id, name, description, owner, fromDocument } = setForm.value
+  if (!name.trim()) { error.value = '请填写问答集名称。'; return }
+  const body = { name: name.trim(), description: description.trim() }
+  const create = () => owner === 'brand' && brand.value
+    ? knowledgeApi.createBrandSet(brand.value.id, { ...body, kind: 'FAQ' })
+    : knowledgeApi.createSet(selectedStoreId.value, { ...body, kind: 'FAQ' })
+  const saved = await mutate(
+    () => id ? knowledgeApi.updateSet(id, body) : create(),
+    set => {
+      replaceSet(set)
+      if (!entriesBySet.value[set.id]) entriesBySet.value = { ...entriesBySet.value, [set.id]: [] }
+      setForm.value = null
+      if (!id && !fromDocument) {
+        selectedSetId.value = set.id
+        selectedDocId.value = null
+        resetSelectionView()
       }
     },
-    { publish: '知识集已发布，草稿问答已启用。', disable: '知识集已停用。', archive: '知识集已归档。' }[action],
+    id ? '问答集已保存。' : fromDocument ? '问答集已建好，可以继续采纳问答了。' : '问答集已建好，写下第一条问答吧。',
+  )
+  // A new set goes straight to writing its first entry.
+  if (saved && !id && !fromDocument) startEntry()
+}
+
+function selectDocument(doc) {
+  if (saving.value) return
+  selectedDocId.value = doc.id
+  selectedSetId.value = null
+  resetSelectionView()
+  notice.value = ''
+  error.value = ''
+}
+function openUpload() {
+  if (saving.value) return
+  error.value = ''
+  uploadForm.value = { owner: 'store', file: null }
+}
+function pickFile(event) {
+  uploadForm.value.file = event.target.files?.[0] || null
+}
+async function submitUpload() {
+  const { owner, file } = uploadForm.value
+  if (!file) { error.value = '请选择要上传的文档。'; return }
+  const target = owner === 'brand' && brand.value ? { brandId: brand.value.id } : { storeId: selectedStoreId.value }
+  await mutate(
+    () => knowledgeApi.uploadDocument(target, file),
+    doc => {
+      documents.value = [doc, ...documents.value]
+      uploadForm.value = null
+      selectedDocId.value = doc.id
+      selectedSetId.value = null
+      resetSelectionView()
+    },
+    '已上传，正在阅读和整理。',
+  )
+}
+// 文档页里采纳、忽略之后，刷新左侧的待确认数量；加了问答的集重新读一遍。
+async function refreshDocuments() {
+  const version = requestVersion
+  const storeId = selectedStoreId.value
+  try {
+    const [storeDocs, brandDocs] = await Promise.all([
+      knowledgeApi.listDocuments({ storeId }),
+      brand.value ? knowledgeApi.listDocuments({ brandId: brand.value.id }) : [],
+    ])
+    if (version === requestVersion && storeId === selectedStoreId.value) {
+      documents.value = [...storeDocs, ...brandDocs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    }
+  } catch {
+    // The list refreshes again on the next change; the panel itself already shows the result.
+  }
+}
+async function reloadEntries(setId) {
+  refreshDocuments()
+  const version = requestVersion
+  try {
+    const loaded = await knowledgeApi.listEntries(setId)
+    if (version === requestVersion) entriesBySet.value = { ...entriesBySet.value, [setId]: loaded }
+  } catch {
+    // Counts catch up the next time the set is opened.
+  }
+}
+function documentDeleted() {
+  documents.value = documents.value.filter(doc => doc.id !== selectedDocId.value)
+  selectedDocId.value = null
+  selectedSetId.value = activeSets.value[0]?.id ?? null
+}
+
+async function startEntry(entry = null) {
+  if (saving.value || readOnly.value) return
+  error.value = ''
+  editingEntryId.value = entry ? entry.id : 'new'
+  entryForm.value = { question: entry?.question || '', answer: entry?.answer || '' }
+  if (!entry) { entryFilter.value = 'all'; search.value = '' }
+  await nextTick()
+  document.querySelector('.kb-entry-form textarea')?.focus()
+}
+function cancelEntry() {
+  if (!saving.value) editingEntryId.value = null
+}
+async function saveEntry() {
+  const question = entryForm.value.question.trim()
+  const answer = entryForm.value.answer.trim()
+  if (!question || !answer) { error.value = '问题和回答都要填写。'; return }
+  const setId = selectedSetId.value
+  const editingId = editingEntryId.value
+  await mutate(
+    () => editingId === 'new'
+      ? knowledgeApi.createEntry(setId, { question, answer, source: 'MANUAL', status: 'ACTIVE' })
+      : knowledgeApi.updateEntry(editingId, { question, answer }),
+    saved => {
+      const list = entriesOf(setId)
+      entriesBySet.value = {
+        ...entriesBySet.value,
+        [setId]: editingId === 'new' ? [saved, ...list] : list.map(entry => entry.id === saved.id ? saved : entry),
+      }
+      editingEntryId.value = null
+    },
+    saved => editingId === 'new' ? '已添加，之后开播的直播会用到。' : (saved.status === 'ACTIVE' ? '已保存。' : '已保存，这条还在停用中。'),
+  )
+}
+async function toggleEntry(entry) {
+  if (readOnly.value) return
+  const status = entry.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
+  await mutate(
+    () => knowledgeApi.updateEntry(entry.id, { status }),
+    saved => {
+      entriesBySet.value = {
+        ...entriesBySet.value,
+        [entry.knowledgeSetId]: entriesOf(entry.knowledgeSetId).map(item => item.id === saved.id ? saved : item),
+      }
+    },
+    status === 'ACTIVE' ? '已启用，之后开播的直播会用到。' : '已停用，之后的直播不再使用。',
+  )
+}
+
+function askDelete(entry) {
+  confirming.value = {
+    title: '删除这条问答？',
+    message: `「${entry.question}」删除后无法找回。只是暂时不用的话，可以把它停用。`,
+    confirmText: '删除',
+    danger: true,
+    run: () => mutate(
+      () => knowledgeApi.deleteEntry(entry.id),
+      () => {
+        entriesBySet.value = {
+          ...entriesBySet.value,
+          [entry.knowledgeSetId]: entriesOf(entry.knowledgeSetId).filter(item => item.id !== entry.id),
+        }
+      },
+      '已删除。',
+    ),
+  }
+}
+function askArchive(set) {
+  confirming.value = {
+    title: '归档这个问答集？',
+    message: `「${set.name}」里的问答将不再用于直播。之后可以在左侧「已归档」里恢复，恢复后一切照旧。`,
+    confirmText: '归档',
+    danger: false,
+    run: () => mutate(
+      () => knowledgeApi.archive(set.id),
+      archived => {
+        replaceSet(archived)
+        selectedSetId.value = activeSets.value[0]?.id ?? null
+        resetSelectionView()
+      },
+      '已归档，可以在左侧「已归档」里恢复。',
+    ),
+  }
+}
+async function confirmAction() {
+  const action = confirming.value
+  if (!action || saving.value) return
+  const done = await action.run()
+  if (done) confirming.value = null
+}
+async function restoreSet(set) {
+  await mutate(
+    async () => {
+      const restored = await knowledgeApi.restore(set.id)
+      return { restored, loaded: entriesBySet.value[set.id] || await knowledgeApi.listEntries(set.id) }
+    },
+    ({ restored, loaded }) => {
+      replaceSet(restored)
+      entriesBySet.value = { ...entriesBySet.value, [restored.id]: loaded }
+      selectedSetId.value = restored.id
+    },
+    '已恢复，里面的问答保持归档前的启用状态。',
   )
 }
 </script>
+
 <template>
-  <div class="knowledge-page">
-    <header v-if="!faqDetailOpen" class="knowledge-header">
-      <div class="header-copy"><h1>知识库</h1><p>管理 {{ selectedStore || '当前门店' }} 的专属知识上下文</p></div>
-      <div class="header-tools">
-        <label class="knowledge-search"><Search :size="16" stroke-width="1.8" /><input v-model="searchQuery" type="search" placeholder="搜索知识名称、ID 或说明" aria-label="搜索知识库" /></label>
-        <div class="filter-wrap">
-          <button class="ghost-button" type="button" :class="{ selected: selectedStatus !== 'all' }" @click.stop="filterOpen = !filterOpen; createOpen = false"><Filter :size="15" /> 筛选 <span v-if="selectedStatus !== 'all'" class="filter-count">1</span></button>
-          <div v-if="filterOpen" class="popover filter-popover" @click.stop>
-            <p>状态</p>
-            <button v-for="option in [{ value: 'all', label: '全部状态' }, { value: 'PUBLISHED', label: '已发布' }, { value: 'DISABLED', label: '已停用' }, { value: 'DRAFT', label: '草稿' }]" :key="option.value" type="button" :class="{ checked: selectedStatus === option.value }" @click="selectedStatus = option.value; filterOpen = false"><span>{{ option.label }}</span><span v-if="selectedStatus === option.value">✓</span></button>
-          </div>
-        </div>
-        <div class="create-wrap">
-          <button class="create-button" type="button" :disabled="loading || saving || !selectedStoreId || !!loadError" @click.stop="createOpen = !createOpen; filterOpen = false"><Plus :size="17" stroke-width="2.2" /> 新建知识 <ChevronDown :size="15" :class="{ rotate: createOpen }" /></button>
-          <div v-if="createOpen" class="popover create-popover" @click.stop>
-            <button type="button" disabled><Upload :size="16" /><span><strong>上传文档</strong><small>文档解析暂未开放</small></span></button>
-            <button type="button" @click="chooseCreate('faq')"><MessageCircleQuestion :size="16" /><span><strong>新建问答集</strong><small>沉淀客服与售前经验</small></span></button>
-          </div>
-        </div>
+  <section class="kb-page">
+    <header class="kb-header">
+      <div>
+        <h1>知识库</h1>
+        <p>直播时，系统用这里的问答回答观众。放整家店通用的问题，比如营业时间、停车、会员、售后；品牌下各门店都一样的，放在品牌里写一次就行。某件商品的问题请写在<RouterLink to="/assets/products">商品</RouterLink>对应的商品里。</p>
       </div>
+      <span v-if="selectedStore" class="kb-store">{{ selectedStore }}</span>
     </header>
 
-    <div v-if="loadError" class="faq-notice error-notice" role="alert">{{ loadError }}<button type="button" class="ghost-button" @click="loadKnowledge">重新加载</button></div>
-    <div v-if="!faqPairModalOpen && !faqSetModalOpen && (formError || faqNotice)" class="faq-notice" :class="{ 'error-notice': formError }" :role="formError ? 'alert' : 'status'">{{ formError || faqNotice }}</div>
+    <p v-if="notice" class="kb-notice" role="status">{{ notice }}</p>
+    <p v-if="error && !setForm && !uploadForm && !confirming" class="kb-notice kb-error" role="alert">{{ error }}</p>
 
-    <nav v-if="!faqDetailOpen" class="knowledge-tabs" aria-label="知识类型">
-      <button v-for="tab in tabs" :key="tab.id" type="button" class="knowledge-tab" :class="{ active: activeTab === tab.id }" @click="activeTab = tab.id"><span>{{ tab.label }}</span><span v-if="tab.suffix" class="tab-suffix">{{ tab.suffix }}</span><span class="tab-count">{{ tab.count }}</span><span v-if="activeTab === tab.id" class="tab-indicator" /></button>
-    </nav>
+    <p v-if="!selectedStoreId" class="kb-empty-line">请先在顶部选择或创建门店。</p>
+    <p v-else-if="loading" class="kb-empty-line" role="status">正在读取知识库…</p>
+    <div v-else-if="loadError" class="kb-notice kb-error" role="alert">{{ loadError }} <button type="button" class="kb-button" @click="loadKnowledge">重新加载</button></div>
 
-    <main v-if="!faqDetailOpen">
-      <section class="faq-feature-card">
-        <div class="faq-feature-mark"><MessageCircleQuestion :size="22" stroke-width="1.8" /></div>
-        <div class="faq-feature-copy"><h2>常见问答集</h2><p>把门店经验整理成可复用的问答对，发布后自动用于实景直播的门店通用知识。</p><div class="faq-feature-meta"><span>{{ faqSets.length }} 个问答集</span><i /><span>{{ faqTotal }} 个问答对</span><i /><span>{{ publishedTotal }} 个已发布</span></div></div>
-        <button type="button" class="faq-feature-action" :disabled="loading || saving || !selectedStoreId || !!loadError" @click="activeTab = 'faq'; selectedStatus = 'all'; searchQuery = ''">管理问答集</button>
-      </section>
-      <div class="list-toolbar"><div><strong>{{ filteredKnowledge.length }}</strong> 个知识集 <span>·</span> 最近更新优先</div><button class="view-button" type="button" :disabled="loading" @click="archiveOpen = true"><Archive :size="14" /> 归档管理 <span v-if="archivedKnowledge.length" class="archive-count">{{ archivedKnowledge.length }}</span></button></div>
-      <div v-if="loading" class="empty-state" role="status"><strong>正在加载知识库…</strong></div>
-      <div v-else-if="activeTab === 'rag' && !filteredKnowledge.length && !loadError" class="empty-state"><FileText :size="22" /><strong>文档知识库暂未开放</strong><span>可以先创建常见问答集，积累门店通用知识。</span></div>
-      <TransitionGroup name="knowledge-list" tag="section" class="knowledge-list" aria-live="polite">
-        <article v-for="(item, index) in filteredKnowledge" :key="item.id" class="knowledge-row" :class="{ clickable: item.type === 'faq' }" :style="{ '--stagger': `${index * 55}ms` }" @click="item.type === 'faq' && openFaqDetail(item)">
-          <div class="row-main"><div class="type-icon" :class="toneClass(item.tone)"><component :is="item.icon" :size="20" stroke-width="1.8" /></div><div class="row-title"><h2><button v-if="item.type === 'faq'" type="button" class="row-title-button" :disabled="saving" @click.stop="openFaqDetail(item)">{{ item.name }}</button><span v-else>{{ item.name }}</span></h2><p>{{ item.meta }}</p></div></div>
-          <div class="row-description">{{ item.description || '暂无说明' }}</div>
-          <div class="row-metric"><strong>{{ item.metric }}</strong><span>{{ item.sync }}</span></div>
-          <div class="row-apps"><span class="app-tag">{{ item.kind === 'FAQ' ? '门店通用' : '文档资料' }}</span></div>
-          <span class="status-badge" :class="statusClass(item.status)"><span class="status-dot" />{{ item.statusLabel }}</span>
-          <div class="row-actions" @click.stop>
-            <button v-if="item.kind === 'FAQ'" type="button" :disabled="saving" @click="changeSetStatus(item, item.status === 'PUBLISHED' ? 'disable' : 'publish')">{{ item.status === 'PUBLISHED' ? '停用' : '发布' }}</button>
-            <button type="button" title="编辑知识集" :disabled="saving" @click="openSetEditor(item)"><Pencil :size="15" /></button>
-            <button type="button" title="归档知识集" :disabled="saving" @click="changeSetStatus(item, 'archive')"><Archive :size="15" /></button>
-          </div>
-        </article>
-      </TransitionGroup>
-      <div v-if="!loading && !loadError && !filteredKnowledge.length && activeTab !== 'rag'" class="empty-state"><Search :size="22" /><strong>{{ currentKnowledge.length ? '没有匹配的知识集' : '还没有知识集' }}</strong><span>{{ currentKnowledge.length ? '试试其他关键词或清除筛选条件' : '新建问答集，整理门店营业、预约、售后等常见问题。' }}</span><button v-if="!currentKnowledge.length && selectedStoreId" type="button" class="create-button" @click="chooseCreate('faq')"><Plus :size="15" /> 新建问答集</button></div>
-    </main>
+    <section v-else-if="!faqSets.length && !documents.length" class="kb-welcome">
+      <MessageCircleQuestion :size="28" aria-hidden="true" />
+      <h2>先建一个问答集</h2>
+      <p>问答集就是一组问答，按主题分就好，比如「营业与停车」「会员与售后」。只建一个也完全可以。</p>
+      <ol>
+        <li><strong>建问答集</strong>起个名字</li>
+        <li><strong>写问答</strong>一个问题配一个标准回答，写完就生效</li>
+        <li><strong>开播</strong>观众问到时，直播按你写的回答</li>
+      </ol>
+      <div class="kb-welcome-actions">
+        <button type="button" class="kb-button kb-primary" :disabled="saving" @click="openSetForm()"><Plus :size="16" />新建问答集</button>
+        <button type="button" class="kb-button" :disabled="saving" @click="openUpload"><Upload :size="16" />手里有资料？上传让 AI 整理</button>
+      </div>
+    </section>
 
-    <main v-else-if="selectedFaq" class="faq-detail-page">
-      <div class="faq-detail-header">
-        <button type="button" class="back-button" :disabled="saving" @click="closeFaqDetail">返回知识库</button>
-        <div class="faq-detail-heading"><div class="faq-detail-icon"><MessageCircleQuestion :size="21" /></div><div><p class="eyebrow">FAQ KNOWLEDGE SET · {{ selectedFaq.statusLabel }}</p><h1>{{ selectedFaq.name }}</h1><p>{{ selectedFaq.description || '维护门店可复用的标准问答。' }}</p></div></div>
-        <div class="faq-detail-actions">
-          <button type="button" class="ghost-button" :disabled="saving" @click="openSetEditor(selectedFaq)"><Pencil :size="15" /> 编辑说明</button>
-          <button type="button" class="ghost-button" :disabled="saving" @click="openFaqPairEditor()"><Plus :size="15" /> 添加问答对</button>
-          <button v-if="selectedFaq.status === 'PUBLISHED'" type="button" class="ghost-button" :disabled="saving" @click="changeSetStatus(selectedFaq, 'disable')">停用</button>
-          <button type="button" class="create-button" :disabled="saving" @click="changeSetStatus(selectedFaq, 'publish')">{{ selectedFaq.status === 'PUBLISHED' ? '发布更新' : '发布知识集' }}</button>
+    <div v-else class="kb-layout">
+      <aside class="kb-sets" aria-label="问答集与文档">
+        <div class="kb-sets-head">
+          <h2>本店问答</h2>
+          <button type="button" class="kb-icon-button" title="新建本店问答集" aria-label="新建本店问答集" :disabled="saving" @click="openSetForm(null, { owner: 'store' })"><Plus :size="17" /></button>
         </div>
-      </div>
-      <p class="knowledge-scope-hint">已发布知识集中的已启用问答，将作为本门店后续直播的通用知识；发布会启用集内全部草稿问答。</p>
-      <div class="faq-stat-grid">
-        <div><span>总问答数</span><strong>{{ faqPairs.length }}</strong><small>当前知识集</small></div>
-        <div><span>已启用</span><strong>{{ faqPairs.filter(pair => pair.status === 'ACTIVE').length }}</strong><small>{{ selectedFaq.status === 'PUBLISHED' ? '供后续直播使用' : '知识集发布后生效' }}</small></div>
-        <div><span>草稿</span><strong>{{ faqPairs.filter(pair => pair.status === 'DRAFT').length }}</strong><small>待启用</small></div>
-        <div><span>累计命中</span><strong>{{ faqPairs.reduce((sum, pair) => sum + Number(pair.hits || 0), 0) }}</strong><small>后台累计记录</small></div>
-      </div>
-      <section class="faq-pair-list">
-        <div class="faq-list-head"><div><h2>问答对配置</h2></div><span>{{ faqPairs.length }} 条记录</span></div>
-        <article v-for="(pair, index) in faqPairs" :key="pair.id" class="faq-pair-card" :style="{ '--stagger': `${index * 55}ms` }">
-          <div class="faq-pair-index">{{ String(index + 1).padStart(2, '0') }}</div>
-          <div class="faq-pair-content"><div class="faq-question"><span>问</span><h3>{{ pair.question }}</h3></div><div class="faq-answer"><span>答</span><p>{{ pair.answer }}</p></div><div class="faq-pair-meta"><span class="hit-count">命中 {{ pair.hits || 0 }} 次</span><span class="faq-status" :class="pair.status === 'ACTIVE' ? 'active' : 'draft'"><i />{{ pair.status === 'ACTIVE' ? '已启用' : '草稿' }}</span><span v-if="pair.scope === 'PRODUCT'" class="hit-count">商品专属</span></div></div>
-          <div class="faq-pair-actions"><button type="button" title="编辑" :disabled="saving" @click="openFaqPairEditor(pair)"><Pencil :size="15" /></button><button type="button" :title="pair.status === 'ACTIVE' ? '转为草稿' : '启用'" :disabled="saving" @click="toggleFaqPair(pair)"><Archive :size="15" /></button><button type="button" class="danger" title="删除" :disabled="saving" @click="removeFaqPair(pair)"><Trash2 :size="15" /></button></div>
-        </article>
-        <div v-if="!faqPairs.length" class="faq-empty"><MessageCircleQuestion :size="24" /><strong>还没有问答对</strong><span>添加第一条问答，积累可复用的回答。</span><button type="button" class="create-button" :disabled="saving" @click="openFaqPairEditor()"><Plus :size="15" /> 添加问答对</button></div>
-      </section>
-    </main>
+        <ul>
+          <li v-for="set in storeSets" :key="set.id">
+            <button type="button" class="kb-set" :class="{ selected: set.id === selectedSetId }" :aria-current="set.id === selectedSetId" @click="selectSet(set)">
+              <strong>{{ set.name }}</strong>
+              <span>{{ entriesOf(set.id).length }} 条 · {{ countOn(set.id) }} 条启用</span>
+            </button>
+          </li>
+        </ul>
+        <p v-if="!storeSets.length" class="kb-sets-empty">这家店还没有自己的问答集。</p>
 
-    <Transition name="dialog-fade">
-      <div v-if="faqSetModalOpen" class="modal-overlay" @click.self="closeEditor('set')">
-        <section class="faq-pair-modal faq-set-modal" role="dialog" aria-modal="true" aria-labelledby="faq-set-title">
-          <header class="modal-header"><div><h2 id="faq-set-title">{{ editingSetId ? '编辑知识集' : '新建常见问答集' }}</h2></div><button type="button" class="close-button" aria-label="关闭" :disabled="saving" @click="closeEditor('set')">×</button></header>
-          <form class="faq-pair-form" @submit.prevent="saveFaqSet">
-            <label class="faq-field"><span>知识集名称</span><input v-model="faqSetForm.name" :disabled="saving" required maxlength="120" placeholder="例如：门店会员服务问答" autofocus /></label>
-            <label class="faq-field"><span>知识集说明 <em>选填</em></span><textarea v-model="faqSetForm.description" :disabled="saving" maxlength="500" rows="4" placeholder="说明这组问答主要服务的业务场景" /></label>
-            <p v-if="formError" class="faq-form-notice" role="alert">{{ formError }}</p>
-            <footer class="faq-form-footer"><button type="button" class="ghost-button" :disabled="saving" @click="closeEditor('set')">取消</button><button type="submit" class="create-button" :disabled="saving">{{ saving ? '保存中…' : editingSetId ? '保存知识集' : '创建并添加问答' }}</button></footer>
-          </form>
-        </section>
-      </div>
-    </Transition>
-    <Transition name="dialog-fade">
-      <div v-if="faqPairModalOpen" class="modal-overlay" @click.self="closeEditor('pair')">
-        <section class="faq-pair-modal" role="dialog" aria-modal="true" aria-labelledby="faq-pair-title">
-          <header class="modal-header"><div><h2 id="faq-pair-title">{{ editingFaqPair ? '编辑问答对' : '添加问答对' }}</h2></div><button type="button" class="close-button" aria-label="关闭" :disabled="saving" @click="closeEditor('pair')">×</button></header>
-          <form class="faq-pair-form" @submit.prevent="saveFaqPair">
-            <label class="faq-field"><span>用户问题</span><input v-model="faqForm.question" :disabled="saving" required maxlength="500" placeholder="例如：你们支持哪些配送方式？" /></label>
-            <label class="faq-field"><span>标准答案</span><textarea v-model="faqForm.answer" :disabled="saving" required rows="6" placeholder="输入应采用的准确、完整回答" /></label>
-            <label class="faq-field"><span>状态</span><AppSelect v-model="faqForm.status" :disabled="saving"><option value="ACTIVE">已启用</option><option value="DRAFT">草稿</option></AppSelect></label>
-            <p v-if="formError" class="faq-form-notice" role="alert">{{ formError }}</p>
-            <footer class="faq-form-footer"><button type="button" class="ghost-button" :disabled="saving" @click="closeEditor('pair')">取消</button><button type="submit" class="create-button" :disabled="saving">{{ saving ? '保存中…' : '保存问答对' }}</button></footer>
-          </form>
-        </section>
-      </div>
-    </Transition>
-    <Transition name="dialog-fade">
-      <div v-if="archiveOpen" class="modal-overlay" @click.self="archiveOpen = false">
-        <section class="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-title">
-          <header class="modal-header"><div><h2 id="archive-title">归档管理</h2><p class="archive-subtitle">归档知识集保留在这里，不再用于新的直播。</p></div><button type="button" class="close-button" aria-label="关闭" @click="archiveOpen = false">×</button></header>
-          <div class="archive-body"><div v-if="archivedKnowledge.length" class="archive-list"><article v-for="item in archivedKnowledge" :key="item.id" class="archive-row"><div class="archive-icon"><Archive :size="17" /></div><div class="archive-copy"><h3>{{ item.name }}</h3><div><span>{{ item.kind === 'FAQ' ? '常见问答' : '文档资料' }}</span><i /><span>归档于 {{ formatDate(item.updatedAt) }}</span></div><p>{{ item.description || '暂无说明' }}</p></div><span class="status-badge status-draft">已归档</span></article></div><div v-else class="archive-empty"><Archive :size="25" /><strong>暂无归档知识集</strong><span>在知识列表中归档的内容会显示在这里。</span></div></div>
-          <footer class="archive-footer"><span>归档内容不会被检索</span><button type="button" class="ghost-button" @click="archiveOpen = false">完成</button></footer>
-        </section>
-      </div>
-    </Transition>
-    <footer v-if="!faqDetailOpen && !loading && !loadError && selectedStoreId" class="knowledge-footer"><span><span class="footer-pulse" />当前门店：{{ selectedStore }}</span><span>已连接知识库</span></footer>
-  </div>
+        <template v-if="brand">
+          <div class="kb-sets-head kb-sets-group">
+            <h2>品牌问答 <small>{{ brand.name }} · 各门店共用</small></h2>
+            <button v-if="auth.isOwner" type="button" class="kb-icon-button" title="新建品牌问答集" aria-label="新建品牌问答集" :disabled="saving" @click="openSetForm(null, { owner: 'brand' })"><Plus :size="17" /></button>
+          </div>
+          <ul>
+            <li v-for="set in brandSets" :key="set.id">
+              <button type="button" class="kb-set" :class="{ selected: set.id === selectedSetId }" :aria-current="set.id === selectedSetId" @click="selectSet(set)">
+                <strong>{{ set.name }}</strong>
+                <span>{{ entriesOf(set.id).length }} 条 · {{ countOn(set.id) }} 条启用</span>
+              </button>
+            </li>
+          </ul>
+          <p v-if="!brandSets.length" class="kb-sets-empty">{{ auth.isOwner ? '品牌通用的问题写在这里，各门店都能用。' : '品牌还没有问答，由管理员维护。' }}</p>
+        </template>
+
+        <div class="kb-sets-head kb-sets-group">
+          <h2>文档 <small>上传后由 AI 整理，你来确认</small></h2>
+          <button type="button" class="kb-icon-button" title="上传文档" aria-label="上传文档" :disabled="saving" @click="openUpload"><Upload :size="16" /></button>
+        </div>
+        <ul v-if="documents.length">
+          <li v-for="doc in documents" :key="doc.id">
+            <button type="button" class="kb-set" :class="{ selected: doc.id === selectedDocId }" :aria-current="doc.id === selectedDocId" @click="selectDocument(doc)">
+              <strong><FileText :size="13" aria-hidden="true" /> {{ doc.name }}</strong>
+              <span :class="{ 'kb-attention': doc.pendingCount && doc.status === 'READY' }">{{ doc.brandId ? '品牌' : '本店' }} · {{ docStatus(doc) }}</span>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="kb-sets-empty">品牌手册、菜单、店铺介绍都可以，AI 会整理出资料和问答，你逐条确认。</p>
+        <template v-if="archivedSets.length">
+          <button type="button" class="kb-archived-toggle" :aria-expanded="showArchived" @click="showArchived = !showArchived">
+            <Archive :size="14" />已归档 {{ archivedSets.length }}<ChevronDown :size="14" :class="{ open: showArchived }" />
+          </button>
+          <ul v-if="showArchived">
+            <li v-for="set in archivedSets" :key="set.id">
+              <button type="button" class="kb-set archived" :class="{ selected: set.id === selectedSetId }" :aria-current="set.id === selectedSetId" @click="selectSet(set)">
+                <strong>{{ set.name }}</strong><span>已归档，不会用于直播</span>
+              </button>
+            </li>
+          </ul>
+        </template>
+      </aside>
+
+      <KnowledgeDocumentPanel
+        v-if="selectedDoc"
+        :key="selectedDoc.id"
+        :document-id="selectedDoc.id"
+        :owner-label="ownerLabel(selectedDoc)"
+        :sets="docSets"
+        :can-edit="canEditOwner(selectedDoc)"
+        @changed="refreshDocuments"
+        @entries-added="reloadEntries"
+        @deleted="documentDeleted"
+        @create-set="openSetForm(null, { owner: selectedDoc.brandId ? 'brand' : 'store', fromDocument: true })"
+      />
+
+      <main v-else-if="selectedSet" class="kb-main">
+        <div class="kb-set-head">
+          <div>
+            <p class="kb-owner">{{ selectedSet.brandId ? `${ownerLabel(selectedSet)} · 各门店共用` : ownerLabel(selectedSet) }}</p>
+            <h2>{{ selectedSet.name }}</h2>
+            <p v-if="selectedSet.description">{{ selectedSet.description }}</p>
+          </div>
+          <div v-if="!readOnly" class="kb-set-actions">
+            <button type="button" class="kb-button" :disabled="saving" @click="openSetForm(selectedSet)"><Pencil :size="14" />编辑</button>
+            <button type="button" class="kb-button" :disabled="saving" @click="askArchive(selectedSet)"><Archive :size="14" />归档</button>
+          </div>
+        </div>
+
+        <div v-if="isArchived" class="kb-archived-banner">
+          <span>这个问答集已归档，里面的问答不会用于直播，也不能修改。</span>
+          <button v-if="canEditOwner(selectedSet)" type="button" class="kb-button kb-primary" :disabled="saving" @click="restoreSet(selectedSet)"><ArchiveRestore :size="15" />恢复</button>
+        </div>
+        <div v-else-if="readOnly" class="kb-archived-banner"><span>品牌问答由管理员维护，这里可以查看。</span></div>
+
+        <div class="kb-toolbar">
+          <div class="kb-filters" role="group" aria-label="按状态筛选">
+            <button v-for="filter in filters" :key="filter.value" type="button" :class="{ active: entryFilter === filter.value }" :aria-pressed="entryFilter === filter.value" @click="entryFilter = filter.value">{{ filter.label }} {{ filter.count }}</button>
+          </div>
+          <label class="kb-search"><Search :size="15" aria-hidden="true" /><input v-model="search" type="search" placeholder="搜索问题或回答" aria-label="搜索问题或回答" /></label>
+          <button v-if="!readOnly" type="button" class="kb-button kb-primary" :disabled="saving || editingEntryId === 'new'" @click="startEntry()"><Plus :size="16" />添加问答</button>
+        </div>
+
+        <p v-if="pendingCount && !readOnly" class="kb-pending">有 {{ pendingCount }} 条问答是直播中顺手存进来的，默认停用。看一下回答没问题，打开开关就会生效。</p>
+
+        <form v-if="editingEntryId === 'new'" class="kb-entry kb-entry-form" @submit.prevent="saveEntry">
+          <label><span>观众会怎么问</span><textarea v-model="entryForm.question" rows="2" maxlength="500" required placeholder="例如：附近好停车吗？" :disabled="saving" /></label>
+          <label><span>标准回答</span><textarea v-model="entryForm.answer" rows="3" required placeholder="例如：店门口有 20 个免费车位，周末建议早点来。" :disabled="saving" /></label>
+          <div class="kb-form-actions">
+            <button type="button" class="kb-button" :disabled="saving" @click="cancelEntry">取消</button>
+            <button type="submit" class="kb-button kb-primary" :disabled="saving">{{ saving ? '保存中…' : '保存' }}</button>
+          </div>
+        </form>
+
+        <ul class="kb-entries">
+          <li v-for="entry in visibleEntries" :key="entry.id">
+            <form v-if="editingEntryId === entry.id" class="kb-entry kb-entry-form" @submit.prevent="saveEntry">
+              <label><span>观众会怎么问</span><textarea v-model="entryForm.question" rows="2" maxlength="500" required :disabled="saving" /></label>
+              <label><span>标准回答</span><textarea v-model="entryForm.answer" rows="3" required :disabled="saving" /></label>
+              <div class="kb-form-actions">
+                <button type="button" class="kb-button" :disabled="saving" @click="cancelEntry">取消</button>
+                <button type="submit" class="kb-button kb-primary" :disabled="saving">{{ saving ? '保存中…' : '保存' }}</button>
+              </div>
+            </form>
+            <article v-else class="kb-entry" :class="{ off: entry.status !== 'ACTIVE' }">
+              <div class="kb-entry-text">
+                <h3>{{ entry.question }}</h3>
+                <p>{{ entry.answer }}</p>
+                <span v-if="entry.source === 'LIVE'" class="kb-tag">直播中保存</span>
+                <span v-else-if="entry.source === 'DOCUMENT'" class="kb-tag kb-tag-doc">从文档整理</span>
+              </div>
+              <div class="kb-entry-side">
+                <button type="button" role="switch" class="kb-switch" :aria-checked="entry.status === 'ACTIVE'" :aria-label="`${entry.question}：${entry.status === 'ACTIVE' ? '启用中' : '已停用'}`" :disabled="saving || readOnly" @click="toggleEntry(entry)">
+                  <span class="kb-switch-track"><span class="kb-switch-knob" /></span>{{ entry.status === 'ACTIVE' ? '启用' : '停用' }}
+                </button>
+                <div v-if="!readOnly" class="kb-entry-actions">
+                  <button type="button" class="kb-icon-button" title="修改" :aria-label="`修改：${entry.question}`" :disabled="saving" @click="startEntry(entry)"><Pencil :size="15" /></button>
+                  <button type="button" class="kb-icon-button danger" title="删除" :aria-label="`删除：${entry.question}`" :disabled="saving" @click="askDelete(entry)"><Trash2 :size="15" /></button>
+                </div>
+              </div>
+            </article>
+          </li>
+        </ul>
+
+        <div v-if="!entries.length && editingEntryId !== 'new'" class="kb-empty">
+          <p>{{ readOnly ? '这个问答集是空的。' : '还没有问答。写下观众常问的问题和你的标准回答。' }}</p>
+          <button v-if="!readOnly" type="button" class="kb-button kb-primary" :disabled="saving" @click="startEntry()"><Plus :size="16" />添加第一条问答</button>
+        </div>
+        <p v-else-if="entries.length && !visibleEntries.length" class="kb-empty-line">没有符合条件的问答。</p>
+      </main>
+      <main v-else class="kb-main kb-empty"><p>在左侧选一个问答集或文档，或者新建一个问答集。</p></main>
+    </div>
+
+    <div v-if="setForm" class="kb-overlay" @click.self="setForm = saving ? setForm : null">
+      <form class="kb-dialog" role="dialog" aria-modal="true" aria-labelledby="kb-set-title" @submit.prevent="saveSet">
+        <header><h2 id="kb-set-title">{{ setForm.id ? '修改问答集' : '新建问答集' }}</h2><button type="button" class="kb-icon-button" aria-label="关闭" :disabled="saving" @click="setForm = null"><X :size="17" /></button></header>
+        <fieldset v-if="!setForm.id && brand && auth.isOwner && !setForm.fromDocument" class="kb-owner-choice">
+          <legend>放在哪里</legend>
+          <label><input v-model="setForm.owner" type="radio" value="store" :disabled="saving" /><span><strong>本店</strong>只用于「{{ selectedStore }}」</span></label>
+          <label><input v-model="setForm.owner" type="radio" value="brand" :disabled="saving" /><span><strong>品牌</strong>「{{ brand.name }}」下所有门店共用</span></label>
+        </fieldset>
+        <label><span>名称</span><input v-model="setForm.name" maxlength="120" required placeholder="例如：营业与停车" :disabled="saving" autofocus /></label>
+        <label><span>说明 <em>选填</em></span><textarea v-model="setForm.description" maxlength="500" rows="3" placeholder="这组问答主要回答哪类问题" :disabled="saving" /></label>
+        <p v-if="error" class="kb-notice kb-error" role="alert">{{ error }}</p>
+        <footer><button type="button" class="kb-button" :disabled="saving" @click="setForm = null">取消</button><button type="submit" class="kb-button kb-primary" :disabled="saving">{{ saving ? '保存中…' : setForm.id ? '保存' : '建好了，去写问答' }}</button></footer>
+      </form>
+    </div>
+
+    <div v-if="uploadForm" class="kb-overlay" @click.self="uploadForm = saving ? uploadForm : null">
+      <form class="kb-dialog" role="dialog" aria-modal="true" aria-labelledby="kb-upload-title" @submit.prevent="submitUpload">
+        <header><h2 id="kb-upload-title">上传文档</h2><button type="button" class="kb-icon-button" aria-label="关闭" :disabled="saving" @click="uploadForm = null"><X :size="17" /></button></header>
+        <p>AI 会读一遍文档，整理出{{ brand ? '品牌或门店资料' : '门店资料' }}的建议和常见问答。每一条都要你确认后才会生效，不会直接改动任何东西。</p>
+        <fieldset v-if="brand && auth.isOwner" class="kb-owner-choice">
+          <legend>这是谁的资料</legend>
+          <label><input v-model="uploadForm.owner" type="radio" value="store" :disabled="saving" /><span><strong>本店</strong>整理成「{{ selectedStore }}」的地址、营业时间、交通和本店问答</span></label>
+          <label><input v-model="uploadForm.owner" type="radio" value="brand" :disabled="saving" /><span><strong>品牌</strong>整理成「{{ brand.name }}」的品牌故事、定位、文化和品牌问答</span></label>
+        </fieldset>
+        <label class="kb-file"><span>文件 <em>PDF、Word（.docx）、TXT、Markdown，10MB 以内</em></span><input type="file" :accept="DOCUMENT_TYPES" :disabled="saving" @change="pickFile" /></label>
+        <p v-if="error" class="kb-notice kb-error" role="alert">{{ error }}</p>
+        <footer><button type="button" class="kb-button" :disabled="saving" @click="uploadForm = null">取消</button><button type="submit" class="kb-button kb-primary" :disabled="saving || !uploadForm.file">{{ saving ? '上传中…' : '上传并整理' }}</button></footer>
+      </form>
+    </div>
+
+    <div v-if="confirming" class="kb-overlay" @click.self="confirming = saving ? confirming : null">
+      <section class="kb-dialog" role="alertdialog" aria-modal="true" aria-labelledby="kb-confirm-title" aria-describedby="kb-confirm-message">
+        <header><h2 id="kb-confirm-title">{{ confirming.title }}</h2></header>
+        <p id="kb-confirm-message">{{ confirming.message }}</p>
+        <p v-if="error" class="kb-notice kb-error" role="alert">{{ error }}</p>
+        <footer><button type="button" class="kb-button" :disabled="saving" @click="confirming = null">取消</button><button type="button" class="kb-button" :class="confirming.danger ? 'kb-danger' : 'kb-primary'" :disabled="saving" @click="confirmAction">{{ saving ? '处理中…' : confirming.confirmText }}</button></footer>
+      </section>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.knowledge-page{--page-ink:var(--color-primary);--page-muted:var(--color-text-muted);--page-line:var(--color-border-subtle);--page-soft:var(--color-bg-canvas);--page-accent:var(--color-accent-text);--page-accent-soft:var(--color-bg-subtle);max-width:1420px;margin:0 auto;padding:14px clamp(22px,3.2vw,52px) 28px;color:var(--page-ink);font-family:var(--font-sans)}
-.knowledge-header{display:flex;align-items:flex-start;justify-content:space-between;gap:32px;margin-bottom:25px}.header-copy h1{margin:10px 0 7px;font:700 clamp(28px,3vw,38px)/1.15 var(--font-serif);letter-spacing:.01em}.header-copy p{margin:0;color:var(--page-muted);font-size:13px}.eyebrow-row{display:flex;align-items:center;gap:8px}.eyebrow{color:var(--color-text-muted);font:600 12px var(--font-mono);letter-spacing:.14em}.eyebrow-dot{width:7px;height:7px;border-radius:50%;background:var(--page-accent);box-shadow:var(--shadow-paper)}
-.header-tools{display:flex;align-items:center;gap:9px;margin-top:4px}.knowledge-search{display:flex;align-items:center;gap:9px;width:min(290px,28vw);height:38px;padding:0 11px;border:1px solid var(--page-line);border-radius:8px;background:var(--color-bg-surface);color:var(--color-text-muted);transition:border-color .18s ease,box-shadow .18s ease}.knowledge-search:focus-within{border-color:var(--color-accent);box-shadow:var(--shadow-paper)}.knowledge-search input{width:100%;min-width:0;border:0;outline:0;color:var(--page-ink);background:transparent;font-size:12px}.knowledge-search input::placeholder{color:var(--color-text-muted)}.knowledge-search kbd{padding:3px 5px;border:1px solid var(--page-line);border-radius:5px;color:var(--color-text-muted);background:var(--color-bg-surface);font:12px var(--font-mono);white-space:nowrap}.ghost-button,.view-button{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid var(--page-line);border-radius:4px;color:var(--color-text-muted);background:var(--color-bg-surface);font-size:12px;transition:all .18s ease}.ghost-button:hover,.ghost-button.selected,.view-button:hover{border-color:var(--color-accent);color:var(--page-accent);background:color-mix(in srgb, var(--color-accent-text) 7%, var(--color-bg-surface))}.filter-count{display:grid;place-items:center;width:16px;height:16px;border-radius:50%;color:var(--color-text-muted);background:var(--page-accent);font-size:12px}.create-button{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 13px;border:1px solid var(--color-accent);border-radius:4px;color:var(--color-on-accent);background:var(--page-accent);font-size:12px;font-weight:600;box-shadow:none;transition:all .18s ease}.create-button:hover{background:var(--color-accent-hover);transform:translateY(-1px);box-shadow:none}.create-button .rotate{transform:rotate(180deg)}
-.filter-wrap,.create-wrap{position:relative}.popover{position:absolute;z-index:10;top:calc(100% + 8px);right:0;border:1px solid var(--page-line);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper);animation:popover-in .16s ease-out}.filter-popover{width:150px;padding:7px}.filter-popover p{margin:5px 8px 6px;color:var(--color-text-muted);font:600 12px var(--font-mono);letter-spacing:.08em}.filter-popover button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px;border:0;border-radius:7px;color:var(--color-text-muted);background:transparent;font-size:12px;text-align:left}.filter-popover button:hover,.filter-popover button.checked{color:var(--page-accent);background:color-mix(in srgb, var(--color-accent-text) 7%, var(--color-bg-surface))}.create-popover{width:250px;padding:6px}.create-popover button{display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px;border:0;border-radius:4px;color:var(--page-accent);background:transparent;text-align:left}.create-popover button:hover{background:var(--color-bg-subtle)}.create-popover button svg{margin-top:2px}.create-popover span{display:grid;gap:3px}.create-popover strong{color:var(--page-ink);font-size:12px;font-weight:600}.create-popover small{color:var(--color-text-muted);font-size:12px}@keyframes popover-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-.knowledge-tabs{display:flex;gap:25px;border-bottom:1px solid var(--page-line);margin-bottom:18px}.knowledge-tab{position:relative;display:inline-flex;align-items:center;gap:7px;height:43px;padding:0 2px;border:0;color:var(--color-text-muted);background:transparent;font-size:12px;cursor:pointer}.knowledge-tab:hover{color:var(--color-primary)}.knowledge-tab.active{color:var(--page-ink);font-weight:700}.tab-suffix{color:var(--color-text-muted);font:12px var(--font-mono)}.tab-count{min-width:18px;padding:2px 5px;border-radius:4px;color:var(--color-text-muted);background:var(--color-bg-surface);font:500 12px var(--font-mono);text-align:center}.knowledge-tab.active .tab-count{color:var(--page-accent);background:var(--page-accent-soft)}.tab-indicator{position:absolute;right:0;bottom:-1px;left:0;height:2px;border-radius:3px 3px 0 0;background:var(--page-accent);animation:tab-in .22s ease-out}@keyframes tab-in{from{transform:scaleX(.25);opacity:.3}to{transform:scaleX(1);opacity:1}}
-.list-toolbar{display:flex;align-items:center;justify-content:space-between;margin:0 3px 10px;color:var(--color-text-muted);font-size:12px}.list-toolbar strong{color:var(--color-text-muted);font-weight:600}.list-toolbar>div span{padding:0 5px;color:var(--color-text-muted)}.view-button{height:30px;padding:0 9px;border-color:transparent;color:var(--color-text-muted);background:transparent;font-size:12px}.knowledge-list{overflow:hidden;border:1px solid var(--page-line);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.knowledge-row{position:relative;display:grid;grid-template-columns:minmax(255px,1.35fr) minmax(180px,1fr) 145px minmax(145px,.8fr) 95px 118px 32px;align-items:center;gap:18px;min-height:84px;padding:14px 17px;border-top:1px solid var(--page-line);transition:background .18s ease}.knowledge-row:first-child{border-top:0}.knowledge-row:hover{background:var(--color-bg-subtle)}.row-main{display:flex;align-items:center;gap:12px;min-width:0}.type-icon{display:grid;place-items:center;width:40px;height:40px;flex:0 0 auto;border-radius:8px}.tone-blue{color:#4d74d8;background:#edf3ff}.tone-cinnabar{color:#bf7663;background:#f9f6f5}.tone-orange{color:#d78338;background:#fff3e7}.row-title{min-width:0}.row-title h2{overflow:hidden;margin:0 0 4px;color:var(--color-primary);font-size:13px;font-weight:650;text-overflow:ellipsis;white-space:nowrap}.row-title p{margin:0;overflow:hidden;color:var(--color-text-muted);font:12px var(--font-mono);text-overflow:ellipsis;white-space:nowrap}.row-description{overflow:hidden;color:var(--color-text-muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap}.row-metric{display:grid;gap:4px}.row-metric strong{color:var(--color-primary);font-size:12px;font-weight:600}.row-metric span{color:var(--color-text-muted);font-size:12px}.row-apps{display:flex;flex-wrap:wrap;gap:4px}.app-tag{padding:4px 7px;border:1px solid var(--color-border-subtle);border-radius:5px;color:var(--color-text-muted);background:var(--color-bg-surface);font-size:12px;white-space:nowrap}.status-badge{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:max-content;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}.status-dot{width:6px;height:6px;border-radius:50%;background:currentColor}.status-active{color:var(--color-success);background:color-mix(in srgb, var(--color-success) 7%, var(--color-bg-surface))}.status-syncing{color:var(--color-success);background:color-mix(in srgb, var(--color-success) 7%, var(--color-bg-surface))}.status-draft{color:var(--color-text-muted);background:var(--color-bg-surface)}.row-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;opacity:0;transform:translateX(5px);transition:opacity .18s ease,transform .18s ease}.knowledge-row:hover .row-actions{opacity:1;transform:none}.row-actions button,.row-more{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:29px;height:29px;padding:0;border:1px solid transparent;border-radius:7px;color:var(--color-text-muted);background:transparent;font-size:12px}.row-actions button:first-child{width:auto;padding:0 7px}.row-actions button:hover,.row-more:hover{border-color:var(--color-border-subtle);color:var(--page-accent);background:var(--color-bg-subtle)}.row-actions .danger:hover{border-color:var(--color-error);color:var(--color-error);background:color-mix(in srgb, var(--color-error) 7%, var(--color-bg-surface))}.row-more{display:none}.knowledge-list-enter-active{animation:row-in .4s cubic-bezier(.22,1,.36,1) both;animation-delay:var(--stagger)}.knowledge-list-leave-active{transition:opacity .16s ease,transform .16s ease}.knowledge-list-enter-from,.knowledge-list-leave-to{opacity:0;transform:translateY(7px)}@keyframes row-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.empty-state{display:grid;place-items:center;gap:8px;min-height:240px;border:1px dashed var(--page-line);border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface)}.empty-state strong{color:var(--color-text-muted);font-size:13px}.empty-state span{font-size:12px}.knowledge-footer{display:flex;align-items:center;justify-content:space-between;margin-top:16px;color:var(--color-text-muted);font-size:12px}.knowledge-footer>span:first-child{display:inline-flex;align-items:center;gap:7px}.footer-pulse{width:6px;height:6px;border-radius:50%;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.mono{font:12px var(--font-mono);letter-spacing:.04em}
-@media(max-width:1180px){.knowledge-row{grid-template-columns:minmax(230px,1.3fr) minmax(150px,1fr) 125px minmax(120px,.8fr) 90px 32px}.row-actions{display:none}.row-more{display:inline-flex}.knowledge-search{width:230px}.header-tools{gap:7px}}
-@media(max-width:860px){.knowledge-page{padding:17px 17px 26px}.knowledge-header{display:grid;gap:18px}.header-tools{flex-wrap:wrap}.knowledge-search{width:100%;order:3}.knowledge-tabs{gap:17px;overflow-x:auto}.knowledge-tab{white-space:nowrap}.knowledge-list{overflow:visible;border:0;background:transparent;box-shadow:var(--shadow-paper)}.knowledge-row{grid-template-columns:1fr auto;gap:12px;padding:15px 0;border:1px solid var(--page-line)!important;border-radius:8px;background:var(--color-bg-surface);margin-bottom:8px;box-shadow:var(--shadow-paper)}.row-description{grid-column:1/-1;order:3;padding-left:52px}.row-metric{grid-column:1;order:4;padding-left:52px}.row-apps{grid-column:1/-1;order:5;padding-left:52px}.status-badge{grid-column:2;grid-row:1;order:2}.row-more{grid-column:2;grid-row:4;order:6}.knowledge-footer{display:grid;gap:8px}.knowledge-footer .mono{font-size:12px}}
-@media(max-width:520px){.header-tools{display:grid;grid-template-columns:1fr auto;align-items:center}.knowledge-search{grid-column:1/-1}.create-button{padding-inline:11px}.ghost-button{padding-inline:10px}.knowledge-tabs{margin-right:-17px;padding-right:17px}.tab-suffix{display:none}.row-title h2{font-size:12px}.row-description{font-size:12px}.row-actions{display:none}}
+.kb-page{max-width:1240px;margin:0 auto;padding:14px clamp(16px,3vw,44px) 32px;color:var(--color-primary);font-family:var(--font-sans)}
+.kb-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:20px}
+.kb-header h1{margin:8px 0 8px;font:700 clamp(26px,3vw,34px)/1.15 var(--font-serif)}
+.kb-header p{max-width:720px;margin:0;color:var(--color-text-muted);font-size:13px;line-height:1.7}
+.kb-header a{color:var(--color-accent-text);text-decoration:underline;text-underline-offset:3px}
+.kb-store{flex:none;margin-top:12px;padding:5px 10px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-text-muted);background:var(--color-bg-surface);font-size:12px}
 
-.faq-feature-card{display:flex;align-items:center;gap:18px;margin:0 0 18px;padding:18px 20px;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.faq-feature-mark{display:grid;place-items:center;width:46px;height:46px;flex:0 0 auto;border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface)}.faq-feature-copy{min-width:0;flex:1}.faq-feature-copy .eyebrow{margin:0 0 4px;color:var(--color-text-muted)}.faq-feature-copy h2{margin:0 0 5px;color:var(--color-primary);font-size:16px;letter-spacing:.01em}.faq-feature-copy>p:not(.eyebrow){margin:0;color:var(--color-text-muted);font-size:12px;line-height:1.6}.faq-feature-meta{display:flex;align-items:center;gap:9px;margin-top:10px;color:var(--color-text-muted);font-size:12px}.faq-feature-meta i{width:3px;height:3px;border-radius:50%;background:var(--color-bg-surface)}.faq-feature-action{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;border:1px solid var(--color-accent);border-radius:8px;color:var(--color-on-accent);background:var(--color-accent);font-size:12px;font-weight:600;white-space:nowrap;transition:.18s}.faq-feature-action:hover{border-color:var(--color-accent);background:var(--color-accent-hover);transform:translateY(-1px)}
-.faq-detail-page{padding-bottom:18px}.modal-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(24,42,42,.42);backdrop-filter:blur(5px)}.faq-detail-header{display:grid;grid-template-columns:1fr auto;gap:18px;margin-bottom:20px}.back-button{grid-column:1/-1;display:inline-flex;align-items:center;gap:6px;width:max-content;padding:0;border:0;color:var(--color-text-muted);background:transparent;font-size:12px}.back-button:hover{color:var(--page-accent)}.faq-detail-heading{display:flex;align-items:center;gap:13px}.faq-detail-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface)}.faq-detail-heading .eyebrow{margin:0 0 4px}.faq-detail-heading h1{margin:0 0 4px;color:var(--color-primary);font-size:22px;letter-spacing:.01em}.faq-detail-heading p:not(.eyebrow){margin:0;color:var(--color-text-muted);font-size:12px}.faq-detail-actions{display:flex;align-items:center;gap:8px}.faq-detail-actions .ghost-button,.faq-detail-actions .create-button{height:34px}.faq-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}.faq-stat-grid>div{display:grid;gap:4px;padding:13px 15px;border:1px solid var(--page-line);border-radius:8px;background:var(--color-bg-surface)}.faq-stat-grid span{color:var(--color-text-muted);font-size:12px}.faq-stat-grid strong{color:var(--color-primary);font:700 21px var(--font-sans);letter-spacing:.01em}.faq-stat-grid small{color:var(--color-text-muted);font-size:12px}.faq-notice,.faq-form-notice{padding:10px 12px;border-radius:8px;color:var(--color-error);background:color-mix(in srgb, var(--color-error) 7%, var(--color-bg-surface));font-size:12px}.faq-notice{margin-bottom:12px}.faq-list-head{display:flex;align-items:flex-end;justify-content:space-between;margin:0 2px 10px}.faq-list-head .eyebrow{margin-bottom:4px}.faq-list-head h2{margin:0;color:var(--color-primary);font-size:15px}.faq-list-head>span{color:var(--color-text-muted);font-size:12px}.faq-pair-list{padding:17px;border:1px solid var(--page-line);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.faq-pair-card{display:grid;grid-template-columns:34px 1fr auto;gap:13px;padding:16px 0;border-top:1px solid var(--page-line);animation:row-in .4s cubic-bezier(.22,1,.36,1) both;animation-delay:var(--stagger)}.faq-pair-card:first-of-type{border-top:0}.faq-pair-index{color:var(--color-text-muted);font:600 12px var(--font-mono);padding-top:3px}.faq-pair-content{min-width:0}.faq-question,.faq-answer{display:flex;align-items:flex-start;gap:9px}.faq-question>span,.faq-answer>span{display:grid;place-items:center;width:20px;height:20px;flex:0 0 auto;border-radius:5px;font-size:12px;font-weight:700}.faq-question>span{color:var(--color-text-muted);background:var(--color-bg-surface)}.faq-answer>span{color:var(--color-text-muted);background:var(--color-bg-surface)}.faq-question h3{margin:0;color:var(--color-accent-text);font-size:13px;font-weight:650;line-height:1.5}.faq-answer{margin-top:8px}.faq-answer p{margin:0;color:var(--color-text-muted);font-size:12px;line-height:1.65}.faq-pair-meta{display:flex;align-items:center;gap:10px;margin-top:10px;padding-left:29px}.hit-count{color:var(--color-text-muted);font-size:12px}.faq-status{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:4px;font-size:12px;font-weight:600}.faq-status i{width:5px;height:5px;border-radius:50%;background:currentColor}.faq-status.active{color:var(--color-success);background:color-mix(in srgb, var(--color-success) 7%, var(--color-bg-surface))}.faq-status.draft{color:var(--color-text-muted);background:var(--color-bg-surface)}.faq-pair-actions{display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .18s}.faq-pair-card:hover .faq-pair-actions{opacity:1}.faq-pair-actions button{display:grid;place-items:center;width:29px;height:29px;border:1px solid transparent;border-radius:7px;color:var(--color-text-muted);background:transparent}.faq-pair-actions button:hover{border-color:var(--color-border-subtle);color:var(--page-accent);background:var(--color-bg-subtle)}.faq-pair-actions .danger:hover{border-color:var(--color-error);color:var(--color-error);background:color-mix(in srgb, var(--color-error) 7%, var(--color-bg-surface))}.faq-empty{display:grid;place-items:center;gap:8px;min-height:220px;color:var(--color-text-muted);text-align:center}.faq-empty strong{color:var(--color-text-muted);font-size:13px}.faq-empty span{font-size:12px}.faq-empty .create-button{margin-top:6px}.dialog-fade-enter-active,.dialog-fade-leave-active{transition:opacity .18s ease}.dialog-fade-enter-active .faq-pair-modal,.dialog-fade-leave-active .faq-pair-modal{transition:transform .32s cubic-bezier(.22,1,.36,1),opacity .22s ease}.dialog-fade-enter-from .faq-pair-modal{opacity:0;transform:translateY(42px)}.dialog-fade-leave-to .faq-pair-modal{opacity:0;transform:translateY(24px)}.faq-pair-modal{width:min(560px,100%);border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.faq-pair-modal .modal-header{display:flex;align-items:center;justify-content:space-between;padding:19px 22px 16px;border-bottom:1px solid var(--color-border-subtle);background:var(--color-bg-surface)}.faq-pair-modal .modal-header h2{margin:5px 0 0;font-size:19px}.close-button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:4px;color:var(--color-text-muted);background:transparent;font-size:24px;line-height:1;cursor:pointer}.close-button:hover{background:var(--color-bg-subtle);color:var(--color-primary)}.faq-pair-form{display:grid;gap:15px;padding:20px 22px 22px}.faq-field{display:grid;gap:7px}.faq-field>span{color:var(--color-text-muted);font-size:12px;font-weight:600}.faq-field input,.faq-field textarea,.faq-field :deep(.app-select-button){width:100%;box-sizing:border-box;padding:10px 11px;border:1px solid var(--color-border-subtle);border-radius:4px;outline:0;color:var(--color-primary);background:var(--color-bg-surface);font:12px/1.6 var(--font-sans);transition:border-color .18s,box-shadow .18s}.faq-field textarea{resize:vertical;min-height:110px}.faq-field input:focus,.faq-field textarea:focus,.faq-field :deep(.app-select-button):focus{border-color:var(--color-accent);box-shadow:var(--shadow-paper)}.faq-form-footer{display:flex;justify-content:flex-end;gap:8px;padding-top:2px}.faq-form-footer .ghost-button,.faq-form-footer .create-button{height:34px}
-@media(max-width:760px){.faq-feature-card{align-items:flex-start;flex-wrap:wrap}.faq-feature-action{margin-left:64px}.faq-detail-header{grid-template-columns:1fr}.faq-detail-actions{justify-content:flex-start}.faq-stat-grid{grid-template-columns:repeat(2,1fr)}.faq-pair-card{grid-template-columns:26px 1fr}.faq-pair-actions{grid-column:2;justify-content:flex-end;opacity:1}.faq-pair-meta{padding-left:0}}
-@media(max-width:520px){.faq-feature-card{padding:15px}.faq-feature-copy>p:not(.eyebrow){font-size:12px}.faq-feature-meta{flex-wrap:wrap}.faq-feature-action{margin-left:0}.faq-detail-heading h1{font-size:19px}.faq-stat-grid strong{font-size:18px}.faq-pair-list{padding:13px}.faq-pair-card{gap:8px}}
-.knowledge-row.clickable{cursor:pointer}.knowledge-row.clickable:hover{background:var(--color-bg-subtle)}.archive-modal{width:min(700px,100%);overflow:hidden;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper)}.archive-modal .modal-header{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 22px 17px;border-bottom:1px solid var(--color-border-subtle);background:var(--color-bg-surface)}.archive-modal .modal-header h2{margin:5px 0 5px;font-size:20px}.archive-subtitle{margin:0;color:var(--color-text-muted);font-size:12px}.archive-body{max-height:52vh;overflow:auto;padding:5px 22px}.archive-row{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid var(--page-line)}.archive-row:last-child{border-bottom:0}.archive-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface)}.archive-copy{min-width:0}.archive-copy h3{margin:0 0 5px;color:var(--color-primary);font-size:13px;font-weight:700}.archive-copy>div{display:flex;align-items:center;gap:7px;color:var(--color-text-muted);font-size:12px}.archive-copy>div i{width:3px;height:3px;border-radius:50%;background:var(--color-bg-surface)}.archive-copy p{margin:6px 0 0;color:var(--color-text-muted);font-size:12px}.archive-actions{display:flex;align-items:center;gap:5px}.restore-button{height:29px;padding:0 10px;border:1px solid var(--color-accent);border-radius:7px;color:var(--color-on-accent);background:var(--color-accent);font-size:12px;font-weight:600}.restore-button:hover{background:var(--color-accent-hover)}.archive-delete{display:grid;place-items:center;width:29px;height:29px;border:1px solid transparent;border-radius:7px;color:var(--color-error);background:transparent}.archive-delete:hover{border-color:var(--color-error);color:var(--color-error);background:color-mix(in srgb, var(--color-error) 7%, var(--color-bg-surface))}.archive-empty{display:grid;place-items:center;gap:8px;min-height:210px;color:var(--color-text-muted);text-align:center}.archive-empty strong{color:var(--color-text-muted);font-size:13px}.archive-empty span{font-size:12px}.archive-footer{display:flex;align-items:center;justify-content:space-between;padding:13px 22px;border-top:1px solid var(--color-border-subtle);color:var(--color-text-muted);font-size:12px}.archive-footer .ghost-button{height:31px;padding:0 11px}
-.archive-count{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;color:var(--color-text-muted);background:var(--color-bg-surface);font-size:12px;font-weight:650}
+.kb-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:10px 13px;border-radius:6px;color:var(--color-primary);background:var(--color-bg-subtle);font-size:13px}
+.kb-error{color:var(--color-error);background:color-mix(in srgb,var(--color-error) 8%,var(--color-bg-surface))}
+.kb-empty-line{margin:24px 0;color:var(--color-text-muted);font-size:13px;text-align:center}
 
-/* Bundled brand typography for headings and knowledge records. */
-.knowledge-page{font-family:var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;letter-spacing:.005em}
-.knowledge-page h1,.knowledge-page h2,.knowledge-page h3,.knowledge-page strong,.knowledge-page button{font-family:var(--font-serif)}
-.knowledge-page h1,.knowledge-page h2,.knowledge-page h3{font-feature-settings:'kern' 1,'liga' 1}
-.header-copy h1{font-size:clamp(30px,3vw,40px);font-weight:780;line-height:1.18;letter-spacing:.01em;color:var(--color-primary)}
-.header-copy p{font-size:13px;font-weight:500;line-height:1.7;color:var(--color-text-muted)}
-.knowledge-search input,.ghost-button,.create-button,.view-button,.knowledge-tab,.row-description,.row-metric,.row-apps,.status-badge,.empty-state,.faq-feature-copy>p,.faq-feature-meta,.faq-detail-heading p,.faq-stat-grid span,.faq-stat-grid small,.faq-pair-card,.faq-field,.faq-form-footer{font-family:var(--font-sans)}
-.knowledge-search input{font-size:12px;font-weight:500;letter-spacing:.01em}.knowledge-search input::placeholder{color:var(--color-text-muted);opacity:1}
-.knowledge-tab{font-size:13px;font-weight:550;letter-spacing:.01em}.knowledge-tab.active{font-weight:720}.tab-suffix,.tab-count,.row-title p,.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
-.tab-suffix{font-size:12px}.tab-count{font-size:12px;font-weight:650}.list-toolbar{font-size:12px;font-weight:500}.list-toolbar strong{font-weight:750;color:var(--color-accent-text)}
-.row-title h2{font-size:14px;font-weight:720;letter-spacing:.01em;color:var(--color-accent-text)}.row-title p{font-size:12px;letter-spacing:.015em;color:var(--color-text-muted)}.row-description{font-size:12px;font-weight:500;line-height:1.5;color:var(--color-text-muted)}.row-metric strong{font-size:13px;font-weight:720;letter-spacing:.01em;color:var(--color-accent-text)}.row-metric span{font-size:12px;color:var(--color-text-muted)}.app-tag{font-size:12px;font-weight:550}.status-badge{font-size:12px;font-weight:700;letter-spacing:.01em}
-.faq-feature-copy h2{font-size:18px;font-weight:760;letter-spacing:.01em}.faq-feature-copy>p:not(.eyebrow){font-size:12px;line-height:1.7;color:var(--color-text-muted)}.faq-feature-meta{font-size:12px;font-weight:550;color:var(--color-text-muted)}.faq-feature-action{font-size:12px;font-weight:700}
-.faq-detail-heading h1{font-size:24px;font-weight:760}.faq-detail-heading p:not(.eyebrow){font-size:12px;line-height:1.6}.faq-list-head h2{font-size:17px;font-weight:720}.faq-list-head>span{font-size:12px}.faq-stat-grid span{font-size:12px;font-weight:550}.faq-stat-grid strong{font-size:23px;font-weight:780}.faq-stat-grid small{font-size:12px}.faq-question h3{font-size:14px;font-weight:700;line-height:1.55}.faq-answer p{font-size:12px;line-height:1.75}.hit-count,.faq-status{font-size:12px}.faq-field>span{font-size:13px;font-weight:650}.faq-field input,.faq-field textarea,.faq-field :deep(.app-select-button){font-family:var(--font-sans);font-size:13px;line-height:1.65}
-.knowledge-footer{font-size:12px}.knowledge-footer .mono{font-size:12px}
-:global(.sidebar),:global(.topbar),:global(.topbar button),:global(.page-scroll){font-family:var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-:global(.brand-name){font-family:var(--font-sans);font-weight:780;letter-spacing:.01em}
-:global(.nav-group-label),:global(.brand-caption),:global(.topbar .mono){font-family:var(--font-mono)}
-:global(.nav-item){font-size:13px;font-weight:550;letter-spacing:.005em}:global(.nav-item.active){font-weight:700}:global(.breadcrumb){font-size:12px;font-weight:550}
-.knowledge-page button:disabled{opacity:.5;cursor:not-allowed;transform:none}.knowledge-row{grid-template-columns:minmax(220px,1.4fr) minmax(130px,1fr) 125px 85px 80px 110px;gap:14px}.row-actions{opacity:1;transform:none}.row-title-button{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}.row-title-button:focus-visible{outline:2px solid var(--page-accent);outline-offset:3px}.faq-notice{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--color-primary);background:var(--color-bg-subtle)}.faq-notice.error-notice{color:var(--color-error);background:color-mix(in srgb,var(--color-error) 7%,var(--color-bg-surface))}.knowledge-scope-hint{margin:-4px 0 18px;color:var(--color-text-muted);font-size:12px;line-height:1.7}.faq-detail-actions{flex-wrap:wrap}.faq-pair-card:focus-within .faq-pair-actions{opacity:1}.faq-pair-modal{max-height:calc(100dvh - 40px);overflow-y:auto}.faq-answer p,.faq-question h3{white-space:pre-wrap;overflow-wrap:anywhere}.knowledge-list:empty{border:0;box-shadow:none}
-@media(max-width:1180px){.knowledge-row{grid-template-columns:minmax(210px,1.4fr) minmax(115px,1fr) 115px 75px 105px}.row-apps{display:none}.row-actions{display:flex}}
-@media(max-width:860px){.knowledge-row{grid-template-columns:minmax(0,1fr) auto;padding:15px;gap:12px}.row-actions{grid-column:2;grid-row:4;display:flex;order:6}.row-apps{display:flex}.row-description{padding-left:52px}.faq-detail-actions{gap:6px}.archive-row>.status-badge{grid-column:auto;grid-row:auto}.archive-copy>div{flex-wrap:wrap}.faq-pair-actions{opacity:1}}
+.kb-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 13px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-primary);background:var(--color-bg-surface);font-size:13px;white-space:nowrap;cursor:pointer;transition:border-color .15s ease,background .15s ease}
+.kb-button:hover:not(:disabled){border-color:var(--color-border-strong)}
+.kb-button:disabled{cursor:not-allowed;opacity:.55}
+.kb-primary{border-color:var(--color-accent);color:var(--color-on-accent);background:var(--color-accent);font-weight:600}
+.kb-primary:hover:not(:disabled){border-color:var(--color-accent-hover);background:var(--color-accent-hover)}
+.kb-danger{border-color:var(--color-error);color:var(--color-on-accent);background:var(--color-error);font-weight:600}
+.kb-icon-button{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid transparent;border-radius:4px;color:var(--color-text-muted);background:transparent;cursor:pointer}
+.kb-icon-button:hover:not(:disabled){border-color:var(--color-border-subtle);color:var(--color-primary);background:var(--color-bg-surface)}
+.kb-icon-button.danger:hover:not(:disabled){color:var(--color-error)}
+.kb-icon-button:disabled{cursor:not-allowed;opacity:.5}
+.kb-button:focus-visible,.kb-icon-button:focus-visible,.kb-set:focus-visible,.kb-switch:focus-visible,.kb-filters button:focus-visible,.kb-archived-toggle:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+
+.kb-welcome{display:grid;justify-items:center;gap:12px;max-width:560px;margin:28px auto;padding:34px 28px;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface);text-align:center;color:var(--color-accent-text)}
+.kb-welcome h2{margin:0;color:var(--color-primary);font:700 22px var(--font-serif)}
+.kb-welcome p{margin:0;color:var(--color-text-muted);font-size:13px;line-height:1.7}
+.kb-welcome ol{display:grid;gap:8px;width:100%;margin:6px 0 8px;padding:0;list-style:none;counter-reset:step;text-align:left}
+.kb-welcome li{display:flex;align-items:baseline;gap:10px;padding:10px 12px;border-radius:6px;background:var(--color-bg-canvas);color:var(--color-text-muted);font-size:13px;counter-increment:step}
+.kb-welcome li::before{content:counter(step);flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;color:var(--color-on-accent);background:var(--color-accent);font-size:12px;font-weight:700}
+.kb-welcome li strong{flex:none;width:70px;color:var(--color-primary)}
+
+.kb-layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;align-items:start}
+.kb-sets{position:sticky;top:12px;display:grid;gap:6px;padding:12px;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface)}
+.kb-sets-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px 4px}
+.kb-sets-head h2{margin:0;font-size:13px;font-weight:700}
+.kb-sets ul{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.kb-set{display:grid;gap:3px;width:100%;padding:9px 10px;border:1px solid transparent;border-radius:6px;color:var(--color-primary);background:transparent;text-align:left;cursor:pointer}
+.kb-set strong{overflow:hidden;font-size:13px;font-weight:600;text-overflow:ellipsis;white-space:nowrap}
+.kb-set span{color:var(--color-text-muted);font-size:12px}
+.kb-set:hover{background:var(--color-bg-canvas)}
+.kb-set.selected{border-color:color-mix(in srgb,var(--color-accent) 40%,transparent);background:color-mix(in srgb,var(--color-accent) 8%,var(--color-bg-surface))}
+.kb-set.archived strong{color:var(--color-text-muted)}
+.kb-sets-empty{margin:4px 2px;color:var(--color-text-muted);font-size:12px}
+.kb-archived-toggle{display:flex;align-items:center;gap:6px;margin-top:6px;padding:8px 4px 4px;border:0;border-top:1px solid var(--color-border-subtle);color:var(--color-text-muted);background:transparent;font-size:12px;cursor:pointer}
+.kb-archived-toggle svg:last-child{margin-left:auto;transition:transform .15s ease}
+.kb-archived-toggle svg.open{transform:rotate(180deg)}
+.kb-sets-group{margin-top:10px;padding-top:12px;border-top:1px solid var(--color-border-subtle)}
+.kb-sets-head h2 small{display:block;margin-top:2px;color:var(--color-text-muted);font-size:12px;font-weight:400}
+.kb-set strong svg{vertical-align:-2px}
+.kb-attention{color:var(--color-accent-text)!important;font-weight:600}
+.kb-owner{margin:0 0 4px;color:var(--color-text-muted);font-size:12px}
+.kb-welcome-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.kb-tag-doc{color:var(--color-info);background:color-mix(in srgb,var(--color-info) 10%,var(--color-bg-surface))}
+.kb-owner-choice{display:grid;gap:8px;margin:0;padding:0;border:0}
+.kb-owner-choice legend{margin-bottom:6px;color:var(--color-text-muted);font-size:12px;font-weight:600}
+.kb-owner-choice label{display:flex!important;align-items:flex-start;gap:9px;padding:10px 12px;border:1px solid var(--color-border-subtle);border-radius:6px;cursor:pointer}
+.kb-owner-choice label:has(input:checked){border-color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 6%,var(--color-bg-surface))}
+.kb-owner-choice input{flex:none;width:auto;margin-top:3px;padding:0;accent-color:var(--color-accent)}
+.kb-owner-choice span{display:grid;gap:2px;color:var(--color-text-muted);font-size:12px;font-weight:400!important}
+.kb-owner-choice strong{color:var(--color-primary);font-size:13px}
+.kb-file input{padding:8px;border:1px dashed var(--color-border-subtle);border-radius:6px;color:var(--color-text-muted);font-size:13px}
+
+.kb-main{min-width:0;padding:18px 20px 22px;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface)}
+.kb-set-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.kb-set-head h2{margin:0;font:700 20px/1.3 var(--font-serif);overflow-wrap:anywhere}
+.kb-set-head p{margin:5px 0 0;color:var(--color-text-muted);font-size:13px;line-height:1.6}
+.kb-set-actions{display:flex;gap:8px;flex:none}
+.kb-archived-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:11px 13px;border-radius:6px;background:var(--color-bg-canvas);color:var(--color-text-muted);font-size:13px}
+
+.kb-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--color-border-subtle)}
+.kb-filters{display:flex;gap:4px;padding:3px;border-radius:6px;background:var(--color-bg-canvas)}
+.kb-filters button{min-height:30px;padding:0 10px;border:0;border-radius:4px;color:var(--color-text-muted);background:transparent;font-size:12px;cursor:pointer}
+.kb-filters button.active{color:var(--color-primary);background:var(--color-bg-surface);box-shadow:var(--shadow-paper);font-weight:600}
+.kb-search{display:flex;flex:1 1 180px;align-items:center;gap:8px;min-height:36px;padding:0 10px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-text-muted);background:var(--color-bg-surface)}
+.kb-search:focus-within{border-color:var(--color-accent)}
+.kb-search input{width:100%;min-width:0;border:0;outline:0;color:var(--color-primary);background:transparent;font-size:13px}
+.kb-pending{margin:0 0 12px;padding:10px 12px;border-left:3px solid var(--color-warning);border-radius:4px;background:color-mix(in srgb,var(--color-warning) 9%,var(--color-bg-surface));color:var(--color-primary);font-size:13px;line-height:1.6}
+
+.kb-entries{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.kb-entry{display:flex;justify-content:space-between;gap:16px;padding:13px 14px;border:1px solid var(--color-border-subtle);border-radius:6px;background:var(--color-bg-surface)}
+.kb-entry.off{background:var(--color-bg-canvas)}
+.kb-entry.off .kb-entry-text{opacity:.62}
+.kb-entry-text{min-width:0}
+.kb-entry-text h3{margin:0 0 5px;font-size:14px;font-weight:600;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}
+.kb-entry-text p{margin:0;color:var(--color-text-muted);font-size:13px;line-height:1.7;overflow-wrap:anywhere;white-space:pre-wrap}
+.kb-tag{display:inline-block;margin-top:7px;padding:2px 7px;border-radius:4px;color:var(--color-warning);background:color-mix(in srgb,var(--color-warning) 10%,var(--color-bg-surface));font-size:12px}
+.kb-entry-side{display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:6px}
+.kb-entry-actions{display:flex;gap:2px}
+.kb-switch{display:inline-flex;align-items:center;gap:7px;min-height:32px;padding:0 4px;border:0;color:var(--color-text-muted);background:transparent;font-size:12px;cursor:pointer}
+.kb-switch[aria-checked="true"]{color:var(--color-success);font-weight:600}
+.kb-switch:disabled{cursor:not-allowed;opacity:.6}
+.kb-switch-track{position:relative;width:34px;height:20px;border-radius:10px;background:color-mix(in srgb,var(--color-text-muted) 38%,var(--color-bg-surface));transition:background .15s ease}
+.kb-switch-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--color-bg-surface);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s ease}
+.kb-switch[aria-checked="true"] .kb-switch-track{background:var(--color-success)}
+.kb-switch[aria-checked="true"] .kb-switch-knob{transform:translateX(14px)}
+
+.kb-entry-form{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-bottom:8px;border-color:var(--color-accent);background:var(--color-bg-surface)}
+.kb-entry-form label,.kb-dialog label{display:grid;gap:6px}
+.kb-entry-form label span,.kb-dialog label span{color:var(--color-text-muted);font-size:12px;font-weight:600}
+.kb-dialog label em{font-style:normal;font-weight:400}
+.kb-entry-form textarea,.kb-dialog input:not([type=radio]):not([type=file]),.kb-dialog textarea{width:100%;padding:9px 10px;border:1px solid var(--color-border-subtle);border-radius:4px;color:var(--color-primary);background:var(--color-bg-surface);font:13px/1.6 var(--font-sans);resize:vertical}
+.kb-entry-form textarea:focus,.kb-dialog input:not([type=radio]):focus,.kb-dialog textarea:focus{border-color:var(--color-accent);outline:0}
+.kb-form-actions{display:flex;justify-content:flex-end;gap:8px}
+
+.kb-empty{display:grid;justify-items:center;gap:12px;padding:30px 12px;color:var(--color-text-muted);font-size:13px;text-align:center}
+.kb-empty p{margin:0}
+
+.kb-overlay{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(20,16,14,.42)}
+.kb-dialog{display:grid;gap:14px;width:min(460px,100%);padding:20px;border:1px solid var(--color-border-subtle);border-radius:8px;background:var(--color-bg-surface);box-shadow:var(--shadow-paper-elevated)}
+.kb-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.kb-dialog h2{margin:0;font:700 18px var(--font-serif)}
+.kb-dialog>p{margin:0;color:var(--color-text-muted);font-size:13px;line-height:1.7}
+.kb-dialog footer{display:flex;justify-content:flex-end;gap:8px}
+
+@media (max-width:860px){
+  .kb-header{flex-direction:column;gap:8px}
+  .kb-store{margin-top:0}
+  .kb-layout{grid-template-columns:1fr}
+  .kb-sets{position:static}
+  .kb-main{padding:14px}
+  .kb-set-head{flex-direction:column}
+  .kb-entry{flex-direction:column;gap:10px}
+  .kb-entry-side{flex-direction:row;align-items:center;justify-content:space-between}
+}
 </style>
