@@ -291,6 +291,8 @@ HAVING count(*) > 1;
 | `POST /api/billing/operations/plans/{id}/publication` | 运营上架或下架，防止同标识多版本同时上架 |
 | `GET /api/billing/operations/tenants/{tenantId}/orders/{id}` | 白名单运营查询指定商家的订单 |
 | `POST /api/billing/operations/tenants/{tenantId}/orders/{id}/confirm` | 白名单运营核销人工订单及实际回单 |
+| `GET /api/billing/operations/ledger` | 白名单运营查看全平台烟火流水；`days` 为 1（今天）至 90，可按 `type`、`capability`、商户 `keyword` 筛选，每个商户在时间范围内最多取最近 2000 条 |
+| `GET /api/billing/operations/ledger/summary` | 时间范围内全平台扣除、今日扣除、退回、充值、赠送合计，以及按功能的扣除；预占不计入消耗 |
 | `POST /api/video/quote` | 服务端视频报价 |
 | `GET /api/video/workflows/{id}/retry-quote` | 恢复费用确认 |
 | `POST /api/video/analyses/{id}/cancel` | 取消分析并释放未交付烟火 |

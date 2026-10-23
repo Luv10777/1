@@ -85,3 +85,20 @@ button:focus-visible,a:focus-visible,input:focus-visible { outline:2px solid #28
 @media(max-width:1100px) { .admin-workspace { grid-template-columns:192px minmax(0,1fr); } .admin-main { padding:28px 24px; } .admin-topbar { padding:0 24px; } .admin-main .management-stats article { padding:16px; } }
 @media(max-width:760px) { .admin-workspace { display:block; } .admin-sidebar { display:none; position:fixed; width:224px; z-index:100; } .menu-open .admin-sidebar { display:flex; } .admin-menu-backdrop { display:block; position:fixed; inset:0; z-index:90; border:0; background:rgb(24 34 44 / 24%); } .admin-menu-toggle { display:grid; place-items:center; padding:6px; margin-left:-6px; border:0; background:transparent; color:#6e7885; } .admin-topbar { height:68px; padding:0 20px; gap:10px; } .admin-topbar>div { gap:8px; } .admin-topbar>div:first-child>span { display:none; } .admin-account-avatar { display:none; } .admin-account button { padding-left:10px; margin-left:2px; } .admin-account small { font-size:9px; } .admin-main { padding:24px 20px; } .admin-access-header { padding:24px; } .admin-login { margin-top:48px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
+
+/* 待处理事项：侧栏数字角标与顶栏铃铛 */
+.admin-nav-badge { margin-left:auto; min-width:20px; padding:1px 6px; border-radius:10px; background:#c84a3d; color:#fff; font-size:11px; font-weight:600; line-height:18px; text-align:center; }
+.admin-topbar-actions { display:flex; align-items:center; gap:16px; }
+.admin-notices { position:relative; }
+.admin-notices-button { position:relative; display:grid; place-items:center; width:36px; height:36px; padding:0; border:1px solid #e7ebef; border-radius:8px; background:#fff; color:#4b5563; cursor:pointer; }
+.admin-notices-button:hover { background:#f7f8fa; color:#202936; }
+.admin-notices-button b { position:absolute; top:-6px; right:-6px; min-width:18px; padding:0 5px; border-radius:9px; background:#c84a3d; color:#fff; font-size:10px; font-weight:600; line-height:18px; }
+.admin-notices-panel { position:absolute; top:44px; right:0; z-index:40; width:260px; padding:12px; border:1px solid #e7ebef; border-radius:8px; background:#fff; box-shadow:0 12px 32px rgba(32,41,54,.12); }
+.admin-notices-panel>strong { display:block; padding:2px 6px 8px; font-size:13px; font-weight:600; }
+.admin-notices-panel a { display:flex; align-items:center; gap:8px; padding:9px 6px; border-radius:6px; color:#202936; font-size:13px; }
+.admin-notices-panel a:hover { background:#f7f8fa; }
+.admin-notices-panel a span { flex:1; }
+.admin-notices-panel a b { color:#c84a3d; font-weight:600; }
+.admin-notices-panel a svg { color:#9aa3ad; }
+.admin-notices-empty { margin:0; padding:6px; color:#7b8590; font-size:12px; line-height:1.7; }
+.admin-topbar-actions>.admin-account { display:flex; align-items:center; gap:12px; font-size:12px; }
