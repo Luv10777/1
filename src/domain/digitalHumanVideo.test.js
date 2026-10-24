@@ -16,9 +16,21 @@ test('digital human requests preserve avatar order, copy and output settings', (
   assert.match(digitalHumanVideoInput(form({ script: '' })).prompt, /数字人口播/)
 })
 
-test('unsupported digital human inputs are rejected without dropping selected materials', () => {
+test('digital human inputs use the selected model limits and preserve all media', () => {
   assert.throws(() => digitalHumanVideoInput(form({ script: '', avatar: null })), /照片或输入播报文案/)
-  assert.throws(() => digitalHumanVideoInput(form({ images: Array.from({ length: 6 }, (_, id) => ({ assetId: id + 2 })) })), /6 张图片/)
-  assert.throws(() => digitalHumanVideoInput(form({ videos: [{ assetId: 3 }, { assetId: 4 }] })), /1 个参考视频/)
-  assert.throws(() => digitalHumanVideoInput(form({ voices: [{ assetId: 5 }] })), /不支持音色/)
+  const images = Array.from({ length: 29 }, (_, id) => ({ assetId: id + 2 }))
+  const videos = Array.from({ length: 10 }, (_, id) => ({ assetId: id + 31 }))
+  const voices = Array.from({ length: 10 }, (_, id) => ({ assetId: id + 41 }))
+  const input = digitalHumanVideoInput(form({ images, videos, voices }))
+  assert.equal(input.images.length, 30)
+  assert.deepEqual(input.videos, videos)
+  assert.deepEqual(input.audios, voices)
+  assert.throws(() => digitalHumanVideoInput(form({ images: [...images, { assetId: 51 }] })), /30 张图片/)
+  for (const model of ['SEEDANCE_2_0', 'SEEDANCE_2_0_MINI', 'SEEDANCE_2_0_FAST']) {
+    const smaller = { model, images: images.slice(0, 8), videos: videos.slice(0, 3), voices: voices.slice(0, 3) }
+    assert.equal(digitalHumanVideoInput(form(smaller)).images.length, 9)
+    assert.throws(() => digitalHumanVideoInput(form({ ...smaller, images: images.slice(0, 9) })), /9 张图片/)
+    assert.throws(() => digitalHumanVideoInput(form({ ...smaller, videos: videos.slice(0, 4) })), /3 个参考视频/)
+    assert.throws(() => digitalHumanVideoInput(form({ ...smaller, voices: voices.slice(0, 4) })), /3 个音频/)
+  }
 })

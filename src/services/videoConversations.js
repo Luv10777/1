@@ -27,7 +27,8 @@ export function snapshotVideoForm(form) {
     resolution: form.resolution,
     selectedModel: form.selectedModel,
     referenceImages: form.referenceImages.map(entry => ({ ...entry })),
-    referenceVideo: form.referenceVideo ? { ...form.referenceVideo } : null,
+    referenceVideos: (form.referenceVideos || (form.referenceVideo ? [form.referenceVideo] : [])).map(entry => ({ ...entry })),
+    referenceAudios: (form.referenceAudios || []).map(entry => ({ ...entry })),
   }
 }
 
@@ -40,6 +41,7 @@ export function videoFormFromWorkflow(workflow) {
     resolution: workflow.resolution,
     selectedModel: workflow.model,
     referenceImages: (workflow.referenceImages || []).map(entry),
-    referenceVideo: workflow.referenceVideo ? entry(workflow.referenceVideo) : null,
+    referenceVideos: (workflow.referenceVideos || (workflow.referenceVideo ? [workflow.referenceVideo] : [])).map(entry),
+    referenceAudios: (workflow.referenceAudios || []).map(entry),
   }
 }

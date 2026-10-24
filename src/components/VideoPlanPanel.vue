@@ -35,6 +35,7 @@ const member = computed(() => billing.summary?.memberActive && billing.summary?.
 const credits = computed(() => config.value?.credits ?? 1)
 const styleText = computed(() => (customOpen.value ? customStyle.value : style.value).trim())
 const unavailable = computed(() => config.value && !config.value.configured)
+const planImages = computed(() => props.images.slice(0, config.value?.maxImages ?? 6))
 
 onMounted(() => { videoPlanApi.config().then(data => { if (!disposed) config.value = data }).catch(() => {}) })
 onBeforeUnmount(() => { disposed = true })
@@ -51,11 +52,11 @@ const run = async (previousPlanId = null) => {
   if (!props.images.length && !idea.value.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的效果。'; return }
   working.value = true
   try {
-    const imageAssetIds = await Promise.all(props.images.map(entry => props.upload(entry, 'IMAGE')))
+    const imageAssetIds = await Promise.all(planImages.value.map(entry => props.upload(entry, 'IMAGE')))
     const body = { imageAssetIds, referenceVideo: Boolean(props.video), style: styleText.value, idea: idea.value.trim(), previousPlanId }
     // 网络中断后重试同一份请求沿用原编号，不会重复预占烟火。
     if (JSON.stringify(body) !== signature) { requestKey = `video-plan-${crypto.randomUUID()}`; signature = JSON.stringify(body) }
-    const images = props.images.map(entry => entry.url)
+    const images = planImages.value.map(entry => entry.url)
     let plan = await videoPlanApi.create({ requestKey, ...body })
     refreshBilling()
     while (!isVideoPlanDone(plan)) {
@@ -91,10 +92,11 @@ const use = (plan, index) => {
       <section class="vp-section">
         <strong class="vp-heading">素材<small>AI 会判断每张图怎么用，写进提示词</small></strong>
         <div v-if="images.length || video" class="vp-materials">
-          <figure v-for="(entry, index) in images" :key="entry.id"><img v-if="entry.url" :src="entry.url" :alt="entry.name"><figcaption>图{{ index + 1 }}</figcaption></figure>
+          <figure v-for="(entry, index) in planImages" :key="entry.id"><img v-if="entry.url" :src="entry.url" :alt="entry.name"><figcaption>图{{ index + 1 }}</figcaption></figure>
           <figure v-if="video" class="is-video"><Film :size="18" :stroke-width="1.6" aria-hidden="true" /><figcaption>参考视频 · 只参考运镜</figcaption></figure>
         </div>
         <p v-else class="vp-muted">还没有参考图，也可以只按一句话出方案；在左侧添加商品图效果更好。</p>
+        <p v-if="images.length > planImages.length" class="vp-muted">方案仅参考前 {{ planImages.length }} 张图片，生成视频时仍使用全部素材。</p>
       </section>
       <section class="vp-section">
         <strong class="vp-heading">风格<small>可不选</small></strong>

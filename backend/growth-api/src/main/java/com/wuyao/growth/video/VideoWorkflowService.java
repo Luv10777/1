@@ -105,11 +105,12 @@ public class VideoWorkflowService {
         } catch (IllegalArgumentException e) {
             throw BizException.of(ErrorCode.VIDEO_PARAMETER_INVALID, e.getMessage());
         }
-        if (request.prompt().isBlank() && request.referenceImageAssetIds().isEmpty() && request.referenceVideoAssetId() == null) {
+        if (request.prompt().isBlank() && request.referenceImageAssetIds().isEmpty() && request.videoReferences().isEmpty() && request.referenceAudioAssetIds().isEmpty()) {
             throw BizException.of(ErrorCode.VIDEO_PARAMETER_INVALID, "请至少描述需求或添加一个参考素材");
         }
         request.referenceImageAssetIds().forEach(id -> assetService.mediaReference(id, "IMAGE"));
-        if (request.referenceVideoAssetId() != null) assetService.mediaReference(request.referenceVideoAssetId(), "VIDEO");
+        request.videoReferences().forEach(id -> assetService.mediaReference(id, "VIDEO"));
+        request.referenceAudioAssetIds().forEach(id -> assetService.mediaReference(id, "AUDIO"));
 
         Long tenantId = TenantContext.require();
         workflows.lockRequest(tenantId + ":" + request.requestKey());
@@ -172,7 +173,8 @@ public class VideoWorkflowService {
             try { VideoCapabilities.validate(request); }
             catch (IllegalArgumentException e) { throw BizException.of(ErrorCode.VIDEO_PARAMETER_INVALID, e.getMessage()); }
             request.referenceImageAssetIds().forEach(assetId -> assetService.mediaReference(assetId, "IMAGE"));
-            if (request.referenceVideoAssetId() != null) assetService.mediaReference(request.referenceVideoAssetId(), "VIDEO");
+            request.videoReferences().forEach(assetId -> assetService.mediaReference(assetId, "VIDEO"));
+            request.referenceAudioAssetIds().forEach(assetId -> assetService.mediaReference(assetId, "AUDIO"));
         }
         if (!workflow.isVideoConcurrencyPermitHeld()) {
             acquirePermit(TenantContext.require());
@@ -407,7 +409,7 @@ public class VideoWorkflowService {
             if (content.isArray()) {
                 for (JsonNode item : content) {
                     String type = item.path("type").asText();
-                    if ("image_url".equals(type) || "video_url".equals(type)) {
+                    if ("image_url".equals(type) || "video_url".equals(type) || "audio_url".equals(type)) {
                         expirations.add(referenceExpiry(item.path(type).path("url").asText()));
                     }
                 }
@@ -878,7 +880,10 @@ public class VideoWorkflowService {
                 request.referenceImageAssetIds().stream().map(this::referenceView).toList(),
                 request.referenceVideoAssetId() == null ? null : referenceView(request.referenceVideoAssetId()),
                 workflow.getErrorCode(), plan.stage() != null, plan.stage(), "SUBMIT".equals(plan.stage()), plan.hint(),
-                actualWidth, actualHeight, actualDurationMs, workflow.getBillingQuote(), workflow.getBillingCapturedCredits());
+                actualWidth, actualHeight, actualDurationMs, workflow.getBillingQuote(), workflow.getBillingCapturedCredits(),
+                request.videoReferences(), request.referenceAudioAssetIds(),
+                request.videoReferences().stream().map(this::referenceView).toList(),
+                request.referenceAudioAssetIds().stream().map(this::referenceView).toList());
     }
 
     private VideoDtos.Reference referenceView(Long id) {

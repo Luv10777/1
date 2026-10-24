@@ -26,6 +26,28 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class VideoProviderGatewayTest {
+    @Test
+    void everySelectedVideoAndAudioIsSignedAndSentInOrder() {
+        var assets = mock(AssetService.class);
+        when(assets.presignedReference(anyLong(), anyString())).thenAnswer(i -> "https://storage.example/" + i.getArgument(0));
+        var request = new VideoDtos.Create("all-materials", "展示商品", List.of(1L, 2L), null,
+                "SEEDANCE_2_5", "auto", 10, "720p", null, null, List.of(3L, 4L), List.of(5L, 6L));
+        var body = new ObjectMapper().valueToTree(volcengineGateway(assets, mock(HttpClient.class)).buildSubmitRequest(request));
+        var content = body.path("content");
+        assertThat(content).hasSize(7);
+        assertThat(content.get(3).path("video_url").path("url").asText()).isEqualTo("https://storage.example/3");
+        assertThat(content.get(4).path("video_url").path("url").asText()).isEqualTo("https://storage.example/4");
+        assertThat(content.get(5).path("audio_url").path("url").asText()).isEqualTo("https://storage.example/5");
+        assertThat(content.get(6).path("audio_url").path("url").asText()).isEqualTo("https://storage.example/6");
+        assertThat(content.get(5).path("role").asText()).isEqualTo("reference_audio");
+        verify(assets).presignedReference(3L, "VIDEO");
+        verify(assets).presignedReference(4L, "VIDEO");
+        verify(assets).presignedReference(5L, "AUDIO");
+        verify(assets).presignedReference(6L, "AUDIO");
+        assertThatThrownBy(() -> gateway(assets, mock(HttpClient.class)).buildSubmitRequest(request))
+                .hasMessageContaining("不支持多个参考视频或音频");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"CANCELED", "CANCELLED", "canceled", "cancelled"})
     void submitAndPollNormalizeBothProviderCancellationSpellings(String providerStatus) throws Exception {

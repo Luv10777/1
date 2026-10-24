@@ -46,8 +46,9 @@ export function useDigitalHumanVideo() {
     quoting.value = true; error.value = ''; quoted.value = null
     try {
       const imageIds = await Promise.all(input.images.map(entry => uploadVideoReference(entry, 'IMAGE')))
-      const videoId = input.video ? await uploadVideoReference(input.video, 'VIDEO') : null
-      const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetId: videoId,
+      const videoIds = await Promise.all((input.videos || []).map(entry => uploadVideoReference(entry, 'VIDEO')))
+      const audioIds = await Promise.all((input.audios || []).map(entry => uploadVideoReference(entry, 'AUDIO')))
+      const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetIds: videoIds, referenceAudioAssetIds: audioIds,
         model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution,
         sourceModule: 'DIGITAL_HUMAN' }
       const signature = JSON.stringify(payload)
@@ -70,9 +71,10 @@ export function useDigitalHumanVideo() {
     error.value = ''
     try {
       const imageIds = await Promise.all(input.images.map(entry => uploadVideoReference(entry, 'IMAGE')))
-      const videoId = input.video ? await uploadVideoReference(input.video, 'VIDEO') : null
+      const videoIds = await Promise.all((input.videos || []).map(entry => uploadVideoReference(entry, 'VIDEO')))
+      const audioIds = await Promise.all((input.audios || []).map(entry => uploadVideoReference(entry, 'AUDIO')))
       if (disposed) return
-      const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetId: videoId,
+      const payload = { prompt: input.prompt, referenceImageAssetIds: imageIds, referenceVideoAssetIds: videoIds, referenceAudioAssetIds: audioIds,
         model: input.model, ratio: input.ratio, durationSeconds: input.durationSeconds, resolution: input.resolution,
         sourceModule: 'DIGITAL_HUMAN' }
       const signature = JSON.stringify(payload)

@@ -5,7 +5,7 @@ import { createRenderer, nextTick } from 'vue'
 import { compileScript, parse } from '@vue/compiler-sfc'
 import { createServer } from 'vite'
 
-async function mountPanel(config = { configured: true, credits: 1 }) {
+async function mountPanel(config = { configured: true, credits: 1 }, props = {}) {
   const saved = Object.fromEntries(['window', 'document', 'Document', 'ShadowRoot', 'fetch'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   const timers = [], applied = [], requests = []
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout: callback => { timers.push(callback); return timers.length } } })
@@ -47,7 +47,7 @@ async function mountPanel(config = { configured: true, credits: 1 }) {
   })
   const root = { children: [] }
   const app = renderer.createApp(Panel, { upload: async entry => entry.assetId, maxDuration: 10, ratios: ['auto', '9:16'],
-    onApply: (...args) => applied.push(args) })
+    onApply: (...args) => applied.push(args), ...props })
   app.component('RouterLink', { render: () => null })
   app.mount(root)
   const settle = async () => { await new Promise(resolve => setImmediate(resolve)); await nextTick() }
@@ -123,5 +123,17 @@ test('an unconfigured planner stays disabled and explains that merchants can wri
     await panel.button('生成提示词').props.onClick()
     assert.equal(panel.requests.length, 0)
     assert.match(panel.text(panel.root), /出方案暂未开放，可以直接在左侧写描述/)
+  } finally { await panel.close() }
+})
+
+test('a larger video image selection respects the planner limit without changing the video materials', async () => {
+  const images = Array.from({ length: 30 }, (_, id) => ({ id, assetId: id + 1, name: `图${id + 1}`, url: `/image-${id}.png` }))
+  const panel = await mountPanel({ configured: true, credits: 1, maxImages: 6 }, { images })
+  try {
+    assert.match(panel.text(panel.root), /方案仅参考前 6 张图片/)
+    panel.videoPlanApi.create = async body => { panel.requests.push(body); return { id: 9, status: 'SUCCEEDED', plans } }
+    await panel.button('生成提示词').props.onClick()
+    assert.deepEqual(panel.requests[0].imageAssetIds, [1, 2, 3, 4, 5, 6])
+    assert.equal(images.length, 30)
   } finally { await panel.close() }
 })

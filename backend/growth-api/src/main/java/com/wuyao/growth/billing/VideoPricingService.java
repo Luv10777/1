@@ -31,7 +31,7 @@ public class VideoPricingService {
                         String sourceUrl, Instant verifiedAt, Instant validUntil, String quoteId) {}
     public Quote quote(VideoDtos.Create request) {
         String model=provider.providerModel(request.model());
-        String mode=request.referenceVideoAssetId()==null?"t2v":"v2v";
+        String mode=request.videoReferences().isEmpty()?"t2v":"v2v";
         var now=Instant.now();
         var matches=prices.getRates().stream().filter(r->Objects.equals(r.getProviderBaseUrl(),provider.baseUrl())
             &&Objects.equals(r.getProviderModel(),model)&&request.resolution().equalsIgnoreCase(r.getResolution())
@@ -40,7 +40,8 @@ public class VideoPricingService {
             return new Quote(false,0,"此模型与分辨率的计价尚未核验，暂不可提交生成。",provider.baseUrl(),model,request.resolution(),mode,0,0,null,null,null,0,0,0,null,null,null,null);
         var rate=matches.getFirst();
         // Match the reference duration sent to the provider, never a client-provided media duration.
-        int reference=request.referenceVideoAssetId()==null||!Boolean.TRUE.equals(rate.getReferenceVideoBilled())?0:Math.max(1,assets.mediaReference(request.referenceVideoAssetId(),"VIDEO").durationMs()/1000);
+        int reference=!Boolean.TRUE.equals(rate.getReferenceVideoBilled())?0:request.videoReferences().stream()
+            .mapToInt(id->Math.max(1,assets.mediaReference(id,"VIDEO").durationMs()/1000)).sum();
         long tokens=tokens(rate.getMaxOutputPixels(),BigDecimal.valueOf(request.durationSeconds()+reference),rate.getFramesPerSecond(),rate.getTokenAreaDivisor());
         long credits=cost(tokens,rate.getUsdPerMillionTokens(),rate.getCnyPerUsd(),rate.getSellingMultiplier());
         var q=new Quote(true,credits,"按已核验的最大画幅预占，交付后按实际用量结算，多余烟火退回。",
@@ -77,8 +78,13 @@ public class VideoPricingService {
     private boolean positive(BigDecimal n) { return n!=null&&n.signum()>0; }
     private String fingerprint(VideoDtos.Create r,Quote q) {
         try {
-            byte[] input=json.writeValueAsBytes(List.of(TenantContext.require(),r.requestKey(),r.prompt(),r.referenceImageAssetIds(),
+            var values=new java.util.ArrayList<Object>(List.of(TenantContext.require(),r.requestKey(),r.prompt(),r.referenceImageAssetIds(),
                 Objects.toString(r.referenceVideoAssetId(),""),r.model(),r.ratio(),r.durationSeconds(),r.resolution().toLowerCase(Locale.ROOT),q));
+            // Preserve existing approvals for requests that predate multiple video/audio references.
+            if(!r.referenceVideoAssetIds().isEmpty()||!r.referenceAudioAssetIds().isEmpty()) {
+                values.add(r.referenceVideoAssetIds());values.add(r.referenceAudioAssetIds());
+            }
+            byte[] input=json.writeValueAsBytes(values);
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(input));
         } catch(Exception e) { throw new IllegalStateException("视频报价无法生成",e); }
     }
