@@ -67,4 +67,17 @@ class VideoPricingServiceTest {
         var q=service.quote(new VideoDtos.Create("pricing-test-002","画面",List.of(),11L,"SEEDANCE_2_0","16:9",5,"720p"));
         assertThat(q.referenceSeconds()).isEqualTo(4);assertThat(q.estimatedTokens()).isEqualTo(194400);
     }
+    @Test void quotesIncludeEveryVideoDurationAndBindApprovalToAllMedia() {
+        rate.setVideoInput("v2v");rate.setReferenceVideoBilled(true);config.setRates(List.of(rate));
+        when(assets.mediaReference(anyLong(),eq("VIDEO"))).thenReturn(new AssetService.MediaReference(11L,"key","video/mp4",4500));
+        var original=new VideoDtos.Create("pricing-multi-001","画面",List.of(),null,"SEEDANCE_2_0","16:9",5,"720p",null,null,List.of(11L,12L),List.of(13L));
+        var quote=service.quote(original);
+        assertThat(quote.referenceSeconds()).isEqualTo(8);
+        assertThat(quote.estimatedTokens()).isEqualTo(280800);
+        assertThat(service.requireApproved(original,quote.quoteId())).isEqualTo(quote);
+        var changedAudio=new VideoDtos.Create("pricing-multi-001","画面",List.of(),null,"SEEDANCE_2_0","16:9",5,"720p",null,null,List.of(11L,12L),List.of(14L));
+        var changedVideo=new VideoDtos.Create("pricing-multi-001","画面",List.of(),null,"SEEDANCE_2_0","16:9",5,"720p",null,null,List.of(11L,15L),List.of(13L));
+        assertThatThrownBy(()->service.requireApproved(changedAudio,quote.quoteId())).isInstanceOf(BizException.class);
+        assertThatThrownBy(()->service.requireApproved(changedVideo,quote.quoteId())).isInstanceOf(BizException.class);
+    }
 }

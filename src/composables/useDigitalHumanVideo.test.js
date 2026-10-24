@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { createRenderer, h } from 'vue'
 import { createServer } from 'vite'
 
-const input = () => ({ prompt: '生成数字人口播视频', images: [{ assetId: 11 }], video: null,
+const input = () => ({ prompt: '生成数字人口播视频', images: [{ assetId: 11 }], videos: [], audios: [],
   model: 'SEEDANCE_2_5', ratio: '9:16', durationSeconds: 10, resolution: '720p' })
 const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
 const approved = () => ({ quote: { available: true, quoteId: 'server-test-quote', credits: 17 }, requestKey: `video-${crypto.randomUUID()}`,
-  signature: JSON.stringify({ prompt: input().prompt, referenceImageAssetIds: [11], referenceVideoAssetId: null,
+  signature: JSON.stringify({ prompt: input().prompt, referenceImageAssetIds: [11], referenceVideoAssetIds: [], referenceAudioAssetIds: [],
     model: input().model, ratio: input().ratio, durationSeconds: input().durationSeconds, resolution: input().resolution,
     sourceModule: 'DIGITAL_HUMAN' }) })
 
@@ -212,6 +212,24 @@ test('digital human task lifecycle follows the real video API', async t => {
         await studio.start({ ...input(), resolution: '1080p' }, approved())
         assert.match(studio.error.value, /配置已变化/)
         assert.deepEqual(calls, ['/api/video/quote'])
+      } finally { app.unmount() }
+    })
+    await t.test('quotes and submits every selected video and audio without losing references', async () => {
+      const calls = []
+      globalThis.fetch = async (url, options) => {
+        calls.push({ url, body: JSON.parse(options.body) })
+        return response(url.endsWith('/quote') ? { available: true, quoteId: 'all-materials', credits: 20 } : { id: 81, status: 'SUCCEEDED' })
+      }
+      const { app, studio } = mount()
+      try {
+        await studio.estimate({ ...input(), videos: [{ assetId: 12 }, { assetId: 13 }], audios: [{ assetId: 14 }, { assetId: 15 }] })
+        await studio.confirmQuote()
+        assert.equal(calls.length, 2)
+        for (const { body } of calls) {
+          assert.deepEqual(body.referenceVideoAssetIds, [12, 13])
+          assert.deepEqual(body.referenceAudioAssetIds, [14, 15])
+        }
+        assert.equal(calls[0].body.requestKey, calls[1].body.requestKey)
       } finally { app.unmount() }
     })
   } finally {

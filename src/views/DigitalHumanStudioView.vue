@@ -8,6 +8,7 @@ import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { useDigitalHumanVideo } from '../composables/useDigitalHumanVideo'
 import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
+import { videoMaterialLimits } from '../domain/videoMaterials'
 import { isVideoInProgress, videoConversationTitle, videoHistoryTime, videoModels, videoModelLabel } from '../services/videoConversations'
 import { get } from '../utils/request'
 import { billing, number, refreshBilling, requireMembership } from '../stores/billing'
@@ -66,7 +67,7 @@ const ratioOptions = [
 ]
 const currentModel = computed(() => videoModels.find(item => item.id === selectedModel.value) || videoModels[0])
 const availableResolutions = computed(() => currentModel.value.resolutions)
-const materialLimits = computed(() => currentModel.value.id === 'SEEDANCE_2_5' ? { image: 30, video: 10, audio: 10 } : { image: 9, video: 3, audio: 3 })
+const materialLimits = computed(() => videoMaterialLimits(currentModel.value.id))
 const materialLimitLabel = computed(() => `图片 ${materialLimits.value.image} · 视频 ${materialLimits.value.video} · 音频 ${materialLimits.value.audio}`)
 
 const imageCount = computed(() => [avatarFile.value, productFile.value, packageFile.value, ...extraImages.value].filter(Boolean).length)

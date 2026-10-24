@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ChevronRight, Film, History, Plus, Sparkles, X } from 'lucide-vue-next'
+import { AudioLines, ChevronRight, Film, History, ImagePlus, Plus, Sparkles, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import VideoPlanPanel from '../components/VideoPlanPanel.vue'
 import '../video-studio.css'
@@ -12,6 +12,7 @@ import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle
 import { billing, dateTime, number, refreshBilling, requireMembership } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
+import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
 
 const prompt = ref('')
 const format = ref('auto')
@@ -19,9 +20,12 @@ const duration = ref(10)
 const resolution = ref('720p')
 const selectedModel = ref('SEEDANCE_2_5')
 const referenceImages = ref([])
-const referenceVideo = ref(null)
+const referenceVideos = ref([])
+const referenceAudios = ref([])
 const imageInput = ref(null)
 const videoInput = ref(null)
+const audioInput = ref(null)
+const referenceMaterials = { image: referenceImages, video: referenceVideos, audio: referenceAudios }
 const capabilities = ref([])
 const conversations = ref([])
 const activeConversationId = ref('')
@@ -61,13 +65,15 @@ const ratioOptions = [
 const currentCapability = computed(() => (capabilities.value.length ? capabilities.value : fallbackCapabilities).find(item => item.id === selectedModel.value) || fallbackCapabilities[0])
 const durationMax = computed(() => currentCapability.value.maxDurationSeconds)
 const availableResolutions = computed(() => currentCapability.value.resolutions)
+const materialLimits = computed(() => videoMaterialLimits(selectedModel.value))
+const materialLimitLabel = computed(() => `图片 ${materialLimits.value.image} · 视频 ${materialLimits.value.video} · 音频 ${materialLimits.value.audio}`)
 const activeConversation = computed(() => conversations.value.find(item => item.id === activeConversationId.value))
 const workflow = computed(() => activeConversation.value?.workflow)
 const isGenerating = computed(() => Boolean(activeConversation.value?.submitting) || isVideoInProgress(workflow.value))
 const notice = computed(() => activeConversation.value?.notice || '')
 const outputUrl = computed(() => workflow.value?.outputUrl || '')
 const stageLabel = computed(() => activeConversation.value?.submitting ? '正在提交创作' : ({ SUBMIT: '正在提交创作', POLL: '画面渲染中', IMPORT: '正在保存成片', QA: '正在检查成片' }[workflow.value?.stage] || '画面渲染中'))
-const readForm = () => snapshotVideoForm({ prompt: prompt.value, format: format.value, duration: duration.value, resolution: resolution.value, selectedModel: selectedModel.value, referenceImages: referenceImages.value, referenceVideo: referenceVideo.value })
+const readForm = () => snapshotVideoForm({ prompt: prompt.value, format: format.value, duration: duration.value, resolution: resolution.value, selectedModel: selectedModel.value, referenceImages: referenceImages.value, referenceVideos: referenceVideos.value, referenceAudios: referenceAudios.value })
 const applyForm = form => {
   prompt.value = form.prompt
   format.value = form.format
@@ -75,7 +81,8 @@ const applyForm = form => {
   resolution.value = form.resolution
   selectedModel.value = form.selectedModel
   referenceImages.value = form.referenceImages.map(entry => ({ ...entry }))
-  referenceVideo.value = form.referenceVideo ? { ...form.referenceVideo } : null
+  referenceVideos.value = (form.referenceVideos || []).map(entry => ({ ...entry }))
+  referenceAudios.value = (form.referenceAudios || []).map(entry => ({ ...entry }))
 }
 
 const newConversationId = () => `video-conversation-${crypto.randomUUID()}`
@@ -106,7 +113,8 @@ const createConversation = (form = null) => {
     resolution: '720p',
     selectedModel: 'SEEDANCE_2_5',
     referenceImages: [],
-    referenceVideo: null,
+    referenceVideos: [],
+    referenceAudios: [],
     workflow: null,
     submitting: false,
     notice: '',
@@ -194,25 +202,33 @@ const clampSettings = () => {
   duration.value = Math.min(durationMax.value, Math.max(5, duration.value))
   if (!availableResolutions.value.includes(resolution.value)) resolution.value = availableResolutions.value[0]
 }
-const selectModel = (model) => { selectedModel.value = model; clampSettings() }
+const enforceMaterialLimits = () => {
+  let trimmed = false
+  for (const [type, materials] of Object.entries(referenceMaterials)) {
+    if (materials.value.length > materialLimits.value[type]) {
+      materials.value = materials.value.slice(0, materialLimits.value[type])
+      trimmed = true
+    }
+  }
+  if (trimmed) activeConversation.value.notice = `已按 ${currentCapability.value.label} 的素材上限保留已选内容。`
+}
+const selectModel = (model) => { selectedModel.value = model; clampSettings(); enforceMaterialLimits() }
 
-const addImageFiles = (fileList) => {
-  const images = Array.from(fileList || []).filter(file => file.type.startsWith('image/'))
-  const remaining = Math.max(0, 6 - referenceImages.value.length)
-  if (images.length > remaining) activeConversation.value.notice = '最多添加 6 张参考图。'
-  referenceImages.value = [...referenceImages.value, ...images.slice(0, remaining).map(file => ({ id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }))]
-}
 const previewUrl = file => { const url = URL.createObjectURL(file); objectUrls.add(url); return url }
-const addVideoFile = (fileList) => {
-  const file = Array.from(fileList || []).find(item => item.type.startsWith('video/'))
-  if (!file) return
-  referenceVideo.value = { id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }
+const addMaterialFiles = (type, fileList) => {
+  if (isGenerating.value || activeConversation.value?.loading) return
+  const files = Array.from(fileList || []).filter(file => file.type.startsWith(`${type}/`))
+  const materials = referenceMaterials[type]
+  const remaining = Math.max(0, materialLimits.value[type] - materials.value.length)
+  if (files.length > remaining) {
+    const label = { image: '张图片', video: '个参考视频', audio: '个音频' }[type]
+    activeConversation.value.notice = `当前模型最多支持 ${materialLimits.value[type]} ${label}。`
+  }
+  materials.value = [...materials.value, ...files.slice(0, remaining).map(file => ({ id: crypto.randomUUID(), file, name: file.name, url: previewUrl(file), assetId: null }))]
 }
-const handleImageChange = (event) => { addImageFiles(event.target.files); event.target.value = '' }
-const handleVideoChange = (event) => { addVideoFile(event.target.files); event.target.value = '' }
-const handleImageDrop = (event) => { event.preventDefault(); addImageFiles(event.dataTransfer.files) }
-const removeImage = (asset) => { referenceImages.value = referenceImages.value.filter(item => item.id !== asset.id) }
-const removeVideo = () => { referenceVideo.value = null }
+const handleMaterialChange = (type, event) => { addMaterialFiles(type, event.target.files); event.target.value = '' }
+const handleMaterialDrop = (type, event) => { event.preventDefault(); addMaterialFiles(type, event.dataTransfer.files) }
+const removeMaterial = (type, asset) => { referenceMaterials[type].value = referenceMaterials[type].value.filter(item => item.id !== asset.id) }
 
 const uploadAsset = async (entry, type) => {
   if (entry.assetId) return entry.assetId
@@ -256,12 +272,15 @@ const generate = async () => {
   item.error = false
   item.notice = '正在上传参考素材并提交视频任务…'
   try {
+    validateVideoMaterials({ model: item.selectedModel, images: item.referenceImages, videos: item.referenceVideos, audios: item.referenceAudios })
     const imageAssetIds = await Promise.all(item.referenceImages.map(entry => uploadAsset(entry, 'IMAGE')))
-    const videoAssetId = item.referenceVideo ? await uploadAsset(item.referenceVideo, 'VIDEO') : null
+    const videoAssetIds = await Promise.all(item.referenceVideos.map(entry => uploadAsset(entry, 'VIDEO')))
+    const audioAssetIds = await Promise.all(item.referenceAudios.map(entry => uploadAsset(entry, 'AUDIO')))
     const payload = {
       prompt: item.prompt.trim(),
       referenceImageAssetIds: imageAssetIds,
-      referenceVideoAssetId: videoAssetId,
+      referenceVideoAssetIds: videoAssetIds,
+      referenceAudioAssetIds: audioAssetIds,
       model: item.selectedModel,
       ratio: item.format,
       durationSeconds: item.duration,
@@ -358,7 +377,7 @@ onBeforeUnmount(() => {
   objectUrls.forEach(url => URL.revokeObjectURL(url))
   pollTimers.forEach(timer => window.clearTimeout(timer))
 })
-watch(selectedModel, clampSettings)
+watch(selectedModel, () => { clampSettings(); enforceMaterialLimits() })
 watch(format, () => {
   isMorphing.value = true
   window.clearTimeout(morphTimer)
@@ -375,22 +394,19 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       <fieldset class="video-workbench-scroll vs-form flex-1 overflow-y-auto" :disabled="isGenerating || activeConversation?.loading">
         <section class="vs-group">
           <span class="vs-label">素材<small>均可选</small></span>
-          <div class="vs-list">
-            <div class="vs-item">
-              <button class="vs-row" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleImageDrop"><span>参考图</span><small>{{ referenceImages.length ? `已选 ${referenceImages.length} 张` : '可拖入图片' }}</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
-              <div v-if="referenceImages.length" class="vs-files">
-                <span v-for="asset in referenceImages" :key="asset.id" class="vs-file"><img v-if="asset.url" :src="asset.url" :alt="asset.name"><span v-else>素材不可用</span><button type="button" aria-label="删除参考图" @click="removeImage(asset)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-              </div>
-              <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleImageChange">
-            </div>
-            <div class="vs-item">
-              <button class="vs-row" type="button" :disabled="!!referenceVideo" @click="videoInput?.click()"><span>参考视频</span><small>{{ referenceVideo ? '已选 1 个' : '最多 1 个' }}</small><Plus :size="17" :stroke-width="1.7" aria-hidden="true" /></button>
-              <div v-if="referenceVideo" class="vs-files">
-                <span class="vs-file"><Film :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ referenceVideo.name }}</span><button type="button" aria-label="删除参考视频" @click="removeVideo"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
-              </div>
-              <input ref="videoInput" class="video-file-input" type="file" accept="video/*" @change="handleVideoChange">
-            </div>
+          <div class="vs-tiles">
+            <button class="vs-tile" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleMaterialDrop('image', $event)"><ImagePlus :size="18" :stroke-width="1.6" aria-hidden="true" /><span>参考图片</span><small>最多 {{ materialLimits.image }} 张</small></button>
+            <button class="vs-tile" type="button" @click="videoInput?.click()" @dragover.prevent @drop="handleMaterialDrop('video', $event)"><Film :size="18" :stroke-width="1.6" aria-hidden="true" /><span>参考视频</span><small>最多 {{ materialLimits.video }} 个</small></button>
+            <button class="vs-tile" type="button" @click="audioInput?.click()" @dragover.prevent @drop="handleMaterialDrop('audio', $event)"><AudioLines :size="18" :stroke-width="1.6" aria-hidden="true" /><span>音色</span><small>最多 {{ materialLimits.audio }} 个</small></button>
           </div>
+          <div v-if="referenceImages.length || referenceVideos.length || referenceAudios.length" class="vs-files">
+            <span v-for="asset in referenceImages" :key="asset.id" class="vs-file"><img v-if="asset.url" :src="asset.url" :alt="asset.name"><span>{{ asset.name }}</span><button type="button" aria-label="删除参考图" @click="removeMaterial('image', asset)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+            <span v-for="asset in referenceVideos" :key="asset.id" class="vs-file"><Film :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" aria-label="删除参考视频" @click="removeMaterial('video', asset)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+            <span v-for="asset in referenceAudios" :key="asset.id" class="vs-file"><AudioLines :size="16" :stroke-width="1.6" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" aria-label="删除音色" @click="removeMaterial('audio', asset)"><X :size="12" :stroke-width="2.2" aria-hidden="true" /></button></span>
+          </div>
+          <input ref="imageInput" class="video-file-input" type="file" accept="image/*" multiple @change="handleMaterialChange('image', $event)">
+          <input ref="videoInput" class="video-file-input" type="file" accept="video/*" multiple @change="handleMaterialChange('video', $event)">
+          <input ref="audioInput" class="video-file-input" type="file" accept="audio/*" multiple @change="handleMaterialChange('audio', $event)">
         </section>
 
         <section class="vs-group">
@@ -405,6 +421,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
             <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="format" class="vs-row-select" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
             <div class="vs-setting-row vs-duration"><label for="video-duration">视频时长</label><strong>{{ duration }} 秒</strong><input id="video-duration" v-model.number="duration" class="vs-range" type="range" min="5" :max="durationMax" step="1"></div>
             <div class="vs-setting-row"><span>分辨率</span><div class="vs-segmented" role="group" aria-label="分辨率"><button v-for="item in availableResolutions" :key="item" type="button" :aria-pressed="resolution === item" :class="{ active: resolution === item }" @click="resolution = item">{{ item }}</button></div></div>
+            <small class="vs-setting-note">{{ currentCapability.label }} 可用素材：{{ materialLimitLabel }}</small>
           </div>
         </section>
       </fieldset>
@@ -447,7 +464,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       <VideoPlanPanel
         v-show="rightTab === 'plan'"
         :images="referenceImages"
-        :video="referenceVideo"
+        :video="referenceVideos[0]"
         :upload="uploadAsset"
         :max-duration="durationMax"
         :ratios="ratioOptions.map(option => option.value)"

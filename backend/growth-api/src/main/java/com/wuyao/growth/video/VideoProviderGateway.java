@@ -73,13 +73,16 @@ public class VideoProviderGateway {
     /** Refresh references only while the workflow is known never to have dispatched a request. */
     public Map<String, Object> buildSubmitRequest(VideoDtos.Create request) {
         if (volcengine()) return buildVolcengineRequest(request);
+        if (request.videoReferences().size() > 1 || !request.referenceAudioAssetIds().isEmpty()) {
+            throw BizException.of(ErrorCode.VIDEO_PARAMETER_INVALID, "当前视频供应商协议不支持多个参考视频或音频素材");
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerModel(request.model()));
         body.put("seconds", request.durationSeconds());
         body.put("resolution", request.resolution());
         String prompt = request.prompt();
         if (!prompt.isBlank() && !"auto".equals(request.ratio())) prompt += "\n画幅：" + request.ratio();
-        body.put("mode", request.referenceVideoAssetId() != null ? "video-to-video"
+        body.put("mode", !request.videoReferences().isEmpty() ? "video-to-video"
                 : request.referenceImageAssetIds().isEmpty() ? "text-to-video" : "image-to-video");
         if (!request.referenceImageAssetIds().isEmpty()) {
             var content = new ArrayList<Map<String, Object>>();
@@ -92,11 +95,12 @@ public class VideoProviderGateway {
         } else if (!prompt.isBlank()) {
             body.put("prompt", prompt);
         }
-        if (request.referenceVideoAssetId() != null) {
-            var reference = assets.mediaReference(request.referenceVideoAssetId(), "VIDEO");
+        if (!request.videoReferences().isEmpty()) {
+            Long videoId = request.videoReferences().getFirst();
+            var reference = assets.mediaReference(videoId, "VIDEO");
             var input = new LinkedHashMap<String, Object>();
             input.put("type", "video");
-            input.put("url", assets.presignedReference(request.referenceVideoAssetId(), "VIDEO"));
+            input.put("url", assets.presignedReference(videoId, "VIDEO"));
             input.put("duration", Math.max(1, reference.durationMs() / 1000));
             body.put("input_reference", input);
         }
@@ -112,9 +116,13 @@ public class VideoProviderGateway {
             content.add(Map.of("type", "image_url", "role", "reference_image",
                     "image_url", Map.of("url", assets.presignedReference(assetId, "IMAGE"))));
         }
-        if (request.referenceVideoAssetId() != null) {
+        for (Long assetId : request.videoReferences()) {
             content.add(Map.of("type", "video_url", "role", "reference_video",
-                    "video_url", Map.of("url", assets.presignedReference(request.referenceVideoAssetId(), "VIDEO"))));
+                    "video_url", Map.of("url", assets.presignedReference(assetId, "VIDEO"))));
+        }
+        for (Long assetId : request.referenceAudioAssetIds()) {
+            content.add(Map.of("type", "audio_url", "role", "reference_audio",
+                    "audio_url", Map.of("url", assets.presignedReference(assetId, "AUDIO"))));
         }
         body.put("content", content);
         body.put("duration", request.durationSeconds());

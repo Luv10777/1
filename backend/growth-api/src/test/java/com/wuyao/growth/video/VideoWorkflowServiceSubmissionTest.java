@@ -146,10 +146,11 @@ class VideoWorkflowServiceSubmissionTest {
         assertThat(workflow.getProviderSubmitBody()).isNull();
     }
 
-    @Test
-    void volcengineVideoReferencesKeepTheSameExpiryProtectionAsImageReferences() throws Exception {
-        Map<String, Object> expired = Map.of("content", List.of(Map.of("type", "video_url",
-                "video_url", Map.of("url", signedUrl(Instant.now().minusSeconds(7200), 3600)))));
+    @ParameterizedTest
+    @CsvSource({"image_url", "video_url", "audio_url"})
+    void everyVolcengineMediaTypeKeepsTheSameExpiryProtection(String type) throws Exception {
+        Map<String, Object> expired = Map.of("content", List.of(Map.of("type", type,
+                type, Map.of("url", signedUrl(Instant.now().minusSeconds(7200), 3600)))));
         freeze(expired);
         assertThatThrownBy(() -> service.prepareSubmissionRequest(42L, task, Map.of()))
                 .isInstanceOfSatisfying(NonRetryableTaskException.class,
