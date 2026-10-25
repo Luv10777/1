@@ -1,6 +1,7 @@
 package com.wuyao.growth.billing;
 
 import com.wuyao.growth.commerce.CommerceController;
+import com.wuyao.growth.commerce.CommerceCheckoutService;
 import com.wuyao.growth.commerce.CommerceService;
 import com.wuyao.growth.common.config.SecurityConfig;
 import com.wuyao.growth.common.config.WebConfig;
@@ -47,6 +48,7 @@ class CommunityMembershipAccessTest {
     @MockitoBean BillingService billing;
     @MockitoBean CommunityService community;
     @MockitoBean CommerceService commerce;
+    @MockitoBean CommerceCheckoutService checkout;
     @MockitoBean JwtService jwt;
     @MockitoBean UserRepository users;
 
