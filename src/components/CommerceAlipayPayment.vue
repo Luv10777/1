@@ -1,31 +1,60 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { Download, ScanLine } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Download } from 'lucide-vue-next'
 import { LEGAL_ENTITY } from '../domain/legalPolicies'
 
 const props = defineProps({ order: { type: Object, required: true }, loading: Boolean, error: { type: String, default: '' } })
-defineEmits(['pay', 'refresh'])
+const emit = defineEmits(['pay', 'refresh'])
+const now = ref(Date.now())
+let countdownTimer
+let stopCountdownWatch
 const imageError = ref(false)
 const payable = computed(() => props.order.status === 'PENDING_CONFIRMATION'
   && props.order.payment?.method === 'ALIPAY_MANUAL' && Number(props.order.totalAmount) > 0)
 const automatic = computed(() => props.order.paymentMethod === 'ALIPAY')
 const pending = computed(() => automatic.value && props.order.paymentState === 'PENDING')
-const expired = computed(() => props.order.paymentExpiresAt && Date.parse(props.order.paymentExpiresAt) <= Date.now())
+const remainingSeconds = computed(() => Math.max(0, Math.ceil((Date.parse(props.order.paymentExpiresAt) - now.value) / 1000)))
+const expired = computed(() => props.order.paymentExpiresAt && remainingSeconds.value === 0)
+const countdown = computed(() => {
+  const seconds = remainingSeconds.value
+  const minutes = Math.floor(seconds / 60)
+  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+})
 const amount = computed(() => Number(props.order.totalAmount).toLocaleString('zh-CN', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 }))
 
 watch(() => props.order.payment?.qrCodeUrl, () => { imageError.value = false })
+
+onMounted(() => {
+  stopCountdownWatch = watch(() => [pending.value, props.order.paymentExpiresAt], ([payable]) => {
+    window.clearInterval(countdownTimer)
+    now.value = Date.now()
+    if (!payable || expired.value) return
+    countdownTimer = window.setInterval(() => {
+      now.value = Date.now()
+      if (expired.value) {
+        window.clearInterval(countdownTimer)
+        emit('refresh')
+      }
+    }, 1000)
+  }, { immediate: true })
+})
+onUnmounted(() => {
+  stopCountdownWatch?.()
+  window.clearInterval(countdownTimer)
+})
 </script>
 
 <template>
   <section v-if="automatic" class="commerce-alipay" aria-label="支付宝付款">
-    <header><ScanLine :size="20" aria-hidden="true" /><h3>{{ order.paymentState === 'PAID' ? '支付宝支付成功' : order.paymentState === 'CLOSED' ? '支付已关闭' : '支付宝付款' }}</h3></header>
+    <header><img class="commerce-alipay-logo" src="/images/payments/alipay.svg" alt="支付宝" width="24" height="24" /><h3>{{ order.paymentState === 'PAID' ? '支付宝支付成功' : order.paymentState === 'CLOSED' ? '支付已关闭' : '支付宝付款' }}</h3></header>
     <p class="commerce-alipay-label">{{ order.paymentState === 'PAID' ? '实付金额' : '订单金额' }}</p>
     <p class="commerce-alipay-amount"><span>¥</span>{{ amount }}</p>
     <p class="commerce-alipay-order">订单号：<strong>{{ order.orderNumber }}</strong></p>
     <p v-if="order.payment" class="commerce-alipay-recipient">收款方：{{ order.payment.recipient }}</p>
     <template v-if="pending">
+      <p class="commerce-alipay-countdown"><span>支付剩余时间</span><strong role="timer" aria-label="支付剩余时间" aria-live="off">{{ countdown }}</strong></p>
       <p class="commerce-alipay-recipient">付款截止：{{ new Date(order.paymentExpiresAt).toLocaleString('zh-CN', { hour12: false }) }}</p>
       <button v-if="!expired" type="button" class="public-button public-button-primary" :disabled="loading" @click="$emit('pay')">{{ loading ? '正在打开收银台…' : '前往支付宝付款' }}</button>
       <p v-else class="commerce-alipay-recipient" role="status">付款时限已结束，正在核实最终支付结果。</p>
@@ -38,7 +67,7 @@ watch(() => props.order.payment?.qrCodeUrl, () => { imageError.value = false })
     <p class="commerce-alipay-help">付款或售后遇到问题，请提供订单号联系<a :href="`tel:${LEGAL_ENTITY.phone}`">{{ LEGAL_ENTITY.phone }}</a>。</p>
   </section>
   <section v-if="payable" class="commerce-alipay" aria-label="企业支付宝付款">
-    <header><ScanLine :size="20" aria-hidden="true" /><h3>支付宝扫码付款</h3></header>
+    <header><img class="commerce-alipay-logo" src="/images/payments/alipay.svg" alt="支付宝" width="24" height="24" /><h3>支付宝扫码付款</h3></header>
     <p class="commerce-alipay-label">本单应付金额</p>
     <p class="commerce-alipay-amount"><span>¥</span>{{ amount }}</p>
     <p class="commerce-alipay-order">订单号：<strong>{{ order.orderNumber }}</strong></p>
@@ -60,7 +89,10 @@ watch(() => props.order.payment?.qrCodeUrl, () => { imageError.value = false })
 <style scoped>
 .commerce-alipay { margin: 20px 0; padding: 24px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); color: var(--color-primary); text-align: center; }
 .commerce-alipay header { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.commerce-alipay header svg { color: #1677ff; }
+.commerce-alipay-logo { display: block; width: 24px; height: 24px; flex-shrink: 0; }
+.commerce-alipay-countdown { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 18px 0 0; }
+.commerce-alipay-countdown > span { color: var(--color-text-muted); font-size: 15px; }
+.commerce-alipay-countdown > strong { color: var(--color-accent-text); font-size: 24px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .commerce-alipay .public-button { margin: 4px; }
 .commerce-alipay h3 { margin: 0; font-size: 17px; font-weight: 600; }
 .commerce-alipay-label { margin: 20px 0 4px; color: var(--color-text-muted); font-size: 12px; }
