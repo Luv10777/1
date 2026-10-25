@@ -114,13 +114,16 @@ public class ImageCreationService {
  public ImageDtos.View get(Long id) {return view(find(id));}
  @Transactional
  public boolean recordPreviewLoaded(Long creationId,Long itemId,int generation) {
-   find(creationId);
+   billing.lockForGeneration();
+   var creation=find(creationId);
    var item=lockItem(itemId);
    if(!item.getCreationId().equals(creationId)) throw bad("图片不属于这次创作");
    if(item.getGeneration()!=generation || (item.getProviderImageUrl()==null && item.getOutputKey()==null)) return false;
    // A reused image in a regenerated set must not become that set's first preview.
    if(item.getTaskId()==null) return false;
    if(item.getPreviewedAt()==null) item.setPreviewedAt(Instant.now());
+   // A successfully displayed preview is delivery, independent of background storage.
+   captureImage(creation,item);
    return true;
  }
 
@@ -224,11 +227,12 @@ public class ImageCreationService {
       if(!Set.of("FAILED","INTERRUPTED","UPSTREAM_UNKNOWN").contains(status)) throw bad("当前图片无需重试");
       c.setBillingRound(c.getBillingRound()+1);
       if(!c.isConcurrencyPermitHeld()) { acquirePermit(TenantContext.require()); c.setConcurrencyPermitHeld(true); }
-      if(!i.isBillingHeld()) {
+      boolean newGeneration=Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus());
+      if(!i.isBillingHeld() && (i.getPreviewedAt()==null || newGeneration)) {
         reserveRetry(c,BillingService.IMAGE_CREDITS,"item-"+i.getId()+"-"+expectedTaskId);
         i.setBillingHeld(true);
-      } else billing.requireMembership("IMAGE");
-      if(Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus())) {
+      } else if(i.isBillingHeld()) billing.requireMembership("IMAGE");
+      if(newGeneration) {
        i.setGeneration(i.getGeneration()+1);i.setProviderJobId(null);i.setRawKey(null);i.setPollRound(0);
        i.setProviderImageUrl(null);i.setPersistedAt(null);i.setPreviewedAt(null);i.setOutputKey(null);
        i.setProviderCode(null);
@@ -351,7 +355,10 @@ public class ImageCreationService {
         || (!children.isEmpty() && children.stream().allMatch(i -> Set.of("SUCCEEDED","FAILED","CANCELLED","UPSTREAM_UNKNOWN","INTERRUPTED").contains(effective(i.getStatus(),i.getTaskId()))));
    if (terminal) {
      cleanupFailedObjects(children);
-     children.forEach(i->i.setBillingHeld(false));
+     children.forEach(i->{
+       if(i.getPreviewedAt()!=null) captureImage(creation,i);
+       i.setBillingHeld(false);
+     });
      if(creation.getBillingReservationId()!=null) billing.release(creation.getBillingReservationId(),
          "image-terminal:"+creation.getId()+":"+creation.getBillingRound(),"图片创作结束 · 退回未交付烟火");
    }
@@ -660,6 +667,10 @@ public class ImageCreationService {
  }
  private void releaseImage(ImageCreation c,ImageItem i,String key) {
    if(c.getBillingReservationId()!=null&&i.isBillingHeld()) {
+     if(i.getPreviewedAt()!=null) {
+       captureImage(c,i);
+       return;
+     }
      billing.releaseAmount(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,key,"图片未交付 · 退回 3 烟火");
      i.setBillingHeld(false);
    }
@@ -681,7 +692,9 @@ public class ImageCreationService {
      if("IMAGE_DOWNLOAD".equals(event.type())&&!Objects.equals(event.payload().get("targetKey"),
          "t"+i.getTenantId()+"/generated/"+i.getId()+"/"+i.getGeneration()+"/background.png")) return;
      if(!Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus())) i.setStatus("INTERRUPTED");
-     if(i.getError()==null||i.getError().isBlank()) i.setError("本次图片未交付，预占烟火已退回，可以恢复原任务");
+     if(i.getError()==null||i.getError().isBlank()) i.setError(i.getPreviewedAt()!=null
+       ?"图片已显示，后台保存未完成，可以恢复原任务"
+       :"本次图片未交付，预占烟火已退回，可以恢复原任务");
      var c=find(i.getCreationId());
      releaseImage(c,i,"image-task-failed:"+event.taskId());
      syncCreationStatus(c); releasePermitIfTerminal(c);
@@ -706,8 +719,8 @@ public class ImageCreationService {
    var views=list.stream().map(i->{
      String status=effective(i.getStatus(),i.getTaskId());
      String durableUrl=i.getOutputKey()==null?null:storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30));
-     // A temporary preview is available immediately; durable delivery still
-     // owns task success, asset operations and billing settlement.
+     // A displayed preview settles billing; durable storage still owns task
+     // success and asset operations.
      String providerUrl=i.getPersistedAt()==null?i.getProviderImageUrl():null;
      String url=durableUrl==null?providerUrl:durableUrl;
      boolean downloadFailed=i.getProviderImageUrl()!=null && i.getPersistedAt()==null

@@ -44,6 +44,7 @@ export function useImageCreation(workflow) {
   let pollError = false
   const previewTracking = new Set()
   const previewReports = new Set()
+  const pendingPreviewReports = new Map()
   const failedPreviews = new Set()
   const previewKey = item => `${item.id}:${item.generation}`
   const owner = readUser()
@@ -72,8 +73,12 @@ export function useImageCreation(workflow) {
     const turn = thread.value.find(entry => entry.items?.some(image => image.id === item.id))
     const key = previewKey(item)
     if (!alive || !turn || !previewTracking.has(turn.id) || item.previewedAt || previewReports.has(key)) return
+    pendingPreviewReports.set(key, item)
     previewReports.add(key)
-    try { await imageApi.previewLoaded(turn.id, item) }
+    try {
+      await imageApi.previewLoaded(turn.id, item)
+      pendingPreviewReports.delete(key)
+    }
     catch { previewReports.delete(key) }
   }
   function imageLoadFailed(item) {
@@ -126,6 +131,8 @@ export function useImageCreation(workflow) {
       if (current.value?.id !== result.id) workspaceTab.value = 'result'
       thread.value = versions
       current.value = result
+      // Retry a lost visibility receipt even when the image does not load again.
+      for (const item of pendingPreviewReports.values()) reportImageVisible(item)
       refreshBilling()
       if (pollError) { error.value = ''; pollError = false }
       const waitingForStorage = versions.some(turn => turn.items?.some(item => item.providerImageUrl && !item.persisted && !item.downloadFailed))

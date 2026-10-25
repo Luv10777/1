@@ -628,6 +628,63 @@ class FoundationIntegrationTest {
         assertThat(imageRateLimiter.getActiveCount(tenantA)).isZero();
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void imageDownloadFailureRefundsOnlyUnseenPreviewsAndStorageRetryDoesNotChargeTwice(boolean visible) throws Exception {
+        enableImageModels(); planImageCount(1);
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
+                .thenReturn(new ProviderResult(true, "TEST", null, Map.of("status", "SUCCEEDED",
+                        "imageUrl", "https://provider.example/temporary.png"), null, null));
+        var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-preview","POSTER",1,List.of()),null));
+        runImageTask("DEFAULT",imagePlanHandler); runImageTask("IMAGE",imageRenderHandler);
+        var item=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()).items().getFirst());
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        if(visible) {
+            assertThat(concurrent(()->TenantContext.runAs(tenantA,()->imageCreations.recordPreviewLoaded(created.id(),item.id(),0))))
+                    .allMatch(Boolean.TRUE::equals);
+            assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
+        }
+        var download=tasks.claim("DEFAULT",1).getFirst();
+        assertThat(tasks.failPermanently(download.getId(),download.getAttempts(),"STORAGE_UNAVAILABLE","test storage failure")).isTrue();
+        var balance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
+        assertThat(balance.held()).isZero();
+        assertThat(balance.available()).isEqualTo(visible?999997:1000000);
+        assertThat(imageRateLimiter.getActiveCount(tenantA)).isZero();
+        if(visible) {
+            TenantContext.runAs(tenantA,()->imageCreations.retry(created.id(),item.id(),download.getId(),null));
+            assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
+            var retry=tasks.claim("DEFAULT",1).getFirst();
+            String storageKey=(String)retry.getPayload().get("targetKey");
+            imageStorage.put(storageKey,imageRenderer.png(new java.awt.image.BufferedImage(480,640,java.awt.image.BufferedImage.TYPE_INT_RGB)),"image/png");
+            TenantContext.runAs(tenantA,()->{
+                imageCreations.markImagePersisted(item.id(),retry,storageKey,480,640,null);
+                return null;
+            });
+            assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).available())).isEqualTo(999997);
+            assertThat(owner.queryForObject("select count(*) from billing_ledger where event_key=?",Long.class,
+                    "image-delivered:"+item.id()+":0")).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void rolledBackImagePreviewDoesNotSettleCreditsOrRecordDelivery() {
+        enableImageModels(); planImageCount(1);
+        when(imageGateway.invokeReal(argThat(r -> r != null && r.alias() == ModelAlias.IMAGE_PRIMARY)))
+                .thenReturn(new ProviderResult(true,"TEST",null,Map.of("status","SUCCEEDED",
+                        "imageUrl","https://provider.example/temporary.png"),null,null));
+        var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-preview-rollback","POSTER",1,List.of()),null));
+        runImageTask("DEFAULT",imagePlanHandler); runImageTask("IMAGE",imageRenderHandler);
+        var item=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()).items().getFirst());
+        TenantContext.runAs(tenantA,()->transactions.execute(status->{
+            imageCreations.recordPreviewLoaded(created.id(),item.id(),0);
+            status.setRollbackOnly(); return null;
+        }));
+        assertThat(TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(item.id()).getPreviewedAt())).isNull();
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(owner.queryForObject("select count(*) from billing_ledger where event_key=?",Long.class,
+                "image-delivered:"+item.id()+":0")).isZero();
+    }
+
     @Test
     void videoSettlementUsesReportedTokensAndRefundsUnusedApprovedCreditsOnlyOnce() {
         pricingConfig.getRates().forEach(r->r.setSellingMultiplier(new BigDecimal("100")));

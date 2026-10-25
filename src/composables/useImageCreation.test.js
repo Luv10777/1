@@ -74,7 +74,7 @@ test('image creation reads capabilities for members and lets guests browse witho
   }
 })
 
-test('temporary previews report the first load once and fall back to durable images without changing history timings', async () => {
+test('temporary previews retry a lost visibility receipt and settle once without changing history timings', async () => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
   const originalFetch = globalThis.fetch
   let auth, app, studio
@@ -93,6 +93,7 @@ test('temporary previews report the first load once and fall back to durable ima
       if (String(url).endsWith('/thread')) data = structuredClone(versions)
       if (String(url).endsWith('/preview-loaded')) {
         previewRequests++
+        if (previewRequests === 1) throw new TypeError('test transient receipt failure')
         assert.equal(options.method, 'POST')
         assert.deepEqual(JSON.parse(options.body), { generation: 0 })
         data = true
@@ -114,8 +115,13 @@ test('temporary previews report the first load once and fall back to durable ima
     assert.equal(item.url, 'https://source.example/temporary.png')
     assert.equal(studio.canUseAsset(item), false)
     await studio.reportImageVisible(item)
-    await studio.reportImageVisible(item)
     assert.equal(previewRequests, 1)
+    await studio.load(42)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    assert.equal(previewRequests, 2, 'polling must retry the receipt without another image load')
+    item = studio.current.items[0]
+    await studio.reportImageVisible(item)
+    assert.equal(previewRequests, 2)
     studio.imageLoadFailed(item)
     assert.equal(item.url, null)
     await studio.load(42)
@@ -127,11 +133,11 @@ test('temporary previews report the first load once and fall back to durable ima
     assert.equal(item.url, 'https://storage.example/durable.png')
     assert.equal(studio.canUseAsset(item), true)
     await studio.reportImageVisible(item)
-    assert.equal(previewRequests, 1, 'switching to the durable URL must not restart the first-preview timer')
+    assert.equal(previewRequests, 2, 'switching to the durable URL must not restart the first-preview timer')
     versions = [{ id: 43, workflow: 'POSTER', status: 'SUCCEEDED', items: [{ id: 13, generation: 0, url: 'https://storage.example/old.png', persisted: true }] }]
     await studio.load(43)
     await studio.reportImageVisible(studio.current.items[0])
-    assert.equal(previewRequests, 1, 'opening completed history must not invent a new generation duration')
+    assert.equal(previewRequests, 2, 'opening completed history must not invent a new generation duration')
   } finally {
     app?.unmount()
     if (auth) { auth.state.user = null; auth.state.token = null }
