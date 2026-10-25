@@ -27,6 +27,7 @@ public class ImageItem {
  @Column(length=500) private String outputKey;
  @Column(name="provider_image_url", columnDefinition="text") private String providerImageUrl;
  @Column(name="persisted_at") private Instant persistedAt;
+ @Column(name="previewed_at") private Instant previewedAt;
  private Integer actualWidth;
  private Integer actualHeight;
  @Column(length=16) private String imageHash;

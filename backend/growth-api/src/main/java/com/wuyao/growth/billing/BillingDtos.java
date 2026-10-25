@@ -60,7 +60,8 @@ public final class BillingDtos {
     /** 全平台烟火流水的一行；availableDelta 是可用烟火变动（赠送 + 购买），heldDelta 是预占变动。 */
     public record PlatformLedgerEntry(Long id, Long tenantId, String tenantName, Long actorUserId, String actorName,
                                       String type, String capability, String description, long availableDelta,
-                                      long heldDelta, long availableAfter, Instant createdAt) {}
+                                      long heldDelta, long availableAfter, Instant createdAt, String model,
+                                      Long elapsedMillis, String taskStatus, Long previewElapsedMillis) {}
 
     /** 时间窗口内的全平台合计；consumed 只算实际扣除（CAPTURE），预占不算消耗。 */
     public record PlatformLedgerSummary(int days, long consumed, long consumedToday, long refunded, long purchased,

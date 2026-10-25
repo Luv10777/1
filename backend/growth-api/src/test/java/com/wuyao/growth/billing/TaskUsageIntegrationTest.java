@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties={"spring.config.import=", "growth.worker.enabled=false", "logging.level.root=WARN",
@@ -78,6 +79,63 @@ class TaskUsageIntegrationTest {
         assertThat(detail.events()).extracting(TaskUsageDtos.Event::type).containsExactly("RESERVE","CAPTURE","CAPTURE","CAPTURE","RELEASE");
     }
 
+    @Test void imagePreviewAppearsBeforePersistenceAndLoadAcknowledgementIsIsolatedAndIdempotent() throws Exception {
+        String reservation=reserve("IMAGE",3);
+        long id=image(tenant,"preview",1,null,reservation,"GENERATING",null);
+        long output=item(id,0,"GENERATING",1L);
+        owner.update("UPDATE image_creations SET request=request || '{\"ratio\":\"1:1\",\"references\":[]}'::jsonb, created_at=now()-interval '55 seconds' WHERE id=?",id);
+        String preview="https://test.oss-cn-hongkong.aliyuncs.com/preview.png";
+        owner.update("UPDATE image_items SET provider_image_url=? WHERE id=?",preview,output);
+        String token=jwt.issueAccessToken(user,tenant,null);
+        String endpoint="/api/image-creations/"+id+"/items/"+output+"/preview-loaded";
+        long ledgerBefore=owner.queryForObject("SELECT count(*) FROM billing_ledger",Long.class);
+        mvc.perform(get("/api/image-creations/"+id).header("Authorization","Bearer "+token))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].url").value(preview))
+            .andExpect(jsonPath("$.data.items[0].persisted").value(false))
+            .andExpect(jsonPath("$.data.items[0].status").value("GENERATING"));
+        mvc.perform(post(endpoint).contentType("application/json").content("{\"generation\":0}"))
+            .andExpect(status().isUnauthorized());
+        long otherUser=owner.queryForObject("INSERT INTO users(tenant_id,username) VALUES (?,'preview-other') RETURNING id",Long.class,otherTenant);
+        String otherToken=jwt.issueAccessToken(otherUser,otherTenant,null);
+        mvc.perform(post(endpoint).header("Authorization","Bearer "+otherToken)
+            .contentType("application/json").content("{\"generation\":0}"))
+            .andExpect(status().isNotFound());
+        mvc.perform(post(endpoint).header("Authorization","Bearer "+token)
+            .contentType("application/json").content("{\"generation\":1}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(false));
+        assertThat(owner.queryForObject("SELECT previewed_at FROM image_items WHERE id=?",java.sql.Timestamp.class,output)).isNull();
+        mvc.perform(post(endpoint).header("Authorization","Bearer "+token)
+            .contentType("application/json").content("{\"generation\":0}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(true));
+        var first=owner.queryForObject("SELECT previewed_at FROM image_items WHERE id=?",java.sql.Timestamp.class,output);
+        mvc.perform(post(endpoint).header("Authorization","Bearer "+token)
+            .contentType("application/json").content("{\"generation\":0}"))
+            .andExpect(status().isOk());
+        assertThat(owner.queryForObject("SELECT previewed_at FROM image_items WHERE id=?",java.sql.Timestamp.class,output)).isEqualTo(first);
+        var row=logs(null,null,"IMAGE_GENERATION",null,null,0,20).records().items().getFirst();
+        assertThat(row.previewElapsedMillis()).isBetween(55000L,65000L);
+        assertThat(row.status()).isEqualTo("SUCCEEDED");
+        assertThat(row.elapsedMillis()).isEqualTo(row.previewElapsedMillis());
+        assertThat(row.succeeded()).isEqualTo(1); assertThat(row.pending()).isZero();
+        assertThat(logs(null,null,"IMAGE_GENERATION",null,"RUNNING",0,20).records().items()).isEmpty();
+        assertThat(logs(null,null,"IMAGE_GENERATION",null,"SUCCEEDED",0,20).records().items()).hasSize(1);
+        assertThat(owner.queryForObject("SELECT status FROM image_items WHERE id=?",String.class,output)).isEqualTo("GENERATING");
+        assertThat(row.heldCredits()).isEqualTo(3); assertThat(row.chargedCredits()).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger",Long.class)).isEqualTo(ledgerBefore);
+        owner.update("UPDATE image_items SET status='SUCCEEDED', persisted_at=now()+interval '60 seconds', output_key='test/durable.png' WHERE id=?",output);
+        var saved=logs(null,null,"IMAGE_GENERATION",null,null,0,20).records().items().getFirst();
+        assertThat(saved.previewElapsedMillis()).isEqualTo(row.previewElapsedMillis());
+        assertThat(saved.elapsedMillis()).isEqualTo(row.elapsedMillis());
+        owner.update("UPDATE image_items SET status='FAILED',error='Background save failed' WHERE id=?",output);
+        var displayed=TenantContext.runAs(tenant,()->usage.detail("image-"+id));
+        assertThat(displayed.task().status()).isEqualTo("SUCCEEDED");
+        assertThat(displayed.task().elapsedMillis()).isEqualTo(row.elapsedMillis());
+        assertThat(displayed.task().failed()).isZero();
+        assertThat(displayed.items().getFirst().status()).isEqualTo("SUCCEEDED");
+        assertThat(displayed.items().getFirst().error()).isNull();
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger",Long.class)).isEqualTo(ledgerBefore);
+    }
+
     @Test void singleImageRegenerationCountsOnlyNewOutputAndNeverChargesCopiedImages() {
         long parent=image(tenant,"original",3,null,null,"SUCCEEDED",null);
         String reservation=reserve("IMAGE",3);
@@ -99,7 +157,7 @@ class TaskUsageIntegrationTest {
         TenantContext.runAs(tenant,()->{ billing.release(reservation,"video-refund-test","Video settlement"); return null; });
         var report=logs(null,null,"DIGITAL_HUMAN_VIDEO","Seedance 2.0",null,0,20);
         var row=report.records().items().getFirst();
-        assertThat(row.model()).isEqualTo("seedance-2.0");
+        assertThat(row.model()).isEqualTo("Seedance 2.0");
         assertThat(row.chargedCredits()).isEqualTo(37);
         assertThat(row.releasedCredits()).isEqualTo(63);
         assertThat(row.durationSeconds()).isEqualTo(10);
@@ -200,6 +258,64 @@ class TaskUsageIntegrationTest {
         assertThat(json.writeValueAsString(digital)).contains("\"sourceModule\":\"DIGITAL_HUMAN\"");
     }
 
+    @Test void publicModelNamesAreSearchableAndImageDetailsDoNotExposeProviderIds() {
+        long id=image(tenant,"public-image",1,null,null,"SUCCEEDED",null);
+        item(id,0,"SUCCEEDED",1L);
+        var detail=TenantContext.runAs(tenant,()->usage.detail("image-"+id));
+        assertThat(detail.task().model()).isEqualTo("一方志Image");
+        assertThat(detail.items()).extracting(TaskUsageDtos.Item::model).containsOnly("一方志Image");
+        assertThat(logs(null,null,null,"一方志Image",null,0,20).records().total()).isEqualTo(1);
+        assertThat(logs(null,null,null,"test-image-model",null,0,20).records().total()).isEqualTo(1);
+    }
+
+    @Test void videoPlansIncludeThreeOutputsOneCreditAndRefundedOrQueuedBatches() throws Exception {
+        String successReservation=reserve("VIDEO_PLAN",1), failedReservation=reserve("VIDEO_PLAN",1), pendingReservation=reserve("VIDEO_PLAN",1);
+        long success=plan(tenant,"SUCCEEDED",successReservation), failed=plan(tenant,"FAILED",failedReservation);
+        plan(tenant,"QUEUED",pendingReservation);
+        capture(successReservation,1,"video-plan:"+success+":capture");
+        TenantContext.runAs(tenant,()->{billing.release(failedReservation,"video-plan:"+failed+":release","Failed plan");return null;});
+        var result=logs(null,null,"VIDEO_PLAN","一方志提示词",null,0,20);
+        assertThat(result.records().total()).isEqualTo(3);
+        assertThat(result.summary().chargedCredits()).isEqualTo(1);
+        assertThat(result.summary().releasedCredits()).isEqualTo(1);
+        assertThat(result.summary().heldCredits()).isEqualTo(1);
+        assertThat(result.records().items()).allSatisfy(row->{
+            assertThat(row.quantity()).isEqualTo(3);assertThat(row.unit()).isEqualTo("个方案");
+            assertThat(row.model()).isEqualTo("一方志提示词");
+        });
+        var detail=TenantContext.runAs(tenant,()->usage.detail("plan-"+success));
+        assertThat(detail.task().succeeded()).isEqualTo(3);
+        assertThat(detail.events()).extracting(TaskUsageDtos.Event::type).containsExactly("RESERVE","CAPTURE");
+        mvc.perform(get("/api/task-center/logs/plan-"+success).header("Authorization","Bearer "+jwt.issueAccessToken(user,tenant,null)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.task.model").value("一方志提示词"));
+        long hidden=plan(otherTenant,"SUCCEEDED",null);
+        assertThat(logs(null,null,"VIDEO_PLAN",null,null,0,20).records().total()).isEqualTo(3);
+        mvc.perform(get("/api/task-center/logs/plan-"+hidden).header("Authorization","Bearer "+jwt.issueAccessToken(user,tenant,null)))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test void elapsedTimeIncludesQueueingFreezesAtSettlementAndLeavesUnknownHistoryEmpty() {
+        String reservation=reserve("VIDEO_PLAN",1);
+        long done=plan(tenant,"SUCCEEDED",reservation);
+        capture(reservation,1,"video-plan:"+done+":capture");
+        Instant settled=owner.queryForObject("SELECT created_at FROM billing_ledger WHERE reservation_id=? AND type='CAPTURE'",
+            java.sql.Timestamp.class,reservation).toInstant();
+        owner.update("UPDATE video_plans SET created_at=?,updated_at=? WHERE id=?",
+            java.sql.Timestamp.from(settled.minusMillis(125000)),java.sql.Timestamp.from(settled.minusSeconds(1)),done);
+        assertThat(TenantContext.runAs(tenant,()->usage.detail("plan-"+done)).task().elapsedMillis()).isEqualTo(125000);
+        long pending=plan(tenant,"QUEUED",null);
+        owner.update("UPDATE video_plans SET created_at=NOW()-INTERVAL '30 seconds' WHERE id=?",pending);
+        assertThat(TenantContext.runAs(tenant,()->usage.detail("plan-"+pending)).task().elapsedMillis()).isBetween(30000L,45000L);
+        long failed=plan(tenant,"FAILED",null);
+        owner.update("UPDATE video_plans SET created_at='2026-10-24T00:00:00Z',updated_at='2026-10-24T00:00:07Z' WHERE id=?",failed);
+        assertThat(TenantContext.runAs(tenant,()->usage.detail("plan-"+failed)).task().elapsedMillis()).isEqualTo(7000);
+        long legacy=image(tenant,"legacy-time",1,null,null,"FAILED",null);
+        assertThat(TenantContext.runAs(tenant,()->usage.detail("image-"+legacy)).task().elapsedMillis()).isNull();
+        long before=owner.queryForObject("SELECT count(*) FROM billing_ledger",Long.class);
+        logs(null,null,null,null,null,0,20);
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger",Long.class)).isEqualTo(before);
+    }
+
     private TaskUsageDtos.Logs logs(Instant from,Instant until,String module,String model,String status,int page,int size) {
         return TenantContext.runAs(tenant,()->usage.logs(new TaskUsageDtos.Filter(from,until,module,model,status,page,size)));
     }
@@ -226,5 +342,10 @@ class TaskUsageIntegrationTest {
         return owner.queryForObject("INSERT INTO video_workflows(tenant_id,request_key,request_hash,request,model,ratio,duration_seconds,resolution,status,billing_reservation_id,billing_quote) "
             +"VALUES (?,?,?,?::jsonb,'SEEDANCE_2_0','9:16',10,'720p',?,?, '{\"providerModel\":\"seedance-2.0\",\"credits\":100}') RETURNING id",
             Long.class,tenantId,key,"b".repeat(64),request,status,reservation);
+    }
+
+    private long plan(long tenantId,String status,String reservation) {
+        return owner.queryForObject("INSERT INTO video_plans(tenant_id,request_key,status,billing_reservation_id,idea) "
+            +"VALUES (?,?,?,?, 'Test video plan') RETURNING id",Long.class,tenantId,UUID.randomUUID().toString(),status,reservation);
     }
 }

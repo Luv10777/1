@@ -53,7 +53,9 @@ public class BillingLedgerReport {
                     .map(r -> new BillingDtos.PlatformLedgerEntry(((Number) r[0]).longValue(), tenant.id(), tenant.name(),
                             r[1] == null ? null : ((Number) r[1]).longValue(), r[1] == null ? null : actors.get(((Number) r[1]).longValue()),
                             (String) r[2], (String) r[3], (String) r[4], ((Number) r[5]).longValue(), ((Number) r[6]).longValue(),
-                            ((Number) r[7]).longValue(), instant(r[8])))
+                            ((Number) r[7]).longValue(), instant(r[8]), (String) r[9],
+                            r[10] == null ? null : ((Number) r[10]).longValue(), (String) r[11],
+                            r[12] == null ? null : ((Number) r[12]).longValue()))
                     .toList());
         }
         rows.sort(Comparator.comparing(BillingDtos.PlatformLedgerEntry::createdAt).thenComparing(BillingDtos.PlatformLedgerEntry::id).reversed());
@@ -89,11 +91,15 @@ public class BillingLedgerReport {
 
     @SuppressWarnings("unchecked")
     private List<Object[]> rows(Long tenantId, Instant since, String type, String capability) {
-        return em.createNativeQuery("""
+        return em.createNativeQuery(TaskUsageStore.REPORT + """
                 SELECT l.id, l.actor_user_id, l.type, r.capability, l.description,
-                       l.gift_delta + l.purchased_delta, l.held_delta, l.available_after, l.created_at
+                       l.gift_delta + l.purchased_delta, l.held_delta, l.available_after, l.created_at,
+                       COALESCE(u.model,CASE r.capability WHEN 'IMAGE' THEN '一方志Image'
+                           WHEN 'VIDEO_ANALYSIS' THEN '一方志反推' WHEN 'VIDEO_PLAN' THEN '一方志提示词' END),
+                       u.elapsed_millis, u.status, u.preview_elapsed_millis
                 FROM billing_ledger l
                 LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id
+                LEFT JOIN logs u ON u.reservation_id = l.reservation_id
                 WHERE l.tenant_id = :tenant AND l.created_at >= :since
                   AND (:type = '' OR l.type = :type) AND (:capability = '' OR r.capability = :capability)
                 ORDER BY l.id DESC LIMIT :limit""")

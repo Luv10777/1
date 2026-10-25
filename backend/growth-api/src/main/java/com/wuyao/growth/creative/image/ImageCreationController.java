@@ -16,6 +16,10 @@ public class ImageCreationController {
    return ApiResponse.ok(service.create(req,me.userId()));
  }
  @GetMapping("/{id}") public ApiResponse<ImageDtos.View> get(@PathVariable Long id){return ApiResponse.ok(service.get(id));}
+ @PostMapping("/{id}/items/{itemId}/preview-loaded") public ApiResponse<Boolean> previewLoaded(
+   @PathVariable Long id,@PathVariable Long itemId,@Valid @RequestBody ImageDtos.PreviewLoaded req){
+   return ApiResponse.ok(service.recordPreviewLoaded(id,itemId,req.generation()));
+ }
  @PostMapping("/{id}/cancel") public ApiResponse<ImageDtos.View> cancel(@PathVariable Long id){return ApiResponse.ok(service.cancel(id));}
  @GetMapping("/{id}/thread") public ApiResponse<java.util.List<ImageDtos.View>> thread(@PathVariable Long id){
    return ApiResponse.ok(service.thread(id));

@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Flame, Gift, RefreshCw, Search, Undo2, X, Cl
 import { ledgerAdminApi as api, ledgerCapabilities, ledgerChange, ledgerRanges, ledgerTypes } from '../services/ledgerAdminApi'
 import { auth } from '../stores/auth'
 import { managementDate } from '../domain/platformManagement'
+import { taskElapsed } from '../domain/taskUsage'
 import '../platform-management.css'
 
 const records = ref([])
@@ -90,12 +91,14 @@ onBeforeUnmount(() => { version++ })
       <div v-else-if="!records.length" class="mg-state"><Flame :size="32" /><h3>{{ keyword || type || capability ? '没有匹配的流水' : '这段时间还没有烟火流水' }}</h3><p>{{ keyword || type || capability ? '调整关键词或筛选条件后重新查询。' : '商家充值、生成内容时，每一笔变动都会记录在这里。' }}</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
-          <thead><tr><th>时间</th><th>商户</th><th>功能 / 说明</th><th>类型</th><th class="credit-number">烟火变动</th><th class="credit-number">可用余额</th></tr></thead>
+          <thead><tr><th>时间</th><th>商户</th><th>功能 / 说明</th><th>模型</th><th title="图片优先显示提交至首次加载图片的时间；其他任务及未记录图片显示时间的历史任务采用任务总耗时">耗时</th><th>类型</th><th class="credit-number">烟火变动</th><th class="credit-number">可用余额</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="`${item.tenantId}-${item.id}`">
               <td class="mg-time">{{ managementDate(item.createdAt) }}</td>
               <td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}{{ item.actorName ? ` · ${item.actorName}` : '' }}</small></td>
               <td><span>{{ ledgerCapabilities[item.capability] || (item.type === 'PURCHASE' || item.type === 'GRANT' ? '账户' : '—') }}</span><small>{{ item.description }}</small></td>
+              <td class="credit-model">{{ item.model || '—' }}</td>
+              <td class="credit-elapsed">{{ taskElapsed(item) }}</td>
               <td><span class="mg-status" :class="`credit-${item.type.toLowerCase()}`"><i />{{ ledgerTypes[item.type] || item.type }}</span></td>
               <td class="credit-number"><strong :class="`credit-${ledgerChange(item).tone}`">{{ ledgerChange(item).text }}</strong></td>
               <td class="credit-number">{{ number(item.availableAfter) }}</td>
@@ -105,13 +108,15 @@ onBeforeUnmount(() => { version++ })
       </div>
       <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 条流水` }}</span><div><label><span class="sr-only">每页条数</span><AppSelect v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></AppSelect></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
-    <p class="management-footnote">扣除表示生成交付后实际消耗的烟火；预占在提交时冻结，交付后转为扣除，失败或取消时退回。</p>
+    <p class="management-footnote">扣除表示生成交付后实际消耗的烟火；预占在提交时冻结，交付后转为扣除，失败或取消时退回。图片耗时优先采用首次加载图片的时间，包含排队；无显示记录时采用任务耗时。</p>
   </div>
 </template>
 
 <style scoped>
 .credit-breakdown { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .credit-number { text-align: right; font-variant-numeric: tabular-nums; }
+.credit-model, .credit-elapsed { white-space: nowrap; }
+.credit-elapsed { font-variant-numeric: tabular-nums; }
 .credit-out { color: #ac4949; font-weight: 500; }
 .credit-hold { color: #8a6d1f; font-weight: 500; }
 .credit-in { color: #31714f; font-weight: 500; }

@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 public class VideoPlanProperties {
     private String baseUrl = "https://api.onlyrouter.ai/v1";
     private String apiKey = "";
-    private String model = "gemini-3.8-flash-ab";
+    private String model = "gpt-6-luna";
     private int timeoutSeconds = 120;
     private int maxTokens = 8000;
     /** 送给模型的参考图边长上限，缩小后再编码，控制请求体积。 */

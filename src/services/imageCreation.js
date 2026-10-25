@@ -5,6 +5,7 @@ export const imageApi = {
   capabilities: () => request(root + '/capabilities', { method: 'GET', signal: AbortSignal.timeout(10000) }),
   create: data => post(root, data),
   get: id => get(root + '/' + id),
+  previewLoaded: (id, item) => post(root + '/' + id + '/items/' + item.id + '/preview-loaded', { generation: item.generation }),
   cancel: id => post(root + '/' + id + '/cancel', {}),
   thread: id => get(root + '/' + id + '/thread'),
   rename: (id, title) => put(root + '/' + id + '/title', { title }),

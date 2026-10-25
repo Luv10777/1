@@ -95,6 +95,41 @@ class BillingLedgerReportIntegrationTest {
         assertThat(summary.consumedByCapability()).isEqualTo(Map.of("IMAGE", 9L, "VIDEO", 10L));
     }
 
+    @Test void imageLedgerKeepsFirstPreviewDurationWhileDurableDeliveryContinues() {
+        var owner=new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()));
+        String reservation=TenantContext.runAs(shop,()->billing.reserve("preview:"+UUID.randomUUID(),"IMAGE",3,"Image preview"));
+        long creation=owner.queryForObject("INSERT INTO image_creations(tenant_id,request_key,request_hash,request,status,billing_reservation_id,created_at) "
+            +"VALUES (?,?,'test','{\"count\":1,\"workflow\":\"POSTER\"}','GENERATING',?,'2026-10-24T00:00:00Z') RETURNING id",Long.class,shop,UUID.randomUUID().toString(),reservation);
+        owner.update("INSERT INTO image_items(tenant_id,creation_id,ordinal,spec,status,previewed_at) "
+            +"VALUES (?,?,0,'{}','GENERATING','2026-10-24T00:00:55Z')",shop,creation);
+        assertThat(report.entries(0,20,90,null,"IMAGE",null).items()).filteredOn(r->r.previewElapsedMillis()!=null)
+            .singleElement().satisfies(r->{assertThat(r.previewElapsedMillis()).isEqualTo(55000);assertThat(r.elapsedMillis()).isEqualTo(55000);assertThat(r.taskStatus()).isEqualTo("SUCCEEDED");});
+        owner.update("UPDATE image_items SET status='SUCCEEDED',persisted_at='2026-10-24T00:01:58Z' WHERE creation_id=?",creation);
+        assertThat(report.entries(0,20,90,null,"IMAGE",null).items()).filteredOn(r->r.previewElapsedMillis()!=null)
+            .singleElement().satisfies(r->{assertThat(r.previewElapsedMillis()).isEqualTo(55000);assertThat(r.elapsedMillis()).isEqualTo(55000);assertThat(r.taskStatus()).isEqualTo("SUCCEEDED");});
+    }
+
+    @Test void ledgerRowsUseTheSameTaskModelAndElapsedTimeWithoutDuplicatingSettlements() {
+        var owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+        String reservation=TenantContext.runAs(shop,()->billing.reserve("plan:"+UUID.randomUUID(),"VIDEO_PLAN",1,"视频方案预占"));
+        owner.update("INSERT INTO video_plans(tenant_id,request_key,status,billing_reservation_id,created_at,updated_at) "
+            +"VALUES (?,?,'SUCCEEDED',?,'2026-10-24T00:00:00Z','2026-10-24T00:00:12Z')",shop,UUID.randomUUID().toString(),reservation);
+        TenantContext.runAs(shop,()->{billing.capture(reservation,1,"plan-delivered","视频方案交付");return null;});
+        var settled=owner.queryForObject("SELECT created_at FROM billing_ledger WHERE reservation_id=? AND type='CAPTURE'",
+            java.sql.Timestamp.class,reservation).toInstant();
+        owner.update("UPDATE video_plans SET created_at=?,updated_at=? WHERE billing_reservation_id=?",
+            java.sql.Timestamp.from(settled.minusMillis(12000)),java.sql.Timestamp.from(settled),reservation);
+        var entries=report.entries(0,20,90,null,"VIDEO_PLAN",null);
+        assertThat(entries.items()).hasSize(2).allSatisfy(row->{
+            assertThat(row.model()).isEqualTo("一方志提示词");
+            assertThat(row.elapsedMillis()).isEqualTo(12000);
+            assertThat(row.taskStatus()).isEqualTo("SUCCEEDED");
+        });
+        assertThat(report.entries(0,20,90,null,"IMAGE",null).items()).allSatisfy(row->assertThat(row.model()).isEqualTo("一方志Image"));
+        assertThat(report.summary(90).consumed()).isEqualTo(20);
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger",Long.class)).isEqualTo(7);
+    }
+
     @Test void onlyBillingOperatorsCanReadThePlatformLedger() throws Exception {
         mvc.perform(get("/api/billing/operations/ledger")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/billing/operations/ledger").header("Authorization", "Bearer " + jwt.issueAccessToken(merchant, cafe, null)))

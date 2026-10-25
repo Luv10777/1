@@ -42,6 +42,10 @@ export function useImageCreation(workflow) {
   let alive = true
   let refreshSequence = 0
   let pollError = false
+  const previewTracking = new Set()
+  const previewReports = new Set()
+  const failedPreviews = new Set()
+  const previewKey = item => `${item.id}:${item.generation}`
   const owner = readUser()
   const pendingKey = 'image-pending:' + (owner?.userId || owner?.id || 'session') + ':' + workflow
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
@@ -63,7 +67,20 @@ export function useImageCreation(workflow) {
   }
   const active = computed(() => isImageActive(current.value?.status))
   const latestItem = item => thread.value.flatMap(turn => turn.items || []).find(latest => latest.id === item?.id) || item
-  const canUseAsset = item => !item?.providerImageUrl || !!latestItem(item)?.persisted
+  const canUseAsset = item => !latestItem(item)?.providerImageUrl || !!latestItem(item)?.persisted
+  async function reportImageVisible(item) {
+    const turn = thread.value.find(entry => entry.items?.some(image => image.id === item.id))
+    const key = previewKey(item)
+    if (!alive || !turn || !previewTracking.has(turn.id) || item.previewedAt || previewReports.has(key)) return
+    previewReports.add(key)
+    try { await imageApi.previewLoaded(turn.id, item) }
+    catch { previewReports.delete(key) }
+  }
+  function imageLoadFailed(item) {
+    if (!item.providerImageUrl || item.persisted) return
+    failedPreviews.add(previewKey(item))
+    latestItem(item).url = null
+  }
   const locked = computed(() => busy.value || !!pending.value)
   const workspaceTab = ref('inspiration')
   const posterPlatform = purposeValue => {
@@ -100,13 +117,19 @@ export function useImageCreation(workflow) {
       const result = versions.at(-1)
       if (!result) throw new Error('这条创作记录不存在')
       if (result.workflow !== workflow) throw new Error('这条记录属于另一个图片工作区')
+      for (const turn of versions) {
+        if (isImageActive(turn.status)) previewTracking.add(turn.id)
+        for (const item of turn.items || []) {
+          if (item.providerImageUrl && !item.persisted && failedPreviews.has(previewKey(item))) item.url = null
+        }
+      }
       if (current.value?.id !== result.id) workspaceTab.value = 'result'
       thread.value = versions
       current.value = result
       refreshBilling()
       if (pollError) { error.value = ''; pollError = false }
       const waitingForStorage = versions.some(turn => turn.items?.some(item => item.providerImageUrl && !item.persisted && !item.downloadFailed))
-      if (isImageActive(result.status) || waitingForStorage) pollTimer = setTimeout(() => load(id), waitingForStorage ? 5000 : 3000)
+      if (isImageActive(result.status) || waitingForStorage) pollTimer = setTimeout(() => load(id), 2000)
       else await refreshHistory()
     } catch (e) {
       if (!alive || sequence !== refreshSequence) return
@@ -166,6 +189,7 @@ export function useImageCreation(workflow) {
     if (operation.kind === 'regenerate') result = await imageApi.regenerate(operation.id, operation.itemId, operation.data)
     persistPending(null)
     if (!alive) return
+    previewTracking.add(result.id)
     current.value = result; revision.value = ''; textEdit.value = null
     await openCreation(result.id)
     await refreshHistory()
@@ -330,6 +354,7 @@ export function useImageCreation(workflow) {
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
+    reportImageVisible, imageLoadFailed,
     supportsQuality, loadCapabilities, billing, imageCredits, estimatedCredits, requiresLogin,
   })
 }

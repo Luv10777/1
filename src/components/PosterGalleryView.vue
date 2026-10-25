@@ -361,7 +361,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   :aria-label="`放大查看${item.role}`"
                   @click="showPreview(item)"
                 >
-                  <img :src="item.url" :alt="item.role" />
+                  <img :src="item.url" :alt="item.role" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
                 </button>
                 <div
                   v-else

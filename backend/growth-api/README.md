@@ -7,11 +7,23 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 60 秒 / 100 MB 的 MP4、MOV 视频，以及公开 HTTPS 视频文件直链。配置、两条 worker 队列、
 接口和画面分析边界见 [视频反推接入文档](../../docs/video-analysis.md)。
 
-2026-10-23 新增视频工作台「帮我出方案」（可选，商家仍可自己写提示词）：OnlyRouter `gemini-3.8-flash-ab`
+2026-10-23 新增视频工作台「帮我出方案」（可选，商家仍可自己写提示词）：OnlyRouter `gpt-6-luna`
 看最多 6 张参考图（缩到长边 1024 的 JPEG），按风格和一句话需求出 3 个方案，每个方案自己判断每张图的用途并写进中文提示词和分镜。
 每次（含「换一批」）预占 1 烟火，结果校验通过才扣除，失败或校验不过退回。任务 `VIDEO_PLAN_GENERATE` 走 `DEFAULT` 队列。
 接口：`GET /api/video/plans/config`、`POST /api/video/plans`（`requestKey` 幂等，`previousPlanId` 表示换一批）、`GET /api/video/plans/{id}`。
 服务端配置 `VIDEO_PLAN_API_KEY`（必填）、`VIDEO_PLAN_BASE_URL`、`VIDEO_PLAN_MODEL`、`VIDEO_PLAN_TIMEOUT_SECONDS`、`VIDEO_PLAN_MAX_TOKENS`；未配置密钥时入口显示未开放。
+
+任务中心和后台烟火日志统一显示模型名：图片为「一方志Image」，视频反推为「一方志反推」，
+视频方案为「一方志提示词」，视频生成显示对应的 Seedance 型号。视频方案每批记录三个方案及实际烟火结算。
+两处日志返回 `elapsedMillis`，从提交到完成或失败计算，包含排队；进行中返回当前已用时间。
+图片拿到中转站 URL 后即可预览，后台继续保存；浏览器首次加载成功时上报
+`POST /api/image-creations/{id}/items/{itemId}/preview-loaded`（携带当前 `generation`）。
+服务端幂等记录 `previewed_at`，两处日志同时返回 `previewElapsedMillis`，界面优先显示
+提交到首次加载图片的耗时。图片保存、切换地址或重新打开已完成历史记录不重记耗时；
+未收到加载上报的记录继续使用 `elapsedMillis`。预览上报不改变交付状态或账本。
+图片任务日志收到首次加载上报后即显示已完成，`elapsedMillis` 和 `previewElapsedMillis`
+均固定为提交至首次加载的时间；后台保存的后续结果不改写这个结束点。烟火消耗仍取真实账本。
+历史记录缺少完成或结算时间时不补造耗时，返回 `null`。此查询沿用租户隔离，不修改生成记录或烟火账本。
 
 2026-09-22 新增 AI 图片创作模块：营销海报、产品套图、结构化规划、逐张生成任务、
 480P–4K 画质、作品记录与版本修改。New API / OpenAI 协议配置、可选桥接协议与运行边界见

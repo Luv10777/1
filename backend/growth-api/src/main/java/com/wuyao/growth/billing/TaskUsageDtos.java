@@ -10,7 +10,7 @@ public final class TaskUsageDtos {
     public record Log(String id, Long taskId, String module, String workflow, String title, String model,
                       String status, Instant createdAt, int quantity, int succeeded, int failed, int cancelled,
                       int pending, String unit, Long chargedCredits, long heldCredits, long releasedCredits,
-                      String resolution, Integer durationSeconds, String error) {}
+                      String resolution, Integer durationSeconds, String error, Long elapsedMillis, Long previewElapsedMillis) {}
     public record Summary(long tasks, long chargedCredits, long heldCredits, long releasedCredits,
                           long succeeded, long failed) {}
     public record Logs(PageResult<Log> records, Summary summary) {}

@@ -20,7 +20,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class TaskUsageService {
     private final TaskUsageStore store;
-    private static final Set<String> MODULES=Set.of("IMAGE_GENERATION","VIDEO_GENERATION","DIGITAL_HUMAN_VIDEO","VIDEO_ANALYSIS");
+    private static final Set<String> MODULES=Set.of("IMAGE_GENERATION","VIDEO_GENERATION","DIGITAL_HUMAN_VIDEO","VIDEO_ANALYSIS","VIDEO_PLAN");
     private static final Set<String> STATUSES=Set.of("RUNNING","SUCCEEDED","PARTIAL","FAILED","CANCELLED","NEEDS_INPUT","UPSTREAM_UNKNOWN");
 
     @Transactional(readOnly=true, isolation=Isolation.REPEATABLE_READ)
@@ -42,7 +42,7 @@ public class TaskUsageService {
         if(filter.model()!=null && !filter.model().isBlank()) {
             if(filter.model().length()>200) throw bad("模型名称过长");
             where.append(" AND POSITION(REGEXP_REPLACE(LOWER(:model),'[[:space:]_.-]','','g') IN "
-                +"REGEXP_REPLACE(LOWER(COALESCE(model,'')),'[[:space:]_.-]','','g'))>0");
+                +"REGEXP_REPLACE(LOWER(COALESCE(model,'')||' '||COALESCE(provider_model,'')),'[[:space:]_.-]','','g'))>0");
             parameters.put("model",filter.model().trim());
         }
         var total=store.report("SELECT COUNT(*) AS total, COALESCE(SUM(charged),0) AS charged, COALESCE(SUM(held),0) AS held, "
@@ -58,13 +58,13 @@ public class TaskUsageService {
 
     @Transactional(readOnly=true, isolation=Isolation.REPEATABLE_READ)
     public TaskUsageDtos.Detail detail(String id) {
-        if(!id.matches("(image|video|analysis)-[1-9][0-9]{0,18}")) throw bad("任务标识无效");
+        if(!id.matches("(image|video|analysis|plan)-[1-9][0-9]{0,18}")) throw bad("任务标识无效");
         long tenant=TenantContext.require();
         var rows=store.report("SELECT *","WHERE id=:id",java.util.Map.of("tenant",tenant,"id",id));
         if(rows.isEmpty()) throw BizException.of(ErrorCode.NOT_FOUND,"任务记录不存在");
         var row=rows.getFirst(); var task=log(row);
         var items=task.module().equals("IMAGE_GENERATION") ? store.items(task.taskId(),tenant).stream().map(i->new TaskUsageDtos.Item(
-            number(i,"id"),(int)number(i,"ordinal")+1,string(i,"title"),string(i,"model"),string(i,"status"),
+            number(i,"id"),(int)number(i,"ordinal")+1,string(i,"title"),"一方志Image",string(i,"status"),
             nullableNumber(i,"charged"),Boolean.TRUE.equals(i.get("reused")),string(i,"error"))).toList() : List.<TaskUsageDtos.Item>of();
         String reservation=string(row,"reservation_id");
         var events=reservation==null ? List.<TaskUsageDtos.Event>of() : store.events(reservation,tenant).stream().map(e->
@@ -77,7 +77,7 @@ public class TaskUsageService {
         return new TaskUsageDtos.Log(string(r,"id"),number(r,"task_id"),string(r,"module"),string(r,"workflow"),string(r,"title"),
             string(r,"model"),string(r,"status"),instant(r,"created_at"),quantity,succeeded,failed,cancelled,
             Math.max(0,quantity-succeeded-failed-cancelled),string(r,"unit"),nullableNumber(r,"charged"),number(r,"held"),number(r,"released"),
-            string(r,"resolution"),r.get("duration_seconds")==null?null:(int)number(r,"duration_seconds"),string(r,"error"));
+            string(r,"resolution"),r.get("duration_seconds")==null?null:(int)number(r,"duration_seconds"),string(r,"error"),nullableNumber(r,"elapsed_millis"),nullableNumber(r,"preview_elapsed_millis"));
     }
     private static long number(Tuple r,String key) { return ((Number)r.get(key)).longValue(); }
     private static Long nullableNumber(Tuple r,String key) { return r.get(key)==null?null:number(r,key); }

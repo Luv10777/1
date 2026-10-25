@@ -4,7 +4,7 @@ import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, RefreshCw, Search, X } from 'lucide-vue-next'
 import { useTaskCenter } from '../composables/useTaskCenter'
-import { taskModules, taskStatuses, taskStatus, taskModel, taskWorkflow, taskDate, taskResultLink } from '../domain/taskUsage'
+import { taskModules, taskStatuses, taskStatus, taskModel, taskWorkflow, taskDate, taskResultLink, taskElapsed } from '../domain/taskUsage'
 import { ref } from 'vue'
 import { billingApi, dateTime, number, yuan } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -66,7 +66,7 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
             <div><input v-model="filters.from" type="datetime-local" aria-label="开始时间（北京时间）"><span>至</span><input v-model="filters.until" type="datetime-local" aria-label="结束时间（北京时间，不含）"></div>
           </fieldset>
           <label>使用模块<AppSelect v-model="filters.module"><option value="">全部模块</option><option v-for="(label, id) in taskModules" :key="id" :value="id">{{ label }}</option></AppSelect></label>
-          <label>模型名称<input v-model="filters.model" type="search" placeholder="搜索模型，如 Seedance" maxlength="200"></label>
+          <label>模型名称<input v-model="filters.model" type="search" placeholder="搜索一方志或 Seedance" maxlength="200"></label>
           <label>任务状态<AppSelect v-model="filters.status"><option value="">全部状态</option><option v-for="[id, state] in filterStatuses" :key="id" :value="id">{{ state.label }}</option></AppSelect></label>
         </div>
         <div class="usage-filter-bottom">
@@ -92,27 +92,28 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
       <div v-else-if="!result?.records.items.length" class="usage-empty"><ClipboardList :size="32" /><strong>{{ error ? '日志暂时无法读取' : '暂无符合条件的任务' }}</strong><p>{{ error ? '恢复连接后可重新读取。' : '调整筛选条件，或完成一次图片、视频创作后再来查看。' }}</p><RouterLink v-if="!error" to="/image/create">开始创作</RouterLink></div>
       <div v-else class="usage-table-scroll" role="region" aria-label="任务消费日志表格，可横向滚动" tabindex="0">
         <table class="usage-table">
-          <caption class="usage-sr-only">任务提交时间、模块、模型、生成数量、结果与实际烟火消耗</caption>
-          <thead><tr><th scope="col">时间</th><th scope="col">使用模块</th><th scope="col">模型</th><th scope="col">生成数量</th><th scope="col">成功 / 失败</th><th scope="col">烟火消耗</th><th scope="col">状态</th><th scope="col" class="usage-action-column">详情</th></tr></thead>
+          <caption class="usage-sr-only">任务提交时间、模块、模型、生成数量、结果、实际烟火消耗与生成耗时</caption>
+          <thead><tr><th scope="col">时间</th><th scope="col">使用模块</th><th scope="col">模型</th><th scope="col">生成数量</th><th scope="col">成功 / 失败</th><th scope="col">烟火消耗</th><th scope="col" title="图片优先显示从提交到浏览器首次加载图片的时间；其他任务及未记录图片显示时间的历史任务，显示提交至完成或失败的耗时">耗时</th><th scope="col">状态</th><th scope="col" class="usage-action-column">详情</th></tr></thead>
           <tbody>
             <template v-for="row in result.records.items" :key="row.id">
               <tr :class="{ 'usage-row-expanded': expandedId === row.id }">
                 <td><time :datetime="row.createdAt">{{ taskDate(row.createdAt) }}</time><small class="usage-code">{{ row.id }}</small></td>
                 <td><strong>{{ taskModules[row.module] }}</strong><small>{{ taskWorkflow(row) || '视频内容分析' }}</small></td>
-                <td class="usage-model-cell"><span class="usage-model" :title="taskModel(row.model)">{{ taskModel(row.model) }}</span></td>
+                <td class="usage-model-cell"><span class="usage-model" :title="taskModel(row.model, row.module)">{{ taskModel(row.model, row.module) }}</span></td>
                 <td class="usage-numeric">{{ row.quantity }} <small class="inline">{{ row.unit }}</small></td>
                 <td><div class="usage-result-count"><span class="usage-success">{{ row.succeeded }}</span><span class="usage-slash">/</span><span :class="{ 'usage-failed': row.failed > 0 }">{{ row.failed }}</span><small class="inline">{{ row.unit }}</small></div><small v-if="row.cancelled || row.pending">{{ row.cancelled ? `取消 ${row.cancelled} ${row.unit}` : '' }}{{ row.cancelled && row.pending ? ' · ' : '' }}{{ row.pending ? `未完成 ${row.pending} ${row.unit}` : '' }}</small></td>
                 <td><span v-if="row.chargedCredits != null" class="usage-charge"><YanhuoIcon :size="14" />{{ number(row.chargedCredits) }}</span><span v-else class="usage-unbilled">未计费记录</span><small v-if="row.heldCredits || row.releasedCredits">{{ row.heldCredits ? `预占 ${number(row.heldCredits)}` : '' }}{{ row.heldCredits && row.releasedCredits ? ' · ' : '' }}{{ row.releasedCredits ? `退回 ${number(row.releasedCredits)}` : '' }}</small></td>
+                <td class="usage-elapsed">{{ taskElapsed(row) }}</td>
                 <td><span class="usage-status" :data-tone="taskStatus(row.status).tone"><i aria-hidden="true" />{{ taskStatus(row.status).label }}</span></td>
                 <td class="usage-action-column"><button class="usage-detail-button" type="button" :aria-expanded="expandedId === row.id" :aria-controls="`detail-${row.id}`" :aria-label="`${expandedId === row.id ? '收起' : '查看'} ${row.id} 消费明细`" @click="toggleDetail(row.id)">{{ expandedId === row.id ? '收起' : '明细' }}<ChevronDown :size="14" :class="{ rotated: expandedId === row.id }" /></button></td>
               </tr>
               <tr v-if="expandedId === row.id" :id="`detail-${row.id}`" class="usage-detail-row">
-                <td colspan="8">
+                <td colspan="9">
                   <p v-if="detailLoading && !detail" class="usage-detail-state" role="status">正在读取逐项明细…</p>
                   <p v-else-if="detailError" class="usage-detail-state usage-failed" role="alert">{{ detailError }} <button class="usage-detail-button" type="button" @click="loadDetail()">重试</button></p>
                   <div v-else-if="detail" class="usage-detail-content">
                     <div class="usage-detail-intro"><div><strong>{{ detail.task.title || taskModules[row.module] }}</strong><p v-if="detail.task.error" class="usage-failed">{{ detail.task.error }}</p></div><RouterLink v-if="taskResultLink(row)" :to="taskResultLink(row)">查看任务</RouterLink></div>
-                    <div v-if="detail.items.length" class="usage-item-list"><h3>逐张记录</h3><div v-for="item in detail.items" :key="item.id" class="usage-item"><span>第 {{ item.ordinal }} 张 <small>{{ item.title }}</small></span><span>{{ taskModel(item.model) }}</span><span class="usage-status" :data-tone="item.reused ? 'muted' : taskStatus(item.status).tone">{{ item.reused ? '沿用原图' : taskStatus(item.status).label }}</span><strong>{{ item.reused ? '本次不计费' : item.chargedCredits == null ? '未计费记录' : `${number(item.chargedCredits)} 烟火` }}</strong><p v-if="item.error" class="usage-item-error">{{ item.error }}</p></div></div>
+                    <div v-if="detail.items.length" class="usage-item-list"><h3>逐张记录</h3><div v-for="item in detail.items" :key="item.id" class="usage-item"><span>第 {{ item.ordinal }} 张 <small>{{ item.title }}</small></span><span>{{ taskModel(item.model, row.module) }}</span><span class="usage-status" :data-tone="item.reused ? 'muted' : taskStatus(item.status).tone">{{ item.reused ? '沿用原图' : taskStatus(item.status).label }}</span><strong>{{ item.reused ? '本次不计费' : item.chargedCredits == null ? '未计费记录' : `${number(item.chargedCredits)} 烟火` }}</strong><p v-if="item.error" class="usage-item-error">{{ item.error }}</p></div></div>
                     <div class="usage-events"><h3>烟火流水</h3><p v-if="!detail.events.length" class="usage-detail-state">此任务没有烟火流水，历史记录不按现行价格补算。</p><div v-for="event in detail.events" :key="event.id" class="usage-event"><time :datetime="event.createdAt">{{ taskDate(event.createdAt) }}</time><span :data-tone="event.type === 'CAPTURE' ? 'charge' : ''">{{ events[event.type] || event.type }}</span><strong>{{ number(event.credits) }} 烟火</strong><span>{{ event.description }}</span></div></div>
                   </div>
                 </td>
@@ -194,6 +195,7 @@ const filterStatuses = Object.entries(taskStatuses).filter(([id]) => !['INTERRUP
 .usage-table tr:hover>td,.usage-row-expanded>td{background:color-mix(in srgb,var(--color-bg-subtle) 45%,var(--color-bg-surface))}
 .usage-table td>strong{font-weight:500;white-space:nowrap}
 .usage-table time{white-space:nowrap;font-size:12px;font-variant-numeric:tabular-nums}
+.usage-elapsed{white-space:nowrap;font-variant-numeric:tabular-nums}
 .usage-table td>small{display:block;margin-top:7px;font-size:12px;color:var(--color-text-muted);line-height:1.4}
 .usage-code{font-family:var(--font-mono)}
 .usage-model-cell{max-width:230px;overflow-wrap:anywhere}

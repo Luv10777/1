@@ -85,7 +85,7 @@ async function saveTitle(entry) {
           <div v-for="n in studio.current.count" :key="n" class="creation-image-placeholder" :style="{ aspectRatio: placeholders.width + '/' + placeholders.height }"><img class="creation-placeholder-mark" src="/images/brand/yifangzhi-mark.png" alt="" /><span class="sr-only">{{ studio.product ? '正在安排第 ' + n + ' 张画面' : '正在安排文案与画面' }}</span></div>
         </template>
         <article v-for="item in studio.current.items" :key="item.id" class="creation-result">
-          <button v-if="item.url" type="button" class="creation-image-button" :aria-label="'放大查看第 ' + (item.ordinal + 1) + ' 张：' + item.role" :style="{ aspectRatio: item.width + '/' + item.height }" @click="showPreview(item)"><img :src="item.url" :alt="item.role" /></button>
+          <button v-if="item.url" type="button" class="creation-image-button" :aria-label="'放大查看第 ' + (item.ordinal + 1) + ' 张：' + item.role" :style="{ aspectRatio: item.width + '/' + item.height }" @click="showPreview(item)"><img :src="item.url" :alt="item.role" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" /></button>
           <div v-else class="creation-image-placeholder" :style="{ aspectRatio: item.width + '/' + item.height }"><img class="creation-placeholder-mark" src="/images/brand/yifangzhi-mark.png" alt="" /><strong>{{ item.role }}</strong><small>{{ IMAGE_STATUS[item.status] }}</small></div>
           <div class="creation-result-actions">
             <span class="creation-result-caption">{{ item.role }}</span>

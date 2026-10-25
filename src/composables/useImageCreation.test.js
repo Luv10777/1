@@ -73,3 +73,69 @@ test('image creation reads capabilities for members and lets guests browse witho
     await vite.close()
   }
 })
+
+test('temporary previews report the first load once and fall back to durable images without changing history timings', async () => {
+  const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+  const originalFetch = globalThis.fetch
+  let auth, app, studio
+  let previewRequests = 0
+  let versions = [{ id: 42, workflow: 'POSTER', status: 'GENERATING', items: [{
+    id: 12, generation: 0, url: 'https://source.example/temporary.png',
+    providerImageUrl: 'https://source.example/temporary.png', persisted: false,
+  }] }]
+  try {
+    ;({ auth } = await vite.ssrLoadModule('/src/stores/auth.js'))
+    auth.state.user = { id: 1, tenantId: 7 }; auth.state.token = { accessToken: 'test-only' }
+    const { useImageCreation } = await vite.ssrLoadModule('/src/composables/useImageCreation.js')
+    globalThis.fetch = async (url, options) => {
+      let data = { items: [], totalPages: 0 }
+      if (String(url).endsWith('/capabilities')) data = { configured: true, qualities: ['2K'], qualityRatios: { '2K': ['3:4'] } }
+      if (String(url).endsWith('/thread')) data = structuredClone(versions)
+      if (String(url).endsWith('/preview-loaded')) {
+        previewRequests++
+        assert.equal(options.method, 'POST')
+        assert.deepEqual(JSON.parse(options.body), { generation: 0 })
+        data = true
+      }
+      return { ok: true, json: async () => ({ code: 200, data }) }
+    }
+    const renderer = createRenderer({
+      createElement: tag => ({ tag, children: [] }), createText: text => ({ text }), createComment: text => ({ text }),
+      setText: (node, text) => { node.text = text }, setElementText: (node, text) => { node.text = text },
+      patchProp: () => {}, insert: (node, parent) => { parent.children.push(node) },
+      remove: () => {}, parentNode: () => null, nextSibling: () => null,
+    })
+    app = renderer.createApp({ setup() { studio = useImageCreation('POSTER'); return () => h('div') } })
+    app.provide(routerKey, { replace: async () => {} })
+    app.provide(routeLocationKey, reactive({ query: {} }))
+    app.mount({ children: [] })
+    await studio.load(42)
+    let item = studio.current.items[0]
+    assert.equal(item.url, 'https://source.example/temporary.png')
+    assert.equal(studio.canUseAsset(item), false)
+    await studio.reportImageVisible(item)
+    await studio.reportImageVisible(item)
+    assert.equal(previewRequests, 1)
+    studio.imageLoadFailed(item)
+    assert.equal(item.url, null)
+    await studio.load(42)
+    assert.equal(studio.current.items[0].url, null, 'polling must not repeatedly load a failed temporary URL')
+    versions[0].status = 'SUCCEEDED'
+    versions[0].items[0] = { ...versions[0].items[0], url: 'https://storage.example/durable.png', providerImageUrl: null, persisted: true }
+    await studio.load(42)
+    item = studio.current.items[0]
+    assert.equal(item.url, 'https://storage.example/durable.png')
+    assert.equal(studio.canUseAsset(item), true)
+    await studio.reportImageVisible(item)
+    assert.equal(previewRequests, 1, 'switching to the durable URL must not restart the first-preview timer')
+    versions = [{ id: 43, workflow: 'POSTER', status: 'SUCCEEDED', items: [{ id: 13, generation: 0, url: 'https://storage.example/old.png', persisted: true }] }]
+    await studio.load(43)
+    await studio.reportImageVisible(studio.current.items[0])
+    assert.equal(previewRequests, 1, 'opening completed history must not invent a new generation duration')
+  } finally {
+    app?.unmount()
+    if (auth) { auth.state.user = null; auth.state.token = null }
+    globalThis.fetch = originalFetch
+    await vite.close()
+  }
+})

@@ -36,7 +36,8 @@ public final class ImageDtos {
     public record ItemView(Long id, int ordinal, String role, String headline, String caption,
                            String status, String error, String url, int width, int height, Long taskId,
                            boolean similarityWarning, String providerImageUrl, boolean persisted,
-                           boolean downloadFailed) {}
+                           boolean downloadFailed, int generation, Instant previewedAt) {}
+    public record PreviewLoaded(@Min(0) int generation) {}
     public record View(Long id, Long parentId, String workflow, String brief, String quality,
                        String ratio, String status, String summary, String question, String error,
                        int completed, int count, List<ItemView> items, Instant createdAt, Long taskId) {}
