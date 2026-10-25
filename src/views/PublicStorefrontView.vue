@@ -15,6 +15,10 @@ const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
 const orderError = ref('')
+const phoneInput = ref(null)
+const phoneError = ref('')
+const phoneMessage = '请填写有效的联系电话：手机号或固定电话，6–20 位。'
+const validPhone = value => /^[0-9+()\- ]{6,20}$/.test(value.trim())
 let generation = 0
 
 const storeId = computed(() => Number(route.params.storeId))
@@ -29,6 +33,7 @@ async function loadStorefront() {
   loading.value = true
   error.value = ''
   orderError.value = ''
+  phoneError.value = ''
   buyer.legalAccepted = false
   store.value = null
   products.value = []
@@ -66,6 +71,12 @@ async function submitOrder() {
     return
   }
   orderError.value = ''
+  phoneError.value = ''
+  if (!validPhone(buyer.phone)) {
+    phoneError.value = phoneMessage
+    phoneInput.value?.focus()
+    return
+  }
   submitting.value = true
   try {
     const receipt = await commerceApi.placeOrder({
@@ -77,13 +88,19 @@ async function submitOrder() {
     })
     await router.push({ name: 'public-order', params: { token: receipt.lookupToken } })
   } catch (failure) {
-    orderError.value = failure.message || '订单尚未提交，请稍后重试。'
+    if (failure.code === 1400 && /buyerPhone/.test(failure.message || '')) {
+      phoneError.value = phoneMessage
+      phoneInput.value?.focus()
+    } else {
+      orderError.value = failure.message || '订单尚未提交，请稍后重试。'
+    }
   } finally {
     submitting.value = false
   }
 }
 
 watch(() => route.params.storeId, loadStorefront, { immediate: true })
+watch(() => buyer.phone, value => { if (phoneError.value && validPhone(value)) phoneError.value = '' })
 </script>
 
 <template>
@@ -127,7 +144,8 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
             <p v-else class="public-cart-empty">选择商品后填写收货信息。</p>
             <form class="public-order-form" @submit.prevent="submitOrder">
               <label><span>收货人</span><input v-model.trim="buyer.name" required maxlength="80" autocomplete="name" placeholder="姓名" /></label>
-              <label><span>联系电话</span><input v-model.trim="buyer.phone" required maxlength="20" type="tel" inputmode="tel" autocomplete="tel" pattern="[0-9+()\- ]{6,20}" placeholder="可联系到您的电话" /></label>
+              <label><span>联系电话</span><input ref="phoneInput" v-model.trim="buyer.phone" required minlength="6" maxlength="20" type="tel" inputmode="tel" autocomplete="tel" :aria-invalid="phoneError ? 'true' : undefined" :aria-describedby="phoneError ? 'buyer-phone-error' : undefined" placeholder="手机号或固定电话" @invalid="phoneError = phoneMessage" /></label>
+              <p v-if="phoneError" id="buyer-phone-error" class="public-error" role="alert">{{ phoneError }}</p>
               <label><span>收货地址</span><textarea v-model.trim="buyer.address" required maxlength="500" autocomplete="street-address" rows="2" placeholder="省市区、街道和门牌号" /></label>
               <label><span>备注</span><textarea v-model.trim="buyer.note" maxlength="500" rows="2" placeholder="选填" /></label>
               <label class="public-order-terms"><input v-model="buyer.legalAccepted" type="checkbox" required :disabled="submitting" /><span>我已阅读并同意<a href="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册与服务协议》</a>、<a href="/policies/aftersales" target="_blank" rel="noopener noreferrer">《售后与退款规则》</a>及<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>，同意将本订单的收货人、电话、地址与备注提供给{{ store.name }}，用于履约及售后。</span></label>

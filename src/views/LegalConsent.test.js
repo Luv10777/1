@@ -93,6 +93,14 @@ test('store checkout keeps recipient details and the cart when consent is missin
     assert.equal(view.error, '', 'consent validation does not replace checkout with a store loading error')
     assert.equal(view.cartItems[0].quantity, 2)
     view.buyer.legalAccepted = true
+    view.buyer.phone = '1'
+    await view.submitOrder()
+    assert.equal(requests.length, 0, 'an invalid phone is checked before creating an order')
+    assert.match(view.phoneError, /联系电话/)
+    assert.doesNotMatch(view.phoneError, /buyerPhone|正则表达式/)
+    assert.equal(view.buyer.address, ' 测试地址 ')
+    assert.equal(view.cartItems[0].quantity, 2)
+    view.buyer.phone = '13800138000'
     await view.submitOrder()
     assert.equal(view.orderError, '库存暂不足')
     assert.equal(view.error, '')
@@ -100,6 +108,12 @@ test('store checkout keeps recipient details and the cart when consent is missin
     assert.equal(view.buyer.address, ' 测试地址 ')
     assert.deepEqual(requests[0], { items: [{ productId: 13, quantity: 2 }], buyerName: '测试收货人',
       buyerPhone: '13800138000', shippingAddress: '测试地址', buyerNote: '测试备注' })
+    const phoneFailure = new Error('buyerPhone 需要匹配正则表达式')
+    phoneFailure.code = 1400
+    commerceApi.placeOrder = async () => { throw phoneFailure }
+    await view.submitOrder()
+    assert.match(view.phoneError, /联系电话/)
+    assert.equal(view.orderError, '')
     await context.router.push('/store/8')
     await settle()
     assert.equal(view.buyer.legalAccepted, false, 'consent must be obtained again when the receiving store changes')
