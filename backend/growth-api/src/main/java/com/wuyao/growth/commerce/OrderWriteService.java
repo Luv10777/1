@@ -4,6 +4,8 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.product.ProductService;
+import com.wuyao.growth.billing.AlipayGateway;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,7 @@ public class OrderWriteService {
     private final SalesOrderRepository orders;
     private final SalesOrderItemRepository items;
     private final CommercePaymentProperties payment;
+    private final AlipayGateway alipay;
 
     @Transactional
     public CommerceDtos.Receipt place(Long storeId, CommerceDtos.PlaceOrderRequest request,
@@ -59,6 +62,13 @@ public class OrderWriteService {
         }
         order.setTotalAmount(total);
         order.setStatus("PENDING_CONFIRMATION");
+        if (payment.supports(storeId) && total.signum() > 0) {
+            if (!alipay.configured()) throw BizException.of(ErrorCode.PAYMENT_UNAVAILABLE, "支付宝收款服务暂未开放，请稍后重试");
+            order.setPaymentMethod("ALIPAY");
+            order.setPaymentState("PENDING");
+            order.setPaymentExpiresAt(Instant.now().plusSeconds(1800));
+            order.setStatus("PENDING_PAYMENT");
+        }
         order.setUpdatedAt(Instant.now());
         SalesOrder saved = orders.saveAndFlush(order);
 
@@ -85,6 +95,10 @@ public class OrderWriteService {
         if (!storeId.equals(order.getStoreId())) throw BizException.of(ErrorCode.NOT_FOUND, "订单不存在");
         String current = order.getStatus();
         String next = request.status();
+        if ("ALIPAY".equals(order.getPaymentMethod()) && ("CANCELLED".equals(next)
+                || !"PAID".equals(order.getPaymentState()))) {
+            throw BizException.of(ErrorCode.CONFLICT, "支付宝订单须核验付款后履约，未付订单须先关闭支付宝交易；已付订单请联系售后办理退款");
+        }
         boolean allowed = switch (current) {
             case "PENDING_CONFIRMATION" -> List.of("CONFIRMED", "CANCELLED").contains(next);
             case "CONFIRMED" -> List.of("SHIPPED", "CANCELLED").contains(next);
@@ -107,6 +121,61 @@ public class OrderWriteService {
         order.setUpdatedAt(Instant.now());
         orders.saveAndFlush(order);
         return CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(id), payment.forOrder(order));
+    }
+
+    @Transactional
+    public boolean claimPaymentQuery(Long id) {
+        SalesOrder order = locked(id);
+        if (!"PENDING".equals(order.getPaymentState())) return false;
+        Instant now = Instant.now();
+        if (order.getPaymentQueriedAt() != null && order.getPaymentQueriedAt().isAfter(now.minusSeconds(5))) return false;
+        order.setPaymentQueriedAt(now);
+        return true;
+    }
+
+    @Transactional
+    public void confirmAlipay(Long id, JsonNode proof) {
+        SalesOrder order = locked(id);
+        if (!"ALIPAY".equals(order.getPaymentMethod())) throw BizException.of(ErrorCode.BAD_REQUEST, "订单收款方式不匹配");
+        alipay.validatePaid(proof, order.getOrderNumber(), order.getTotalAmount());
+        String tradeNo = proof.path("trade_no").asText();
+        if ("PAID".equals(order.getPaymentState())) {
+            if (!tradeNo.equals(order.getAlipayTradeNo())) throw BizException.of(ErrorCode.CONFLICT, "订单支付凭证不一致");
+            return;
+        }
+        if (!"PENDING".equals(order.getPaymentState()) || !"PENDING_PAYMENT".equals(order.getStatus()))
+            throw BizException.of(ErrorCode.CONFLICT, "订单已关闭，请联系售后核实付款");
+        order.setPaymentState("PAID");
+        order.setAlipayTradeNo(tradeNo);
+        order.setPaidAt(Instant.now());
+        order.setStatus("PENDING_CONFIRMATION");
+        order.setUpdatedAt(Instant.now());
+        orders.saveAndFlush(order);
+    }
+
+    /** Only called after a verified remote close, or a missing trade whose signed URLs have expired. */
+    @Transactional
+    public CommerceDtos.MerchantOrder cancelUnpaidAlipay(Long id) {
+        SalesOrder order = locked(id);
+        if (!"ALIPAY".equals(order.getPaymentMethod())) throw BizException.of(ErrorCode.BAD_REQUEST, "订单收款方式不匹配");
+        if ("CANCELLED".equals(order.getStatus())) return merchantView(order);
+        if (!"PENDING".equals(order.getPaymentState()) || !"PENDING_PAYMENT".equals(order.getStatus()))
+            throw BizException.of(ErrorCode.CONFLICT, "订单已付款，请联系售后办理退款");
+        items.findAllByOrderIdOrderByIdAsc(id).stream().filter(item -> item.getProductId() != null)
+                .forEach(item -> products.restoreInventory(item.getProductId(), item.getQuantity()));
+        order.setPaymentState("CLOSED");
+        order.setStatus("CANCELLED");
+        order.setUpdatedAt(Instant.now());
+        orders.saveAndFlush(order);
+        return merchantView(order);
+    }
+
+    private SalesOrder locked(Long id) {
+        return orders.findForUpdate(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "订单不存在"));
+    }
+
+    private CommerceDtos.MerchantOrder merchantView(SalesOrder order) {
+        return CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId()), payment.forOrder(order));
     }
 
     private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }

@@ -9,12 +9,16 @@ import java.util.Map;
 public class AlipayController {
     private final AlipayGateway alipay;
     private final BillingCheckoutService checkout;
+    private final com.wuyao.growth.commerce.CommerceCheckoutService commerce;
     /** Alipay keeps retrying until the body is exactly "success". */
     @PostMapping(value="/notify",produces="text/plain")
     public String notifyPaid(@RequestParam Map<String,String> params) {
         try {
             var proof=alipay.notification(params);
-            if(AlipayGateway.paid(proof)) checkout.notifyAlipay(proof);
+            if(AlipayGateway.paid(proof)) {
+                if(proof.path("passback_params").asText().startsWith("commerce_")) commerce.notifyAlipay(proof);
+                else checkout.notifyAlipay(proof);
+            }
             return "success";
         } catch(RuntimeException e) {
             log.warn("支付宝通知未入账: {}",e.getClass().getSimpleName());

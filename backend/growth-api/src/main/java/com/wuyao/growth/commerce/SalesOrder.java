@@ -43,6 +43,18 @@ public class SalesOrder {
     private BigDecimal totalAmount;
     @Column(nullable = false, length = 24)
     private String status = "PENDING_CONFIRMATION";
+    @Column(name = "payment_method", nullable = false, length = 24)
+    private String paymentMethod = "MANUAL";
+    @Column(name = "payment_state", length = 16)
+    private String paymentState;
+    @Column(name = "alipay_trade_no", length = 64)
+    private String alipayTradeNo;
+    @Column(name = "paid_at")
+    private Instant paidAt;
+    @Column(name = "payment_expires_at")
+    private Instant paymentExpiresAt;
+    @Column(name = "payment_queried_at")
+    private Instant paymentQueriedAt;
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
     @Column(name = "updated_at", nullable = false)

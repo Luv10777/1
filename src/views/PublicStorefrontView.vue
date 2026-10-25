@@ -133,7 +133,7 @@ watch(() => route.params.storeId, loadStorefront, { immediate: true })
               <label class="public-order-terms"><input v-model="buyer.legalAccepted" type="checkbox" required :disabled="submitting" /><span>我已阅读并同意<a href="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册与服务协议》</a>、<a href="/policies/aftersales" target="_blank" rel="noopener noreferrer">《售后与退款规则》</a>及<a href="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</a>，同意将本订单的收货人、电话、地址与备注提供给{{ store.name }}，用于履约及售后。</span></label>
               <p v-if="orderError" class="public-error" role="alert">{{ orderError }}</p>
               <button class="public-button public-button-primary" type="submit" :disabled="submitting || !cartItems.length"><ShoppingBag :size="16" />{{ submitting ? '正在提交…' : '提交订单' }}</button>
-              <p class="public-payment-note">提交后按订单页面指引付款，由商家核实并确认。提交订单本身不会自动扣款。</p>
+              <p class="public-payment-note">提交后按订单页面指引付款。支付宝收银台付款成功后自动更新支付状态，再由商家确认交付。提交订单本身不会自动扣款。</p>
             </form>
           </aside>
         </div>

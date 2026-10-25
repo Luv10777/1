@@ -14,7 +14,15 @@ public class CommercePaymentProperties {
     private String recipient = "";
     private String qrCodeUrl = "";
 
+    boolean supports(Long orderStoreId) {
+        return storeId != null && storeId.equals(orderStoreId) && !recipient.isBlank();
+    }
+
     CommerceDtos.PaymentInstructions forOrder(SalesOrder order) {
+        if ("ALIPAY".equals(order.getPaymentMethod())) {
+            return "PENDING_PAYMENT".equals(order.getStatus()) && "PENDING".equals(order.getPaymentState())
+                    ? new CommerceDtos.PaymentInstructions("ALIPAY", recipient, null) : null;
+        }
         if (storeId == null || !storeId.equals(order.getStoreId())
                 || !"PENDING_CONFIRMATION".equals(order.getStatus())
                 || order.getTotalAmount() == null || order.getTotalAmount().signum() <= 0

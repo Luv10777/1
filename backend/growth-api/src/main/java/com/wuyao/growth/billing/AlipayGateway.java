@@ -22,6 +22,7 @@ import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.ZoneId;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -38,19 +39,26 @@ public class AlipayGateway {
     public boolean configured() { return config.configured(); }
     /** Signed locally on every request: Alipay rejects stale request timestamps, so the URL is never stored. */
     public String pageUrl(BillingDtos.OrderView order,long tenantId) {
+        return pageUrl(tradeNo(order.id()),BigDecimal.valueOf(order.amountMinor(),2),
+            order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name(),
+            order.expiresAt(),tenantId+"_"+order.id());
+    }
+    public String pageUrl(String tradeNo,BigDecimal amount,String subject,Instant expiresAt,String passback) {
         requireConfigured();
         var biz=new LinkedHashMap<String,Object>();
-        biz.put("out_trade_no",tradeNo(order.id())); biz.put("total_amount",yuan(order.amountMinor()));
-        biz.put("subject",order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name());
+        biz.put("out_trade_no",tradeNo); biz.put("total_amount",amount.setScale(2).toPlainString());
+        biz.put("subject",subject);
         biz.put("product_code","FAST_INSTANT_TRADE_PAY");
-        biz.put("time_expire",TIME.format(order.expiresAt().atZone(SHANGHAI)));
+        biz.put("time_expire",TIME.format(expiresAt.atZone(SHANGHAI)));
         // Only URL-safe characters, so Alipay returns it unchanged in the notification.
-        biz.put("passback_params",tenantId+"_"+order.id());
+        biz.put("passback_params",passback);
         try { return config.getGateway()+"?"+form(signed("alipay.trade.page.pay",biz,true)); }
         catch(Exception e) { throw unavailable("支付宝收银台暂时无法打开，请稍后重试"); }
     }
-    public JsonNode query(String id) { return send("alipay.trade.query",Map.of("out_trade_no",tradeNo(id))); }
-    public void close(String id) { send("alipay.trade.close",Map.of("out_trade_no",tradeNo(id))); }
+    public JsonNode query(String id) { return queryTrade(tradeNo(id)); }
+    public void close(String id) { closeTrade(tradeNo(id)); }
+    public JsonNode queryTrade(String tradeNo) { return send("alipay.trade.query",Map.of("out_trade_no",tradeNo)); }
+    public void closeTrade(String tradeNo) { send("alipay.trade.close",Map.of("out_trade_no",tradeNo)); }
     /** Alipay creates the trade only after the buyer opens the cashier, so a pending order may not exist remotely yet. */
     public static boolean missing(JsonNode result) { return "ACQ.TRADE_NOT_EXIST".equals(result.path("sub_code").asText()); }
     public static boolean paid(JsonNode result) {
@@ -67,10 +75,13 @@ public class AlipayGateway {
         return proof;
     }
     public void validatePaid(JsonNode trade,BillingDtos.OrderView order) {
+        validatePaid(trade,tradeNo(order.id()),BigDecimal.valueOf(order.amountMinor(),2));
+    }
+    public void validatePaid(JsonNode trade,String tradeNo,BigDecimal expectedAmount) {
         boolean amount;
-        try { amount=new BigDecimal(trade.path("total_amount").asText()).compareTo(BigDecimal.valueOf(order.amountMinor(),2))==0; }
+        try { amount=new BigDecimal(trade.path("total_amount").asText()).compareTo(expectedAmount)==0; }
         catch(NumberFormatException e) { amount=false; }
-        if(!paid(trade)||!amount||!tradeNo(order.id()).equals(trade.path("out_trade_no").asText())
+        if(!paid(trade)||!amount||!tradeNo.equals(trade.path("out_trade_no").asText())
             ||trade.path("trade_no").asText().isBlank()) throw BizException.of(ErrorCode.BAD_REQUEST,"支付宝支付结果与订单不一致");
     }
     private JsonNode send(String method,Map<String,Object> biz) {
@@ -137,7 +148,6 @@ public class AlipayGateway {
     private byte[] keyBytes(String path) throws Exception {
         return Base64.getDecoder().decode(Files.readString(Path.of(path)).replaceAll("-----[^-]+-----","").replaceAll("\\s",""));
     }
-    private static String yuan(long minor) { return BigDecimal.valueOf(minor,2).toPlainString(); }
     private String tradeNo(String id) { return UUID.fromString(id).toString().replace("-",""); }
     private void requireConfigured() { if(!configured()) throw unavailable("支付宝收款服务暂未开放，请联系一方志客服"); }
     private BizException unavailable(String message) { return BizException.of(ErrorCode.PAYMENT_UNAVAILABLE,message); }

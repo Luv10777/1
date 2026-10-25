@@ -23,6 +23,7 @@ public class BillingRecovery {
     private final VideoPlanService plans;
     private final BillingService billing;
     private final BillingCheckoutService checkout;
+    private final com.wuyao.growth.commerce.CommerceCheckoutService commerce;
     public void recover() {
         Long after=0L;
         while(true) {
@@ -35,6 +36,7 @@ public class BillingRecovery {
                         try { checkout.refresh(id); }
                         catch(RuntimeException e) { log.warn("在线支付订单对账等待重试: tenant={} order={}",tenant,id); }
                     }
+                    commerce.recover();
                     recoverFailures(tenant);
                 } catch(RuntimeException e) { log.warn("烟火恢复检查失败: tenant={}",tenant,e); }
                 return null;

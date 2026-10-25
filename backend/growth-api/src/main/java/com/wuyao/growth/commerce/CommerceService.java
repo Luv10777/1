@@ -58,12 +58,35 @@ public class CommerceService {
 
     @Transactional(readOnly = true)
     public CommerceDtos.Receipt publicReceipt(String token) {
-        entityManager.createNativeQuery("SELECT set_config('app.order_lookup_token', :token, true)")
-                .setParameter("token", token).getSingleResult();
-        SalesOrder order = orders.findByLookupToken(token)
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "订单凭证无效或已过期"));
+        SalesOrder order = lookup(token);
         return CommerceDtos.Receipt.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId()), false,
                 payment.forOrder(order));
+    }
+
+    @Transactional(readOnly = true)
+    public CommerceDtos.PaymentOrder paymentOrder(String token) {
+        return CommerceDtos.PaymentOrder.of(lookup(token));
+    }
+
+    private SalesOrder lookup(String token) {
+        entityManager.createNativeQuery("SELECT set_config('app.order_lookup_token', :token, true)")
+                .setParameter("token", token).getSingleResult();
+        return orders.findByLookupToken(token)
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "订单凭证无效或已过期"));
+    }
+
+    @Transactional(readOnly = true)
+    public CommerceDtos.PaymentOrder merchantPaymentOrder(Long orderId, Long storeId, Long userId) {
+        storeAccess.requireAccess(storeId, userId);
+        SalesOrder order = orders.findById(orderId).filter(o -> storeId.equals(o.getStoreId()))
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "订单不存在"));
+        return CommerceDtos.PaymentOrder.of(order);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommerceDtos.PaymentOrder> reconciliationOrders() {
+        return entityManager.createQuery("select o from SalesOrder o where o.paymentMethod='ALIPAY' and o.paymentState='PENDING' order by o.paymentQueriedAt asc nulls first, o.id", SalesOrder.class)
+                .setMaxResults(100).getResultList().stream().map(CommerceDtos.PaymentOrder::of).toList();
     }
 
     @Transactional(readOnly = true)

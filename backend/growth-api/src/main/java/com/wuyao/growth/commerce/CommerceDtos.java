@@ -43,14 +43,25 @@ public final class CommerceDtos {
 
     public record PaymentInstructions(String method, String recipient, String qrCodeUrl) {}
 
+    public record PaymentOrder(Long id, Long tenantId, Long storeId, String orderNumber, BigDecimal totalAmount,
+                               String status, String paymentMethod, String paymentState, Instant expiresAt) {
+        static PaymentOrder of(SalesOrder order) {
+            return new PaymentOrder(order.getId(), order.getTenantId(), order.getStoreId(), order.getOrderNumber(),
+                    order.getTotalAmount(), order.getStatus(), order.getPaymentMethod(), order.getPaymentState(),
+                    order.getPaymentExpiresAt());
+        }
+    }
+
     public record Receipt(Long id, String orderNumber, String lookupToken, String status, BigDecimal totalAmount,
                           String shippingCompany, String trackingNumber, List<Line> items, Instant createdAt,
-                          PaymentInstructions payment) {
+                          PaymentInstructions payment, String paymentMethod, String paymentState, Instant paidAt,
+                          Instant paymentExpiresAt) {
         static Receipt of(SalesOrder order, List<SalesOrderItem> items, boolean includeToken,
                           PaymentInstructions payment) {
             return new Receipt(order.getId(), order.getOrderNumber(), includeToken ? order.getLookupToken() : null,
                     order.getStatus(), order.getTotalAmount(), order.getShippingCompany(), order.getTrackingNumber(),
-                    items.stream().map(Line::of).toList(), order.getCreatedAt(), payment);
+                    items.stream().map(Line::of).toList(), order.getCreatedAt(), payment, order.getPaymentMethod(),
+                    order.getPaymentState(), order.getPaidAt(), order.getPaymentExpiresAt());
         }
     }
 
@@ -58,12 +69,13 @@ public final class CommerceDtos {
                                 String shippingAddress, String shippingCompany, String trackingNumber,
                                 String buyerNote, String status, BigDecimal totalAmount,
                                 List<Line> items, Instant createdAt, Instant updatedAt,
-                                PaymentInstructions payment) {
+                                PaymentInstructions payment, String paymentMethod, String paymentState, Instant paidAt) {
         static MerchantOrder of(SalesOrder order, List<SalesOrderItem> items, PaymentInstructions payment) {
             return new MerchantOrder(order.getId(), order.getOrderNumber(), order.getBuyerName(), order.getBuyerPhone(),
                     order.getShippingAddress(), order.getShippingCompany(), order.getTrackingNumber(), order.getBuyerNote(),
                     order.getStatus(), order.getTotalAmount(),
-                    items.stream().map(Line::of).toList(), order.getCreatedAt(), order.getUpdatedAt(), payment);
+                    items.stream().map(Line::of).toList(), order.getCreatedAt(), order.getUpdatedAt(), payment,
+                    order.getPaymentMethod(), order.getPaymentState(), order.getPaidAt());
         }
     }
 

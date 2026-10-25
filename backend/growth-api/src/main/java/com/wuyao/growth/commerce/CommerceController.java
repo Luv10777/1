@@ -14,6 +14,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CommerceController {
     private final CommerceService service;
+    private final CommerceCheckoutService checkout;
 
     @GetMapping("/api/public/products")
     public ApiResponse<PageResult<CommerceDtos.CatalogItem>> catalog(
@@ -33,6 +34,16 @@ public class CommerceController {
         return ApiResponse.ok(service.publicReceipt(token));
     }
 
+    @PostMapping("/api/public/orders/{token}/alipay")
+    public ApiResponse<String> alipay(@PathVariable String token) {
+        return ApiResponse.ok(checkout.alipayUrl(token));
+    }
+
+    @PostMapping("/api/public/orders/{token}/refresh")
+    public ApiResponse<CommerceDtos.Receipt> refresh(@PathVariable String token) {
+        return ApiResponse.ok(checkout.refresh(token));
+    }
+
     @GetMapping("/api/stores/{storeId}/orders")
     public ApiResponse<List<CommerceDtos.MerchantOrder>> list(@PathVariable Long storeId,
                                                                @AuthenticationPrincipal AuthPrincipal me) {
@@ -43,6 +54,6 @@ public class CommerceController {
     public ApiResponse<CommerceDtos.MerchantOrder> update(@PathVariable Long storeId, @PathVariable Long orderId,
                                                             @Valid @RequestBody CommerceDtos.StatusRequest request,
                                                             @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.changeStatus(orderId, storeId, me.userId(), request));
+        return ApiResponse.ok(checkout.changeStatus(orderId, storeId, me.userId(), request));
     }
 }

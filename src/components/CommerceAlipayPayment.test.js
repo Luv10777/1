@@ -30,5 +30,18 @@ test('enterprise Alipay shows the persisted amount and original QR only for paya
     }
     assert.doesNotMatch(await render({ payment: null }), /<img|扫码付款/, 'other merchants do not inherit the collection code')
     assert.doesNotMatch(await render({ totalAmount: 0 }), /<img|扫码付款/)
+
+    const auto = { paymentMethod: 'ALIPAY', paymentState: 'PENDING', status: 'PENDING_PAYMENT',
+      payment: { method: 'ALIPAY', recipient: '嘉兴市梧曜科技有限公司' }, paymentExpiresAt: '2099-01-01T00:00:00Z' }
+    const cashier = await render(auto)
+    assert.match(cashier, /前往支付宝付款/)
+    assert.match(cashier, /197\.50/)
+    assert.match(cashier, /查询支付结果/)
+    assert.doesNotMatch(cashier, /<img|输入上方应付金额|支付成功/)
+    const paid = await render({ ...auto, status: 'SHIPPED', paymentState: 'PAID', payment: null })
+    assert.match(paid, /支付宝支付成功/)
+    assert.doesNotMatch(paid, /前往支付宝付款|查询支付结果|等待商家确认/)
+    assert.doesNotMatch(await render({ ...auto, status: 'CANCELLED', paymentState: 'CLOSED' }), /前往支付宝付款|查询支付结果|支付成功/)
+    assert.doesNotMatch(await render({ ...auto, paymentExpiresAt: '2000-01-01T00:00:00Z' }), /前往支付宝付款/)
   } finally { await vite.close() }
 })
