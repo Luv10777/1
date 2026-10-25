@@ -55,7 +55,6 @@ onUnmounted(() => {
     <p v-if="order.payment" class="commerce-alipay-recipient">收款方：{{ order.payment.recipient }}</p>
     <template v-if="pending">
       <p class="commerce-alipay-countdown"><span>支付剩余时间</span><strong role="timer" aria-label="支付剩余时间" aria-live="off">{{ countdown }}</strong></p>
-      <p class="commerce-alipay-recipient">付款截止：{{ new Date(order.paymentExpiresAt).toLocaleString('zh-CN', { hour12: false }) }}</p>
       <button v-if="!expired" type="button" class="public-button public-button-primary" :disabled="loading" @click="$emit('pay')">{{ loading ? '正在打开收银台…' : '前往支付宝付款' }}</button>
       <p v-else class="commerce-alipay-recipient" role="status">付款时限已结束，正在核实最终支付结果。</p>
       <button type="button" class="public-button" :disabled="loading" @click="$emit('refresh')">查询支付结果</button>
