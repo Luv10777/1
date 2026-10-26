@@ -50,6 +50,13 @@ public class AuthController {
                 http.getHeader("User-Agent"), http.getHeader("X-Device-Id")));
     }
 
+    /** 忘记密码。成功后不发令牌，回登录页用新密码登录。 */
+    @PostMapping("/password-reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody AuthDtos.PasswordResetRequest req) {
+        authService.resetPassword(req.phone(), req.code(), req.newPassword());
+        return ApiResponse.ok();
+    }
+
     @GetMapping("/wechat/start")
     public void wechatStart(@RequestParam(required = false) String redirect,
                             HttpServletRequest http,

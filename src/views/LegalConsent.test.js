@@ -72,6 +72,43 @@ test('registration requires explicit consent before SMS, password login and WeCh
   } finally { await context.close() }
 })
 
+test('a forgotten password is reset with the phone code and the person returns to password login', async () => {
+  const context = await fixture('LoginView', '/login', [{ path: '/login', name: 'login' }])
+  try {
+    const { auth } = await context.vite.ssrLoadModule('/src/stores/auth.js')
+    const calls = []
+    auth.sendCode = async phone => { calls.push(['sms', phone]); return {} }
+    auth.resetPassword = async (...values) => {
+      calls.push(['reset', ...values])
+      if (values[1] === '000000') throw new Error('验证码不正确')
+    }
+    const view = context.mount()
+    let closed = 0
+    view.dialog = { showModal() {}, close() { closed++ } }
+    view.selectTab('password')
+    view.form.account = '13800138000'
+    view.openDialog()
+    assert.equal(view.reset.phone, '13800138000', 'a phone typed as the account is carried into the reset form')
+    await view.sendResetCode()
+    Object.assign(view.reset, { code: '123456', password: 'NewUnitPass9', confirm: 'Different9' })
+    await view.submitReset()
+    assert.match(view.resetError, /两次输入的密码不一致/)
+    Object.assign(view.reset, { code: '000000', confirm: 'NewUnitPass9' })
+    await view.submitReset()
+    assert.equal(view.resetError, '验证码不正确')
+    assert.equal(closed, 0, 'a failed reset keeps the dialog open')
+    view.reset.code = '123456'
+    await view.submitReset()
+    assert.deepEqual(calls, [['sms', '13800138000'], ['reset', '13800138000', '000000', 'NewUnitPass9'],
+      ['reset', '13800138000', '123456', 'NewUnitPass9']], 'resetting needs no consent and never signs in by itself')
+    assert.equal(closed, 1)
+    assert.equal(view.activeTab, 'password')
+    assert.equal(view.form.account, '13800138000')
+    assert.match(view.notice, /新密码登录/)
+    assert.equal(context.router.currentRoute.value.path, '/login')
+  } finally { await context.close() }
+})
+
 test('store checkout keeps recipient details and the cart when consent is missing or an order fails', async () => {
   const context = await fixture('PublicStorefrontView', '/store/7', [
     { path: '/store/:storeId', name: 'public-storefront' }, { path: '/order/:token', name: 'public-order' },

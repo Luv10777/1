@@ -25,6 +25,10 @@ export const authService = {
     return post(endpoint, { account, password })
   },
 
+  resetPassword(phone, code, newPassword) {
+    return post('/api/auth/password-reset', { phone, code, newPassword })
+  },
+
   completeWechat(payload) {
     return post('/api/auth/wechat/complete', payload)
   },

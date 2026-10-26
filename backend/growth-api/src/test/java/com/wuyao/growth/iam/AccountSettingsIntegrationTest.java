@@ -193,6 +193,38 @@ class AccountSettingsIntegrationTest {
     }
 
     @Test
+    void aForgottenPasswordIsResetWithoutSigningInByTheCodeSentToTheirPhone() throws Exception {
+        JsonNode laptop = login(PHONE);
+        owner.update("UPDATE users SET password_hash = ? WHERE phone = ?", hashpw("old-secret-1", gensalt(4)), PHONE);
+        for (int i = 0; i < 5; i++) {
+            refused(post("/api/auth/password-login"), null, Map.of("account", PHONE, "password", "wrong-guess"), 401, 2009);
+        }
+
+        seedCode(PHONE, "222222");
+        refused(post("/api/auth/password-reset"), null, Map.of("phone", PHONE, "code", "333333", "newPassword", "new-secret-1"), 401, 2003);
+        refused(post("/api/auth/password-reset"), null, Map.of("phone", PHONE, "code", "222222", "newPassword", "short"), 400, 1400);
+        api(post("/api/auth/password-reset"), null, Map.of("phone", PHONE, "code", "222222", "newPassword", "new-secret-1"));
+
+        // 新密码立即可用，之前连错导致的锁定一并解除；旧密码和此前的登录全部作废。
+        api(post("/api/auth/password-login"), null, Map.of("account", PHONE, "password", "new-secret-1"));
+        refused(post("/api/auth/password-login"), null, Map.of("account", PHONE, "password", "old-secret-1"), 401, 2009);
+        refused(get("/api/auth/account"), laptop.path("accessToken").asText(), null, 401, 1401);
+        refused(post("/api/auth/refresh"), null, Map.of("refreshToken", laptop.path("refreshToken").asText()), 401, 2005);
+        refused(post("/api/auth/password-reset"), null, Map.of("phone", PHONE, "code", "222222", "newPassword", "new-secret-2"), 401, 2003);
+
+        // 没注册过的手机号不会因为找回密码多出一个账号；被平台停用的账号也不能借此改密码。
+        seedCode("13900000013", "555555");
+        assertThat(refused(post("/api/auth/password-reset"), null,
+                Map.of("phone", "13900000013", "code", "555555", "newPassword", "new-secret-1"), 400, 1400)).contains("还没有注册");
+        assertThat(owner.queryForObject("SELECT count(*) FROM users WHERE phone = '13900000013'", Integer.class)).isZero();
+        login("13900000014");
+        owner.update("UPDATE users SET status = 'SUSPENDED' WHERE phone = '13900000014'");
+        seedCode("13900000014", "666666");
+        assertThat(refused(post("/api/auth/password-reset"), null,
+                Map.of("phone", "13900000014", "code", "666666", "newPassword", "new-secret-1"), 401, 1401)).contains("停用");
+    }
+
+    @Test
     void anAccountWithoutAPhoneCanOnlyUseItsCurrentPassword() throws Exception {
         Long tenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('丙商户') RETURNING id", Long.class);
         owner.update("INSERT INTO users(tenant_id, username, name, password_hash) VALUES (?, 'shop-admin', '店长', ?)",

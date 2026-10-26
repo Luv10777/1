@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 "/api/auth/send-code",
                                 "/api/auth/login",
                                 "/api/auth/password-login",
+                                "/api/auth/password-reset",
                                 "/api/auth/wechat/start",
                                 "/api/auth/wechat/callback",
                                 "/api/auth/wechat/complete",

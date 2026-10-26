@@ -202,15 +202,42 @@ public class AuthService {
             User user = userRepository.findForUpdate(userId)
                     .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                     .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
-            user.setPasswordHash(PasswordLoginVerifier.hashPassword(newPassword));
-            user.setPasswordFailedAttempts(0);
-            user.setPasswordLockedUntil(null);
-            user.setTokenVersion(user.getTokenVersion() + 1);
-            user.setUpdatedAt(Instant.now());
-            int revoked = refreshTokenRepository.revokeAllForUser(userId);
-            log.info("修改密码: userId={} 作废 {} 个 refresh token", userId, revoked);
+            storeNewPassword(user, newPassword, "修改密码");
             return issueTokens(user, ip, userAgent, deviceId);
         });
+    }
+
+    /**
+     * 忘记密码：不用登录，凭发到本人手机的验证码设新密码。
+     * 用的就是验证码登录那种验证码，收得到它的人本来就能直接登录，这里没有多放出权限。
+     * 和登录不同，手机号没注册过也不会顺手建账号。改完所有设备上的登录失效，回登录页用新密码登录。
+     */
+    public void resetPassword(String phone, String code, String newPassword) {
+        if (!PasswordLoginVerifier.acceptable(newPassword)) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "密码长度需为 8–64 位");
+        }
+        codeVerifier.verifyAndConsume(phone, code);
+        transactions.executeWithoutResult(status -> {
+            Long userId = userRepository.findByPhone(phone).map(User::getId)
+                    .orElseThrow(() -> BizException.of(ErrorCode.BAD_REQUEST, "这个手机号还没有注册账号"));
+            User user = userRepository.findForUpdate(userId).orElseThrow();
+            if (!"ACTIVE".equals(user.getStatus())) {
+                throw BizException.of(ErrorCode.UNAUTHORIZED, PlatformAccountDirectory.SUSPENDED.equals(user.getStatus())
+                        ? "账号已被平台停用，如有疑问请联系客服" : "账号已停用，请联系商户管理员");
+            }
+            storeNewPassword(user, newPassword, "找回密码");
+        });
+    }
+
+    /** 调用方持有用户行锁。连带清掉失败计数和锁定，并让此前签发的令牌全部失效。 */
+    private void storeNewPassword(User user, String newPassword, String reason) {
+        user.setPasswordHash(PasswordLoginVerifier.hashPassword(newPassword));
+        user.setPasswordFailedAttempts(0);
+        user.setPasswordLockedUntil(null);
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        user.setUpdatedAt(Instant.now());
+        int revoked = refreshTokenRepository.revokeAllForUser(user.getId());
+        log.info("{}: userId={} 作废 {} 个 refresh token", reason, user.getId(), revoked);
     }
 
     @Transactional(readOnly = true)

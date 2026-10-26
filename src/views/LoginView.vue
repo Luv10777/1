@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, Eye, EyeOff, LockKeyhole, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
+import { ChevronDown, Eye, EyeOff, ShieldCheck, X, LoaderCircle, Sun, Moon } from 'lucide-vue-next'
 import { auth } from '../stores/auth'
 import { theme } from '../stores/theme'
 import { accountError, codeError, passwordError, phoneError, safeRedirect } from '../utils/authValidation.js'
@@ -36,6 +36,12 @@ const wechatBusy = ref(false)
 const wechatVerifying = ref(false)
 const wechatSending = ref(false)
 const wechatForm = ref(null)
+const reset = reactive({ phone: '', code: '', password: '', confirm: '' })
+const resetError = ref('')
+const resetNotice = ref('')
+const resetSending = ref(false)
+const resetBusy = ref(false)
+const resetForm = ref(null)
 
 function clearMessages() {
   notice.value = ''
@@ -249,13 +255,59 @@ function loginWithWechat() {
 }
 
 function openDialog() {
+  Object.assign(reset, { phone: phoneError(form.account) ? '' : form.account.trim(), code: '', password: '', confirm: '' })
+  resetError.value = ''
+  resetNotice.value = ''
   dialog.value?.showModal()
+  nextTick(() => resetForm.value?.querySelector(reset.phone ? '#reset-code' : '#reset-phone')?.focus())
 }
 
-function useSmsInstead() {
+function closeDialog() {
+  if (!resetBusy.value) dialog.value?.close()
+}
+
+async function sendResetCode() {
+  if (resetSending.value || resetBusy.value || auth.state.cooldown > 0) return
+  resetNotice.value = ''
+  resetError.value = phoneError(reset.phone)
+  if (resetError.value) return
+  resetSending.value = true
+  try {
+    const result = await auth.sendCode(reset.phone.trim())
+    resetNotice.value = result.developmentMode
+      ? '当前为本地调试模式，验证码请在后端控制台查看。'
+      : '验证码短信已发送，5 分钟内有效。'
+    await nextTick()
+    resetForm.value?.querySelector('#reset-code')?.focus()
+  } catch (err) {
+    resetError.value = err.message || '验证码发送失败，请稍后重试。'
+  } finally {
+    resetSending.value = false
+  }
+}
+
+async function submitReset() {
+  if (resetSending.value || resetBusy.value) return
+  resetNotice.value = ''
+  resetError.value = phoneError(reset.phone) || codeError(reset.code.trim()) || passwordError(reset.password)
+    || (reset.password === reset.confirm ? '' : '两次输入的密码不一致')
+  if (resetError.value) return
+  resetBusy.value = true
+  try {
+    await auth.resetPassword(reset.phone.trim(), reset.code.trim(), reset.password)
+  } catch (err) {
+    resetError.value = err.message || '密码重置失败，请稍后重试。'
+    return
+  } finally {
+    resetBusy.value = false
+  }
   dialog.value?.close()
-  selectTab('sms', true)
-  notice.value = '使用已绑定手机号接收验证码，即可登录账号。'
+  selectTab('password')
+  Object.assign(form, { account: reset.phone.trim(), password: '' })
+  Object.assign(reset, { code: '', password: '', confirm: '' })
+  notice.value = '密码已重置，请使用新密码登录。'
+  await nextTick()
+  pageForm.value?.querySelector('#login-password')?.focus()
 }
 </script>
 
@@ -342,7 +394,7 @@ function useSmsInstead() {
                   <p v-if="errors.account" id="account-error" class="access-field-error">{{ errors.account }}</p>
                 </div>
                 <div class="access-field">
-                  <div class="access-label-row"><label for="login-password">密码</label><button type="button" @click="openDialog('forgot')">忘记密码？</button></div>
+                  <div class="access-label-row"><label for="login-password">密码</label><button type="button" :disabled="actionBusy" @click="openDialog">忘记密码？</button></div>
                   <div class="access-input-shell" :class="{ 'has-error': errors.password }">
                     <input id="login-password" v-model="form.password" class="focus:ring-2 focus:ring-brand-primary" name="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="请输入 8–64 位密码" :disabled="busy" :aria-invalid="Boolean(errors.password)" :aria-describedby="errors.password ? 'password-error' : undefined" @input="errors.password = ''" />
                     <button class="access-eye" type="button" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><component :is="showPassword ? EyeOff : Eye" :size="18" aria-hidden="true" /></button>
@@ -382,12 +434,21 @@ function useSmsInstead() {
       </div>
       <p class="access-board-foot">记录一方水土，讲述万家故事</p>
     </aside>
-    <dialog ref="dialog" class="access-dialog" aria-labelledby="access-dialog-title" @click="event => event.target === dialog && dialog.close()">
-      <button class="access-dialog-close" type="button" aria-label="关闭" @click="dialog.close()"><X :size="20" /></button>
-      <LockKeyhole :size="25" class="access-dialog-icon" aria-hidden="true" />
-      <h2 id="access-dialog-title">找回账号访问权限</h2>
-      <p>忘记密码也可以通过已绑定的手机号登录。若手机号已停用，请联系平台管理员协助处理。</p>
-      <button class="access-submit w-full" type="button" @click="useSmsInstead">使用验证码登录</button>
+    <dialog ref="dialog" class="access-dialog" aria-labelledby="access-dialog-title" @click="event => event.target === dialog && closeDialog()" @cancel="event => resetBusy && event.preventDefault()">
+      <button class="access-dialog-close" type="button" aria-label="关闭" :disabled="resetBusy" @click="closeDialog"><X :size="20" /></button>
+      <h2 id="access-dialog-title">找回密码</h2>
+      <p>验证账号绑定的手机号后设置新密码，其他设备上的登录会同时退出。若手机号已停用，请联系平台管理员协助处理。</p>
+      <form ref="resetForm" class="access-reset" novalidate :aria-busy="resetBusy" @submit.prevent="submitReset">
+        <div class="access-fields">
+          <div class="access-field"><label for="reset-phone">手机号</label><div class="access-input-shell"><input id="reset-phone" v-model="reset.phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="11" placeholder="请输入账号绑定的手机号" :disabled="resetBusy || resetSending" /></div></div>
+          <div class="access-field"><label for="reset-code">短信验证码</label><div class="access-input-shell"><input id="reset-code" v-model="reset.code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="请输入 6 位验证码" :disabled="resetBusy" /><button type="button" class="access-send" :disabled="resetBusy || resetSending || auth.state.cooldown > 0" @click="sendResetCode">{{ resetSending ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}</button></div></div>
+          <div class="access-field"><label for="reset-password">新密码</label><div class="access-input-shell"><input id="reset-password" v-model="reset.password" type="password" autocomplete="new-password" maxlength="64" placeholder="请输入 8–64 位密码" :disabled="resetBusy" /></div></div>
+          <div class="access-field"><label for="reset-confirm">确认新密码</label><div class="access-input-shell"><input id="reset-confirm" v-model="reset.confirm" type="password" autocomplete="new-password" maxlength="64" placeholder="请再次输入新密码" :disabled="resetBusy" /></div></div>
+        </div>
+        <p v-if="resetError" class="access-message is-error" role="alert">{{ resetError }}</p>
+        <p v-if="resetNotice" class="access-message is-success" role="status">{{ resetNotice }}</p>
+        <button class="access-submit w-full" type="submit" :disabled="resetBusy || resetSending"><LoaderCircle v-if="resetBusy" class="access-spinner" :size="18" aria-hidden="true" />{{ resetBusy ? '正在重置…' : '重置密码' }}</button>
+      </form>
     </dialog>
   </main>
 </template>
