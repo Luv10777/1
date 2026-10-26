@@ -62,6 +62,14 @@ public class VideoPricingService {
             ||!Objects.equals(q.providerModel(),provider.providerModel(request.model())))
             throw BizException.of(ErrorCode.BILLING_QUOTE_EXPIRED,"视频计价或供应商配置已变化，预占烟火将退回，请重新创建视频");
     }
+    public long actualCredits(Quote q,Long billedQuota,Long reportedTokens,int width,int height,int durationMs) {
+        if(billedQuota==null||billedQuota<=0||prices.getRelayQuotaPerUnit()<=0||!positive(prices.getRelayCnyPerUnit()))
+            return actualCredits(q,reportedTokens,width,height,durationMs);
+        // The relay's own charge replaces the token estimate; the accepted quote stays the ceiling.
+        long credits=BigDecimal.valueOf(billedQuota).multiply(prices.getRelayCnyPerUnit()).multiply(q.sellingMultiplier()).multiply(BigDecimal.valueOf(10))
+            .divide(BigDecimal.valueOf(prices.getRelayQuotaPerUnit()),0,RoundingMode.UP).longValueExact();
+        return Math.min(q.credits(),credits);
+    }
     public long actualCredits(Quote q,Long reportedTokens,int width,int height,int durationMs) {
         long actual=reportedTokens!=null&&reportedTokens>0?reportedTokens:tokens(Math.multiplyExact((long)width,height),
             BigDecimal.valueOf(durationMs,3).add(BigDecimal.valueOf(q.referenceSeconds())),q.framesPerSecond(),q.tokenAreaDivisor());

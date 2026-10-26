@@ -59,6 +59,7 @@ public class VideoWorkflow {
     @Column(length=36) private String billingReservationId;
     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition="jsonb") private com.wuyao.growth.billing.VideoPricingService.Quote billingQuote;
     private Long providerBillingTokens;
+    private Long providerBilledQuota;
     private Long billingCapturedCredits;
     @Column(name = "error_code", length = 64) private String errorCode;
     @Column(name = "error_message", columnDefinition = "text") private String errorMessage;

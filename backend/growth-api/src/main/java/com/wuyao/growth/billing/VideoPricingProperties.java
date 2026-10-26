@@ -12,6 +12,10 @@ import java.util.List;
 @Component @ConfigurationProperties(prefix="growth.billing.video") @Getter @Setter
 public class VideoPricingProperties {
     private List<Rate> rates = List.of();
+    // Relay quota per display unit (new-api quota_per_unit) and the CNY actually paid per unit.
+    // Either one absent keeps settlement on the token formula.
+    private long relayQuotaPerUnit;
+    private BigDecimal relayCnyPerUnit;
     @Getter @Setter public static class Rate {
         private String providerBaseUrl;
         private String providerModel;

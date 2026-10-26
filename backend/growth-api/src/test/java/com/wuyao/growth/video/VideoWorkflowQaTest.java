@@ -129,7 +129,7 @@ class VideoWorkflowQaTest {
         task.setAttempts(1);
         task.setMaxAttempts(3);
         task.setPayload(java.util.Map.of("workflowId", 42L));
-        assertThatCode(() -> new VideoQaHandler(service).handle(task)).doesNotThrowAnyException();
+        assertThatCode(() -> new VideoQaHandler(service, mock(VideoProviderGateway.class), workflows).handle(task)).doesNotThrowAnyException();
         assertThat(workflow.getStatus()).isEqualTo("FAILED");
         assertThat(workflow.getErrorCode()).isEqualTo("VIDEO_ASSET_INVALID");
         assertThat(output.getStatus()).isEqualTo("INVALID");

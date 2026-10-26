@@ -604,7 +604,11 @@ public class VideoWorkflowService {
     }
 
     @Transactional
-    public void completeQa(Long workflowId, Task task) {
+    public void completeQa(Long workflowId, Task task) { completeQa(workflowId, task, null); }
+
+    /** {@code billedQuota} is the relay's own charge, looked up outside this transaction; null keeps the formula. */
+    @Transactional
+    public void completeQa(Long workflowId, Task task, Long billedQuota) {
    billing.lockForGeneration();
         if (!tasks.ownsExecution(task)) return;
         VideoWorkflow workflow = lock(workflowId);
@@ -641,7 +645,8 @@ public class VideoWorkflowService {
             return;
         }
         if (workflow.getBillingReservationId() != null) {
-            long charge = pricing.actualCredits(workflow.getBillingQuote(), workflow.getProviderBillingTokens(),
+            if (billedQuota != null) workflow.setProviderBilledQuota(billedQuota);
+            long charge = pricing.actualCredits(workflow.getBillingQuote(), billedQuota, workflow.getProviderBillingTokens(),
                     output.getWidth(), output.getHeight(), output.getDurationMs());
             billing.capture(workflow.getBillingReservationId(), charge, "video-delivered:" + workflow.getId(), "视频交付 · 消耗 " + charge + " 烟火");
             workflow.setBillingCapturedCredits(charge);

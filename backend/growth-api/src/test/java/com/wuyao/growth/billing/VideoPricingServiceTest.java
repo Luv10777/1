@@ -61,6 +61,17 @@ class VideoPricingServiceTest {
         assertThat(service.actualCredits(quote,null,640,480,5000)).isEqualTo(6);
         assertThatThrownBy(()->service.actualCredits(quote,null,0,0,0)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void relayBilledQuotaReplacesTheFormulaButNeverExceedsTheAcceptedQuote() {
+        rate.setSellingMultiplier(new BigDecimal("1.3"));config.setRates(List.of(rate));var quote=service.quote(request);
+        assertThat(quote.credits()).isEqualTo(20);
+        // Not configured: the relay quota is ignored and reported tokens still settle.
+        assertThat(service.actualCredits(quote,425000L,54000L,1920,1080,10000)).isEqualTo(10);
+        config.setRelayQuotaPerUnit(500000);config.setRelayCnyPerUnit(BigDecimal.ONE);
+        // 425000 / 500000 x CNY 1 x 1.3 x 10 = 11.05 -> 12 yanhuo.
+        assertThat(service.actualCredits(quote,425000L,54000L,1920,1080,10000)).isEqualTo(12);
+        assertThat(service.actualCredits(quote,99999999L,54000L,1920,1080,10000)).isEqualTo(20);
+        assertThat(service.actualCredits(quote,null,54000L,1920,1080,10000)).isEqualTo(10);
+    }
     @Test void referenceVideoUsesPersistedDurationAndVerifiedFormula() {
         rate.setVideoInput("v2v");rate.setReferenceVideoBilled(true);config.setRates(List.of(rate));
         when(assets.mediaReference(11L,"VIDEO")).thenReturn(new AssetService.MediaReference(11L,"key","video/mp4",4500));
