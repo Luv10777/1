@@ -453,8 +453,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V61 | 问答集可以挂在品牌上，品牌下所有门店共用；问答来源增加 DOCUMENT | `refactor/knowledge-simplify` |
 | V62 | 知识库文档：`knowledge_documents`、`knowledge_suggestions`（文档整理出的待确认建议） | `refactor/knowledge-simplify` |
 | V63 | 视频工作台「帮我出方案」：`video_plans`（参考图、风格、一句话、3 个方案、预占烟火） | `claude/video-plan` |
+| V66 | 商城好物「入驻商户」栏：`public_alliance_stores` 函数（只交出已入驻商户营业中门店的编号和名称） | `claude/alliance-stores-tab` |
 
-下一个可用编号：V64（V54 直播计费、V58 消息通知已在主干）。
+下一个可用编号：V67（V64、V65 已在主干）。
 
 后端检查：
 

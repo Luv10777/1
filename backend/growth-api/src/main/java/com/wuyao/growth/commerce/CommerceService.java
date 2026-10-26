@@ -7,6 +7,7 @@ import com.wuyao.growth.common.web.PageResult;
 import com.wuyao.growth.product.ProductDtos;
 import com.wuyao.growth.product.ProductService;
 import com.wuyao.growth.store.StoreAccessService;
+import com.wuyao.growth.store.StoreDtos;
 import com.wuyao.growth.store.StoreService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -21,6 +22,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class CommerceService {
+    private static final int SHOWCASE_SIZE = 6;
+
     private final ProductService products;
     private final OrderWriteService writer;
     private final SalesOrderRepository orders;
@@ -53,6 +56,21 @@ public class CommerceService {
         Map<Long, String> names = stores.publicNames(listed.items().stream().map(ProductDtos.PublicListing::storeId).distinct().toList());
         List<CommerceDtos.CatalogItem> items = listed.items().stream().filter(item -> names.containsKey(item.storeId()))
                 .map(item -> CommerceDtos.CatalogItem.of(item, names.get(item.storeId()))).toList();
+        return new PageResult<>(items, listed.page(), listed.size(), listed.total(), listed.totalPages());
+    }
+
+    /** 入驻商户栏：已入驻商户名下营业中的门店，每家带最近 {@value #SHOWCASE_SIZE} 件在售实物商品。 */
+    @Transactional(readOnly = true)
+    public PageResult<CommerceDtos.AllianceStore> publicAllianceStores(int page, int size) {
+        PageResult<StoreDtos.AllianceStore> listed = stores.publicAllianceStores(page, size);
+        Map<Long, ProductService.PublicShowcase> showcases = products.publicShowcase(
+                listed.items().stream().map(StoreDtos.AllianceStore::id).toList(), SHOWCASE_SIZE);
+        List<CommerceDtos.AllianceStore> items = listed.items().stream().map(store -> {
+            ProductService.PublicShowcase showcase = showcases.get(store.id());
+            if (showcase == null) return new CommerceDtos.AllianceStore(store.id(), store.name(), 0, List.of());
+            return new CommerceDtos.AllianceStore(store.id(), store.name(), showcase.total(), showcase.products().stream()
+                    .map(item -> CommerceDtos.CatalogItem.of(item, store.name())).toList());
+        }).toList();
         return new PageResult<>(items, listed.page(), listed.size(), listed.total(), listed.totalPages());
     }
 

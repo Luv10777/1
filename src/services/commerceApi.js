@@ -2,6 +2,7 @@ import { get, patch, post } from '../utils/request.js'
 
 export const commerceApi = {
   catalog: params => get('/api/public/products', Object.fromEntries(Object.entries(params || {}).filter(([, value]) => value != null && value !== ''))),
+  allianceStores: params => get('/api/public/alliance-stores', params),
   publicStore: storeId => get(`/api/public/stores/${storeId}`),
   publicProducts: storeId => get(`/api/public/stores/${storeId}/products`),
   publicImageUrl: assetId => get(`/api/public/assets/${assetId}/download-url`),
