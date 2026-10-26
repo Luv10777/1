@@ -194,13 +194,19 @@ Seedance 2.0 的 8 个 USD / 1M token 档位已按运营提供的价格表整理
 
 交付结算按以下顺序取成本，最终向上取整到整数烟火，最高为用户确认的预占额，超出部分由平台承担，多余预占退回：
 
-1. **中转站实扣**：质检任务在结算事务外查询中转站任务记录（new-api `GET /api/task/self?task_id=<任务 ID>`），取状态为 `SUCCESS` 的 `quota`，存入 `video_workflows.provider_billed_quota`。
-   `结算烟火 = ceil(quota / relay-quota-per-unit × relay-cny-per-unit × 售价倍率 × 10)`，售价倍率取报价快照。
-   只查询接受报价的同一个供应商地址；未配置、查询失败、记录未完成或额度为 0 时跳过这一步。
+1. **中转站实扣**：质检任务在结算事务外查询中转站消费日志（new-api `GET /api/log/self?type=0&start_timestamp=<提交时间 - 5 分钟>`，每页 100 条，最多翻 10 页），
+   找 `task_id` 等于我方 `provider_job_id`、`billing_stage` 为 `settle_extra` / `settle_refund` 的结算记录，取其 `other.actual_quota`，存入 `video_workflows.provider_billed_quota`。
+   `结算烟火 = ceil(actual_quota / relay-quota-per-unit × relay-cny-per-unit × 售价倍率 × 10)`，售价倍率取报价快照。
+   只查询接受报价的同一个供应商地址；未配置、查询失败、还没有结算记录或额度为 0 时跳过这一步。
 2. 供应商轮询返回的 `usage.completion_tokens`，其次 `usage.total_tokens`，按费率快照换算。
 3. 交付视频的实测宽、高、时长与已核验公式。
 
-`provider_billed_quota` 为空的单子没有用到实扣，对账时据此区分来源。中转站的 `quota` 是否已含完成后的补扣、任务 ID 是否与我方保存的 `provider_job_id` 一致，须用真实任务核对后再依赖。
+`provider_billed_quota` 为空的单子没有用到实扣，对账时据此区分来源。
+
+不用任务记录（`/api/task/self`）的 `quota`：它是提交时按参数预扣的额度（日志 `billing_stage=preconsume`），任务完成后中转站按实际 token 重算，另记一笔补扣或退还，任务记录本身不更新。
+2026-10-26 核对正式账号：最近 100 条日志里补扣 35 次、退还 8 次，带参考视频的单子预扣 ¥1.33、最终 ¥3.48。
+少数成功任务没有结算记录（可能实扣正好等于预扣），与「还没结算」无法区分，所以统一退回公式，不用预扣额。失败任务中转站全额退回（`failure_refund`）。
+中转站写结算日志一般比我方交付早 15–50 秒；质检时还没写到的单子按公式结算。
 
 开启实扣结算需要两部分配置，缺一项都按公式结算：
 

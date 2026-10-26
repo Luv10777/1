@@ -35,6 +35,6 @@ public class VideoQaHandler implements TaskHandler {
         VideoWorkflow workflow = workflows.findById(workflowId).orElse(null);
         if (workflow == null || workflow.getBillingReservationId() == null || workflow.getBillingQuote() == null
                 || !Objects.equals(workflow.getBillingQuote().providerBaseUrl(), provider.baseUrl())) return null;
-        return provider.billedQuota(workflow.getProviderJobId());
+        return provider.billedQuota(workflow.getProviderJobId(), workflow.getProviderSubmitStartedAt());
     }
 }

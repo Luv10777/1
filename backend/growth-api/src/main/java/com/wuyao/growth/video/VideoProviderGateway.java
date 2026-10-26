@@ -22,8 +22,9 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -39,6 +40,9 @@ import java.util.Map;
 @Slf4j
 public class VideoProviderGateway {
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+    private static final int LOG_PAGE_SIZE = 100;
+    private static final int MAX_LOG_PAGES = 10;
+    private static final Duration LOG_CLOCK_SKEW = Duration.ofMinutes(5);
 
     private final ObjectMapper json;
     private final AssetService assets;
@@ -56,10 +60,10 @@ public class VideoProviderGateway {
     @Value("${growth.video.provider.name:haomaotoken}") private String providerName;
     @Value("${growth.video.provider.protocol:VOLCENGINE}") private String protocol;
     @Value("${growth.video.provider.timeout-seconds:60}") private long timeoutSeconds;
-    // new-api account access token and user id; the task's API key cannot read its own task records.
+    // new-api account access token and user id; the task's API key cannot read the account's billing logs.
     @Value("${growth.video.provider.usage-access-token:}") private String usageAccessToken;
     @Value("${growth.video.provider.usage-user-id:}") private String usageUserId;
-    @Value("${growth.video.provider.usage-task-path:/api/task/self}") private String usageTaskPath;
+    @Value("${growth.video.provider.usage-log-path:/api/log/self}") private String usageLogPath;
     @Value("${growth.video.model.seedance-2-5:seedance-2.5}") private String seedance25;
     @Value("${growth.video.model.seedance-2-0:seedance-2.0}") private String seedance20;
     @Value("${growth.video.model.seedance-2-0-mini:seedance-2.0-mini}") private String seedance20Mini;
@@ -185,35 +189,49 @@ public class VideoProviderGateway {
 
     /**
      * What the relay finally charged for a finished task, in its own quota units.
-     * Returns null when the lookup is not configured, fails, or the relay has no
-     * successful record for the task, so settlement falls back to the token formula.
+     * The task record only keeps the submit-time pre-charge; the final amount is the
+     * {@code actual_quota} of the task's settle log written once usage is recalculated.
+     * Returns null when the lookup is not configured, fails, or no settle log exists yet,
+     * so settlement falls back to the token formula rather than the pre-charge.
      */
-    public Long billedQuota(String jobId) {
-        if (!hasText(usageAccessToken) || !hasText(usageUserId) || !hasText(jobId)) return null;
+    public Long billedQuota(String jobId, Instant submittedAt) {
+        if (!hasText(usageAccessToken) || !hasText(usageUserId) || !hasText(jobId) || submittedAt == null) return null;
         try {
-            URI endpoint = VideoUrlSecurity.checkedHttps(joinUrl(usageTaskPath)
-                    + "?p=1&page_size=10&task_id=" + URLEncoder.encode(jobId, StandardCharsets.UTF_8));
-            var request = new HttpGet(endpoint);
-            request.setConfig(requestConfig());
-            request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + usageAccessToken);
-            request.setHeader("New-Api-User", usageUserId);
-            request.setHeader(HttpHeaders.ACCEPT, "application/json");
-            JsonNode body = httpClient.execute(request, response -> {
-                String text = readBody(response.getEntity(), MAX_RESPONSE_BYTES);
-                if (response.getCode() / 100 != 2) throw new IOException("HTTP " + response.getCode());
-                return json.readTree(text);
-            });
-            JsonNode data = body.path("data");
-            for (JsonNode item : data.isArray() ? data : data.path("items")) {
-                JsonNode quota = item.path("quota");
-                if (jobId.equals(item.path("task_id").asText()) && "SUCCESS".equalsIgnoreCase(item.path("status").asText())
-                        && quota.isIntegralNumber() && quota.asLong() > 0) return quota.asLong();
+            // The log API cannot filter by task, so page through logs since the submission, newest first.
+            long since = submittedAt.minus(LOG_CLOCK_SKEW).getEpochSecond();
+            for (int page = 1; page <= MAX_LOG_PAGES; page++) {
+                JsonNode data = usageGet(usageLogPath + "?type=0&page_size=" + LOG_PAGE_SIZE + "&p=" + page
+                        + "&start_timestamp=" + since).path("data");
+                JsonNode items = data.isArray() ? data : data.path("items");
+                for (JsonNode item : items) {
+                    if (!jobId.equals(item.path("task_id").asText()) || !item.path("billing_stage").asText().startsWith("settle")) continue;
+                    JsonNode other = item.path("other");
+                    if (other.isTextual()) other = json.readTree(other.asText());
+                    JsonNode actual = other.path("actual_quota");
+                    if (actual.isIntegralNumber() && actual.asLong() > 0) return actual.asLong();
+                }
+                if (items.size() < LOG_PAGE_SIZE) break;
             }
-            log.warn("中转站没有该任务的成功扣费记录: jobId={}", jobId);
+            log.warn("中转站还没有该任务的结算记录，按公式结算: jobId={}", jobId);
         } catch (Exception e) {
-            log.warn("查询中转站任务扣费失败: jobId={} type={}", jobId, e.getClass().getSimpleName());
+            log.warn("查询中转站任务结算记录失败: jobId={} type={}", jobId, e.getClass().getSimpleName());
         }
         return null;
+    }
+
+    private JsonNode usageGet(String pathAndQuery) throws IOException {
+        var request = new HttpGet(VideoUrlSecurity.checkedHttps(joinUrl(pathAndQuery)));
+        request.setConfig(requestConfig());
+        request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + usageAccessToken);
+        request.setHeader("New-Api-User", usageUserId);
+        request.setHeader(HttpHeaders.ACCEPT, "application/json");
+        return httpClient.execute(request, response -> {
+            String text = readBody(response.getEntity(), MAX_RESPONSE_BYTES);
+            if (response.getCode() / 100 != 2) throw new IOException("HTTP " + response.getCode());
+            JsonNode body = json.readTree(text);
+            if (!body.path("success").asBoolean()) throw new IOException("relay rejected the log query");
+            return body;
+        });
     }
 
     private Long firstPositiveLong(JsonNode node, String... fields) {
