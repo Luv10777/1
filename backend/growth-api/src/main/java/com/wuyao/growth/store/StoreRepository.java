@@ -16,6 +16,10 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     java.util.List<Store> findAllByIdInAndStatus(java.util.Collection<Long> ids, String status);
     long countByBrandIdAndStatus(Long brandId, String status);
 
+    /** 已入驻商户名下营业中的门店：store_id, store_name, total。见 V66。 */
+    @Query(value = "select store_id, store_name, total from public_alliance_stores(:limit, :offset)", nativeQuery = true)
+    List<Object[]> findPublicAllianceStores(@Param("limit") int limit, @Param("offset") long offset);
+
     @Query("select s.brandId, count(s) from Store s where s.status = 'ACTIVE' and s.brandId is not null group by s.brandId")
     List<Object[]> countActiveByBrand();
 

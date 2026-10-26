@@ -1,5 +1,6 @@
 package com.wuyao.growth.commerce;
 
+import com.wuyao.growth.community.MerchantTestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,5 +119,61 @@ class PublicCatalogIntegrationTest {
         owner.update("INSERT INTO product_images(tenant_id,product_id,asset_id,sort_order) VALUES (?,?,?,0)", tenantA, id, first);
 
         mvc.perform(get("/api/public/products")).andExpect(jsonPath("$.data.items[0].coverAssetId").value(first));
+    }
+
+    @Test
+    void allianceStoresListOnlyApprovedMerchantsActiveStoresIncludingOnesWithoutProducts() throws Exception {
+        MerchantTestFixtures.approveMerchant(owner, tenantA, userA);
+        Long emptyStore = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '甲茶铺二店', ?) RETURNING id", Long.class, tenantA, userA);
+        Long archived = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by,status) VALUES (?, '甲茶铺旧店', ?, 'ARCHIVED') RETURNING id", Long.class, tenantA, userA);
+        product(tenantA, storeA, userA, "龙井茶礼盒", "PHYSICAL", "PUBLISHED", "茶饮");
+        product(tenantA, storeA, userA, "草稿商品", "PHYSICAL", "DRAFT", "茶饮");
+        product(tenantA, archived, userA, "旧店商品", "PHYSICAL", "PUBLISHED", "茶饮");
+        // 乙只提交了申请、还没通过：即使有在售商品，也不算入驻商户。
+        owner.update("""
+                INSERT INTO merchant_applications(tenant_id,submitted_by,merchant_name,company_name,industry,region,
+                    credit_code,contact_name,contact_phone,introduction)
+                VALUES (?,?,'乙商家','乙商家有限公司','家居','测试地区','91330400MA2T000002','联系人','13800009998','测试')""", tenantB, userB);
+        product(tenantB, storeB, userB, "实木托盘", "PHYSICAL", "PUBLISHED", "家居");
+
+        mvc.perform(get("/api/public/alliance-stores")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.items[0].storeId").value(storeA))
+                .andExpect(jsonPath("$.data.items[0].storeName").value("甲茶铺"))
+                .andExpect(jsonPath("$.data.items[0].productTotal").value(1))
+                .andExpect(jsonPath("$.data.items[0].products[0].name").value("龙井茶礼盒"))
+                .andExpect(jsonPath("$.data.items[0].products[0].storeName").value("甲茶铺"))
+                .andExpect(jsonPath("$.data.items[1].storeId").value(emptyStore))
+                .andExpect(jsonPath("$.data.items[1].productTotal").value(0))
+                .andExpect(jsonPath("$.data.items[1].products.length()").value(0))
+                .andExpect(jsonPath("$.data.items[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].merchantName").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].contactPhone").doesNotExist());
+    }
+
+    @Test
+    void allianceStoresShowTheLatestSixProductsAndDropSuspendedMerchants() throws Exception {
+        MerchantTestFixtures.approveMerchant(owner, tenantA, userA);
+        MerchantTestFixtures.approveMerchant(owner, tenantB, userB);
+        for (int i = 1; i <= 8; i++) {
+            Long id = product(tenantA, storeA, userA, "茶" + i, "PHYSICAL", "PUBLISHED", "茶饮");
+            owner.update("UPDATE products SET updated_at = now() - make_interval(mins => ?) WHERE id = ?", 10 - i, id);
+        }
+        product(tenantA, storeA, userA, "团购券", "VOUCHER", "PUBLISHED", "茶饮");
+
+        mvc.perform(get("/api/public/alliance-stores"))
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.items[0].productTotal").value(8))
+                .andExpect(jsonPath("$.data.items[0].products.length()").value(6))
+                .andExpect(jsonPath("$.data.items[0].products[0].name").value("茶8"))
+                .andExpect(jsonPath("$.data.items[0].products[5].name").value("茶3"));
+
+        owner.update("UPDATE merchant_applications SET status = 'SUSPENDED' WHERE tenant_id = ?", tenantA);
+        mvc.perform(get("/api/public/alliance-stores"))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].storeName").value("乙家居"));
+
+        mvc.perform(get("/api/public/alliance-stores").param("size", "51")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/public/alliance-stores").param("page", "-1")).andExpect(status().isBadRequest());
     }
 }

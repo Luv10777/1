@@ -46,6 +46,22 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             """)
     Page<Product> searchPublicPhysical(@Param("keyword") String keyword, Pageable pageable);
 
+    /** 每家门店最近更新的前 limit 件在售实物商品：id, 该门店在售总数。条件同 {@link #searchPublicPhysical}。 */
+    @Query(value = """
+            select id, total from (
+                select p.id, p.store_id, p.updated_at,
+                       count(*) over (partition by p.store_id) as total,
+                       row_number() over (partition by p.store_id order by p.updated_at desc, p.id desc) as seq
+                from products p
+                where p.store_id in (:storeIds)
+                  and p.status = 'ACTIVE' and p.online_status = 'PUBLISHED' and p.deleted_at is null
+                  and p.type = 'PHYSICAL'
+            ) listed
+            where seq <= :limit
+            order by store_id, seq
+            """, nativeQuery = true)
+    List<Object[]> findPublicShowcase(@Param("storeIds") java.util.Collection<Long> storeIds, @Param("limit") int limit);
+
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
     List<Product> findAllByStoreIdAndStatusAndOnlineStatusAndDeletedAtIsNullOrderByUpdatedAtDescIdDesc(

@@ -35,6 +35,9 @@ public final class CommerceDtos {
         }
     }
 
+    /** 商户联盟「入驻商户」栏的一家门店：在售实物商品总数和最近的几件。没有商品时 products 为空。 */
+    public record AllianceStore(Long storeId, String storeName, long productTotal, List<CatalogItem> products) {}
+
     public record Line(Long productId, String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
         static Line of(SalesOrderItem item) {
             return new Line(item.getProductId(), item.getProductName(), item.getUnitPrice(), item.getQuantity(), item.getLineTotal());

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Package, RefreshCw, Search, Store, X } from 'lucide-vue-next'
 import { commerceApi } from '../services/commerceApi'
+import MerchantAllianceTabs from './MerchantAllianceTabs.vue'
 
 const PAGE_SIZE = 12
 const route = useRoute()
@@ -42,7 +43,7 @@ async function load() {
 
 function go(values) {
   const next = { keyword: keyword.value, page: page.value, ...values }
-  return router.push({ name: 'merchant-alliance', query: { ...(next.keyword ? { keyword: next.keyword } : {}), ...(next.page ? { page: next.page } : {}) }, hash: '#products' })
+  return router.push({ name: 'merchant-alliance', query: { ...(next.keyword ? { keyword: next.keyword } : {}), ...(next.page ? { page: next.page } : {}) }, hash: '#alliance-panel-products' })
 }
 function search() {
   const value = query.value.trim().slice(0, 80)
@@ -56,9 +57,9 @@ onBeforeUnmount(() => { generation++ })
 </script>
 
 <template>
-  <section id="products" class="alliance-wall" aria-labelledby="alliance-wall-title">
+  <section id="alliance-panel-products" class="alliance-wall" role="tabpanel" aria-labelledby="alliance-tab-products">
     <div class="alliance-wall-toolbar">
-      <h2 id="alliance-wall-title">联盟好物</h2>
+      <MerchantAllianceTabs />
       <form class="alliance-search" role="search" @submit.prevent="search">
         <Search :size="15" aria-hidden="true" />
         <input v-model="query" type="search" maxlength="80" placeholder="搜索商品名称或分类" aria-label="搜索商品" />

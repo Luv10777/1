@@ -24,6 +24,13 @@ public class CommerceController {
         return ApiResponse.ok(service.publicCatalog(page, size, keyword));
     }
 
+    @GetMapping("/api/public/alliance-stores")
+    public ApiResponse<PageResult<CommerceDtos.AllianceStore>> allianceStores(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.ok(service.publicAllianceStores(page, size));
+    }
+
     @PostMapping("/api/public/orders")
     public ApiResponse<CommerceDtos.Receipt> place(@Valid @RequestBody CommerceDtos.PlaceOrderRequest request) {
         return ApiResponse.ok(service.place(request));
