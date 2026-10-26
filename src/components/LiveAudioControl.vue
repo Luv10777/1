@@ -437,6 +437,7 @@ onBeforeUnmount(() => { mounted = false; generation++; clearTimeout(poll); playe
   .audio-desktop-head { align-items: flex-start; flex-direction: column; }
   .audio-auto-head { align-items: flex-start; flex-direction: column; }
   .audio-live-bar { flex-wrap: wrap; }
+  .audio-live-copy { flex: 1 1 200px; min-width: 0; }
   .audio-live-actions { margin-left: 48px; }
   .audio-secondary > summary span { display: block; margin: 6px 0 0 15px; }
 }

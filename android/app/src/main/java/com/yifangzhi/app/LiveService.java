@@ -61,6 +61,7 @@ public final class LiveService extends Service implements DanmakuCollector.Liste
     private String room = "";
     private WeakReference<Activity> screen = new WeakReference<>(null);
     private boolean shown;
+    private boolean settingsInPage;
     private View overlay;
     private TextView badge;
     private PowerManager.WakeLock wakeLock;
@@ -74,6 +75,7 @@ public final class LiveService extends Service implements DanmakuCollector.Liste
         super.onCreate();
         log = ProbeState.of(this);
         console = new ConsoleWeb(this, this);
+        settingsInPage = false;
         console.start();
     }
 
@@ -112,6 +114,25 @@ public final class LiveService extends Service implements DanmakuCollector.Liste
         console.detach();
         console.shownIn(null);
         arrangeOverlay();
+    }
+
+    /** 页面菜单里有“设置”入口时为真；换了一张新网页就要等它重新说。 */
+    boolean settingsInPage() {
+        return settingsInPage;
+    }
+
+    @Override
+    public void settingsInPage(boolean inPage) {
+        settingsInPage = inPage;
+        Activity activity = screen.get();
+        if (shown && activity instanceof ConsoleActivity) ((ConsoleActivity) activity).arrangeSettings();
+    }
+
+    @Override
+    public void openSettings() {
+        Activity activity = screen.get();
+        // 只有页面显示在屏幕上时才点得到这个入口。
+        if (shown && activity != null) activity.startActivity(new Intent(activity, MainActivity.class));
     }
 
     boolean goBack() {

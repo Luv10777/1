@@ -225,6 +225,6 @@ export function describePlayback(playback) {
       return { label, detail: waiting ? `${now} · 待播 ${waiting} 条` : now }
     }
     default:
-      return { label: '未开始', detail: '点击开始播报，播报声音会从这台电脑播放。播报期间请保持本页面打开。' }
+      return { label: '未开始', detail: '点击开始播报，播报声音会从这台设备播放。播报期间请保持本页面打开。' }
   }
 }

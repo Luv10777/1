@@ -48,6 +48,11 @@
       take: () => ask('link.take'),
       onOpen: listener => subscribe(links, listener),
     },
+    // 手机软件的“设置与验证”：页面菜单里放了入口时告诉软件一声，软件就收起浮在左下角的按钮。
+    settings: {
+      open: () => ask('settings.open'),
+      inPage: shown => ask('settings.inPage', Boolean(shown)),
+    },
   }
   // 打个招呼：软件要先收到页面的一句话，才有办法主动往页面送东西。
   ask('hello').catch(() => {})
