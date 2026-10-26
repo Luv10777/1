@@ -1,6 +1,7 @@
 package com.wuyao.growth.common.gateway;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.*;
 import org.apache.hc.client5.http.classic.HttpClient;
@@ -142,7 +143,11 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      response=post(config.editsUrl(),endpoint,req,"multipart/form-data; boundary="+boundary,chunks);
    }
    var root=json.readTree(response);var data=root.path("data");
-   if(!data.isArray() || data.size()!=1) throw failure("图片服务未返回单张有效图片");
+   if(!data.isArray() || data.size()!=1) {
+     log.warn("图片响应缺少单张图片: model={} dataSize={} fields={} error={}",endpoint.getModel(),
+       data.isArray()?data.size():"none",fieldNames(root,endpoint.getApiKey()),relayError(root,endpoint.getApiKey()));
+     throw failure("图片服务未返回单张有效图片");
+   }
    String url=data.get(0).path("url").asText("");
    var output=new LinkedHashMap<String,Object>();output.put("status","SUCCEEDED");
    if(!url.isBlank()) {
@@ -157,6 +162,35 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    }
    if(root.path("usage").isObject()) output.put("usage",json.convertValue(root.get("usage"),Map.class));
    return output;
+ }
+ private List<String> fieldNames(JsonNode root,String apiKey) {
+   var names=new ArrayList<String>();
+   for(var it=root.fieldNames();it.hasNext() && names.size()<10;) names.add(redact(it.next(),apiKey));
+   return names;
+ }
+ /** Relay error fields for logs only; URLs, bearer tokens and key-like strings are masked. */
+ private Map<String,String> relayError(JsonNode root,String apiKey) {
+   var fields=new LinkedHashMap<String,String>();
+   var error=root.path("error");
+   if(error.isValueNode() && !error.isNull()) fields.put("error",redact(error.asText(),apiKey));
+   for(String name:List.of("code","type","message","param")) {
+     var value=error.path(name);
+     if(value.isValueNode() && !value.isNull()) fields.put("error."+name,redact(value.asText(),apiKey));
+   }
+   for(String name:List.of("code","status","message","msg")) {
+     var value=root.path(name);
+     if(value.isValueNode() && !value.isNull()) fields.put(name,redact(value.asText(),apiKey));
+   }
+   return fields;
+ }
+ private static String redact(String value,String apiKey) {
+   if(apiKey!=null && !apiKey.isBlank()) value=value.replace(apiKey,"[key]");
+   value=value.replaceAll("\\p{Cntrl}+"," ")
+     .replaceAll("(?i)\\b[a-z][a-z0-9+.-]*://\\S+","[url]")
+     .replaceAll("(?i)\\bbearer\\s+\\S+","Bearer [key]")
+     .replaceAll("\\bsk-[A-Za-z0-9_-]+","[key]")
+     .replaceAll("[A-Za-z0-9+/_=-]{32,}","[redacted]").strip();
+   return value.length()>200?value.substring(0,200)+"…":value;
  }
  private List<Map<?,?>> references(ProviderRequest req) {
    var refs=new ArrayList<Map<?,?>>();
