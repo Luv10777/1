@@ -19,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -322,44 +323,56 @@ class VideoProviderGatewayTest {
         verify(http, times(1)).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
     }
 
+    private static final Instant SUBMITTED = Instant.ofEpochSecond(1_793_000_000L);
+
     @Test
-    void billedQuotaReadsTheRelayTaskRecordWithTheAccountAccessToken() throws Exception {
+    void billedQuotaIsTheSettleLogActualQuotaNotThePreCharge() throws Exception {
         var http = mock(HttpClient.class);
         var requests = new ArrayList<ClassicHttpRequest>();
-        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class))).thenAnswer(invocation -> {
-            requests.add(invocation.getArgument(0));
-            var response = mock(ClassicHttpResponse.class);
-            when(response.getCode()).thenReturn(200);
-            when(response.getEntity()).thenReturn(new StringEntity("{\"success\":true,\"data\":{\"items\":["
-                    + "{\"task_id\":\"task_other\",\"status\":\"SUCCESS\",\"quota\":1},"
-                    + "{\"task_id\":\"task_abc\",\"status\":\"SUCCESS\",\"quota\":2185000}],\"total\":2}}", ContentType.APPLICATION_JSON));
-            return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
-        });
-        var gateway = relayUsageGateway(http);
+        logPages(http, requests, logPage(
+                logItem("task_other", "settle_extra", 9, "{\\\"actual_quota\\\":9}"),
+                logItem("task_abc", "settle_extra", 1075000, "{\\\"actual_quota\\\":1740000,\\\"pre_consumed_quota\\\":665000}"),
+                logItem("task_abc", "preconsume", 665000, "{\\\"is_task\\\":true}")));
 
-        assertThat(gateway.billedQuota("task_abc")).isEqualTo(2185000L);
+        assertThat(relayUsageGateway(http).billedQuota("task_abc", SUBMITTED)).isEqualTo(1740000L);
         var request = requests.getFirst();
-        assertThat(request.getRequestUri()).isEqualTo("/api/task/self?p=1&page_size=10&task_id=task_abc");
+        assertThat(request.getRequestUri()).isEqualTo("/api/log/self?type=0&page_size=100&p=1&start_timestamp=" + (SUBMITTED.getEpochSecond() - 300));
         assertThat(request.getFirstHeader("Authorization").getValue()).isEqualTo("Bearer access-token");
         assertThat(request.getFirstHeader("New-Api-User").getValue()).isEqualTo("1001");
     }
 
+    @Test
+    void billedQuotaPagesThroughLogsUntilTheSettleRecordAppears() throws Exception {
+        var http = mock(HttpClient.class);
+        var requests = new ArrayList<ClassicHttpRequest>();
+        var unrelated = new String[100];
+        java.util.Arrays.fill(unrelated, logItem("task_other", "preconsume", 1, "{}"));
+        logPages(http, requests, logPage(unrelated),
+                logPage(logItem("task_abc", "settle_refund", 335000, "{\\\"actual_quota\\\":760000}")));
+
+        assertThat(relayUsageGateway(http).billedQuota("task_abc", SUBMITTED)).isEqualTo(760000L);
+        assertThat(requests).extracting(ClassicHttpRequest::getRequestUri)
+                .allMatch(uri -> uri.startsWith("/api/log/self?type=0&page_size=100&p="))
+                .anyMatch(uri -> uri.contains("&p=2&"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
-            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"status\":\"IN_PROGRESS\",\"quota\":2185000}]}}",
-            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"status\":\"SUCCESS\",\"quota\":0}]}}",
+            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"billing_stage\":\"preconsume\",\"quota\":665000,\"other\":\"{}\"}]}}",
+            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"billing_stage\":\"failure_refund\",\"quota\":665000,\"other\":\"{}\"}]}}",
+            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"billing_stage\":\"settle_extra\",\"quota\":5,\"other\":\"{\\\"actual_quota\\\":0}\"}]}}",
             "{\"success\":true,\"data\":{\"items\":[]}}",
             "{\"success\":false,\"message\":\"Unauthorized\"}",
             "not json"
     })
-    void billedQuotaIsAbsentUnlessTheRelayRecordsAFinishedCharge(String body) throws Exception {
+    void billedQuotaIsAbsentWithoutAPositiveSettleRecord(String body) throws Exception {
         var http = mock(HttpClient.class);
         jsonResponse(http, body);
-        assertThat(relayUsageGateway(http).billedQuota("task_abc")).isNull();
+        assertThat(relayUsageGateway(http).billedQuota("task_abc", SUBMITTED)).isNull();
     }
 
     @Test
-    void billedQuotaIsAbsentOnRelayErrorsOrWithoutAnAccessToken() throws Exception {
+    void billedQuotaIsAbsentOnRelayErrorsOrWithoutAnAccessTokenOrSubmissionTime() throws Exception {
         var http = mock(HttpClient.class);
         when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class))).thenAnswer(invocation -> {
             var response = mock(ClassicHttpResponse.class);
@@ -367,18 +380,38 @@ class VideoProviderGatewayTest {
             when(response.getEntity()).thenReturn(new StringEntity("{\"success\":false}", ContentType.APPLICATION_JSON));
             return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
         });
-        assertThat(relayUsageGateway(http).billedQuota("task_abc")).isNull();
+        assertThat(relayUsageGateway(http).billedQuota("task_abc", SUBMITTED)).isNull();
 
-        var unconfigured = mock(HttpClient.class);
-        assertThat(volcengineGateway(mock(AssetService.class), unconfigured).billedQuota("task_abc")).isNull();
-        verifyNoInteractions(unconfigured);
+        var unused = mock(HttpClient.class);
+        assertThat(volcengineGateway(mock(AssetService.class), unused).billedQuota("task_abc", SUBMITTED)).isNull();
+        assertThat(relayUsageGateway(unused).billedQuota("task_abc", null)).isNull();
+        verifyNoInteractions(unused);
+    }
+
+    private static String logItem(String taskId, String stage, long quota, String escapedOther) {
+        return "{\"task_id\":\"" + taskId + "\",\"billing_stage\":\"" + stage + "\",\"quota\":" + quota
+                + ",\"other\":\"" + escapedOther + "\"}";
+    }
+
+    private static String logPage(String... items) {
+        return "{\"success\":true,\"data\":{\"page\":1,\"page_size\":100,\"items\":[" + String.join(",", items) + "]}}";
+    }
+
+    private void logPages(HttpClient http, List<ClassicHttpRequest> requests, String... pages) throws Exception {
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class))).thenAnswer(invocation -> {
+            requests.add(invocation.getArgument(0));
+            var response = mock(ClassicHttpResponse.class);
+            when(response.getCode()).thenReturn(200);
+            when(response.getEntity()).thenReturn(new StringEntity(pages[requests.size() - 1], ContentType.APPLICATION_JSON));
+            return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+        });
     }
 
     private VideoProviderGateway relayUsageGateway(HttpClient http) {
         var gateway = volcengineGateway(mock(AssetService.class), http);
         ReflectionTestUtils.setField(gateway, "usageAccessToken", "access-token");
         ReflectionTestUtils.setField(gateway, "usageUserId", "1001");
-        ReflectionTestUtils.setField(gateway, "usageTaskPath", "/api/task/self");
+        ReflectionTestUtils.setField(gateway, "usageLogPath", "/api/log/self");
         return gateway;
     }
 

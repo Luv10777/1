@@ -188,7 +188,7 @@ growth:
       # 中转站账号访问令牌与用户 ID，用于按任务读取实扣额度；留空则按 token 公式结算。
       usage-access-token: ${VIDEO_PROVIDER_USAGE_ACCESS_TOKEN:}
       usage-user-id: ${VIDEO_PROVIDER_USAGE_USER_ID:}
-      usage-task-path: ${VIDEO_PROVIDER_USAGE_TASK_PATH:/api/task/self}
+      usage-log-path: ${VIDEO_PROVIDER_USAGE_LOG_PATH:/api/log/self}
     model:
       seedance-2-5: ${VIDEO_MODEL_SEEDANCE_2_5:seedance-2.5}
       seedance-2-0: ${VIDEO_MODEL_SEEDANCE_2_0:seedance-2.0}

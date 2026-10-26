@@ -16,6 +16,7 @@ class VideoQaHandlerTest {
     private final VideoWorkflowService service = mock(VideoWorkflowService.class);
     private final VideoProviderGateway provider = mock(VideoProviderGateway.class);
     private final VideoWorkflowRepository workflows = mock(VideoWorkflowRepository.class);
+    private static final java.time.Instant SUBMITTED = java.time.Instant.parse("2026-10-24T13:31:08Z");
     private final VideoQaHandler handler = new VideoQaHandler(service, provider, workflows);
 
     @ParameterizedTest
@@ -37,7 +38,7 @@ class VideoQaHandlerTest {
         var task = task();
         when(workflows.findById(42L)).thenReturn(Optional.of(billed("https://haomaotoken.com")));
         when(provider.baseUrl()).thenReturn("https://haomaotoken.com");
-        when(provider.billedQuota("task_abc")).thenReturn(2185000L);
+        when(provider.billedQuota("task_abc", SUBMITTED)).thenReturn(2185000L);
         handler.handle(task);
         verify(service).completeQa(42L, task, 2185000L);
     }
@@ -52,7 +53,7 @@ class VideoQaHandlerTest {
         unbilled.setBillingReservationId(null);
         when(workflows.findById(42L)).thenReturn(Optional.of(unbilled));
         handler.handle(task);
-        verify(provider, never()).billedQuota(anyString());
+        verify(provider, never()).billedQuota(anyString(), any());
         verify(service, times(2)).completeQa(42L, task, null);
     }
 
@@ -65,6 +66,7 @@ class VideoQaHandlerTest {
     private VideoWorkflow billed(String providerBaseUrl) {
         var workflow = new VideoWorkflow();
         workflow.setProviderJobId("task_abc");
+        workflow.setProviderSubmitStartedAt(SUBMITTED);
         workflow.setBillingReservationId("reservation-1");
         workflow.setBillingQuote(new VideoPricingService.Quote(true, 20, "", providerBaseUrl, "seedance-2.0", "720p", "t2v",
                 0, 0, null, null, null, 0, 0, 0, null, null, null, null));
