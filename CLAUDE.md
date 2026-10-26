@@ -42,7 +42,7 @@
 - 模块间通过公开 Service/DTO 交互，不跨模块调用 Repository 或复用 Entity。
 - 新建 Flyway 版本前先同步主干并登记编号，已合并迁移不修改。
 - `TaskHandler` 按至少一次执行设计，外部副作用使用稳定幂等键。
-- 后端改动必须在 `backend/growth-api` 运行 `mvn verify`，需要 Docker。
+- 后端验证按改动范围选：只改文档或注释，不跑构建；局部代码改动，优先跑相关模块和测试（`mvn test -Dtest=...`）；涉及公共接口、依赖或跨模块的改动，在 `backend/growth-api` 跑 `mvn verify`（需要 Docker）。完成后说明跑了哪些检查、结果如何。
 
 ## 前端
 

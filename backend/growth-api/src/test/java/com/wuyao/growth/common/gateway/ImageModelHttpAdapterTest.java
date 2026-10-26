@@ -2,6 +2,10 @@ package com.wuyao.growth.common.gateway;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.BizException;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -12,6 +16,7 @@ import org.apache.hc.core5.http.message.BasicHeader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -100,6 +105,25 @@ class ImageModelHttpAdapterTest {
      String request=captured.get(5,TimeUnit.SECONDS);
      assertThat(request).startsWith("POST /v1/images/generations ").contains("Bearer test-key","stable-key","\"size\":\"1104x1472\"","\"n\":1");
      assertThat(request).contains("\"quality\":\"high\"").doesNotContain("\"operation\"","\"seriesKey\"","\"references\"","response_format");
+   }
+ }
+ @Test void responseWithoutSingleImageLogsRedactedRelayError() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+     String token="A".repeat(40);
+     pool.submit(()->respond(server,200,"{\"data\":[],\"error\":{\"code\":\"content_policy_violation\",\"type\":\"invalid_request_error\","
+       +"\"message\":\"Rejected by safety system.\\nSee https://relay.example/log?sig=signed-123 Bearer sk-live-secret test-key "+token+"\"}}"));
+     // 挂在本类日志上读并固定级别，避免其他测试改过全局日志级别。
+     var logger=(Logger)LoggerFactory.getLogger(ImageModelHttpAdapter.class);
+     var previousLevel=logger.getLevel();
+     var appender=new ListAppender<ILoggingEvent>();appender.start();logger.addAppender(appender);logger.setLevel(Level.WARN);
+     try {
+       assertThatThrownBy(()->new ImageModelHttpAdapter(openAiConfig(server),new ObjectMapper()).invoke(imageRequest(List.of())))
+         .isInstanceOf(BizException.class).hasMessage("图片服务未返回单张有效图片");
+     } finally {logger.setLevel(previousLevel);logger.detachAppender(appender);}
+     String logged=String.join("\n",appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
+     assertThat(logged).contains("dataSize=0","error.code=content_policy_violation","error.type=invalid_request_error",
+       "Rejected by safety system. See [url]","Bearer [key]");
+     assertThat(logged).doesNotContain("relay.example","signed-123","sk-live-secret","test-key",token);
    }
  }
  @Test void referencesUseMultipartEditsWithOrderedRolesAndBinaryFiles() throws Exception {
