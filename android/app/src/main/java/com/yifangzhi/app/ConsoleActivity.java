@@ -21,10 +21,12 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
@@ -33,6 +35,8 @@ import android.widget.TextView;
  */
 public final class ConsoleActivity extends Activity {
     private FrameLayout frame;
+    private TextView settings;
+    private boolean typing;
     private LiveService service;
     private boolean visible;
     private View gate;
@@ -69,7 +73,8 @@ public final class ConsoleActivity extends Activity {
         setContentView(frame);
 
         // 授权、测试声音、运行记录都在“设置”里（也就是验证版那个界面）。
-        TextView settings = new TextView(this);
+        // 页面的“更多”菜单里有设置入口时，这个按钮就收起来（见 arrangeSettings），免得浮在内容上挡字。
+        settings = new TextView(this);
         settings.setText("设置");
         settings.setTextSize(12);
         settings.setTextColor(Color.WHITE);
@@ -80,6 +85,14 @@ public final class ConsoleActivity extends Activity {
         FrameLayout.LayoutParams corner = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
         corner.setMargins(pad, pad, pad, pad * 3);
         frame.addView(settings, corner);
+        // 键盘弹出时页面被顶上来，这个按钮会正好压在登录、发送这些按钮上：打字的时候先收起来。
+        if (Build.VERSION.SDK_INT >= 30) {
+            frame.setOnApplyWindowInsetsListener((view, insets) -> {
+                typing = insets.isVisible(WindowInsets.Type.ime());
+                arrangeSettings();
+                return view.onApplyWindowInsets(insets);
+            });
+        }
 
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, 1);
@@ -224,8 +237,13 @@ public final class ConsoleActivity extends Activity {
         });
         card.addView(skip);
 
-        gate = card;
-        frame.addView(card, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // 小屏、横屏或系统字体调大时一屏放不下，要能往下滑到“先不允许”。
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(0xFFF8F6F3);
+        scroll.addView(card, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        gate = scroll;
+        frame.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     private TextView words(String content, int size, boolean bold, int color) {
@@ -271,6 +289,12 @@ public final class ConsoleActivity extends Activity {
         if (service == null || !visible) return;
         WebView web = service.show(this);
         if (web != null && web.getParent() == null) frame.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        arrangeSettings();
+    }
+
+    void arrangeSettings() {
+        boolean inPage = service != null && service.settingsInPage();
+        settings.setVisibility(inPage || typing ? View.GONE : View.VISIBLE);
     }
 
     @Override

@@ -54,6 +54,12 @@ final class ConsoleWeb {
 
         void note(String text);
 
+        /** 打开“设置与验证”。 */
+        void openSettings();
+
+        /** 页面自己的菜单里有没有“设置”入口；有的话界面就不再另外浮一个按钮挡住页面。 */
+        void settingsInPage(boolean inPage);
+
         /** 显示控制台的那个进程没了，这张网页不能再用，要换一张新的。 */
         void consoleGone();
     }
@@ -223,6 +229,14 @@ final class ConsoleWeb {
                 break;
             case "danmaku.stop":
                 host.stopCollector();
+                answer(from, id, null);
+                break;
+            case "settings.open":
+                host.openSettings();
+                answer(from, id, null);
+                break;
+            case "settings.inPage":
+                host.settingsInPage("true".equals(first));
                 answer(from, id, null);
                 break;
             default:
