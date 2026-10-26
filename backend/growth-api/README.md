@@ -455,7 +455,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V63 | 视频工作台「帮我出方案」：`video_plans`（参考图、风格、一句话、3 个方案、预占烟火） | `claude/video-plan` |
 | V66 | 商城好物「入驻商户」栏：`public_alliance_stores` 函数（只交出已入驻商户营业中门店的编号和名称） | `claude/alliance-stores-tab` |
 
-下一个可用编号：V67（V64、V65 已在主干）。
+| V67 | 「入驻商户」栏改为按入驻商户列出：`public_alliance_merchants` 函数（只交出申请编号、租户编号和商户名） | `claude/alliance-merchants` |
+
+下一个可用编号：V68（V64、V65 已在主干）。
 
 后端检查：
 

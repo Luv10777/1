@@ -87,9 +87,6 @@ public final class StoreDtos {
         }
     }
 
-    /** 商城好物「入驻商户」栏的一家门店：只有编号和对外名称。 */
-    public record AllianceStore(Long id, String name) {}
-
     /** 其他模块生成内容时可以引用的门店事实，例如直播回答"在哪、几点关门、能不能停车"。 */
     public record Profile(Long id, String name, String address, String phone, String businessHours,
                           String transportGuide, List<String> amenities, List<SpecialHour> specialHours) {

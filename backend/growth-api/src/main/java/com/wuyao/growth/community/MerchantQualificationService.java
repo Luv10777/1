@@ -26,6 +26,23 @@ public class MerchantQualificationService {
                 .map(application -> new ApprovedMerchant(application.getMerchantName(), application.getCompanyName(), application.getCreditCode()));
     }
 
+    /** 商城好物「入驻商户」栏的一个商户。tenantId 只给服务端取商品用，不对外返回。 */
+    public record PublicMerchant(Long id, Long tenantId, String merchantName) {}
+
+    /** 全平台入驻审核通过的商户，和管理后台「已入驻商家」一致；不需要租户上下文。 */
+    @Transactional(readOnly = true)
+    public com.wuyao.growth.common.web.PageResult<PublicMerchant> publicApprovedMerchants(int page, int size) {
+        if (page < 0 || size < 1 || size > 50) {
+            throw com.wuyao.growth.common.web.BizException.of(com.wuyao.growth.common.web.ErrorCode.BAD_REQUEST,
+                    "page 必须非负，size 必须在 1 到 50 之间");
+        }
+        java.util.List<Object[]> rows = applications.findPublicAllianceMerchants(size, (long) page * size);
+        long total = rows.isEmpty() ? 0 : ((Number) rows.get(0)[3]).longValue();
+        java.util.List<PublicMerchant> items = rows.stream().map(row -> new PublicMerchant(
+                ((Number) row[0]).longValue(), ((Number) row[1]).longValue(), (String) row[2])).toList();
+        return new com.wuyao.growth.common.web.PageResult<>(items, page, size, total, (int) ((total + size - 1) / size));
+    }
+
     /** 线上卖货、发布信息、提供联盟券都要求入驻审核通过。 */
     public void requireApproved(String action) {
         if (approvedMerchant().isEmpty()) {

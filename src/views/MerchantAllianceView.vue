@@ -1,7 +1,7 @@
 <script setup>
 import { useRoute } from 'vue-router'
 import MerchantProductWall from '../components/MerchantProductWall.vue'
-import MerchantStoreList from '../components/MerchantStoreList.vue'
+import AllianceMerchantList from '../components/AllianceMerchantList.vue'
 
 const route = useRoute()
 </script>
@@ -15,7 +15,7 @@ const route = useRoute()
         <RouterLink :to="{ name: 'merchant-join' }" class="business-button business-button-primary">加入商户联盟</RouterLink>
       </div>
     </header>
-    <MerchantStoreList v-if="route.query.tab === 'stores'" />
+    <AllianceMerchantList v-if="route.query.tab === 'merchants'" />
     <MerchantProductWall v-else />
   </div>
 </template>

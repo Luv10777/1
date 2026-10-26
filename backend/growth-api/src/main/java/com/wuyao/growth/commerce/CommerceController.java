@@ -24,11 +24,11 @@ public class CommerceController {
         return ApiResponse.ok(service.publicCatalog(page, size, keyword));
     }
 
-    @GetMapping("/api/public/alliance-stores")
-    public ApiResponse<PageResult<CommerceDtos.AllianceStore>> allianceStores(
+    @GetMapping("/api/public/alliance-merchants")
+    public ApiResponse<PageResult<CommerceDtos.AllianceMerchant>> allianceMerchants(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.ok(service.publicAllianceStores(page, size));
+        return ApiResponse.ok(service.publicAllianceMerchants(page, size));
     }
 
     @PostMapping("/api/public/orders")

@@ -24,10 +24,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const result = await commerceApi.allianceStores({ page: page.value, size: PAGE_SIZE })
+    const result = await commerceApi.allianceMerchants({ page: page.value, size: PAGE_SIZE })
     if (current !== generation) return
     feed.value = result
-    result.items.flatMap(store => store.products).forEach(async item => {
+    result.items.flatMap(merchant => merchant.products).forEach(async item => {
       if (!item.coverAssetId || covers[item.coverAssetId] !== undefined) return
       covers[item.coverAssetId] = ''
       covers[item.coverAssetId] = (await commerceApi.publicImageUrl(item.coverAssetId).catch(() => null))?.downloadUrl || ''
@@ -41,7 +41,7 @@ async function load() {
 
 function go(next) {
   const keyword = String(route.query.keyword || '')
-  return router.push({ name: 'merchant-alliance', query: { tab: 'stores', ...(keyword ? { keyword } : {}), ...(next ? { page: next } : {}) } })
+  return router.push({ name: 'merchant-alliance', query: { tab: 'merchants', ...(keyword ? { keyword } : {}), ...(next ? { page: next } : {}) } })
 }
 
 watch(page, load, { immediate: true })
@@ -49,7 +49,7 @@ onBeforeUnmount(() => { generation++ })
 </script>
 
 <template>
-  <section id="alliance-panel-stores" class="alliance-wall" role="tabpanel" aria-labelledby="alliance-tab-stores">
+  <section id="alliance-panel-merchants" class="alliance-wall" role="tabpanel" aria-labelledby="alliance-tab-merchants">
     <div class="alliance-wall-toolbar"><MerchantAllianceTabs /></div>
 
     <p v-if="error" class="business-message-error" role="alert">{{ error }} <button type="button" class="alliance-retry" @click="load"><RefreshCw :size="13" aria-hidden="true" />重新加载</button></p>
@@ -57,23 +57,26 @@ onBeforeUnmount(() => { generation++ })
     <div v-else-if="!feed.items.length" class="alliance-state">
       <Store :size="30" aria-hidden="true" />
       <h3>还没有商户入驻联盟</h3>
-      <p>商家通过入驻审核后，门店会出现在这里。</p>
+      <p>商家通过入驻审核后，会出现在这里。</p>
       <RouterLink :to="{ name: 'merchant-join' }" class="business-button">加入商户联盟</RouterLink>
     </div>
     <template v-else>
-      <p class="alliance-count" aria-live="polite">共 {{ feed.total }} 家入驻门店</p>
-      <ul class="alliance-stores" :aria-busy="loading">
-        <li v-for="store in feed.items" :key="store.storeId" class="alliance-store">
-          <div class="alliance-store-head">
-            <span class="alliance-store-mark" aria-hidden="true">{{ store.storeName.slice(0, 1) }}</span>
+      <p class="alliance-count" aria-live="polite">共 {{ feed.total }} 家入驻商户</p>
+      <ul class="alliance-merchants" :aria-busy="loading">
+        <li v-for="merchant in feed.items" :key="merchant.id" class="alliance-merchant">
+          <div class="alliance-merchant-head">
+            <span class="alliance-merchant-mark" aria-hidden="true">{{ merchant.merchantName.slice(0, 1) }}</span>
             <div>
-              <h3>{{ store.storeName }}</h3>
-              <p v-if="store.productTotal">在售 {{ store.productTotal }} 件<template v-if="store.productTotal > store.products.length">，展示最近 {{ store.products.length }} 件</template></p>
+              <h3>{{ merchant.merchantName }}</h3>
+              <p v-if="merchant.productTotal">在售 {{ merchant.productTotal }} 件<template v-if="merchant.productTotal > merchant.products.length">，展示最近 {{ merchant.products.length }} 件</template></p>
             </div>
-            <RouterLink v-if="store.productTotal" :to="storefront(store.storeId)" class="alliance-store-link">进店看看</RouterLink>
+            <p v-if="merchant.stores.length" class="alliance-merchant-links">
+              进店看看
+              <RouterLink v-for="store in merchant.stores" :key="store.storeId" :to="storefront(store.storeId)">{{ store.storeName }}</RouterLink>
+            </p>
           </div>
-          <ul v-if="store.products.length" class="alliance-store-products">
-            <li v-for="item in store.products" :key="item.id">
+          <ul v-if="merchant.products.length" class="alliance-merchant-products">
+            <li v-for="item in merchant.products" :key="item.id">
               <RouterLink :to="storefront(item.storeId)" class="alliance-mini">
                 <span class="alliance-card-photo">
                   <img v-if="covers[item.coverAssetId]" :src="covers[item.coverAssetId]" :alt="item.name" loading="lazy" width="160" height="160" />
@@ -85,10 +88,10 @@ onBeforeUnmount(() => { generation++ })
               </RouterLink>
             </li>
           </ul>
-          <p v-else class="alliance-store-empty"><Package :size="16" aria-hidden="true" />该门店暂未上架商品</p>
+          <p v-else class="alliance-merchant-empty"><Package :size="16" aria-hidden="true" />该商户暂未上架商品</p>
         </li>
       </ul>
-      <nav v-if="pages > 1" class="alliance-pagination" aria-label="入驻门店分页">
+      <nav v-if="pages > 1" class="alliance-pagination" aria-label="入驻商户分页">
         <button type="button" :disabled="page <= 0 || loading" @click="go(page - 1)">上一页</button>
         <span>{{ page + 1 }} / {{ pages }}</span>
         <button type="button" :disabled="page + 1 >= pages || loading" @click="go(page + 1)">下一页</button>

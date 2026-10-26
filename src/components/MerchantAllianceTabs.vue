@@ -2,17 +2,17 @@
 import { computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-const TABS = [{ key: 'products', label: '联盟好物' }, { key: 'stores', label: '入驻商户' }]
+const TABS = [{ key: 'products', label: '联盟好物' }, { key: 'merchants', label: '入驻商户' }]
 const route = useRoute()
 const router = useRouter()
-const current = computed(() => (route.query.tab === 'stores' ? 'stores' : 'products'))
+const current = computed(() => (route.query.tab === 'merchants' ? 'merchants' : 'products'))
 
 // 栏目记在地址里；切换时保留搜索词（只对联盟好物生效），页码回到第一页。
 // 两个栏目各自渲染一份栏目条，切换后焦点要放到新面板里的按钮上。
 async function select(key) {
   if (key === current.value) return
   const keyword = String(route.query.keyword || '')
-  await router.push({ name: 'merchant-alliance', query: { ...(key === 'stores' ? { tab: 'stores' } : {}), ...(keyword ? { keyword } : {}) } })
+  await router.push({ name: 'merchant-alliance', query: { ...(key === 'merchants' ? { tab: 'merchants' } : {}), ...(keyword ? { keyword } : {}) } })
   await nextTick()
   globalThis.document?.getElementById(`alliance-tab-${key}`)?.focus()
 }

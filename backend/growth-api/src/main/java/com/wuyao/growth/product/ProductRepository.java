@@ -46,21 +46,37 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             """)
     Page<Product> searchPublicPhysical(@Param("keyword") String keyword, Pageable pageable);
 
-    /** 每家门店最近更新的前 limit 件在售实物商品：id, 该门店在售总数。条件同 {@link #searchPublicPhysical}。 */
+    /**
+     * 每个商户（租户）最近更新的前 limit 件在售实物商品：id, 该商户在售总数。
+     * 条件同 {@link #searchPublicPhysical}，另外只算营业中门店的商品。
+     */
     @Query(value = """
             select id, total from (
-                select p.id, p.store_id, p.updated_at,
-                       count(*) over (partition by p.store_id) as total,
-                       row_number() over (partition by p.store_id order by p.updated_at desc, p.id desc) as seq
+                select p.id, p.tenant_id,
+                       count(*) over (partition by p.tenant_id) as total,
+                       row_number() over (partition by p.tenant_id order by p.updated_at desc, p.id desc) as seq
                 from products p
-                where p.store_id in (:storeIds)
+                join stores s on s.id = p.store_id and s.tenant_id = p.tenant_id and s.status = 'ACTIVE'
+                where p.tenant_id in (:tenantIds)
                   and p.status = 'ACTIVE' and p.online_status = 'PUBLISHED' and p.deleted_at is null
                   and p.type = 'PHYSICAL'
             ) listed
             where seq <= :limit
-            order by store_id, seq
+            order by tenant_id, seq
             """, nativeQuery = true)
-    List<Object[]> findPublicShowcase(@Param("storeIds") java.util.Collection<Long> storeIds, @Param("limit") int limit);
+    List<Object[]> findPublicShowcase(@Param("tenantIds") java.util.Collection<Long> tenantIds, @Param("limit") int limit);
+
+    /** 上面这些商户里有在售实物商品的营业中门店：tenant_id, store_id。 */
+    @Query(value = """
+            select distinct p.tenant_id, p.store_id
+            from products p
+            join stores s on s.id = p.store_id and s.tenant_id = p.tenant_id and s.status = 'ACTIVE'
+            where p.tenant_id in (:tenantIds)
+              and p.status = 'ACTIVE' and p.online_status = 'PUBLISHED' and p.deleted_at is null
+              and p.type = 'PHYSICAL'
+            order by p.tenant_id, p.store_id
+            """, nativeQuery = true)
+    List<Object[]> findPublicShowcaseStores(@Param("tenantIds") java.util.Collection<Long> tenantIds);
 
     Optional<Product> findByIdAndDeletedAtIsNull(Long id);
 
