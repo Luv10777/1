@@ -167,11 +167,14 @@ public class ProductService {
                         .findFirst().map(ProductImage::getAssetId).orElse(null))).toList());
     }
 
-    /** 商城好物「入驻商户」栏：每家门店的在售实物商品总数和最近的前 limit 件。没有在售商品的门店不在结果里。 */
+    /**
+     * 商城好物「入驻商户」栏：每个商户（租户）的在售实物商品总数、最近的前 limit 件，
+     * 以及有在售商品的门店。没有在售商品的商户不在结果里。
+     */
     @Transactional(readOnly = true)
-    public java.util.Map<Long, PublicShowcase> publicShowcase(java.util.Collection<Long> storeIds, int limit) {
-        if (storeIds.isEmpty()) return java.util.Map.of();
-        List<Object[]> rows = productRepository.findPublicShowcase(storeIds, limit);
+    public java.util.Map<Long, PublicShowcase> publicShowcase(java.util.Collection<Long> tenantIds, int limit) {
+        if (tenantIds.isEmpty()) return java.util.Map.of();
+        List<Object[]> rows = productRepository.findPublicShowcase(tenantIds, limit);
         java.util.Map<Long, Product> byId = productRepository.findAllById(
                         rows.stream().map(row -> ((Number) row[0]).longValue()).toList()).stream()
                 .collect(java.util.stream.Collectors.toMap(Product::getId, product -> product));
@@ -182,13 +185,17 @@ public class ProductService {
             ProductDtos.PublicListing listing = ProductDtos.PublicListing.of(product,
                     imageRepository.findByProductIdOrderBySortOrderAscIdAsc(product.getId()).stream()
                             .findFirst().map(ProductImage::getAssetId).orElse(null));
-            result.computeIfAbsent(product.getStoreId(), id -> new PublicShowcase(((Number) row[1]).longValue(), new java.util.ArrayList<>()))
-                    .products().add(listing);
+            result.computeIfAbsent(product.getTenantId(), id -> new PublicShowcase(((Number) row[1]).longValue(),
+                    new java.util.ArrayList<>(), new java.util.ArrayList<>())).products().add(listing);
+        }
+        for (Object[] row : productRepository.findPublicShowcaseStores(tenantIds)) {
+            PublicShowcase showcase = result.get(((Number) row[0]).longValue());
+            if (showcase != null) showcase.storeIds().add(((Number) row[1]).longValue());
         }
         return result;
     }
 
-    public record PublicShowcase(long total, List<ProductDtos.PublicListing> products) {}
+    public record PublicShowcase(long total, List<ProductDtos.PublicListing> products, List<Long> storeIds) {}
 
     @Transactional(readOnly = true)
     public List<SaleProduct> saleProducts(List<Long> productIds) {

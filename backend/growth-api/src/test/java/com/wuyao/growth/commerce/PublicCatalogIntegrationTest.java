@@ -122,11 +122,15 @@ class PublicCatalogIntegrationTest {
     }
 
     @Test
-    void allianceStoresListOnlyApprovedMerchantsActiveStoresIncludingOnesWithoutProducts() throws Exception {
+    void allianceMerchantsListEachApprovedMerchantOnceWithProductsFromAllItsStores() throws Exception {
         MerchantTestFixtures.approveMerchant(owner, tenantA, userA);
-        Long emptyStore = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '甲茶铺二店', ?) RETURNING id", Long.class, tenantA, userA);
+        owner.update("UPDATE merchant_applications SET merchant_name = '甲商家' WHERE tenant_id = ?", tenantA);
+        Long secondStore = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '甲茶铺二店', ?) RETURNING id", Long.class, tenantA, userA);
+        owner.update("INSERT INTO stores(tenant_id,name,created_by) VALUES (?, '甲茶铺三店', ?)", tenantA, userA);
         Long archived = owner.queryForObject("INSERT INTO stores(tenant_id,name,created_by,status) VALUES (?, '甲茶铺旧店', ?, 'ARCHIVED') RETURNING id", Long.class, tenantA, userA);
-        product(tenantA, storeA, userA, "龙井茶礼盒", "PHYSICAL", "PUBLISHED", "茶饮");
+        Long older = product(tenantA, storeA, userA, "龙井茶礼盒", "PHYSICAL", "PUBLISHED", "茶饮");
+        owner.update("UPDATE products SET updated_at = now() - interval '1 hour' WHERE id = ?", older);
+        product(tenantA, secondStore, userA, "二店茶杯", "PHYSICAL", "PUBLISHED", "茶具");
         product(tenantA, storeA, userA, "草稿商品", "PHYSICAL", "DRAFT", "茶饮");
         product(tenantA, archived, userA, "旧店商品", "PHYSICAL", "PUBLISHED", "茶饮");
         // 乙只提交了申请、还没通过：即使有在售商品，也不算入驻商户。
@@ -135,33 +139,45 @@ class PublicCatalogIntegrationTest {
                     credit_code,contact_name,contact_phone,introduction)
                 VALUES (?,?,'乙商家','乙商家有限公司','家居','测试地区','91330400MA2T000002','联系人','13800009998','测试')""", tenantB, userB);
         product(tenantB, storeB, userB, "实木托盘", "PHYSICAL", "PUBLISHED", "家居");
+        // 丙入驻通过但还没开店：照样列出，商品为空。
+        Long tenantC = owner.queryForObject("INSERT INTO tenants(name) VALUES ('丙商户') RETURNING id", Long.class);
+        Long userC = owner.queryForObject("INSERT INTO users(tenant_id,phone,name) VALUES (?, '13800000003', '丙') RETURNING id", Long.class, tenantC);
+        MerchantTestFixtures.approveMerchant(owner, tenantC, userC);
+        owner.update("UPDATE merchant_applications SET merchant_name = '丙商家' WHERE tenant_id = ?", tenantC);
 
-        mvc.perform(get("/api/public/alliance-stores")).andExpect(status().isOk())
+        mvc.perform(get("/api/public/alliance-merchants")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(2))
-                .andExpect(jsonPath("$.data.items[0].storeId").value(storeA))
-                .andExpect(jsonPath("$.data.items[0].storeName").value("甲茶铺"))
-                .andExpect(jsonPath("$.data.items[0].productTotal").value(1))
-                .andExpect(jsonPath("$.data.items[0].products[0].name").value("龙井茶礼盒"))
-                .andExpect(jsonPath("$.data.items[0].products[0].storeName").value("甲茶铺"))
-                .andExpect(jsonPath("$.data.items[1].storeId").value(emptyStore))
+                .andExpect(jsonPath("$.data.items[0].merchantName").value("甲商家"))
+                .andExpect(jsonPath("$.data.items[0].productTotal").value(2))
+                .andExpect(jsonPath("$.data.items[0].products[0].name").value("二店茶杯"))
+                .andExpect(jsonPath("$.data.items[0].products[0].storeName").value("甲茶铺二店"))
+                .andExpect(jsonPath("$.data.items[0].products[1].name").value("龙井茶礼盒"))
+                .andExpect(jsonPath("$.data.items[0].products[1].storeName").value("甲茶铺"))
+                .andExpect(jsonPath("$.data.items[0].stores.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].stores[0].storeName").value("甲茶铺"))
+                .andExpect(jsonPath("$.data.items[0].stores[1].storeId").value(secondStore))
+                .andExpect(jsonPath("$.data.items[1].merchantName").value("丙商家"))
                 .andExpect(jsonPath("$.data.items[1].productTotal").value(0))
+                .andExpect(jsonPath("$.data.items[1].stores.length()").value(0))
                 .andExpect(jsonPath("$.data.items[1].products.length()").value(0))
                 .andExpect(jsonPath("$.data.items[0].tenantId").doesNotExist())
-                .andExpect(jsonPath("$.data.items[0].merchantName").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].companyName").doesNotExist())
+                .andExpect(jsonPath("$.data.items[0].creditCode").doesNotExist())
                 .andExpect(jsonPath("$.data.items[0].contactPhone").doesNotExist());
     }
 
     @Test
-    void allianceStoresShowTheLatestSixProductsAndDropSuspendedMerchants() throws Exception {
+    void allianceMerchantsShowTheLatestSixProductsAndDropSuspendedMerchants() throws Exception {
         MerchantTestFixtures.approveMerchant(owner, tenantA, userA);
         MerchantTestFixtures.approveMerchant(owner, tenantB, userB);
+        owner.update("UPDATE merchant_applications SET merchant_name = '乙商家' WHERE tenant_id = ?", tenantB);
         for (int i = 1; i <= 8; i++) {
             Long id = product(tenantA, storeA, userA, "茶" + i, "PHYSICAL", "PUBLISHED", "茶饮");
             owner.update("UPDATE products SET updated_at = now() - make_interval(mins => ?) WHERE id = ?", 10 - i, id);
         }
         product(tenantA, storeA, userA, "团购券", "VOUCHER", "PUBLISHED", "茶饮");
 
-        mvc.perform(get("/api/public/alliance-stores"))
+        mvc.perform(get("/api/public/alliance-merchants"))
                 .andExpect(jsonPath("$.data.total").value(2))
                 .andExpect(jsonPath("$.data.items[0].productTotal").value(8))
                 .andExpect(jsonPath("$.data.items[0].products.length()").value(6))
@@ -169,11 +185,11 @@ class PublicCatalogIntegrationTest {
                 .andExpect(jsonPath("$.data.items[0].products[5].name").value("茶3"));
 
         owner.update("UPDATE merchant_applications SET status = 'SUSPENDED' WHERE tenant_id = ?", tenantA);
-        mvc.perform(get("/api/public/alliance-stores"))
+        mvc.perform(get("/api/public/alliance-merchants"))
                 .andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.items[0].storeName").value("乙家居"));
+                .andExpect(jsonPath("$.data.items[0].merchantName").value("乙商家"));
 
-        mvc.perform(get("/api/public/alliance-stores").param("size", "51")).andExpect(status().isBadRequest());
-        mvc.perform(get("/api/public/alliance-stores").param("page", "-1")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/public/alliance-merchants").param("size", "51")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/public/alliance-merchants").param("page", "-1")).andExpect(status().isBadRequest());
     }
 }

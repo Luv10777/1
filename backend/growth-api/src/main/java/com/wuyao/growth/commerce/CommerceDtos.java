@@ -35,8 +35,14 @@ public final class CommerceDtos {
         }
     }
 
-    /** 商户联盟「入驻商户」栏的一家门店：在售实物商品总数和最近的几件。没有商品时 products 为空。 */
-    public record AllianceStore(Long storeId, String storeName, long productTotal, List<CatalogItem> products) {}
+    /**
+     * 商户联盟「入驻商户」栏的一个入驻商户：入驻时的商户名、在售实物商品总数、有在售商品的门店和最近的几件商品。
+     * 没有商品时 stores 和 products 为空。
+     */
+    public record AllianceMerchant(Long id, String merchantName, long productTotal, List<StoreLink> stores,
+                                   List<CatalogItem> products) {}
+
+    public record StoreLink(Long storeId, String storeName) {}
 
     public record Line(Long productId, String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
         static Line of(SalesOrderItem item) {

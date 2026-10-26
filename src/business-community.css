@@ -154,15 +154,16 @@
 .alliance-tabs button.is-active::after { content: ''; position: absolute; right: 0; bottom: -15px; left: 0; height: 2px; background: var(--color-accent); }
 .alliance-tabs button:hover { color: var(--ink); }
 .alliance-tabs button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
-.alliance-stores { display: grid; gap: 14px; padding: 0; margin: 14px 0 0; list-style: none; }
-.alliance-store { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel, transparent); }
-.alliance-store-head { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; gap: 4px 12px; }
-.alliance-store-head h3 { margin: 0; overflow-wrap: anywhere; font: 600 17px/1.4 var(--font-serif); }
-.alliance-store-head p { margin: 4px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
-.alliance-store-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--color-accent); color: #fff; font: 600 17px var(--font-serif); }
-.alliance-store-link { grid-column: 2; justify-self: start; margin-top: 6px; color: var(--color-accent-text); font-size: 12px; }
-.alliance-store-link:hover { text-decoration: underline; }
-.alliance-store-products { display: grid; grid-template-columns: repeat(6, minmax(0, 128px)); gap: 12px; padding: 0; margin: 0; list-style: none; }
+.alliance-merchants { display: grid; gap: 14px; padding: 0; margin: 14px 0 0; list-style: none; }
+.alliance-merchant { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--night-panel, transparent); }
+.alliance-merchant-head { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; gap: 4px 12px; }
+.alliance-merchant-head h3 { margin: 0; overflow-wrap: anywhere; font: 600 17px/1.4 var(--font-serif); }
+.alliance-merchant-head p { margin: 4px 0 0; color: var(--ink-muted); font-size: 12px; line-height: 1.6; }
+.alliance-merchant-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--color-accent); color: #fff; font: 600 17px var(--font-serif); }
+.alliance-merchant-links { display: flex; flex-wrap: wrap; grid-column: 2; gap: 4px 10px; margin: 6px 0 0; color: var(--ink-muted); font-size: 12px; }
+.alliance-merchant-links a { color: var(--color-accent-text); }
+.alliance-merchant-links a:hover { text-decoration: underline; }
+.alliance-merchant-products { display: grid; grid-template-columns: repeat(6, minmax(0, 128px)); gap: 12px; padding: 0; margin: 0; list-style: none; }
 .alliance-mini { display: flex; flex-direction: column; gap: 6px; color: inherit; }
 .alliance-mini .alliance-card-photo { border: 1px solid var(--line); border-radius: 4px; transition: border-color .15s; }
 .alliance-mini:hover .alliance-card-photo { border-color: var(--color-accent); }
@@ -170,7 +171,7 @@
 .alliance-mini strong { overflow: hidden; font-size: 13px; font-weight: 500; white-space: nowrap; text-overflow: ellipsis; }
 .alliance-mini-price { color: var(--color-accent-text); font: 500 14px/1.2 var(--font-mono); }
 .alliance-mini-price i { font-size: 11px; font-style: normal; }
-.alliance-store-empty { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 120px; margin: 0; border: 1px dashed var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 12px; }
+.alliance-merchant-empty { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 120px; margin: 0; border: 1px dashed var(--line); border-radius: 4px; color: var(--ink-muted); font-size: 12px; }
 .alliance-search { display: flex; align-items: center; gap: 7px; width: min(320px, 100%); padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel, transparent); color: var(--ink-muted); }
 .alliance-search input { flex: 1; min-width: 0; height: 38px; border: 0; outline: 0; background: transparent; color: inherit; font-size: 12px; }
 .alliance-search button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--ink-muted); cursor: pointer; }
@@ -200,4 +201,4 @@
 .alliance-pagination button { min-height: 34px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; font-size: 12px; cursor: pointer; }
 .alliance-pagination button:disabled { opacity: .45; cursor: not-allowed; }
 .alliance-join-strip { border-top: 1px solid var(--line); }
-@media (max-width: 640px) { .alliance-wall-toolbar { align-items: stretch; flex-direction: column; } .alliance-search { width: 100%; } .alliance-tabs button { font-size: 20px; } .alliance-store { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 12px; } .alliance-store-products { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 112px; overflow-x: auto; } .alliance-store-empty { min-height: 72px; } .alliance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .alliance-card-body { padding: 10px; } .alliance-card-price { font-size: 17px; } }
+@media (max-width: 640px) { .alliance-wall-toolbar { align-items: stretch; flex-direction: column; } .alliance-search { width: 100%; } .alliance-tabs button { font-size: 20px; } .alliance-merchant { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 12px; } .alliance-merchant-products { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 112px; overflow-x: auto; } .alliance-merchant-empty { min-height: 72px; } .alliance-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .alliance-card-body { padding: 10px; } .alliance-card-price { font-size: 17px; } }

@@ -134,17 +134,6 @@ public class StoreService {
                 .collect(java.util.stream.Collectors.toMap(Store::getId, Store::getName));
     }
 
-    /** 商城好物「入驻商户」栏：已入驻商户名下营业中的门店，没上架商品的也在内。 */
-    @Transactional(readOnly = true)
-    public com.wuyao.growth.common.web.PageResult<StoreDtos.AllianceStore> publicAllianceStores(int page, int size) {
-        if (page < 0 || size < 1 || size > 50) throw BizException.of(ErrorCode.BAD_REQUEST, "page 必须非负，size 必须在 1 到 50 之间");
-        List<Object[]> rows = storeRepository.findPublicAllianceStores(size, (long) page * size);
-        long total = rows.isEmpty() ? 0 : ((Number) rows.get(0)[2]).longValue();
-        List<StoreDtos.AllianceStore> items = rows.stream()
-                .map(row -> new StoreDtos.AllianceStore(((Number) row[0]).longValue(), (String) row[1])).toList();
-        return new com.wuyao.growth.common.web.PageResult<>(items, page, size, total, (int) ((total + size - 1) / size));
-    }
-
     /** 请求里没带的项（null）保持原样，带了的整项替换。 */
     private StoreDtos.Extras extras(StoreDtos.Extras current, String transportGuide, List<String> amenities,
                                     List<StoreDtos.SpecialHour> specialHours) {

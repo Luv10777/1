@@ -4,10 +4,10 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.common.web.PageResult;
+import com.wuyao.growth.community.MerchantQualificationService;
 import com.wuyao.growth.product.ProductDtos;
 import com.wuyao.growth.product.ProductService;
 import com.wuyao.growth.store.StoreAccessService;
-import com.wuyao.growth.store.StoreDtos;
 import com.wuyao.growth.store.StoreService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -31,6 +31,7 @@ public class CommerceService {
     private final StoreAccessService storeAccess;
     private final CommercePaymentProperties payment;
     private final StoreService stores;
+    private final MerchantQualificationService qualification;
     @PersistenceContext private EntityManager entityManager;
 
     public CommerceDtos.Receipt place(CommerceDtos.PlaceOrderRequest request) {
@@ -59,17 +60,21 @@ public class CommerceService {
         return new PageResult<>(items, listed.page(), listed.size(), listed.total(), listed.totalPages());
     }
 
-    /** 入驻商户栏：已入驻商户名下营业中的门店，每家带最近 {@value #SHOWCASE_SIZE} 件在售实物商品。 */
+    /** 入驻商户栏：入驻审核通过的商户，每个带最近 {@value #SHOWCASE_SIZE} 件在售实物商品和有商品的门店。 */
     @Transactional(readOnly = true)
-    public PageResult<CommerceDtos.AllianceStore> publicAllianceStores(int page, int size) {
-        PageResult<StoreDtos.AllianceStore> listed = stores.publicAllianceStores(page, size);
+    public PageResult<CommerceDtos.AllianceMerchant> publicAllianceMerchants(int page, int size) {
+        PageResult<MerchantQualificationService.PublicMerchant> listed = qualification.publicApprovedMerchants(page, size);
         Map<Long, ProductService.PublicShowcase> showcases = products.publicShowcase(
-                listed.items().stream().map(StoreDtos.AllianceStore::id).toList(), SHOWCASE_SIZE);
-        List<CommerceDtos.AllianceStore> items = listed.items().stream().map(store -> {
-            ProductService.PublicShowcase showcase = showcases.get(store.id());
-            if (showcase == null) return new CommerceDtos.AllianceStore(store.id(), store.name(), 0, List.of());
-            return new CommerceDtos.AllianceStore(store.id(), store.name(), showcase.total(), showcase.products().stream()
-                    .map(item -> CommerceDtos.CatalogItem.of(item, store.name())).toList());
+                listed.items().stream().map(MerchantQualificationService.PublicMerchant::tenantId).toList(), SHOWCASE_SIZE);
+        Map<Long, String> names = stores.publicNames(
+                showcases.values().stream().flatMap(showcase -> showcase.storeIds().stream()).distinct().toList());
+        List<CommerceDtos.AllianceMerchant> items = listed.items().stream().map(merchant -> {
+            ProductService.PublicShowcase showcase = showcases.get(merchant.tenantId());
+            if (showcase == null) return new CommerceDtos.AllianceMerchant(merchant.id(), merchant.merchantName(), 0, List.of(), List.of());
+            return new CommerceDtos.AllianceMerchant(merchant.id(), merchant.merchantName(), showcase.total(),
+                    showcase.storeIds().stream().filter(names::containsKey)
+                            .map(id -> new CommerceDtos.StoreLink(id, names.get(id))).toList(),
+                    showcase.products().stream().map(item -> CommerceDtos.CatalogItem.of(item, names.get(item.storeId()))).toList());
         }).toList();
         return new PageResult<>(items, listed.page(), listed.size(), listed.total(), listed.totalPages());
     }
