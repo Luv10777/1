@@ -192,7 +192,32 @@ Seedance 2.0 的 8 个 USD / 1M token 档位已按运营提供的价格表整理
 
 `max-output-pixels` 是该模型与分辨率所有已开放比例及 `auto` 的核验上界。报价说明是按该上界预占，不能把未经核验的宽高当作精确成本。帧率、面积除数、费率、汇率、倍率、视频参考是否计费均无商业默认值。V2V 需明确 `reference-video-billed`；若为 `true`，参考秒数来自服务端已探测素材，采用与供应商请求相同的 `max(1, floor(durationMs / 1000))`。
 
-最终优先使用供应商返回的 `usage.completion_tokens`，其次 `usage.total_tokens`；未返回时使用交付视频的实测宽、高、时长与已核验公式计算。最终向上取整到整数烟火，最高为用户确认的预占额，超出部分由平台承担，多余预占退回。
+交付结算按以下顺序取成本，最终向上取整到整数烟火，最高为用户确认的预占额，超出部分由平台承担，多余预占退回：
+
+1. **中转站实扣**：质检任务在结算事务外查询中转站任务记录（new-api `GET /api/task/self?task_id=<任务 ID>`），取状态为 `SUCCESS` 的 `quota`，存入 `video_workflows.provider_billed_quota`。
+   `结算烟火 = ceil(quota / relay-quota-per-unit × relay-cny-per-unit × 售价倍率 × 10)`，售价倍率取报价快照。
+   只查询接受报价的同一个供应商地址；未配置、查询失败、记录未完成或额度为 0 时跳过这一步。
+2. 供应商轮询返回的 `usage.completion_tokens`，其次 `usage.total_tokens`，按费率快照换算。
+3. 交付视频的实测宽、高、时长与已核验公式。
+
+`provider_billed_quota` 为空的单子没有用到实扣，对账时据此区分来源。中转站的 `quota` 是否已含完成后的补扣、任务 ID 是否与我方保存的 `provider_job_id` 一致，须用真实任务核对后再依赖。
+
+开启实扣结算需要两部分配置，缺一项都按公式结算：
+
+```properties
+# 中转站「个人设置 → 系统访问令牌」与该账号用户 ID，只放服务端密钥配置
+VIDEO_PROVIDER_USAGE_ACCESS_TOKEN=...
+VIDEO_PROVIDER_USAGE_USER_ID=...
+```
+
+```yaml
+growth:
+  billing:
+    video:
+      # 中转站 /api/status 的 quota_per_unit，以及每个计价单位实际支付的人民币
+      relay-quota-per-unit: 500000
+      relay-cny-per-unit: 1
+```
 
 报价标识绑定租户、提交标识、提示词、素材、模型、比例、分辨率、时长与完整费率。参数或费率变化后，旧报价不能用于新任务；首次调用供应商前再次核对供应商与报价有效期。已经提交的任务按接受时的费率快照结算。
 

@@ -123,7 +123,7 @@ class VideoWorkflowStageMetricsTest {
     void aQaHandlerNormalReturnAfterInvalidMediaIsRecordedAsFailure() {
         prepareQa();
         when(probe.probe(anyString(), anyString())).thenThrow(new IllegalStateException("invalid video"));
-        assertThat(new VideoQaHandler(service).handle(task)).containsEntry("status", "PASSED");
+        assertThat(new VideoQaHandler(service, mock(VideoProviderGateway.class), workflows).handle(task)).containsEntry("status", "PASSED");
         assertThat(workflow.getStatus()).isEqualTo("FAILED");
         assertThat(timer("qa", "failed").count()).isEqualTo(1);
         assertThat(timer("qa", "succeeded").count()).isZero();

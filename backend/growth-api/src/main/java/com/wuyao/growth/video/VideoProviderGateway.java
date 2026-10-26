@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -55,6 +56,10 @@ public class VideoProviderGateway {
     @Value("${growth.video.provider.name:haomaotoken}") private String providerName;
     @Value("${growth.video.provider.protocol:VOLCENGINE}") private String protocol;
     @Value("${growth.video.provider.timeout-seconds:60}") private long timeoutSeconds;
+    // new-api account access token and user id; the task's API key cannot read its own task records.
+    @Value("${growth.video.provider.usage-access-token:}") private String usageAccessToken;
+    @Value("${growth.video.provider.usage-user-id:}") private String usageUserId;
+    @Value("${growth.video.provider.usage-task-path:/api/task/self}") private String usageTaskPath;
     @Value("${growth.video.model.seedance-2-5:seedance-2.5}") private String seedance25;
     @Value("${growth.video.model.seedance-2-0:seedance-2.0}") private String seedance20;
     @Value("${growth.video.model.seedance-2-0-mini:seedance-2.0-mini}") private String seedance20Mini;
@@ -176,6 +181,39 @@ public class VideoProviderGateway {
         if (tokens == null) tokens = firstPositiveLong(response.path("data"), "video_tokens", "output_tokens",
                 "completion_tokens", "total_tokens", "tokens");
         return tokens;
+    }
+
+    /**
+     * What the relay finally charged for a finished task, in its own quota units.
+     * Returns null when the lookup is not configured, fails, or the relay has no
+     * successful record for the task, so settlement falls back to the token formula.
+     */
+    public Long billedQuota(String jobId) {
+        if (!hasText(usageAccessToken) || !hasText(usageUserId) || !hasText(jobId)) return null;
+        try {
+            URI endpoint = VideoUrlSecurity.checkedHttps(joinUrl(usageTaskPath)
+                    + "?p=1&page_size=10&task_id=" + URLEncoder.encode(jobId, StandardCharsets.UTF_8));
+            var request = new HttpGet(endpoint);
+            request.setConfig(requestConfig());
+            request.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + usageAccessToken);
+            request.setHeader("New-Api-User", usageUserId);
+            request.setHeader(HttpHeaders.ACCEPT, "application/json");
+            JsonNode body = httpClient.execute(request, response -> {
+                String text = readBody(response.getEntity(), MAX_RESPONSE_BYTES);
+                if (response.getCode() / 100 != 2) throw new IOException("HTTP " + response.getCode());
+                return json.readTree(text);
+            });
+            JsonNode data = body.path("data");
+            for (JsonNode item : data.isArray() ? data : data.path("items")) {
+                JsonNode quota = item.path("quota");
+                if (jobId.equals(item.path("task_id").asText()) && "SUCCESS".equalsIgnoreCase(item.path("status").asText())
+                        && quota.isIntegralNumber() && quota.asLong() > 0) return quota.asLong();
+            }
+            log.warn("中转站没有该任务的成功扣费记录: jobId={}", jobId);
+        } catch (Exception e) {
+            log.warn("查询中转站任务扣费失败: jobId={} type={}", jobId, e.getClass().getSimpleName());
+        }
+        return null;
     }
 
     private Long firstPositiveLong(JsonNode node, String... fields) {

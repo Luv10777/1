@@ -322,6 +322,66 @@ class VideoProviderGatewayTest {
         verify(http, times(1)).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
     }
 
+    @Test
+    void billedQuotaReadsTheRelayTaskRecordWithTheAccountAccessToken() throws Exception {
+        var http = mock(HttpClient.class);
+        var requests = new ArrayList<ClassicHttpRequest>();
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class))).thenAnswer(invocation -> {
+            requests.add(invocation.getArgument(0));
+            var response = mock(ClassicHttpResponse.class);
+            when(response.getCode()).thenReturn(200);
+            when(response.getEntity()).thenReturn(new StringEntity("{\"success\":true,\"data\":{\"items\":["
+                    + "{\"task_id\":\"task_other\",\"status\":\"SUCCESS\",\"quota\":1},"
+                    + "{\"task_id\":\"task_abc\",\"status\":\"SUCCESS\",\"quota\":2185000}],\"total\":2}}", ContentType.APPLICATION_JSON));
+            return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+        });
+        var gateway = relayUsageGateway(http);
+
+        assertThat(gateway.billedQuota("task_abc")).isEqualTo(2185000L);
+        var request = requests.getFirst();
+        assertThat(request.getRequestUri()).isEqualTo("/api/task/self?p=1&page_size=10&task_id=task_abc");
+        assertThat(request.getFirstHeader("Authorization").getValue()).isEqualTo("Bearer access-token");
+        assertThat(request.getFirstHeader("New-Api-User").getValue()).isEqualTo("1001");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"status\":\"IN_PROGRESS\",\"quota\":2185000}]}}",
+            "{\"success\":true,\"data\":{\"items\":[{\"task_id\":\"task_abc\",\"status\":\"SUCCESS\",\"quota\":0}]}}",
+            "{\"success\":true,\"data\":{\"items\":[]}}",
+            "{\"success\":false,\"message\":\"Unauthorized\"}",
+            "not json"
+    })
+    void billedQuotaIsAbsentUnlessTheRelayRecordsAFinishedCharge(String body) throws Exception {
+        var http = mock(HttpClient.class);
+        jsonResponse(http, body);
+        assertThat(relayUsageGateway(http).billedQuota("task_abc")).isNull();
+    }
+
+    @Test
+    void billedQuotaIsAbsentOnRelayErrorsOrWithoutAnAccessToken() throws Exception {
+        var http = mock(HttpClient.class);
+        when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class))).thenAnswer(invocation -> {
+            var response = mock(ClassicHttpResponse.class);
+            when(response.getCode()).thenReturn(401);
+            when(response.getEntity()).thenReturn(new StringEntity("{\"success\":false}", ContentType.APPLICATION_JSON));
+            return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
+        });
+        assertThat(relayUsageGateway(http).billedQuota("task_abc")).isNull();
+
+        var unconfigured = mock(HttpClient.class);
+        assertThat(volcengineGateway(mock(AssetService.class), unconfigured).billedQuota("task_abc")).isNull();
+        verifyNoInteractions(unconfigured);
+    }
+
+    private VideoProviderGateway relayUsageGateway(HttpClient http) {
+        var gateway = volcengineGateway(mock(AssetService.class), http);
+        ReflectionTestUtils.setField(gateway, "usageAccessToken", "access-token");
+        ReflectionTestUtils.setField(gateway, "usageUserId", "1001");
+        ReflectionTestUtils.setField(gateway, "usageTaskPath", "/api/task/self");
+        return gateway;
+    }
+
     private void jsonResponse(HttpClient http, String body) throws Exception {
         when(http.execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class)))
                 .thenAnswer(invocation -> {
