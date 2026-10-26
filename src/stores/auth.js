@@ -115,6 +115,11 @@ export const auth = {
     }
   },
 
+  /** 忘记密码：凭手机验证码设新密码。不会登录，此前所有设备上的登录随之失效。 */
+  resetPassword(phone, code, newPassword) {
+    return authService.resetPassword(phone, code, newPassword)
+  },
+
   async completeWechat(payload) {
     state.loading = true
     try {
