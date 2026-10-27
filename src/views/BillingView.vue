@@ -176,7 +176,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     <header class="yanhuo-heading">
       <div>
         <h1>套餐与权益</h1>
-        <p class="yanhuo-intro">开通会员后即可使用 AI 创作，创作按烟火计费，会员赠送的烟火优先使用。</p>
+        <p class="yanhuo-intro">开通会员后即可使用 AI 创作，创作按烟火计费，赠送的烟火优先使用。</p>
       </div>
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>
@@ -206,7 +206,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <span class="yanhuo-card-label">可用烟火</span>
           </div>
           <p class="yanhuo-number"><YanhuoIcon :size="30" />{{ number(account.available) }}</p>
-          <dl class="yanhuo-sources"><div><dt>会员赠送</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
+          <dl class="yanhuo-sources"><div><dt>赠送烟火</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
           <button type="button" class="yanhuo-secondary" @click="openTopup">充值烟火</button>
         </article>
       </section>
@@ -228,7 +228,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
 
 
       <section class="yanhuo-section" aria-labelledby="rules-title">
-        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>创作需有效会员，优先使用会员赠送的烟火。</p></header>
+        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>创作需有效会员，优先使用赠送的烟火。</p></header>
         <dl class="yanhuo-rule-grid">
           <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong>生成中先预占，未交付的退回。</dd></div>
           <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>

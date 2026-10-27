@@ -8,10 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 @Service @RequiredArgsConstructor
 public class BillingService {
@@ -21,6 +23,8 @@ public class BillingService {
     /** Live sessions reserve one hour at a time and settle by the minute. */
     public static final int LIVE_CREDITS_PER_HOUR = 35;
     public static final int CREDITS_PER_YUAN = 10;
+    /** One operator grant is capped at 10,000 yuan worth of credits. */
+    public static final long MAX_GRANT_CREDITS = 100_000;
     private final BillingStore store;
     private final BillingProperties config;
     private final WechatPayGateway wechat;
@@ -160,13 +164,8 @@ public class BillingService {
         return view(o);
     }
     private BillingDtos.OrderView fulfil(BillingAccount a,BillingOrder o,String receipt,Long operator) {
-        if("MEMBERSHIP".equals(o.getKind())) {
-            var p=o.getPlanSnapshot(); checkRenewal(a,p);
-            Instant start=a.active(Instant.now())?a.getMemberUntil():Instant.now();
-            a.setPlanSnapshot(p); a.setMemberUntil(start.plus(Duration.ofDays(p.durationDays())));
-            a.setMembershipOrderId(o.getId()); a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),o.getCredits()));
-            events.publishEvent(new BillingDtos.MembershipActivated(o.getTenantId(),o.getId(),p,start,a.getMemberUntil()));
-        } else a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),o.getCredits()));
+        if("MEMBERSHIP".equals(o.getKind())) activate(a,o.getPlanSnapshot(),o.getId(),o.getCredits());
+        else a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),o.getCredits()));
         o.setReceiptReference(receipt); o.setConfirmedBy(operator); o.setPaidAt(Instant.now()); o.setState("PAID");
         ledger(a,"order:"+o.getId(),"MEMBERSHIP".equals(o.getKind())?"GRANT":"PURCHASE",
             "MEMBERSHIP".equals(o.getKind())?o.getPlanSnapshot().name()+" · 会员赠送":"充值烟火",
@@ -174,6 +173,56 @@ public class BillingService {
             operator!=null?operator:currentUserId());
         store.flush(); // receipt_reference uniqueness also prevents reusing one receipt across tenants.
         return view(o);
+    }
+    /** Paid or granted, a membership period starts the same way: renewals extend, gifts and alliance quota follow the plan. */
+    private void activate(BillingAccount a,BillingDtos.PlanSnapshot p,String grantId,long giftCredits) {
+        checkRenewal(a,p);
+        Instant start=a.active(Instant.now())?a.getMemberUntil():Instant.now();
+        a.setPlanSnapshot(p); a.setMemberUntil(start.plus(Duration.ofDays(p.durationDays())));
+        a.setMembershipOrderId(grantId); a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),giftCredits));
+        events.publishEvent(new BillingDtos.MembershipActivated(TenantContext.require(),grantId,p,start,a.getMemberUntil()));
+    }
+
+    /**
+     * 平台运营直接开通会员：按已上架套餐发放，效果与付款开通相同，只是没有订单和收款。
+     * @return 开通的套餐；同一 requestKey 已处理过时返回 null，不重复开通
+     */
+    @Transactional
+    public BillingDtos.PlanSnapshot grantMembership(Long planId,String requestKey,Long operator) {
+        requireBillingOperator(operator);
+        var a=store.lockAccount(); String key="admin-membership:"+requestKey;
+        if(store.eventExists(key)) return null;
+        var p=store.plan(planId);
+        if(p==null||!p.isPublished()) throw bad("该套餐未上架，不能开通");
+        var plan=p.snapshot();
+        activate(a,plan,UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)).toString(),plan.giftCredits());
+        ledger(a,key,"GRANT",plan.name()+" · 平台开通会员赠送",plan.giftCredits(),0,0,null,null,operator);
+        return plan;
+    }
+    /** 平台运营关闭会员：立即到期。已发放的烟火和联盟券额度不收回。 */
+    @Transactional
+    public void revokeMembership(Long operator) {
+        requireBillingOperator(operator);
+        var a=store.lockAccount(); var now=Instant.now();
+        if(!a.active(now)) throw BizException.of(ErrorCode.CONFLICT,"该商户当前没有生效中的会员");
+        a.setMemberUntil(now); a.setUpdatedAt(now);
+    }
+    /**
+     * 平台运营赠送烟火：记入赠送烟火，不计入充值收入。
+     * @return 是否入账；同一 requestKey 已处理过时为 false
+     */
+    @Transactional
+    public boolean grantCredits(long credits,String requestKey,Long operator) {
+        requireBillingOperator(operator);
+        if(credits<1||credits>MAX_GRANT_CREDITS) throw bad("单次赠送烟火须为 1 至 "+MAX_GRANT_CREDITS);
+        var a=store.lockAccount(); String key="admin-credits:"+requestKey;
+        if(store.eventExists(key)) return false;
+        a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),credits));
+        ledger(a,key,"GRANT","平台赠送烟火",credits,0,0,null,null,operator);
+        return true;
+    }
+    private void requireBillingOperator(Long operator) {
+        if(!config.getOperatorUserIds().contains(operator)) throw BizException.of(ErrorCode.FORBIDDEN,"没有会员与烟火管理权限");
     }
 
     @Transactional
