@@ -7,7 +7,8 @@ import { compileScript, parse } from '@vue/compiler-sfc'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createServer } from 'vite'
 
-test('merchant edits immediately update the real view, copy, export and generation handoff and reset between records', async () => {
+// 挂载视频反推页面：用最小的渲染器代替浏览器，接口换成固定数据。
+async function mountAnalyzeView(path) {
   const filename = resolve('src/views/VideoAnalyzeView.vue'), moduleId = filename.replaceAll('\\', '/').replace('.vue', '.interaction.js')
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-merchant-tests',
     optimizeDeps: { noDiscovery: true, entries: [] }, server: { middlewareMode: true, hmr: false }, appType: 'custom',
@@ -15,7 +16,7 @@ test('merchant edits immediately update the real view, copy, export and generati
       load(id) { if (id === moduleId) return compileScript(parse(readFileSync(filename, 'utf8'), { filename }).descriptor,
         { id: 'merchant-view', inlineTemplate: true }).content } }],
   })
-  const clipboard = [], downloads = [], navigations = []
+  const clipboard = [], downloads = [], navigations = [], renderErrors = []
   const savedGlobals = Object.fromEntries(['window', 'document', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   const savedCreateUrl = URL.createObjectURL
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout: () => 1, clearTimeout() {} } })
@@ -62,11 +63,13 @@ test('merchant edits immediately update the real view, copy, export and generati
     videoAnalysisApi.get = async id => fixture(Number(id))
     const { default: View } = await vite.ssrLoadModule('/merchant-view-under-test')
     const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/video/analyze', component: View }, { path: '/video/workbench', component: { render: () => null } }] })
-    await router.push('/video/analyze?history=1')
+    await router.push(path)
     const realPush = router.push.bind(router)
     router.push = target => { navigations.push(target); return Promise.resolve() }
     const root = { children: [] }
-    app = renderer.createApp(View).use(router); app.mount(root)
+    app = renderer.createApp(View).use(router)
+    app.config.errorHandler = error => { renderErrors.push(error) }
+    app.mount(root)
     const settle = async () => { await new Promise(resolve => setImmediate(resolve)); await nextTick() }
     await settle()
     const nodes = function* (node) { yield node; for (const child of node.children) yield* nodes(child) }
@@ -77,7 +80,26 @@ test('merchant edits immediately update the real view, copy, export and generati
     const button = label => find(node => node.tag === 'button' && text(node).includes(label))
     const edit = async (label, value) => { field(label).props.onInput({ target: { value } }); await nextTick() }
     const copyText = () => text(block('整体复刻提示词正文'))
+    return { root, nodes, find, text, field, block, button, edit, copyText, settle, realPush,
+      clipboard, downloads, navigations, renderErrors, close }
+  } catch (error) { await close(); throw error }
 
+  async function close() {
+    app?.unmount()
+    if (auth) { auth.state.user = null; auth.state.token = null }
+    URL.createObjectURL = savedCreateUrl
+    for (const [key, descriptor] of Object.entries(savedGlobals)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+      else delete globalThis[key]
+    }
+    await vite.close()
+  }
+}
+
+test('merchant edits immediately update the real view, copy, export and generation handoff and reset between records', async () => {
+  const view = await mountAnalyzeView('/video/analyze?history=1')
+  const { nodes, root, text, field, block, button, edit, copyText, settle, realPush, clipboard, downloads, navigations } = view
+  try {
     assert.equal(field('口播 1修改内容').props.value, '旧牌新品，活动 99 元，欢迎选购。')
     assert.match(copyText(), /口播：“旧牌新品，活动 99 元，欢迎选购。”/)
     assert.equal(field('品牌名称修改内容'), undefined)
@@ -111,14 +133,19 @@ test('merchant edits immediately update the real view, copy, export and generati
     await realPush('/video/analyze?history=2'); await settle()
     assert.equal(field('口播 1修改内容').props.value, '旧牌新品，活动 99 元，欢迎选购。')
     assert.doesNotMatch(copyText(), /上条记录的口播|欢喜/)
-  } finally {
-    app?.unmount()
-    if (auth) { auth.state.user = null; auth.state.token = null }
-    URL.createObjectURL = savedCreateUrl
-    for (const [key, descriptor] of Object.entries(savedGlobals)) {
-      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
-      else delete globalThis[key]
-    }
-    await vite.close()
-  }
+  } finally { await view.close() }
+})
+
+test('choosing a local video shows its preview without rendering an empty report', async () => {
+  const view = await mountAnalyzeView('/video/analyze')
+  try {
+    const input = view.find(node => node.tag === 'input' && node.props.type === 'file')
+    const file = new File([new Uint8Array(64)], '新品.mp4', { type: 'video/mp4' })
+    input.props.onChange({ target: { files: [file], value: '' } })
+    await view.settle()
+    assert.deepEqual(view.renderErrors, [])
+    assert.ok(view.find(node => node.tag === 'video' && node.props.src === 'blob:merchant-test'), 'the chosen video is previewed')
+    assert.equal(view.block('整体复刻提示词正文'), undefined)
+    assert.equal(view.button('开始分析')?.props.disabled, false)
+  } finally { await view.close() }
 })
