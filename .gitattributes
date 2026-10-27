@@ -1,2 +1,5 @@
 # Shell 脚本在 Linux 服务器上运行，检出时也必须是 LF
 *.sh text eol=lf
+# systemd keeps a trailing carriage return in values, so unit files must stay LF too
+*.service text eol=lf
+*.timer text eol=lf

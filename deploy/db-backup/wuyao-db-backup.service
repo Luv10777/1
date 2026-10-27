@@ -1,0 +1,10 @@
+[Unit]
+Description=Wuyao daily database backup (pg_dump, encrypt, upload to COS)
+After=postgresql.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/wuyao-db-backup/backup.sh
+Nice=19
+IOSchedulingClass=idle

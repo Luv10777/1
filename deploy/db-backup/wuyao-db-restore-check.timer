@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Wuyao restore drill every Sunday at 04:30, after that night's backup
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
