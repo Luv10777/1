@@ -318,7 +318,8 @@ const confirmQuote = async () => {
       ? await post('/api/video/workflows/' + quoted.value.retryId + '/retry', { taskId: quoted.value.taskId, quoteId: quote.quoteId })
       : await submitVideoQuote(request, quote.quoteId)
     updateWorkflow(item, result)
-    if (activeConversationId.value === item.id) applyForm(item)
+    // 确认开始生成后切到成片预览看进度（例如刚从视频方案填入后点了生成）。
+    if (activeConversationId.value === item.id) { applyForm(item); openRightTab('preview') }
     if (isVideoInProgress(result)) schedulePoll(item)
     quoteBusy.value = false
     closeQuote()
@@ -347,22 +348,24 @@ const cancelVideo = async () => {
   catch (e) { item.notice = e.message || '取消失败，请刷新任务后重试' }
   finally { item.submitting = false; refreshBilling() }
 }
-const openPlan = async () => {
-  rightTab.value = 'plan'
+const openRightTab = async (tab) => {
+  rightTab.value = tab
   historyOpen.value = false
   await nextTick()
   // 手机上预览区在表单下方，点了入口直接滚过去。
   if (window.matchMedia('(max-width: 760px)').matches) canvas.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-const applyPlan = (form, letter) => {
+const applyPlan = (form, letter, images) => {
+  // 从灵感记录复用时换回当时的参考图，提示词里的「图1、图2」才对得上。
+  if (images) referenceImages.value = images
   prompt.value = form.prompt
   format.value = form.format
   duration.value = form.duration
   saveActiveConversation()
   activeConversation.value.error = false
   activeConversation.value.notice = form.shortened
-    ? `已填入方案 ${letter}；当前模型最长 ${durationMax.value} 秒，时长已缩短，提示词里的分镜可能需要再改。`
-    : `已填入方案 ${letter}，可以再改字后生成。`
+    ? `已填入方案 ${letter}${images ? '并换回当时的参考图' : ''}；当前模型最长 ${durationMax.value} 秒，时长已缩短，提示词里的分镜可能需要再改。`
+    : `已填入方案 ${letter}${images ? '并换回当时的参考图' : ''}，可以再改字后生成。`
 }
 const switchWorkspace = (path) => {
   if (path === router.currentRoute.value.path) return
@@ -389,7 +392,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 <template>
   <div class="video-workbench-page flex h-[calc(100vh-64px)] w-full overflow-hidden border-t border-gray-200 bg-white">
     <div class="video-workbench-sidebar w-[420px] h-full flex flex-col bg-white border-r border-gray-100 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
-      <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="vp-entry" type="button" :aria-pressed="rightTab === 'plan'" @click="openPlan"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />帮我出方案</button><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
+      <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="vp-entry" type="button" :aria-pressed="rightTab === 'plan'" @click="openRightTab('plan')"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />帮我出方案</button><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
       <fieldset class="video-workbench-scroll vs-form flex-1 overflow-y-auto" :disabled="isGenerating || activeConversation?.loading">
         <section class="vs-group">

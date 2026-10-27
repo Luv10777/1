@@ -7,6 +7,7 @@ import com.wuyao.growth.common.task.*;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 
 import java.util.List;
 import java.util.Map;
@@ -97,5 +98,18 @@ class VideoPlanServiceTest {
         service.taskFailed(new TaskTerminalFailure(3L, 70L, VideoPlanGenerateHandler.TYPE, Map.of("planId", 7L)));
         assertThat(plan.getStatus()).isEqualTo("FAILED");
         verify(billing).release(eq("r1"), eq("video-plan:7:release"), anyString());
+    }
+
+    @Test void historyListsSucceededBatchesAndKeepsTheSlotOfADeletedImage() {
+        var plan = new VideoPlan(); plan.setId(7L); plan.setStatus("SUCCEEDED"); plan.setImageAssetIds(List.of(5L, 6L));
+        plan.setStyle("高级质感"); plan.setIdea("突出补水"); plan.setPlans(List.of(Map.of("title", "晨光")));
+        when(plans.findByStatusOrderByIdDesc(eq("SUCCEEDED"), any())).thenReturn(new PageImpl<>(List.of(plan)));
+        when(assets.imagePreview(5L)).thenReturn(Optional.of(new AssetService.ImagePreview(5L, "瓶身.png", "https://cdn/5")));
+        when(assets.imagePreview(6L)).thenReturn(Optional.empty());
+        var item = service.history(0, 10).items().getFirst();
+        assertThat(item.style()).isEqualTo("高级质感");
+        assertThat(item.plans()).hasSize(1);
+        assertThat(item.images()).extracting(VideoPlanDtos.Image::assetId, VideoPlanDtos.Image::url)
+                .containsExactly(tuple(5L, "https://cdn/5"), tuple(6L, null));
     }
 }

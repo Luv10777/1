@@ -25,5 +25,11 @@ public final class VideoPlanDtos {
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
                        Long previousPlanId, Instant createdAt) {}
 
+    /** 灵感记录里的一批方案，带上当初的素材和要求，方便再看或换回这些参考图复用。图片已删除时 url 为空。 */
+    public record History(Long id, String style, String idea, boolean referenceVideo, List<Image> images,
+                         List<Map<String, Object>> plans, Instant createdAt) {}
+
+    public record Image(Long assetId, String name, String url) {}
+
     public record Config(boolean configured, long credits, int maxImages) {}
 }
