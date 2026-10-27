@@ -190,6 +190,15 @@
 .vp-status { margin: 0; color: var(--ink-muted); font-size: 13px; }
 .vp-status.is-error { color: var(--color-error); }
 .vp-billing { align-self: flex-start; font-size: 13px; }
+.vp-record { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .18s; }
+.vp-record:hover:not(:disabled), .vp-record.active { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.vp-record:disabled { opacity: .65; cursor: wait; }
+.vp-record-thumbs { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 4px; min-width: 40px; height: 40px; color: var(--ink-muted); }
+.vp-record-thumbs img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+.vp-record-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vp-record-text strong, .vp-record-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vp-record-text strong { font-size: 13px; font-weight: 600; }
+.vp-record-text small { color: var(--ink-muted); font-size: 12px; }
 @media (max-width: 1180px) { .vp-cards { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
   .video-canvas-heading .vp-tabs button { padding: 0 12px; }

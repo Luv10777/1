@@ -11,7 +11,9 @@ import com.wuyao.growth.common.task.TaskTerminalFailure;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.common.web.PageResult;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +81,18 @@ public class VideoPlanService {
 
     @Transactional(readOnly = true)
     public VideoPlanDtos.View get(Long id) { return view(find(id)); }
+
+    /** 灵感记录：本店出成功的方案，新的在前。 */
+    @Transactional(readOnly = true)
+    public PageResult<VideoPlanDtos.History> history(int page, int size) {
+        var result = plans.findByStatusOrderByIdDesc("SUCCEEDED", PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size))));
+        return PageResult.of(result, result.getContent().stream().map(p -> new VideoPlanDtos.History(
+                p.getId(), p.getStyle(), p.getIdea(), p.isReferenceVideo(),
+                p.getImageAssetIds().stream().map(id -> assets.imagePreview(id)
+                        .map(image -> new VideoPlanDtos.Image(id, image.name(), image.url()))
+                        .orElse(new VideoPlanDtos.Image(id, "参考图已不可用", null))).toList(),
+                p.getPlans(), p.getCreatedAt())).toList());
+    }
 
     @Transactional(readOnly = true)
     public VideoPlan processing(Long id) { return find(id); }

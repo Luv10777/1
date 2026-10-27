@@ -122,6 +122,17 @@ public class AssetService {
         return storage.presignGet(reference.storageKey(), referencePresignLifetime());
     }
 
+    /** 回看记录时显示当初引用的图片：素材已删除或不可用时返回空，不抛异常，免得一张图拖垮整页记录。 */
+    @Transactional(readOnly = true)
+    public java.util.Optional<ImagePreview> imagePreview(Long id) {
+        return repository.findById(id)
+                .filter(asset -> "READY".equals(asset.getStatus()) && "IMAGE".equals(asset.getType()))
+                .map(asset -> new ImagePreview(asset.getId(), asset.getName(),
+                        storage.presignGet(asset.getStorageKey(), referencePresignLifetime())));
+    }
+
+    public record ImagePreview(Long id, String name, String url) {}
+
     /** Upper bound for a document read into memory; a brand manual or menu stays well below it. */
     public static final int MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
