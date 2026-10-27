@@ -487,7 +487,10 @@ class LiveSessionServiceTest {
         assertThatThrownBy(() -> service.start(20L, 4L)).isInstanceOf(BizException.class);
         assertThat(session.getStatus()).isEqualTo("DRAFT");
 
-        assertThat(service.start(20L, 4L).status()).isEqualTo("LIVE");
+        LiveDtos.View started = service.start(20L, 4L);
+        assertThat(started.status()).isEqualTo("LIVE");
+        assertThat(started.billing()).extracting(LiveDtos.Billing::onAir, LiveDtos.Billing::reservedCredits,
+                LiveDtos.Billing::usedCredits).containsExactly(true, 35L, 0L);
         assertThat(session.getBillingReservationId()).isEqualTo("reservation-1");
         assertThat(session.getBilledHours()).isEqualTo(1);
         assertThat(session.getLiveSegmentStartedAt()).isNotNull();
@@ -503,15 +506,21 @@ class LiveSessionServiceTest {
         session.setBilledHours(1);
         session.setLiveSegmentStartedAt(Instant.now().minusSeconds(20 * 60 + 5));
 
-        service.pause(20L, 4L);
+        LiveDtos.Billing paused = service.pause(20L, 4L).billing();
         assertThat(session.getLiveSeconds()).isBetween(1205L, 1207L);
         assertThat(session.getLiveSegmentStartedAt()).isNull();
+        assertThat(paused.onAir()).isFalse();
+        assertThat(paused.liveSeconds()).isBetween(1205L, 1207L);
+        assertThat(paused).extracting(LiveDtos.Billing::creditsPerHour, LiveDtos.Billing::reservedCredits,
+                LiveDtos.Billing::usedCredits, LiveDtos.Billing::refundedCredits).containsExactly(35, 35L, 13L, 0L);
 
-        service.end(20L, 4L);
+        LiveDtos.Billing ended = service.end(20L, 4L).billing();
         // 21 started minutes at 35/60 credits each, rounded up once for the whole session.
         verify(billingService).capture(eq("reservation-1"), eq(13L), eq("live-capture:20"), anyString());
         verify(billingService).release(eq("reservation-1"), eq("live-release:20"), anyString());
         assertThat(session.getLiveSeconds()).isBetween(1205L, 1207L);
+        assertThat(ended).extracting(LiveDtos.Billing::usedCredits, LiveDtos.Billing::refundedCredits)
+                .containsExactly(13L, 22L);
     }
 
     @Test

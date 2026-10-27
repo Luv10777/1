@@ -13,7 +13,9 @@ import { launchApp, onPhone } from '../utils/appLaunch'
 import { findDesktopDownloads } from '../services/desktopDownload'
 import { productApi } from '../services/productApi'
 import { knowledgeApi } from '../services/knowledgeApi'
-import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSessionName, pickCurrentSession, describeSession, sessionStatusLabel, isActiveSession, startBlockers, toCommentFeedItem, answeringCohostId } from '../services/liveApi'
+import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSessionName, pickCurrentSession, describeSession, sessionStatusLabel, isActiveSession, startBlockers, toCommentFeedItem, answeringCohostId, liveCostEstimate, liveBillingProgress } from '../services/liveApi'
+import { billing as account, refreshBilling } from '../stores/billing'
+import YanhuoIcon from '../components/YanhuoIcon.vue'
 
 /* ---------------- 场次配置 ---------------- */
 const route = useRoute()
@@ -556,8 +558,9 @@ const checkSessionStatus = async () => {
   const id = activeSessionId.value
   if (!id || stage.value !== 'live' || currentStatus.value !== 'LIVE' || apiBusy.value) return
   try {
-    const latest = await liveApi.get(id)
-    if (id !== activeSessionId.value || currentStatus.value !== 'LIVE' || latest.status === 'LIVE') return
+    const [latest] = await Promise.all([liveApi.get(id), refreshBilling()])
+    if (id !== activeSessionId.value || currentStatus.value !== 'LIVE') return
+    if (latest.status === 'LIVE') { currentSession.value = latest; return }
     currentSession.value = latest
     rememberSession(latest)
     if (latest.status === 'PAUSED') draftError.value = '烟火不足或会员已到期，本场已自动暂停。充值或续订后点「继续」即可恢复播报。'
@@ -572,7 +575,20 @@ watch(() => [stage.value, activeSessionId.value], ([nextStage, id]) => {
     sessionStatusPoll = setInterval(checkSessionStatus, 30000)
   }
 }, { immediate: true })
-onBeforeUnmount(() => { clearInterval(realtimePoll); clearInterval(sessionStatusPoll) })
+onBeforeUnmount(() => { clearInterval(realtimePoll); clearInterval(sessionStatusPoll); clearInterval(billingClock) })
+/* ---------------- 本场烟火 ---------------- */
+// 后端给的是响应那一刻的在播秒数；在播时页面自己往上加，每 30 秒核对状态时再校准。
+const cost = computed(() => liveCostEstimate(account.summary))
+const sessionFetchedAt = ref(Date.now())
+const clockNow = ref(Date.now())
+let billingClock = null
+watch(currentSession, () => { sessionFetchedAt.value = Date.now(); clockNow.value = Date.now() })
+watch(() => currentSession.value?.billing?.onAir === true, (onAir) => {
+  clearInterval(billingClock)
+  if (onAir) billingClock = setInterval(() => { clockNow.value = Date.now() }, 15000)
+}, { immediate: true })
+const sessionCost = computed(() => liveBillingProgress(currentSession.value?.billing,
+  (clockNow.value - sessionFetchedAt.value) / 1000, account.summary?.available ?? null))
 // 桌面端是用来开播的：只要这一场还没结束，打开就是直播工作台；配置在旁边的页签里。
 const stageFor = (status) => (status === 'ENDED' ? 'review' : hasWorkbench && (isActiveSession({ status }) || inDesktop) ? 'live' : 'setup')
 const loadSessionCore = async (id, ticket, storeId) => {
@@ -732,6 +748,7 @@ const followDesktopLink = async () => {
   await loadStore()
 }
 onMounted(() => {
+  refreshBilling()
   if (!inDesktop) findDesktopDownloads().then(found => { appDownloads.value = found })
   if (typeof route.query.prompt === 'string' && route.query.prompt.trim()) {
     manualProduct.value = { points: route.query.prompt }
@@ -971,6 +988,7 @@ onBeforeUnmount(() => {
           <li v-if="!sessionName.trim()" class="todo"><i aria-hidden="true" /><span>场次名称未填写</span></li>
           <li :class="hostReady ? 'ok' : 'todo'"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>主播音色：{{ hostVoice ? hostVoice.name + (hostReady ? '' : '（不可用）') : '未选择' }}</span><button v-if="!hostReady && !readOnlySession" type="button" @click="editStep('voice')">去设置</button></li>
           <li :class="productQueue.length ? 'ok' : 'todo'"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>本场商品 {{ productQueue.length }} 件</span><button v-if="!productQueue.length && !readOnlySession" type="button" @click="editStep('script')">去添加</button></li>
+          <li v-if="cost && currentStatus === 'DRAFT'" :class="cost.problem ? 'todo' : 'ok'"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>{{ cost.problem || `烟火余额 ${cost.available}，约可播 ${cost.playable}` }}</span><RouterLink v-if="cost.problem" :to="account.summary.memberActive ? '/billing?topup=1' : '/billing'">{{ account.summary.memberActive ? '去充值' : '开通会员' }}</RouterLink></li>
           <li :class="{ ok: !!answeringCohost }"><i aria-hidden="true"><Check :size="11" :stroke-width="3" /></i><span>{{ answeringCohost ? `助播回答弹幕：${answeringCohost.name}` : '助播回答弹幕未开启（可选）' }}</span></li>
         </ul>
         <dl class="ls-precheck-facts">
@@ -980,7 +998,8 @@ onBeforeUnmount(() => {
           <div><dt>节奏</dt><dd>{{ urgencyLabel.split(' · ')[0] }}</dd></div>
           <div><dt>问答</dt><dd>{{ qaPairs.length }} 条</dd></div>
         </dl>
-        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场</button>
+        <p v-if="cost && currentStatus === 'DRAFT'" class="ls-cost-rule">直播每小时 {{ cost.perHour }} 烟火，按实际在播的分钟算，暂停不计。开播先预占一小时，快播满时再预占下一小时，下播后没用完的退回。</p>
+        <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场<span v-if="cost" class="ls-cost-tag"><YanhuoIcon :size="13" />预占 {{ cost.perHour }}</span></button>
         <button v-else-if="hasWorkbench && currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台</button>
         <p v-else-if="currentStatus !== 'ENDED'" class="ls-precheck-live">本场正在一方志软件里直播。</p>
       </aside>
@@ -1001,6 +1020,17 @@ onBeforeUnmount(() => {
           <ol v-if="productQueue.length" class="ls-workspace-products"><li v-for="(product, index) in productQueue" :key="product.id"><span class="ls-product-index">{{ index + 1 }}</span><span><strong>{{ product.name }}</strong><small>{{ product.tag }} · {{ product.price }}</small></span></li></ol>
           <p v-else class="ls-section-note">还没有选择本场商品。</p><button type="button" class="ls-text-action" @click="editStep('script')">{{ readOnlySession ? '查看商品配置' : '管理本场商品' }}</button>
         </article>
+        <article v-if="sessionCost" class="panel ls-session-cost">
+          <div class="panel-heading"><h3>本场烟火</h3><YanhuoIcon :size="18" /></div>
+          <dl class="ls-precheck-facts">
+            <div><dt>已播时长</dt><dd>{{ sessionCost.duration }}{{ currentStatus === 'PAUSED' ? '（已暂停）' : '' }}</dd></div>
+            <div><dt>已用</dt><dd>约 {{ sessionCost.used }} 烟火</dd></div>
+            <div><dt>已预占</dt><dd>{{ sessionCost.reserved }} 烟火</dd></div>
+            <div v-if="account.summary"><dt>账户余额</dt><dd>{{ account.summary.available }} 烟火</dd></div>
+          </dl>
+          <p v-if="sessionCost.pauseInMinutes != null" class="ls-cost-warning">余额不够续下一小时，约 {{ sessionCost.pauseInMinutes }} 分钟后会自动暂停，在那之前充值会自动续上。<RouterLink to="/billing?topup=1">去充值</RouterLink></p>
+          <p v-else class="ls-card-note">每小时 {{ sessionCost.perHour }} 烟火，按分钟计，暂停不计。下播后没用完的退回。</p>
+        </article>
         <article class="panel ls-platform-summary"><div class="panel-heading"><h3>直播间数据</h3><span class="ls-pending-badge">未接入</span></div><div class="ls-platform-metrics"><span>在线人数<strong>—</strong></span><span>点赞<strong>—</strong></span><span>新增关注<strong>—</strong></span></div><p class="ls-card-note">等待平台数据接入后展示真实统计。</p></article>
       </aside>
     </section>
@@ -1011,7 +1041,7 @@ onBeforeUnmount(() => {
         <p class="ls-review-intro">{{ currentSession ? `「${currentSession.name}」的场次概览。` : '保存本场配置后，可在这里查看场次概览。' }}观看、互动与转化数据尚未接入，暂不能生成运营报告。</p>
         <div class="ls-review-grid"><article v-for="metric in ['观看人数', '弹幕互动', '新增关注', '成交转化']" :key="metric" class="ls-review-card"><p class="eyebrow">{{ metric }}</p><strong>—</strong><small>平台数据未接入</small></article></div>
         <div v-if="currentSession" class="ls-review-details">
-          <div><h3>场次记录</h3><dl class="ls-fact-list"><div><dt>场次状态</dt><dd>{{ sessionStatusLabel(currentSession.status) }}</dd></div><div><dt>本系统开始时间</dt><dd>{{ formatSessionTime(currentSession.startedAt) }}</dd></div><div><dt>本系统结束时间</dt><dd>{{ formatSessionTime(currentSession.endedAt) }}</dd></div><div><dt>本系统记录时长</dt><dd>{{ recordedDuration }}</dd></div><div><dt>已保存商品</dt><dd>{{ currentSession.productIds?.length || 0 }} 件</dd></div><div><dt>知识快照</dt><dd>{{ readOnlySession ? `${currentSession.knowledge?.length || 0} 条` : '草稿尚未生成快照' }}</dd></div></dl></div>
+          <div><h3>场次记录</h3><dl class="ls-fact-list"><div><dt>场次状态</dt><dd>{{ sessionStatusLabel(currentSession.status) }}</dd></div><div><dt>本系统开始时间</dt><dd>{{ formatSessionTime(currentSession.startedAt) }}</dd></div><div><dt>本系统结束时间</dt><dd>{{ formatSessionTime(currentSession.endedAt) }}</dd></div><div><dt>本系统记录时长</dt><dd>{{ recordedDuration }}</dd></div><div v-if="sessionCost && readOnlySession"><dt>在播时长（不含暂停）</dt><dd>{{ sessionCost.duration }}</dd></div><div v-if="sessionCost && sessionCost.reserved > 0 && currentSession.status === 'ENDED'"><dt>本场烟火</dt><dd>扣 {{ sessionCost.used }} · 退回 {{ sessionCost.refunded }} <RouterLink to="/billing">查看账单</RouterLink></dd></div><div><dt>已保存商品</dt><dd>{{ currentSession.productIds?.length || 0 }} 件</dd></div><div><dt>知识快照</dt><dd>{{ readOnlySession ? `${currentSession.knowledge?.length || 0} 条` : '草稿尚未生成快照' }}</dd></div></dl></div>
           <div><h3>播报准备</h3><dl class="ls-fact-list"><div><dt>本场主讲</dt><dd>{{ hostVoice?.name || '未选择' }}</dd></div><div><dt>播报方式</dt><dd>网页直接播放</dd></div></dl><p class="ls-card-note">此处时间来自本系统的场次记录，不等同于抖音实际开播时长。{{ draftDirty ? '当前还有未保存的配置，播报准备以页面当前选择为准。' : '' }}</p></div>
         </div>
         <div v-if="currentSession && readOnlySession" class="ls-gaps">

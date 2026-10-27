@@ -638,6 +638,9 @@ V41 同时删除了 `store_members.role`，并清掉管理员名下的成员记�
 直播间标识不是必填；`DELETE /api/live-sessions/{id}` 只能删除未开始的场次；`POST /api/live-sessions/{id}/duplicate`
 按已有场次的配置、商品和本场问答新建一场；场次列表只返回摘要，不带知识快照。
 
+场次详情带 `billing`：每小时单价、截至响应时的在播秒数（暂停不计）、是否在播、已预占烟火、已用烟火
+（在播时按当前时长估算，结束后为实际扣除）、结束后退回的烟火。前端在播时自己往上累加秒数，不读客户端时钟对比服务端时间。
+
 播报与自动讲解：`POST /api/live-sessions/{id}/speech` 只登记一条播报并提交任务，返回的是受理状态而不是音频；
 `/auto-script`、`/auto-script/start`、`/auto-script/stop` 控制自动讲解，`/speech-items` 返回最近的播报及其进度。
 弹幕回复的任务在单独的队列 `LIVE_REPLY` 上：处理 `LIVE` 的 worker 进程会自动多起几个循环专门处理它，和讲解并行，
