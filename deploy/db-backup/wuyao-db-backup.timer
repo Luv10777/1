@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Wuyao database backup every day at 03:30 (server time, Asia/Shanghai)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# Catch up after the server was off at 03:30.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

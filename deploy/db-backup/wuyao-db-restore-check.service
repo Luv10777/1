@@ -1,0 +1,9 @@
+[Unit]
+Description=Wuyao weekly restore drill of the latest database backup
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/wuyao-db-backup/restore-check.sh
+Nice=19
+IOSchedulingClass=idle
