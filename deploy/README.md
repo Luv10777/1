@@ -135,6 +135,22 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env \
   exec -T postgres pg_dump -U growth_owner wuyao_growth | gzip > backup-$(date +%F).sql.gz
 ```
 
+## 正式服清理旧版本
+
+正式服不用这套 Docker Compose，而是逐版发布到 `releases/<版本>` 目录，再切换 `current` 软链接。
+前端每次发布都会复制上一版，旧版本和旧资源会一直累积。`server-cleanup.sh` 只保留当前版和上一版，
+清理旧版本、发布暂存、配置备份和 home 目录杂物；被软链接、systemd 或 nginx 引用的路径会跳过。
+
+在本机项目目录运行，脚本通过 ssh 传给服务器，服务器上不留文件。默认只列出路径和大小：
+
+```bash
+ssh -i <密钥> ubuntu@<服务器> 'bash -s' < deploy/server-cleanup.sh
+```
+
+核对清单后，把 `'bash -s'` 换成 `'APPLY=1 bash -s'` 才会删除（Windows 命令提示符里要用双引号）。
+删除前会拿发布锁，认不出当前版或上一版时整体退出。发布前的数据库备份在发布暂存目录里，
+清理后只剩最近两次的。
+
 ## 这套和生产环境的差别
 
 测试服是"全都挤一台"，正式上线要改这几处：
