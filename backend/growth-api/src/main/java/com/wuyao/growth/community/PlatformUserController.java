@@ -36,4 +36,16 @@ public class PlatformUserController {
             @Valid @RequestBody PlatformDtos.UserSuspensionRequest request) {
         return ApiResponse.ok(service.suspension(me, userId, request));
     }
+
+    @PostMapping("/{userId}/membership")
+    public ApiResponse<PlatformDtos.UserView> membership(@AuthenticationPrincipal AuthPrincipal me, @PathVariable Long userId,
+            @Valid @RequestBody PlatformDtos.MembershipRequest request) {
+        return ApiResponse.ok(service.membership(me, userId, request));
+    }
+
+    @PostMapping("/{userId}/credits")
+    public ApiResponse<PlatformDtos.UserView> credits(@AuthenticationPrincipal AuthPrincipal me, @PathVariable Long userId,
+            @Valid @RequestBody PlatformDtos.CreditGrantRequest request) {
+        return ApiResponse.ok(service.credits(me, userId, request));
+    }
 }

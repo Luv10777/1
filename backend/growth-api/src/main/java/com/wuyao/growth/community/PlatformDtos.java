@@ -34,6 +34,18 @@ public final class PlatformDtos {
             @jakarta.validation.constraints.NotNull Boolean suspended,
             @jakarta.validation.constraints.Size(max = 500) String note) {}
 
+    /** granted=true 时按 planId 开通或续期；false 时立即关闭。 */
+    public record MembershipRequest(
+            @jakarta.validation.constraints.NotNull Boolean granted,
+            Long planId,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "[a-zA-Z0-9-]{8,80}") String requestKey,
+            @jakarta.validation.constraints.Size(max = 300) String note) {}
+
+    public record CreditGrantRequest(
+            @jakarta.validation.constraints.NotNull Long credits,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Pattern(regexp = "[a-zA-Z0-9-]{8,80}") String requestKey,
+            @jakarta.validation.constraints.Size(max = 300) String note) {}
+
     public record ReviewRequest(
             @jakarta.validation.constraints.NotBlank
             @jakarta.validation.constraints.Pattern(regexp = "PUBLISHED|REJECTED|OFFLINE", message = "信息状态不正确") String status,

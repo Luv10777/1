@@ -2,8 +2,9 @@
 import AppSelect from '../components/AppSelect.vue'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
-import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, LockKeyhole, LogIn, RefreshCw, Search, UserCheck, UserPlus, Users, X } from 'lucide-vue-next'
+import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Crown, Flame, Gift, LockKeyhole, LogIn, RefreshCw, Search, UserCheck, UserPlus, Users, X } from 'lucide-vue-next'
 import { platformManagementApi as api } from '../services/platformManagement'
+import { planAdminApi } from '../services/planAdminApi'
 import { auth } from '../stores/auth'
 import { loadPlatformAccess, platform } from '../stores/platform'
 import { auditActions, managementDate, userRoles, userStatuses } from '../domain/platformManagement'
@@ -29,6 +30,14 @@ const trailError = ref('')
 const note = ref('')
 const actionError = ref('')
 const busy = ref(false)
+const plans = ref([])
+const plansError = ref('')
+const planId = ref('')
+const credits = ref(100)
+const billingNote = ref('')
+const billingError = ref('')
+const billingDone = ref('')
+const confirming = ref(null)
 let version = 0
 let detailVersion = 0
 
@@ -80,6 +89,10 @@ function closeDetail() {
   actionError.value = ''
   trail.value = []
   trailError.value = ''
+  billingNote.value = ''
+  billingError.value = ''
+  billingDone.value = ''
+  confirming.value = null
 }
 async function loadTrail(item, attempt) {
   trailLoading.value = true
@@ -94,6 +107,63 @@ function openDetail(item) {
   closeDetail()
   selected.value = item
   loadTrail(item, ++detailVersion)
+  loadPlans()
+}
+// 只列已上架的套餐；没有会员与烟火管理权限时，接口返回 403，提示原因并禁用操作。
+async function loadPlans() {
+  if (plans.value.length) return
+  plansError.value = ''
+  try {
+    plans.value = (await planAdminApi.plans()).filter(item => item.published).map(item => item.plan)
+    planId.value = plans.value[0] ? String(plans.value[0].id) : ''
+  } catch (failure) { plansError.value = failure.message || '套餐读取失败，暂时不能开通会员。' }
+}
+const chosenPlan = () => plans.value.find(plan => String(plan.id) === String(planId.value))
+const tenantLabel = item => `「${item.tenantName || `商户 #${item.tenantId}`}」`
+// 先确认再提交；确认时固定套餐、数量和 requestKey，重试沿用，网络中断后重试也不会重复开通或重复赠送。
+function ask(kind) {
+  billingError.value = ''
+  billingDone.value = ''
+  const note = billingNote.value.trim()
+  if (note.length < 5) { billingError.value = '请填写至少5字的处理依据。'; return }
+  const item = selected.value
+  let text, plan = null, amount = null
+  if (kind === 'grant') {
+    plan = chosenPlan()
+    if (!plan) { billingError.value = '请选择要开通的套餐。'; return }
+    text = `为${tenantLabel(item)}开通「${plan.name}」${plan.durationDays} 天会员，赠送 ${plan.giftCredits.toLocaleString('zh-CN')} 烟火${item.memberActive ? '，从现在的到期时间往后顺延' : ''}？`
+  } else if (kind === 'revoke') {
+    text = `立即关闭${tenantLabel(item)}的会员？已发放的烟火和联盟券额度不收回，正在直播的场次会被暂停。`
+  } else {
+    amount = Number(credits.value)
+    if (!Number.isInteger(amount) || amount < 1 || amount > 100000) { billingError.value = '赠送烟火须为 1 至 100,000 的整数。'; return }
+    text = `向${tenantLabel(item)}赠送 ${amount.toLocaleString('zh-CN')} 烟火？`
+  }
+  confirming.value = { kind, text, planId: plan?.id ?? null, amount, note, requestKey: 'platform-' + crypto.randomUUID() }
+}
+async function confirmBilling() {
+  const { kind, planId: plan, amount, note, requestKey } = confirming.value
+  const item = selected.value
+  const attempt = detailVersion
+  busy.value = true
+  billingError.value = ''
+  try {
+    const result = kind === 'credits'
+      ? await api.userCredits(item, { credits: amount, requestKey, note })
+      : await api.userMembership(item, { granted: kind === 'grant', planId: plan, requestKey, note })
+    if (attempt !== detailVersion) return
+    selected.value = result
+    // 会员和烟火按商户记，同一商户的其他账号在列表里一起更新。
+    records.value = records.value.map(row => row.tenantId === result.tenantId
+      ? { ...row, memberActive: result.memberActive, memberUntil: result.memberUntil, planName: result.planName, creditsAvailable: result.creditsAvailable }
+      : row)
+    billingDone.value = kind === 'grant' ? '会员已开通。' : kind === 'revoke' ? '会员已关闭。' : '烟火已赠送。'
+    confirming.value = null
+    billingNote.value = ''
+    loadTrail(result, attempt)
+  } catch (failure) {
+    if (attempt === detailVersion) billingError.value = failure.message || '暂时无法确认处理结果，请刷新后核对。'
+  } finally { if (attempt === detailVersion) busy.value = false }
 }
 const canSuspend = item => item.status !== 'SUSPENDED' && item.status !== 'REMOVED' && !item.operator && item.id !== auth.user?.id
 async function changeSuspension(suspended) {
@@ -177,6 +247,25 @@ onBeforeUnmount(() => { version++; detailVersion++ })
             <div class="mg-drawer-body">
               <section class="mg-detail-section"><h3><Users :size="17" />账号资料</h3><dl class="mg-detail-grid"><div><dt>角色</dt><dd>{{ userRoles[selected.role] || selected.role }}{{ selected.operator ? ' · 平台运营' : '' }}</dd></div><div><dt>绑定手机</dt><dd>{{ selected.phoneMasked }}</dd></div><div><dt>登录账号</dt><dd>{{ selected.username || '未设置' }}</dd></div><div><dt>注册时间</dt><dd>{{ managementDate(selected.createdAt) }}</dd></div><div><dt>最近登录</dt><dd>{{ selected.lastLoginAt ? managementDate(selected.lastLoginAt) : '从未登录' }}</dd></div><div v-if="selected.suspendedAt"><dt>平台停用于</dt><dd>{{ managementDate(selected.suspendedAt) }}</dd></div></dl></section>
               <section class="mg-detail-section"><h3><UserCheck :size="17" />所属商户的会员</h3><dl class="mg-detail-grid"><div><dt>会员套餐</dt><dd>{{ selected.memberActive ? selected.planName || '会员' : '未开通会员' }}</dd></div><div><dt>到期时间</dt><dd>{{ selected.memberActive ? managementDate(selected.memberUntil) : '—' }}</dd></div><div><dt>烟火余额</dt><dd>{{ Number(selected.creditsAvailable).toLocaleString('zh-CN') }}</dd></div></dl></section>
+              <section class="mg-detail-section" aria-labelledby="user-billing-title">
+                <h3 id="user-billing-title"><Flame :size="17" />会员与烟火操作</h3>
+                <p class="mg-muted">会员和烟火按商户计算，操作作用于{{ tenantLabel(selected) }}下的所有账号。赠送的烟火不计入充值收入。</p>
+                <p v-if="plansError" class="mg-inline-error" role="alert">{{ plansError }}</p>
+                <div class="mg-billing-row">
+                  <label class="mg-select"><span class="sr-only">会员套餐</span><AppSelect v-model="planId" :disabled="busy || Boolean(confirming) || !plans.length" aria-label="会员套餐"><option v-if="!plans.length" value="">暂无上架套餐</option><option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.name }} · {{ plan.durationDays }} 天 · 送 {{ plan.giftCredits.toLocaleString('zh-CN') }} 烟火</option></AppSelect></label>
+                  <button class="mg-button" type="button" :disabled="busy || Boolean(confirming) || !planId" @click="ask('grant')"><Crown :size="15" />{{ selected.memberActive ? '续期会员' : '开通会员' }}</button>
+                  <button v-if="selected.memberActive" class="mg-button mg-danger" type="button" :disabled="busy || Boolean(confirming)" @click="ask('revoke')"><Ban :size="15" />关闭会员</button>
+                </div>
+                <div class="mg-billing-row">
+                  <label class="mg-amount"><span class="sr-only">赠送烟火数量</span><input v-model.number="credits" type="number" min="1" max="100000" step="1" inputmode="numeric" :disabled="busy || Boolean(confirming)" /><span>烟火</span></label>
+                  <button class="mg-button" type="button" :disabled="busy || Boolean(confirming)" @click="ask('credits')"><Gift :size="15" />赠送烟火</button>
+                </div>
+                <label class="mg-note-label" for="user-billing-note">处理依据<span>必填 · 5–300字</span></label>
+                <textarea id="user-billing-note" v-model="billingNote" class="mg-note" rows="2" maxlength="300" :disabled="busy || Boolean(confirming)" placeholder="说明依据，例如线下签约、活动奖励、客服补偿单号。" />
+                <div v-if="confirming" class="mg-confirm" role="alert"><p>{{ confirming.text }}</p><div><button class="mg-button" type="button" :disabled="busy" @click="confirming = null">取消</button><button class="mg-button" :class="confirming.kind === 'revoke' ? 'mg-danger' : 'mg-primary'" type="button" :disabled="busy" @click="confirmBilling">{{ busy ? '正在保存…' : '确认' }}</button></div></div>
+                <p v-if="billingError" class="mg-inline-error" role="alert">{{ billingError }}</p>
+                <p v-if="billingDone" class="mg-billing-done" role="status"><Check :size="14" />{{ billingDone }}</p>
+              </section>
               <section v-if="selected.status === 'SUSPENDED' || canSuspend(selected)" class="mg-detail-section"><h3><ClipboardList :size="17" />处理依据</h3><label class="mg-note-label" for="user-suspension-note">{{ selected.status === 'SUSPENDED' ? '解除原因' : '停用原因' }}<span>必填 · 至少5字</span></label><textarea id="user-suspension-note" v-model="note" class="mg-note" rows="3" maxlength="500" :disabled="busy" :placeholder="selected.status === 'SUSPENDED' ? '说明核实情况与解除依据。' : '说明停用依据，例如违规内容、投诉编号。停用后对方所有设备立即下线。'" /><span class="mg-note-count">{{ note.length }}/500</span><p v-if="actionError" class="mg-inline-error" role="alert">{{ actionError }}</p></section>
               <p v-else class="mg-muted">{{ selected.operator ? '平台运营账号不能在这里停用，请先从运营名单中移除。' : selected.id === auth.user?.id ? '不能停用自己的账号。' : '该账号已被商户移除，无需处理。' }}</p>
               <section class="mg-detail-section"><h3>最近处理记录</h3><p v-if="trailLoading" class="mg-muted" role="status">正在读取处理记录…</p><p v-else-if="trailError" class="mg-inline-error" role="alert">{{ trailError }}</p><p v-else-if="!trail.length" class="mg-muted">暂无平台处理记录。</p><ol v-else class="mg-audit"><li v-for="event in trail" :key="event.id"><span class="mg-audit-dot" /><div><strong>{{ auditActions[event.action] || event.action }}<small>运营人员 #{{ event.actorUserId }}</small></strong><p>{{ event.note }}</p><time>{{ managementDate(event.createdAt) }}</time></div></li></ol></section>

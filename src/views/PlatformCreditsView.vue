@@ -28,7 +28,7 @@ const stats = computed(() => [
   { label: `${ledgerRanges[days.value]}消耗`, value: summary.value?.consumed, helper: '实际扣除的烟火，预占不计', icon: Flame },
   { label: '今日消耗', value: summary.value?.consumedToday, helper: '北京时间今天零点起', icon: CalendarClock },
   { label: `${ledgerRanges[days.value]}退回`, value: summary.value?.refunded, helper: '失败、取消或未用完退回', icon: Undo2 },
-  { label: `${ledgerRanges[days.value]}充值 / 赠送`, value: summary.value ? `${number(summary.value.purchased)} / ${number(summary.value.granted)}` : null, helper: '充值购买与会员赠送', icon: Gift },
+  { label: `${ledgerRanges[days.value]}充值 / 赠送`, value: summary.value ? `${number(summary.value.purchased)} / ${number(summary.value.granted)}` : null, helper: '充值购买与会员、平台赠送', icon: Gift },
 ])
 const breakdown = computed(() => Object.entries(summary.value?.consumedByCapability || {}).map(([key, value]) => ({ label: ledgerCapabilities[key] || key, value })))
 

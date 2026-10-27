@@ -17,6 +17,9 @@ export const platformManagementApi = {
   users: values => get('/api/platform/users', params(values)),
   userSummary: () => get('/api/platform/users/summary'),
   userSuspension: (item, values) => post(`/api/platform/users/${encodeURIComponent(item.id)}/suspension`, values),
+  // 会员和烟火按商户记账：对某个账号操作，作用于他所属的整个商户。
+  userMembership: (item, values) => post(`/api/platform/users/${encodeURIComponent(item.id)}/membership`, values),
+  userCredits: (item, values) => post(`/api/platform/users/${encodeURIComponent(item.id)}/credits`, values),
   audit: (item, type) => get(`/api/platform/tenants/${encodeURIComponent(item.tenantId)}/audit/${type}/${encodeURIComponent(item.id)}`),
   myIdentity: () => get('/api/identity/me'),
   submitIdentity: async values => {

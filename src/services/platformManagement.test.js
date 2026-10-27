@@ -45,6 +45,13 @@ test('platform controls send authenticated requests and identity values are only
     assert.equal(calls.at(-1).url, '/api/platform/users/9/suspension')
     assert.equal(calls.at(-1).options.method, 'POST')
     assert.deepEqual(JSON.parse(calls.at(-1).options.body), { suspended: true, note: '多次发布违规信息' })
+    const grant = { granted: true, planId: 4, requestKey: 'platform-key-0001', note: '线下签约赠送会员' }
+    await api.userMembership({ id: 9, tenantId: 3 }, grant)
+    assert.deepEqual([calls.at(-1).url, calls.at(-1).options.method], ['/api/platform/users/9/membership', 'POST'])
+    assert.deepEqual(JSON.parse(calls.at(-1).options.body), grant)
+    await api.userCredits({ id: 9, tenantId: 3 }, { credits: 500, requestKey: 'platform-key-0002', note: '活动奖励赠送' })
+    assert.deepEqual([calls.at(-1).url, calls.at(-1).options.method], ['/api/platform/users/9/credits', 'POST'])
+    assert.equal(JSON.parse(calls.at(-1).options.body).credits, 500)
     for (const call of calls) {
       assert.equal(call.options.headers.Authorization, 'Bearer test-platform-token')
       assert.ok(!call.url.includes(values.idNumber))

@@ -94,6 +94,50 @@ public class PlatformUserService {
         return view(updated, tenantNames().get(tenantId), membership(tenantId));
     }
 
+    /** 会员按商户计：给某个账号开通或关闭，就是给他所属的商户开通或关闭。 */
+    public PlatformDtos.UserView membership(AuthPrincipal me, Long userId, PlatformDtos.MembershipRequest request) {
+        management.requireOperator(me);
+        String note = reason(request.note());
+        boolean grant = request.granted();
+        if (grant && request.planId() == null) throw BizException.of(ErrorCode.BAD_REQUEST, "请选择要开通的套餐");
+        return billingChange(me, userId, grant ? "GRANT_MEMBERSHIP" : "REVOKE_MEMBERSHIP", () -> {
+            if (!grant) { billing.revokeMembership(me.userId()); return note; }
+            var plan = billing.grantMembership(request.planId(), request.requestKey(), me.userId());
+            return plan == null ? null : "「" + plan.name() + "」" + plan.durationDays() + " 天：" + note;
+        });
+    }
+
+    public PlatformDtos.UserView credits(AuthPrincipal me, Long userId, PlatformDtos.CreditGrantRequest request) {
+        management.requireOperator(me);
+        String note = reason(request.note());
+        return billingChange(me, userId, "GRANT_CREDITS", () ->
+                billing.grantCredits(request.credits(), request.requestKey(), me.userId()) ? request.credits() + " 烟火：" + note : null);
+    }
+
+    /**
+     * 账户变动和审计记录在用户所属商户的租户里同一事务提交。
+     * change 返回审计说明；返回 null 表示同一请求已处理过，不再重复记录。
+     */
+    private PlatformDtos.UserView billingChange(AuthPrincipal me, Long userId, String action, Supplier<String> change) {
+        Long tenantId = directory.user(userId).tenantId();
+        inScope(tenantId, false, () -> {
+            String note = change.get();
+            if (note == null) return null;
+            var event = new PlatformManagementAudit();
+            event.setTenantId(tenantId); event.setActorUserId(me.userId()); event.setTargetType("USER");
+            event.setTargetId(userId); event.setAction(action); event.setNote(note);
+            audits.saveAndFlush(event);
+            return null;
+        });
+        return view(directory.user(userId), tenantNames().get(tenantId), membership(tenantId));
+    }
+
+    private static String reason(String note) {
+        String value = note == null ? "" : note.trim();
+        if (value.length() < 5 || value.length() > 300) throw BizException.of(ErrorCode.BAD_REQUEST, "请填写5至300字的处理依据");
+        return value;
+    }
+
     private PlatformDtos.UserView view(PlatformAccountDirectory.PlatformUser u, String tenantName, BillingDtos.Summary member) {
         return new PlatformDtos.UserView(u.id(), u.tenantId(), tenantName, u.name(), PlatformManagementService.maskPhone(u.phone()),
                 u.username(), u.role(), u.status(), u.lastLoginAt(), u.createdAt(), u.suspendedAt(),
