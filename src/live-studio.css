@@ -488,3 +488,9 @@
   .ls-qa-row-side{justify-items:start;max-width:none}
   .ls-qa-new-foot :is(select, .app-select-button){max-width:150px}
 }
+.ls-check-list li>a{flex:none;color:var(--color-accent-text);font-size:12px}
+.ls-cost-rule{margin:0 0 12px;color:var(--ink-muted);font-size:12px;line-height:1.6}
+.ls-cost-tag{display:inline-flex;align-items:center;gap:3px;margin-left:8px;padding:1px 7px;border-radius:999px;background:color-mix(in srgb,currentColor 16%,transparent);font-size:12px;font-weight:600}
+.ls-session-cost .ls-precheck-facts{margin:12px 0}
+.ls-cost-warning{margin:0;padding:10px 12px;border-radius:8px;color:var(--color-warning);background:color-mix(in srgb,var(--color-warning) 10%,transparent);font-size:12px;line-height:1.6}
+.ls-cost-warning a,.ls-fact-list dd a{color:var(--color-accent-text)}

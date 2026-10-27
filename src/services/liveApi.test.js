@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { liveApi, normalizeLiveConfig, defaultLiveConfig, answeringCohostId, toSessionQa, toSpeechFeedItem, toCommentFeedItem, describeAutoScript, describePlayback, defaultSessionName, pickCurrentSession, describeSession, startBlockers, sessionStatusLabel } from './liveApi.js'
+import { liveApi, normalizeLiveConfig, defaultLiveConfig, answeringCohostId, toSessionQa, toSpeechFeedItem, toCommentFeedItem, describeAutoScript, describePlayback, defaultSessionName, pickCurrentSession, describeSession, startBlockers, sessionStatusLabel, formatLiveDuration, liveCostEstimate, liveBillingProgress } from './liveApi.js'
 
 const response = (data) => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
 
@@ -237,4 +237,34 @@ test('弹幕由助播回答默认关闭，开启后由最先设为助播的那�
   assert.equal(answeringCohostId({ replyByCohost: true, voiceRoles: [{ id: 'sample:7', role: 'host' }] }), null)
   assert.equal(answeringCohostId({ replyByCohost: true, voiceRoles: [{ id: 'sample:6', role: 'cohost' }] }), null)
   assert.equal(answeringCohostId(null), null)
+})
+
+test('live duration reads in plain minutes and hours', () => {
+  assert.equal(formatLiveDuration(0), '0 分钟')
+  assert.equal(formatLiveDuration(61), '2 分钟')
+  assert.equal(formatLiveDuration(3600), '1 小时')
+  assert.equal(formatLiveDuration(4320), '1 小时 12 分')
+})
+
+test('live cost estimate says how long the balance lasts and what blocks the start', () => {
+  const summary = { liveCreditsPerHour: 35, available: 120, memberActive: true, plan: { liveEnabled: true } }
+  assert.deepEqual(liveCostEstimate(summary), { perHour: 35, available: 120, playable: '3 小时 25 分', problem: '' })
+  assert.match(liveCostEstimate({ ...summary, available: 20 }).problem, /不够预占第一小时/)
+  assert.equal(liveCostEstimate({ ...summary, plan: { liveEnabled: false } }).problem, '当前套餐不含直播')
+  assert.equal(liveCostEstimate({ ...summary, memberActive: false }).problem, '还没有开通会员，开不了播')
+  assert.equal(liveCostEstimate(null), null)
+})
+
+test('live billing progress keeps counting on air and matches the server settlement', () => {
+  const billing = { creditsPerHour: 35, liveSeconds: 1200, onAir: true, reservedCredits: 35, usedCredits: 12, refundedCredits: 0 }
+  const progress = liveBillingProgress(billing, 6)
+  assert.equal(progress.seconds, 1206)
+  assert.equal(progress.used, 13)
+  assert.equal(progress.duration, '21 分钟')
+  assert.equal(progress.pauseInMinutes, null)
+  assert.deepEqual([liveBillingProgress({ ...billing, onAir: false }, 600).seconds, liveBillingProgress({ ...billing, onAir: false }).used], [1200, 12])
+  assert.equal(liveBillingProgress(billing, 6, 10).pauseInMinutes, 37)
+  assert.equal(liveBillingProgress({ ...billing, liveSeconds: 7200 }).used, 35)
+  const ended = liveBillingProgress({ ...billing, onAir: false, liveSeconds: 1206, usedCredits: 13, refundedCredits: 22 })
+  assert.equal(ended.refunded, 22)
 })

@@ -81,6 +81,16 @@ public class LiveBilling {
         billing.release(reservation, "live-release:" + session.getId(), "直播结束 · 退回未用烟火");
     }
 
+    static LiveDtos.Billing view(LiveSession session, Instant now) {
+        long seconds = onAirSeconds(session, now);
+        long reserved = session.getBillingReservationId() == null ? 0
+                : (long) session.getBilledHours() * BillingService.LIVE_CREDITS_PER_HOUR;
+        long used = Math.min(charge(seconds), reserved);
+        boolean ended = "ENDED".equals(session.getStatus());
+        return new LiveDtos.Billing(BillingService.LIVE_CREDITS_PER_HOUR, seconds,
+                session.getLiveSegmentStartedAt() != null, reserved, used, ended ? reserved - used : 0);
+    }
+
     static long onAirSeconds(LiveSession session, Instant now) {
         Instant segment = session.getLiveSegmentStartedAt();
         long current = segment == null ? 0 : Math.max(0, Duration.between(segment, now).getSeconds());

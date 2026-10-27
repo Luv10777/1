@@ -228,3 +228,40 @@ export function describePlayback(playback) {
       return { label: '未开始', detail: '点击开始播报，播报声音会从这台设备播放。播报期间请保持本页面打开。' }
   }
 }
+
+// 直播按在播时长收烟火，单价以后端为准。这里只把后端给的数字换成主播看得懂的说法。
+export function formatLiveDuration(seconds) {
+  const minutes = Math.ceil(Math.max(0, seconds) / 60)
+  const hours = Math.floor(minutes / 60)
+  if (!hours) return `${minutes} 分钟`
+  return minutes % 60 ? `${hours} 小时 ${minutes % 60} 分` : `${hours} 小时`
+}
+
+/** 开播前：余额够播多久。没有会员、套餐不含直播、余额不够一小时时给出要处理的事。 */
+export function liveCostEstimate(summary) {
+  if (!summary) return null
+  const perHour = summary.liveCreditsPerHour
+  const available = Math.max(0, summary.available || 0)
+  let problem = ''
+  if (!summary.memberActive) problem = '还没有开通会员，开不了播'
+  else if (summary.plan && summary.plan.liveEnabled === false) problem = '当前套餐不含直播'
+  else if (available < perHour) problem = `余额 ${available} 烟火，不够预占第一小时（${perHour}）`
+  return { perHour, available, playable: perHour ? formatLiveDuration(Math.floor(available * 60 / perHour) * 60) : '', problem }
+}
+
+/**
+ * 直播中和结束后的本场烟火。onAir 时在后端返回的秒数上加上收到响应以来过去的时间，
+ * 在播时已用烟火按后端结算的算法估算：按开始的分钟计，整场向上取整，不超过已预占；不在播时用后端的数。
+ * available 是账户余额，用来提醒续不上下一小时、多久后会自动暂停（后端剩不到 2 分钟时暂停）。
+ */
+export function liveBillingProgress(billing, elapsedSeconds = 0, available = null) {
+  if (!billing) return null
+  const seconds = billing.liveSeconds + (billing.onAir ? Math.max(0, Math.floor(elapsedSeconds)) : 0)
+  const perHour = billing.creditsPerHour
+  const used = billing.onAir ? Math.min(Math.ceil(Math.ceil(seconds / 60) * perHour / 60), billing.reservedCredits) : billing.usedCredits
+  const coveredSeconds = perHour ? Math.floor(billing.reservedCredits * 3600 / perHour) : 0
+  const pauseInMinutes = billing.onAir && available != null && available < perHour
+    ? Math.max(0, Math.floor((coveredSeconds - seconds - 120) / 60))
+    : null
+  return { seconds, duration: formatLiveDuration(seconds), used, reserved: billing.reservedCredits, refunded: billing.refundedCredits, perHour, pauseInMinutes }
+}

@@ -462,7 +462,8 @@ public class LiveSessionService {
                         .map(snapshot -> new LiveDtos.SnapshotView(snapshot.getId(), snapshot.getSourceType(),
                                 snapshot.getSourceId(), snapshot.getQuestion(), snapshot.getAnswer(),
                                 snapshot.getPriority())).toList(), session.getConfig(), session.getAudioRoute(),
-                session.getAudioTestStatus(), session.isPlayerPaired(), session.getPlayerLastHeartbeatAt());
+                session.getAudioTestStatus(), session.isPlayerPaired(), session.getPlayerLastHeartbeatAt(),
+                LiveBilling.view(session, Instant.now()));
     }
 
     private static void requireDraft(LiveSession session) {

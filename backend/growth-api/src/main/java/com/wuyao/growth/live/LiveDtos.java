@@ -98,7 +98,15 @@ public final class LiveDtos {
                        Long version, Instant startedAt, Instant endedAt,
                        List<Long> productIds, List<SnapshotView> knowledge, Config config,
                        String audioRoute, String audioTestStatus, boolean playerPaired,
-                       Instant playerLastHeartbeatAt) {
+                       Instant playerLastHeartbeatAt, Billing billing) {
+    }
+
+    /**
+     * 本场烟火：liveSeconds 是返回这一刻累计的在播秒数（暂停不计），onAir 时前端从收到响应起自行累加。
+     * usedCredits 在播时是按当前时长估算的，结束后就是实际扣除；refundedCredits 只在结束后有值。
+     */
+    public record Billing(int creditsPerHour, long liveSeconds, boolean onAir, long reservedCredits,
+                          long usedCredits, long refundedCredits) {
     }
 
     /** What a list of sessions needs. The full view carries the whole knowledge snapshot of each one. */
