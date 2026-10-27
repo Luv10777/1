@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -39,8 +40,13 @@ public class ProductService {
         String normalizedCategory = blankToNull(category);
         var result = productRepository.search(storeId, normalizedKeyword, normalizedType,
                 normalizedCategory, PageRequest.of(page, size));
+        // One query for the whole page's images; grouping keeps each product's sort order.
+        var ids = result.getContent().stream().map(Product::getId).toList();
+        Map<Long, List<ProductImage>> images = ids.isEmpty() ? Map.of()
+                : imageRepository.findByProductIdInOrderBySortOrderAscIdAsc(ids).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(ProductImage::getProductId));
         return PageResult.of(result, result.getContent().stream()
-                .map(p -> ProductDtos.View.of(p, imageRepository.findByProductIdOrderBySortOrderAscIdAsc(p.getId())
+                .map(p -> ProductDtos.View.of(p, images.getOrDefault(p.getId(), List.of())
                         .stream().map(ProductDtos.ImageView::of).toList(), List.of()))
                 .toList());
     }
@@ -264,7 +270,8 @@ public class ProductService {
 
     @Transactional
     public void restoreInventory(Long productId, int quantity) {
-        productRepository.findByIdAndDeletedAtIsNull(productId).ifPresent(product -> {
+        // Same row lock as reserveForOrder: a concurrent order must not turn a cancellation into an optimistic-lock failure.
+        productRepository.findForUpdate(productId).ifPresent(product -> {
             if (product.getInventory() != null) {
                 product.setInventory(product.getInventory() + quantity);
                 product.setUpdatedAt(Instant.now());

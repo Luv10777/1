@@ -33,10 +33,6 @@ public class StoreAccessService {
         return storeRepository.findByIdAndTenantIdAndStatus(storeId, TenantContext.require(), "ACTIVE").isPresent() && allowed(storeId, userId);
     }
 
-    public Long requireTenant() {
-        return TenantContext.require();
-    }
-
     private boolean allowed(Long storeId, Long userId) {
         // roleOf 会拒绝已停用或不属于当前商户的账号，名单上还留着他也没用。
         return AccountService.OWNER.equals(accounts.roleOf(userId))

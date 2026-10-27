@@ -115,8 +115,13 @@ public class CommerceService {
     @Transactional(readOnly = true)
     public List<CommerceDtos.MerchantOrder> merchantOrders(Long storeId, Long userId) {
         storeAccess.requireAccess(storeId, userId);
-        return orders.findAllByStoreIdOrderByCreatedAtDescIdDesc(storeId).stream()
-                .map(order -> CommerceDtos.MerchantOrder.of(order, items.findAllByOrderIdOrderByIdAsc(order.getId()),
+        List<SalesOrder> list = orders.findAllByStoreIdOrderByCreatedAtDescIdDesc(storeId);
+        if (list.isEmpty()) return List.of();
+        // One query for every order's items instead of one per order; each order keeps its items in id order.
+        Map<Long, List<SalesOrderItem>> byOrder = items.findAllByOrderIdInOrderByIdAsc(list.stream().map(SalesOrder::getId).toList())
+                .stream().collect(java.util.stream.Collectors.groupingBy(SalesOrderItem::getOrderId));
+        return list.stream()
+                .map(order -> CommerceDtos.MerchantOrder.of(order, byOrder.getOrDefault(order.getId(), List.of()),
                         payment.forOrder(order)))
                 .toList();
     }

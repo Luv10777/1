@@ -18,19 +18,13 @@ public final class PcmAudio {
     private static final int TAIL_MILLIS = 40;
 
     /**
-     * Removes the silence a synthesiser pads its output with, keeping a short margin so that a soft
-     * first or last sound is not clipped. Measured on the provider in use, that padding is roughly
-     * half a second before the speech and up to a second after it, which becomes a long dead gap
-     * once sentences are synthesised one by one and joined. Audio with nothing audible is returned
-     * unchanged rather than emptied.
+     * The span left after removing the silence a synthesiser pads its output with, keeping a short
+     * margin so that a soft first or last sound is not clipped. Measured on the provider in use, that
+     * padding is roughly half a second before the speech and up to a second after it, which becomes a
+     * long dead gap once sentences are synthesised one by one and joined.
+     *
+     * @return the first and one-past-last sample worth keeping, or null when nothing is audible
      */
-    public static byte[] trimSilence(byte[] pcm, int sampleRate) {
-        int[] range = speechRange(pcm, sampleRate);
-        return range == null || (range[0] == 0 && range[1] == pcm.length / 2) ? pcm
-                : java.util.Arrays.copyOfRange(pcm, range[0] * 2, range[1] * 2);
-    }
-
-    /** @return the first and one-past-last sample worth keeping, or null when nothing is audible */
     public static int[] speechRange(byte[] pcm, int sampleRate) {
         durationMillis(pcm, sampleRate);
         int window = Math.max(1, sampleRate / 100); // 10 ms

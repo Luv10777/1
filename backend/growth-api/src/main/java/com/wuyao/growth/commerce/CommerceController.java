@@ -1,6 +1,8 @@
 package com.wuyao.growth.commerce;
 
 import com.wuyao.growth.common.security.AuthPrincipal;
+import com.wuyao.growth.common.security.ClientIpResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.common.web.PageResult;
 import jakarta.validation.Valid;
@@ -15,6 +17,8 @@ import java.util.List;
 public class CommerceController {
     private final CommerceService service;
     private final CommerceCheckoutService checkout;
+    private final PublicOrderRateLimiter orderLimits;
+    private final ClientIpResolver clientIps;
 
     @GetMapping("/api/public/products")
     public ApiResponse<PageResult<CommerceDtos.CatalogItem>> catalog(
@@ -32,7 +36,9 @@ public class CommerceController {
     }
 
     @PostMapping("/api/public/orders")
-    public ApiResponse<CommerceDtos.Receipt> place(@Valid @RequestBody CommerceDtos.PlaceOrderRequest request) {
+    public ApiResponse<CommerceDtos.Receipt> place(@Valid @RequestBody CommerceDtos.PlaceOrderRequest request,
+                                                   HttpServletRequest http) {
+        orderLimits.check(clientIps.resolve(http));
         return ApiResponse.ok(service.place(request));
     }
 

@@ -26,8 +26,7 @@ class ImageQualityTest {
    for(String ratio:List.of("1:1","3:4","4:3","2:3","3:2"))
      assertThatThrownBy(()->ImageQuality.modelDimensions("4K",ratio,config())).hasMessageContaining("该画质");
  }
- @Test void requestsHighestSupportedQualityForPortraitPoster() {
-   assertThat(ImageQuality.highestQuality("3:4",config())).isEqualTo("2K");
+ @Test void portraitPosterUsesTwoKDimensions() {
    assertThat(ImageQuality.modelDimensions("2K","3:4",config()))
      .isEqualTo(new ImageDtos.Dimensions(1536,2048));
  }

@@ -51,6 +51,8 @@ class CommunityMembershipAccessTest {
     @MockitoBean CommerceCheckoutService checkout;
     @MockitoBean JwtService jwt;
     @MockitoBean UserRepository users;
+    @MockitoBean com.wuyao.growth.commerce.PublicOrderRateLimiter orderLimits;
+    @MockitoBean com.wuyao.growth.common.security.ClientIpResolver clientIps;
 
     @BeforeEach
     void nonmember() {

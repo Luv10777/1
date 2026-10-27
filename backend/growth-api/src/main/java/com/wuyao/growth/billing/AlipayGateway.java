@@ -36,6 +36,7 @@ public class AlipayGateway {
     private final AlipayProperties config;
     private final ObjectMapper json;
     private final HttpClient http;
+    private final Map<String,CachedKey> keys=new java.util.concurrent.ConcurrentHashMap<>();
     public boolean configured() { return config.configured(); }
     /** Signed locally on every request: Alipay rejects stale request timestamps, so the URL is never stored. */
     public String pageUrl(BillingDtos.OrderView order,long tenantId) {
@@ -139,11 +140,23 @@ public class AlipayGateway {
         return params.entrySet().stream().map(e->e.getKey()+"="+URLEncoder.encode(e.getValue(),StandardCharsets.UTF_8)).collect(Collectors.joining("&"));
     }
     private PrivateKey privateKey() throws Exception {
-        return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(keyBytes(config.getPrivateKeyPath())));
+        return (PrivateKey)cached(config.getPrivateKeyPath(),bytes->KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(bytes)));
     }
     private PublicKey publicKey() throws Exception {
-        return KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keyBytes(config.getAlipayPublicKeyPath())));
+        return (PublicKey)cached(config.getAlipayPublicKeyPath(),bytes->KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes)));
     }
+    /** Each key file version is parsed once; replacing a file on disk still takes effect without a restart. */
+    private Key cached(String path,KeyParser parser) throws Exception {
+        Path file=Path.of(path);
+        String version=Files.getLastModifiedTime(file)+":"+Files.size(file);
+        var hit=keys.get(path);
+        if(hit!=null&&hit.version().equals(version)) return hit.key();
+        Key key=parser.parse(keyBytes(path));
+        keys.put(path,new CachedKey(version,key));
+        return key;
+    }
+    private interface KeyParser { Key parse(byte[] bytes) throws Exception; }
+    private record CachedKey(String version,Key key) {}
     /** The Alipay key tool writes bare Base64; PEM armour is accepted too. */
     private byte[] keyBytes(String path) throws Exception {
         return Base64.getDecoder().decode(Files.readString(Path.of(path)).replaceAll("-----[^-]+-----","").replaceAll("\\s",""));

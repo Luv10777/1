@@ -87,7 +87,8 @@ public class TaskWorker {
     @Scheduled(fixedDelayString = "${growth.worker.heartbeat-interval:10000}")
     public void heartbeat() {
         for (Task task : activeTasks.values()) {
-            if (!taskService.renew(task.getId(), task.getAttempts())) {
+            // A task that just finished is removed before its result is written, so a failed renewal is only a real loss while it is still active.
+            if (!taskService.renew(task.getId(), task.getAttempts()) && activeTasks.containsKey(task.getId())) {
                 log.warn("任务已失去执行租约，后续回写将被拒绝: id={} attempt={}", task.getId(), task.getAttempts());
             }
         }
@@ -106,6 +107,7 @@ public class TaskWorker {
                 return;
             }
             Map<String, Object> result = TenantContext.runAs(task.getTenantId(), () -> handler.handle(task));
+            activeTasks.remove(task.getId());
             if (taskService.succeed(task.getId(), task.getAttempts(), result)) {
                 if ("UPSTREAM_UNKNOWN".equals(result == null ? null : result.get("status"))) {
                     log.warn("任务完成但上游结果待核对: id={} type={}", task.getId(), task.getType());
@@ -114,6 +116,7 @@ public class TaskWorker {
                 }
             }
         } catch (Exception e) {
+            activeTasks.remove(task.getId());
             log.warn("任务执行异常: id={} type={}", task.getId(), task.getType(), e);
             if (e instanceof NonRetryableTaskException permanent) {
                 taskService.failPermanently(task.getId(), task.getAttempts(), permanent.errorCode(), permanent.getMessage());

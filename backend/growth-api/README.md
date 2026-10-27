@@ -89,6 +89,16 @@ mvn spring-boot:run
 `init-local.ps1` 会生成随机 JWT 密钥，已有 `.env` 时保留原配置。
 首次运行需等待 PostgreSQL 健康检查通过；可用 `docker compose ps` 检查。
 
+部分 Windows 环境的 JDK 建不了本地回环连接（报 `Unable to establish loopback connection`），
+Spring 上下文因此无法启动，集成测试会成批失败。遇到时改在 Linux 的 Maven 容器里跑，
+Git Bash 里执行（Testcontainers 通过宿主机的 Docker 起数据库）：
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/app" -v "$HOME/.m2:/root/.m2" \
+  -v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+  -w /app maven:3.9-eclipse-temurin-21 mvn -Dmaven.repo.local=/root/.m2/repository verify
+```
+
 Linux/macOS（脚本保留已有配置，自动生成随机 JWT 密钥）：
 
 ```bash
