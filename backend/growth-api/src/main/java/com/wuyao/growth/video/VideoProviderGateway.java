@@ -251,10 +251,6 @@ public class VideoProviderGateway {
         return null;
     }
 
-    public String providerName() { return providerName; }
-
-    public String protocol() { return protocol; }
-
     private JsonNode send(String method, String path, String body, String idempotencyKey, String key) {
         try {
             URI endpoint = VideoUrlSecurity.checkedHttps(joinUrl(path));

@@ -472,12 +472,6 @@ public class ImageCreationService {
    if(!Objects.equals(i.getTaskId(),task.getId())||Set.of("SUCCEEDED","FAILED","CANCELLED").contains(i.getStatus()))return false;
    i.setStatus(i.getRawKey()==null?"GENERATING":"SAVING");return true;
  }
- /** Persist intent before a synchronous call: OpenAI compatibility does not guarantee idempotency. */
- @Transactional
- public boolean reserveSynchronousSubmission(Long id,Task task) {
-   billing.lockForGeneration();
-   return reserveProviderSubmission(id, task);
- }
  /** Record a known pre-submit failure without ending the item or consuming submission rights. */
  @Transactional
  public void recordSubmissionWaitFailure(Long id,Task task,String message) {

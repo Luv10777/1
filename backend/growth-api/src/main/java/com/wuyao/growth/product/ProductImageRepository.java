@@ -9,6 +9,8 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Long
 
     List<ProductImage> findByProductIdOrderBySortOrderAscIdAsc(Long productId);
 
+    List<ProductImage> findByProductIdInOrderBySortOrderAscIdAsc(java.util.Collection<Long> productIds);
+
     Optional<ProductImage> findByIdAndProductId(Long id, Long productId);
 
     boolean existsByProductIdAndAssetId(Long productId, Long assetId);

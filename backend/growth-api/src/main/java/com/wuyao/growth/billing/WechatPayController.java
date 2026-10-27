@@ -18,7 +18,7 @@ public class WechatPayController {
             checkout.notifyPaid(wechat.notification(body,serial,timestamp,nonce,signature));
             return ResponseEntity.ok(Map.of("code","SUCCESS","message","成功"));
         } catch(RuntimeException e) {
-            log.warn("微信支付通知未入账: {}",e.getClass().getSimpleName());
+            log.warn("微信支付通知未入账: type={} reason={}",e.getClass().getSimpleName(),AlipayController.reason(e));
             return ResponseEntity.status(500).body(Map.of("code","FAIL","message","通知未处理成功"));
         }
     }

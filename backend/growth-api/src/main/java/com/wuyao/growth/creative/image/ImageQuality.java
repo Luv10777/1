@@ -25,16 +25,6 @@ public final class ImageQuality {
             return false;
         }
     }
-    public static String highestQuality(String ratio, ImageModelProperties config) {
-        return Map.of("4K", 4, "2K", 2, "1K", 1).entrySet().stream()
-            .sorted((a,b) -> Integer.compare(b.getValue(), a.getValue()))
-            .map(Map.Entry::getKey)
-            .filter(config.getQualities()::contains)
-            .filter(quality -> supportsOutput(quality, ratio, config))
-            .findFirst()
-            .orElseThrow(() -> BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,
-                "当前图片模型不支持该比例的输出"));
-    }
     // 1K and 2K use the short edge; 4K uses a 3840px long edge for landscape/portrait.
     public static ImageDtos.Dimensions dimensions(String quality, String ratio) {
         if (!ratio.matches("1:1|3:4|4:3|9:16|16:9|2:3|3:2"))

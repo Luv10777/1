@@ -81,9 +81,13 @@ public class AllianceRedemptionService {
     @Transactional(readOnly = true)
     public List<AllianceDtos.RedemptionView> records(Long storeId, Long userId) {
         storeAccess.requireAccess(storeId, userId);
-        return claims.findAllByRedeemedStoreIdAndStatusOrderByRedeemedAtDesc(storeId, "REDEEMED", PageRequest.of(0, 100)).stream()
+        var redeemed = claims.findAllByRedeemedStoreIdAndStatusOrderByRedeemedAtDesc(storeId, "REDEEMED", PageRequest.of(0, 100));
+        // One query for all offers on the page instead of one per record.
+        Map<Long, AllianceOffer> byId = offers.findAllById(redeemed.stream().map(AllianceOfferClaim::getOfferId).distinct().toList())
+                .stream().collect(java.util.stream.Collectors.toMap(AllianceOffer::getId, o -> o));
+        return redeemed.stream()
                 .map(c -> {
-                    var offer = offers.findById(c.getOfferId()).orElseThrow();
+                    var offer = java.util.Optional.ofNullable(byId.get(c.getOfferId())).orElseThrow();
                     return new AllianceDtos.RedemptionView(offer.getProductName(), c.getHolderName(),
                             offer.getFaceValueMinor(), c.getRedeemedAt(), c.getRedeemedBy());
                 }).toList();

@@ -3052,7 +3052,7 @@ class FoundationIntegrationTest {
         runImageTask("DEFAULT", imagePlanHandler);
         var item=TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).items().getFirst());
         var task=tasks.claim("IMAGE",1).getFirst();
-        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.reserveSynchronousSubmission(item.id(),task))).isTrue();
+        assertThat(TenantContext.runAs(tenantA, () -> imageCreations.reserveProviderSubmission(item.id(),task))).isTrue();
         expire(task.getId());tasks.reclaimExpired();owner.update("update tasks set run_after=now() where id=?",task.getId());
         clearInvocations(imageGateway);
         runImageTask("IMAGE",imageRenderHandler);

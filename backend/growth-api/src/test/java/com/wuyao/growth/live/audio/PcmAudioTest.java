@@ -80,17 +80,14 @@ class PcmAudioTest {
     void paddingAroundSpeechIsTrimmedToAShortMarginAndSilentAudioIsLeftAlone() {
         byte[] pcm = new byte[24000 * 2 * 2];                       // 2 s
         for (int i = 12000; i < 24000; i++) pcm[2 * i + 1] = (byte) (i % 2 == 0 ? 40 : -40);   // speech from 0.5 s to 1 s
-        byte[] trimmed = PcmAudio.trimSilence(pcm, 24000);
+        // 30 ms of margin before the first sound (sample 12000), 40 ms after the last (sample 23999): 570 ms kept.
+        int[] kept = PcmAudio.speechRange(pcm, 24000);
+        assertThat(kept).containsExactly(12000 - 720, 24000 + 960);
+        byte[] trimmed = Arrays.copyOfRange(pcm, kept[0] * 2, kept[1] * 2);
         assertThat(PcmAudio.durationMillis(trimmed, 24000)).isEqualTo(570);
-        // 30 ms of margin before the first sound, 40 ms after the last.
-        assertThat(trimmed[2 * 719 + 1]).isZero();
-        assertThat(trimmed[2 * 720 + 1]).isNotZero();
-        assertThat(trimmed[2 * 12719 + 1]).isNotZero();
-        assertThat(trimmed[2 * 12720 + 1]).isZero();
-        // Speech that already starts and ends at the edges is returned as it is.
-        assertThat(PcmAudio.trimSilence(trimmed, 24000)).hasSize(trimmed.length);
-        byte[] silent = new byte[48000];
-        assertThat(PcmAudio.trimSilence(silent, 24000)).isSameAs(silent);
+        // Speech that already starts and ends at the edges keeps everything.
+        assertThat(PcmAudio.speechRange(trimmed, 24000)).containsExactly(0, trimmed.length / 2);
+        assertThat(PcmAudio.speechRange(new byte[48000], 24000)).isNull();
     }
 
     @Test
