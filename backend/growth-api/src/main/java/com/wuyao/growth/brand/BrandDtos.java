@@ -98,6 +98,9 @@ public final class BrandDtos {
         }
     }
 
+    /** 门店所属品牌的 ID 和行业（品牌库下拉里的选项，旧数据可能是自由文本或为空）。 */
+    public record StoreBrand(Long id, String industry) {}
+
     /** 其他模块生成内容时可以引用的品牌资料：只有文字，不含视觉资产。 */
     public record Profile(Long id, String name, String slogan, String intro,
                           String positioning, String targetAudience, String languageStyle) {

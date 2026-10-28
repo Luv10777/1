@@ -57,6 +57,17 @@ public final class CopyDtos {
                                List<String> tags, Instant finalizedAt) {}
 
     /**
+     * 今日宜发。status：GENERATING 正在生成，READY 已生成，FAILED 生成失败，UNAVAILABLE 模型没配置。
+     * fallback 为 true 时宜、忌是只按日期和行业给的稳妥建议，没有选题。
+     * industryStatus：KNOWN 已识别；MISSING 品牌没填行业或填了「其他」；NO_BRAND 门店没关联品牌。
+     * topics 每个：title、platform、style、idea。
+     */
+    public record Almanac(String status, boolean fallback, String date, int day, String month, String weekday,
+                          String termLabel, List<String> todays, String industry, String industryStatus, Long brandId,
+                          List<String> good, List<String> avoid, String quote, List<Map<String, Object>> topics,
+                          String journalHint) {}
+
+    /**
      * 口吻档案。status：EMPTY 还没喂样本，LEARNING 正在总结，READY 可用，FAILED 总结失败。
      * brandStyle 是品牌库的语言风格，还没喂样本时用它兜底。
      */

@@ -139,6 +139,14 @@ public class BrandService {
                 .map(BrandDtos.Profile::of);
     }
 
+    /** 供文案创作「今日宜发」使用：门店所属品牌的 ID 和行业。门店没有品牌时为空，行业没填时 industry 为空。 */
+    @Transactional(readOnly = true)
+    public Optional<BrandDtos.StoreBrand> brandForStore(Long storeId) {
+        return stores.brandIdOf(storeId)
+                .flatMap(id -> brands.findByIdAndStatus(id, ACTIVE))
+                .map(brand -> new BrandDtos.StoreBrand(brand.getId(), brand.getIndustry()));
+    }
+
     private Brand find(Long id) {
         return brands.findByIdAndStatus(id, ACTIVE)
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "品牌不存在或已删除"));

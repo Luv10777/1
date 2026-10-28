@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { brandApi } from '../services/brandApi'
 import { auth } from '../stores/auth'
 import StoreCards from '../components/StoreCards.vue'
@@ -7,6 +8,7 @@ import StoreFormModal from '../components/StoreFormModal.vue'
 import { stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 
 const brands = ref([])
+const route = useRoute()
 const loading = ref(true)
 const showModal = ref(false)
 const editingBrand = ref(null)
@@ -65,7 +67,12 @@ const completion = computed(() => {
 })
 
 // 门店列表登录时已经取过；这里再取一次，别人刚改过的资料也能看到。
-onMounted(async () => { document.querySelector('.page-scroll')?.classList.add('brands-scroll'); document.addEventListener('click', closeIndustryMenu); await Promise.all([loadBrands(), loadStores()]) })
+onMounted(async () => {
+  document.querySelector('.page-scroll')?.classList.add('brands-scroll'); document.addEventListener('click', closeIndustryMenu); await Promise.all([loadBrands(), loadStores()])
+  // 文案创作「今日宜发」判断不了行业时，会带 ?edit=<品牌ID> 跳过来，直接打开这个品牌的档案补行业。
+  const editing = auth.isOwner && brands.value.find(brand => String(brand.id) === String(route.query.edit))
+  if (editing) openEditModal(editing)
+})
 watch(showModal, async (visible) => {
   if (!visible) { sectionObserver?.disconnect(); sectionObserver = null; if (scrollFrame) cancelAnimationFrame(scrollFrame); return }
   await nextTick()

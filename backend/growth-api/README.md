@@ -19,6 +19,8 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 模型单独配置 `COPY_WRITER_URL`（完整的 `/chat/completions` 地址）、`COPY_WRITER_API_KEY`、`COPY_WRITER_MODEL`（需能看图，例如 gpt-6-luna），可选 `COPY_WRITER_TIMEOUT_SECONDS`（默认 120）；
 不配时退回平台文本模型 `TEXT_WRITER`，两者都没配时页面显示未开放。直播用的 `TEXT_WRITER` 不受影响。文本模型适配器新增可选的 `images`、`jsonObject` 参数，不传时请求不变。
 任务中心和烟火日志显示为「一方志文案」。
+2026-10-29 文案创作加「今日宜发」（迁移 V70 `copy_almanacs`，接口 `GET /api/copy/almanac/today?storeId=`）：每家门店每天一份黄历和 3 个选题，首次打开时由任务 `COPY_ALMANAC` 生成，
+每天 00:10（`growth.copy.almanac-cron`）为最近 7 天活跃的门店预生成（`COPY_ALMANAC_PREPARE`）；节气和节日由新依赖 `cn.6tail:lunar` 计算，不扣烟火。
 
 任务中心和后台烟火日志统一显示模型名：图片为「一方志Image」，视频反推为「一方志反推」，
 视频方案为「一方志提示词」，视频生成显示对应的 Seedance 型号。视频方案每批记录三个方案及实际烟火结算。

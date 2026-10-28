@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aiLevel, copyApi, copyFormFromBatch, copySegments, copyText, groupByDay, missingFacts, validateCopyImage } from './copywriting.js'
+import { aiLevel, copyApi, copyFormFromBatch, copySegments, copyText, groupByDay, industryPrompt, missingFacts, topicLink, validateCopyImage } from './copywriting.js'
 
 const store = { 店名: '梧桐小馆', 地址: '梧桐路 8 号' }
 
@@ -60,6 +60,23 @@ test('history leaves the platform out when listing everything', async () => {
   await copyApi.history(7, { platform: 'DOUYIN' })
   assert.doesNotMatch(requests[0], /platform/)
   assert.match(requests[1], /platform=DOUYIN/)
+})
+
+test('a topic opens the workspace with its platform, style and idea', () => {
+  const link = topicLink({ title: '今天的第一碗热汤', platform: 'MOMENTS', style: '文艺治愈', idea: '写写天冷时的一碗汤' })
+  const query = new URLSearchParams(link.split('?')[1])
+  assert.equal(link.split('?')[0], '/copy/create')
+  assert.equal(query.get('platform'), 'MOMENTS')
+  assert.equal(query.get('style'), '文艺治愈')
+  assert.equal(query.get('note'), '今天的第一碗热汤：写写天冷时的一碗汤')
+})
+
+test('owners are sent to complete the brand, staff only see a hint', () => {
+  assert.equal(industryPrompt({ industryStatus: 'KNOWN' }, true), null)
+  assert.deepEqual(industryPrompt({ industryStatus: 'MISSING', brandId: 3 }, true),
+    { text: '补充行业，推荐更贴合你的店', label: '去品牌库完善', link: '/brands?edit=3' })
+  assert.equal(industryPrompt({ industryStatus: 'NO_BRAND' }, true).link, '/brands')
+  assert.equal(industryPrompt({ industryStatus: 'MISSING', brandId: 3 }, false).link, null)
 })
 
 test('only small enough jpg, png and webp images are accepted', () => {

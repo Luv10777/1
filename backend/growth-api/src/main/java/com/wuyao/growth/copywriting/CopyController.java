@@ -14,8 +14,14 @@ import org.springframework.web.bind.annotation.*;
 public class CopyController {
     private final CopyService service;
     private final CopyVoiceService voices;
+    private final CopyAlmanacService almanacs;
 
     @GetMapping("/config") public ApiResponse<CopyDtos.Config> config() { return ApiResponse.ok(service.config()); }
+
+    @GetMapping("/almanac/today")
+    public ApiResponse<CopyDtos.Almanac> almanac(@RequestParam Long storeId, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(almanacs.today(storeId, me.userId()));
+    }
 
     @PostMapping("/batches")
     public ApiResponse<CopyDtos.View> create(@Valid @RequestBody CopyDtos.Create request, @AuthenticationPrincipal AuthPrincipal me) {

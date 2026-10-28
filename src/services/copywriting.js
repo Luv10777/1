@@ -3,6 +3,7 @@ import { get, post, put } from '../utils/request.js'
 /** 文案创作：看图或一句话，给朋友圈、抖音、小红书写 3 条配文。每次（含换一批）1 烟火，失败退回；改写不另收费。 */
 export const copyApi = {
   config: () => get('/api/copy/config'),
+  almanac: storeId => get('/api/copy/almanac/today', { storeId }),
   create: request => post('/api/copy/batches', request),
   get: id => get(`/api/copy/batches/${id}`),
   history: (storeId, { platform = '', page = 0 } = {}) => get('/api/copy/batches', { storeId, ...(platform ? { platform } : {}), page, size: 20 }),
@@ -120,6 +121,21 @@ export function groupByDay(records, now = new Date()) {
 export function clockTime(value) {
   const date = new Date(value)
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+/** 「今天可以发」的选题点进工作区：带上平台、风格，选题思路填进「想说的话」。 */
+export function topicLink(topic) {
+  const query = new URLSearchParams({ platform: topic.platform, style: topic.style, note: [topic.title, topic.idea].filter(Boolean).join('：') })
+  return `/copy/create?${query}`
+}
+
+/** 品牌行业判断不了时，黄历卡底部的提示和去处。店长去品牌库补，员工只看提示。 */
+export function industryPrompt(almanac, isOwner) {
+  if (!almanac || almanac.industryStatus === 'KNOWN') return null
+  if (!isOwner) return { text: '请店长在品牌库补充行业，推荐会更贴合你的店', link: null }
+  return almanac.industryStatus === 'NO_BRAND'
+    ? { text: '门店还没关联品牌，关联后推荐更贴合你的店', label: '去品牌库关联品牌', link: '/brands' }
+    : { text: '补充行业，推荐更贴合你的店', label: '去品牌库完善', link: `/brands?edit=${almanac.brandId}` }
 }
 
 /** 打开一条旧记录时左栏要恢复的设置。 */
