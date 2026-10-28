@@ -47,6 +47,8 @@ class CopyAlmanacServiceTest {
         var view = TenantContext.runAs(7L, () -> service.today(9L, 1L));
         assertThat(view.status()).isEqualTo("GENERATING");
         assertThat(view.fallback()).isTrue();
+        assertThat(view.topics()).isEmpty();
+        assertThat(view.term()).isNotBlank();
         assertThat(view.industry()).isEqualTo("餐饮 / 茶饮");
         assertThat(view.industryStatus()).isEqualTo("KNOWN");
         assertThat(view.avoid()).contains("暗示保健功效");
@@ -100,7 +102,7 @@ class CopyAlmanacServiceTest {
         var view = TenantContext.runAs(7L, () -> service.today(9L, 1L));
         assertThat(view.status()).isEqualTo("UNAVAILABLE");
         assertThat(view.good()).isNotEmpty();
-        assertThat(view.topics()).isEmpty();
+        assertThat(view.topics()).extracting(t -> t.get("title")).containsExactlyElementsOf(view.good());
         verifyNoInteractions(tasks);
     }
 

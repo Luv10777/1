@@ -123,9 +123,10 @@ export function clockTime(value) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-/** 「今天可以发」的选题点进工作区：带上平台、风格，选题思路填进「想说的话」。 */
-export function topicLink(topic) {
-  const query = new URLSearchParams({ platform: topic.platform, style: topic.style, note: [topic.title, topic.idea].filter(Boolean).join('：') })
+/** 「今天可以发」就是今日宜的那几条：点进工作区，带上平台、风格，「想说的话」写成「今日宜：晒一杯暖茶（霜降）」。 */
+export function topicLink(topic, term) {
+  const note = `今日宜：${topic.title}${term ? `（${term}）` : ''}${topic.idea ? `。${topic.idea}` : ''}`
+  const query = new URLSearchParams({ platform: topic.platform, style: topic.style, note })
   return `/copy/create?${query}`
 }
 

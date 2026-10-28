@@ -62,13 +62,16 @@ test('history leaves the platform out when listing everything', async () => {
   assert.match(requests[1], /platform=DOUYIN/)
 })
 
-test('a topic opens the workspace with its platform, style and idea', () => {
-  const link = topicLink({ title: '今天的第一碗热汤', platform: 'MOMENTS', style: '文艺治愈', idea: '写写天冷时的一碗汤' })
+test('what is good to post today opens the workspace with its platform, style and the solar term', () => {
+  const link = topicLink({ title: '晒一杯暖茶', platform: 'MOMENTS', style: '文艺治愈' }, '霜降')
   const query = new URLSearchParams(link.split('?')[1])
   assert.equal(link.split('?')[0], '/copy/create')
   assert.equal(query.get('platform'), 'MOMENTS')
   assert.equal(query.get('style'), '文艺治愈')
-  assert.equal(query.get('note'), '今天的第一碗热汤：写写天冷时的一碗汤')
+  assert.equal(query.get('note'), '今日宜：晒一杯暖茶（霜降）')
+  // 10-29 以前生成的选题还带一句思路，照样带进去。
+  assert.equal(new URLSearchParams(topicLink({ title: '老板的备餐日常', platform: 'DOUYIN', style: '真诚日常', idea: '拍后厨' }).split('?')[1]).get('note'),
+    '今日宜：老板的备餐日常。拍后厨')
 })
 
 test('owners are sent to complete the brand, staff only see a hint', () => {

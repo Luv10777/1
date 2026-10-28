@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-/** 一家门店某一天的「今日宜发」：黄历的宜、忌、时令短句，3 个选题，以及给门店志的一句提醒。 */
+/** 一家门店某一天的「今日宜发」：黄历的宜（带平台和风格，可以点去写）、忌、时令短句，以及给门店志的一句提醒。 */
 @Entity
 @Table(name = "copy_almanacs")
 @Getter
@@ -31,7 +31,7 @@ public class CopyAlmanac {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb") private List<String> avoid;
     @Column(columnDefinition = "text") private String quote;
-    /** 每个选题：title、platform、style、idea。 */
+    /** 「今天可以发」：就是宜的那几条，每个 title、platform、style（10-29 以前生成的还带 idea）。 */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb") private List<Map<String, Object>> topics;
     @Column(name = "journal_hint", columnDefinition = "text") private String journalHint;

@@ -128,7 +128,7 @@ onBeforeUnmount(() => { clearTimeout(almanacTimer); clearTimeout(voiceTimer) })
       <section class="cw-topics" aria-label="今天可以发">
         <h2>今天可以发</h2>
         <template v-if="almanac?.topics?.length">
-          <RouterLink v-for="(topic, index) in almanac.topics" :key="topic.title" :to="topicLink(topic)" class="cw-card cw-topic">
+          <RouterLink v-for="(topic, index) in almanac.topics" :key="topic.title" :to="topicLink(topic, almanac.term)" class="cw-card cw-topic">
             <span class="cw-topic-no">{{ NUMERALS[index] }}</span>
             <span class="cw-topic-main"><strong>{{ topic.title }}</strong><small>{{ platformLabel(topic.platform) }} · {{ topic.style }}</small></span>
             <span class="cw-topic-go">就写这个<ChevronRight :size="15" :stroke-width="2" aria-hidden="true" /></span>
