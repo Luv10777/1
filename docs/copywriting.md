@@ -11,7 +11,9 @@
 
 第一期实现与下文设计不同的地方：
 
-- 模型：直接用平台的文本模型 `TEXT_WRITER`（`growth.ai.writer.*`，现在配的是 gpt-6-luna，能看图），不另配模型。看图和写稿在**同一次调用**里完成，没有拆成 `VISION_ANALYZER` + `TEXT_WRITER` 两步。为此文本模型适配器 `ChatCompletionTextAdapter` 加了两个可选参数：`images`（最多 6 张 JPEG data URL）和 `jsonObject`（要求返回 JSON 对象）；不传时请求和原来完全一样。如果以后把 `TEXT_WRITER` 换成不能看图的模型，带图的文案生成会失败，需要同时调整。
+- 模型：文案单独配模型 `COPY_WRITER`（`COPY_WRITER_URL`、`COPY_WRITER_API_KEY`、`COPY_WRITER_MODEL`，正式服用 OnlyRouter 的 gpt-6-luna），其他模块的模型不变。
+  不单独配时退回平台文本模型 `TEXT_WRITER`。单独配的原因：正式服的 `TEXT_WRITER` 是 deepseek-v4.1-flash，不能看图，但约 0.7 秒就能回答，直播弹幕回复靠它；gpt-6-luna 能看图，一次要 5–20 秒，不能拿去顶替直播用的模型。
+  两者请求格式相同，`CopyWriterAdapter` 直接复用 `ChatCompletionTextAdapter`。看图和写稿在**同一次调用**里完成；为此 `ChatCompletionTextAdapter` 加了两个可选参数：`images`（最多 6 张 JPEG data URL）和 `jsonObject`（要求返回 JSON 对象），不传时请求和原来完全一样。退回 `TEXT_WRITER` 时如果那个模型不能看图，带图的文案生成会失败。
 - AI 味：由写稿的同一次调用自评打分（`aiScore`、`aiReason`），没有用 `TEXT_REVIEWER`。
 - 素材：支持上传图片和作品库图片，合计最多 6 张；**视频暂不支持**。
 - 校验：词表放在文案模块内（`CopyGuard`），没有抽到 `common/`。不合格的条目带原因补写一次，最后至少 2 条合格才算成功并扣费，否则整批失败退回烟火。

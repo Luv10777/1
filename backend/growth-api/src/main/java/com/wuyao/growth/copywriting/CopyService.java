@@ -3,7 +3,6 @@ package com.wuyao.growth.copywriting;
 import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
-import com.wuyao.growth.common.gateway.ModelAlias;
 import com.wuyao.growth.common.task.Task;
 import com.wuyao.growth.common.task.TaskRepository;
 import com.wuyao.growth.common.task.TaskService;
@@ -50,14 +49,14 @@ public class CopyService {
 
     public CopyDtos.Config config() {
         var styles = CopyPrompt.STYLES.entrySet().stream().map(e -> new CopyDtos.Style(e.getKey(), e.getValue())).toList();
-        return new CopyDtos.Config(gateway.configured(ModelAlias.TEXT_WRITER), BillingService.COPY_CREDITS,
+        return new CopyDtos.Config(CopyModel.configured(gateway), BillingService.COPY_CREDITS,
                 MAX_IMAGES, 3, REWRITE_LIMIT, styles);
     }
 
     @Transactional
     public CopyDtos.View create(CopyDtos.Create request, Long userId) {
         billing.lockForGeneration();
-        if (!gateway.configured(ModelAlias.TEXT_WRITER)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
+        if (!CopyModel.configured(gateway)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
         storeAccess.requireAccess(request.storeId(), userId);
         if (!CopyPrompt.STYLES.containsKey(request.style())) throw BizException.of(ErrorCode.BAD_REQUEST, "不支持的风格");
         String note = trim(request.note());
@@ -156,7 +155,7 @@ public class CopyService {
 
     @Transactional
     public CopyDtos.View rewrite(Long id, int index, CopyDtos.Rewrite request, Long userId) {
-        if (!gateway.configured(ModelAlias.TEXT_WRITER)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
+        if (!CopyModel.configured(gateway)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
         var batch = batches.lock(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "文案不存在"));
         storeAccess.requireAccess(batch.getStoreId(), userId);
         if (!"SUCCEEDED".equals(batch.getStatus()) || batch.getVersions() == null) throw BizException.of(ErrorCode.BAD_REQUEST, "这批文案还没写好");

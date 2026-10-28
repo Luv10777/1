@@ -2,7 +2,6 @@ package com.wuyao.growth.copywriting;
 
 import com.wuyao.growth.brand.BrandService;
 import com.wuyao.growth.common.gateway.AiGateway;
-import com.wuyao.growth.common.gateway.ModelAlias;
 import com.wuyao.growth.common.task.TaskService;
 import com.wuyao.growth.common.task.TaskTerminalFailure;
 import com.wuyao.growth.common.tenant.TenantContext;
@@ -41,7 +40,7 @@ public class CopyVoiceService {
     @Transactional
     public CopyDtos.Voice update(CopyDtos.VoiceUpdate request, Long userId) {
         storeAccess.requireAccess(request.storeId(), userId);
-        if (!gateway.configured(ModelAlias.TEXT_WRITER)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
+        if (!CopyModel.configured(gateway)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
         var samples = request.samples().stream().map(String::strip).filter(s -> !s.isEmpty()).distinct().toList();
         if (samples.size() < 3) throw BizException.of(ErrorCode.BAD_REQUEST, "至少贴 3 条不同的文案");
         var voice = voices.lockByStoreId(request.storeId()).orElseGet(() -> {
