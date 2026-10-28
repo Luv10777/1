@@ -86,6 +86,15 @@ growth:
       max-tokens: ${VIDEO_ANALYSIS_AUDIO_MAX_TOKENS:4000}
     ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
     ffprobe-path: ${FFPROBE_PATH:ffprobe}
+  copy:
+    # 文案创作单独用的模型（COPY_WRITER），要能看图，例如 gpt-6-luna。不配就用下面的 TEXT_WRITER。
+    # 单独配是因为看图写稿要十几秒，而 TEXT_WRITER 还服务直播话术和弹幕回复，要快。
+    writer:
+      url: ${COPY_WRITER_URL:}
+      api-key: ${COPY_WRITER_API_KEY:}
+      model: ${COPY_WRITER_MODEL:}
+      timeout-seconds: ${COPY_WRITER_TIMEOUT_SECONDS:120}
+      extra-body: ${COPY_WRITER_EXTRA_BODY:}
   ai:
     # 文案能力（TEXT_WRITER），直播自动讲解用它写话术。任何 OpenAI 兼容的 chat completions 接口都可以。
     # 三项缺任何一项都视为未配置：自动讲解会明确报错，不会用占位内容顶替。
