@@ -131,6 +131,13 @@
             <version>3.0.3</version>
         </dependency>
 
+        <!-- 文案创作「今日宜发」：节气、农历节日按日期计算，不让模型推日期。MIT 许可 -->
+        <dependency>
+            <groupId>cn.6tail</groupId>
+            <artifactId>lunar</artifactId>
+            <version>1.7.4</version>
+        </dependency>
+
         <!-- Micrometer 指标监控 -->
         <dependency>
             <groupId>io.micrometer</groupId>

@@ -272,9 +272,12 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
   if (copyPlatforms.some(p => p.id === route.query.platform)) form.value.platform = route.query.platform
   if (typeof route.query.note === 'string') form.value.note = route.query.note.slice(0, 500)
+  if (copyStyles.some(s => s.name === route.query.style)) form.value.style = route.query.style
   await loadConfig()
   await loadVoice()
-  const requested = Number(route.query.batch) || remembered()
+  // 从首页选题或平台入口进来是重新开始写，不再打开上次那批。
+  const fresh = Boolean(route.query.platform || route.query.note)
+  const requested = Number(route.query.batch) || (fresh ? null : remembered())
   if (requested && auth.isAuthenticated) openBatch(requested)
   if (route.query.history) { historyOpen.value = true; loadHistory(); router.replace({ query: { ...route.query, history: undefined } }) }
 })
