@@ -104,6 +104,7 @@ const navGroups = [
       { name: 'video-create', label: '视频创作', path: '/video/create' },
       { name: 'digital-human', label: '实景直播', path: '/digital-human' },
       { name: 'video-analyze', label: '视频反推', path: '/video/analyze' },
+      { name: 'copy', label: '文案创作', path: '/copy' },
     ],
   },
   {
@@ -195,7 +196,7 @@ const getInitialExpandedGroups = () => {
 
 const expandedGroups = ref(getInitialExpandedGroups())
 // 不在侧边栏的页面，打开时高亮它所属的入口：我的发布 → 信息广场，我的联盟券 → 领券中心。
-const ACTIVE_ALSO = { 'public-information': ['information-publishing', 'public-information-detail'], 'alliance-pool': ['alliance-vouchers'] }
+const ACTIVE_ALSO = { 'public-information': ['information-publishing', 'public-information-detail'], 'alliance-pool': ['alliance-vouchers'], copy: ['copy-create'] }
 const isActive = (name) => route.name === name || (ACTIVE_ALSO[name] || []).includes(route.name)
 const isGroupActive = (group) => isActive(group.name) || route.meta.navGroup === group.key || group.items?.some(item => isActive(item.name))
 const isGroupExpanded = (key) => expandedGroups.value.has(key)

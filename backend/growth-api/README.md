@@ -13,6 +13,12 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 接口：`GET /api/video/plans/config`、`POST /api/video/plans`（`requestKey` 幂等，`previousPlanId` 表示换一批）、`GET /api/video/plans/{id}`。
 服务端配置 `VIDEO_PLAN_API_KEY`（必填）、`VIDEO_PLAN_BASE_URL`、`VIDEO_PLAN_MODEL`、`VIDEO_PLAN_TIMEOUT_SECONDS`、`VIDEO_PLAN_MAX_TOKENS`；未配置密钥时入口显示未开放。
 
+2026-10-28 新增文案创作（`copywriting` 模块，设计与进度见 [文案创作文档](../../docs/copywriting.md)）：看最多 6 张图（上传或作品库）和一句话，
+给朋友圈、抖音、小红书写 3 条配文，逐条校验数字、优惠承诺、极限词和门店占位符，至少 2 条合格才扣 1 烟火，否则退回。
+改写不收费（每批 5 次），定稿收进门店志，「学我口吻」按门店保存样本并总结口吻。任务 `COPY_GENERATE`、`COPY_REWRITE`、`COPY_VOICE_PROFILE` 走 `DEFAULT` 队列，迁移 V69。
+模型直接用平台的文本模型 `TEXT_WRITER`（`growth.ai.writer.*`，需能看图，例如 gpt-6-luna），不另配密钥；文本模型适配器新增可选的 `images`、`jsonObject` 参数，
+不传时请求不变。文本模型未配置时页面显示未开放。任务中心和烟火日志显示为「一方志文案」。
+
 任务中心和后台烟火日志统一显示模型名：图片为「一方志Image」，视频反推为「一方志反推」，
 视频方案为「一方志提示词」，视频生成显示对应的 Seedance 型号。视频方案每批记录三个方案及实际烟火结算。
 两处日志返回 `elapsedMillis`，从提交到完成或失败计算，包含排队；进行中返回当前已用时间。

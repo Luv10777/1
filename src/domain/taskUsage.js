@@ -2,7 +2,7 @@ import { videoModelLabel } from '../services/videoConversations.js'
 
 export const taskModules = {
   IMAGE_GENERATION: '图片生成', DIGITAL_HUMAN_VIDEO: '数字人视频生成',
-  VIDEO_GENERATION: '视频生成', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案',
+  VIDEO_GENERATION: '视频生成', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', COPY: '文案创作',
 }
 export const taskStatuses = {
   RUNNING: { label: '进行中', tone: 'info' }, SUCCEEDED: { label: '已完成', tone: 'success' },
@@ -13,7 +13,7 @@ export const taskStatuses = {
 }
 export const taskStatus = status => taskStatuses[status] || { label: status, tone: 'muted' }
 export const taskModel = (model, module) => ({
-  IMAGE_GENERATION: '一方志Image', VIDEO_ANALYSIS: '一方志反推', VIDEO_PLAN: '一方志提示词',
+  IMAGE_GENERATION: '一方志Image', VIDEO_ANALYSIS: '一方志反推', VIDEO_PLAN: '一方志提示词', COPY: '一方志文案',
 }[module]) || (model ? model.split(', ').map(name => {
   const alias = name.replace(/[-.]/g, '_').toUpperCase()
   const label = videoModelLabel(alias)
@@ -22,6 +22,7 @@ export const taskModel = (model, module) => ({
 export const taskWorkflow = task => task.module === 'IMAGE_GENERATION'
   ? ({ POSTER: '营销海报', PRODUCT_SET: '产品套图' }[task.workflow] || '图片创作')
   : task.module === 'VIDEO_PLAN' ? (task.workflow === 'REGENERATE' ? '换一批方案' : '生成 3 个方案')
+  : task.module === 'COPY' ? (task.workflow === 'REGENERATE' ? '换一批文案' : '写 3 条文案')
   : [task.resolution, task.durationSeconds ? `${task.durationSeconds} 秒` : ''].filter(Boolean).join(' · ')
 export function taskElapsed(task) {
   const preview = task.previewElapsedMillis != null

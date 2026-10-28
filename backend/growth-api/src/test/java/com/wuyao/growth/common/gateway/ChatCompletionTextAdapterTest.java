@@ -69,6 +69,22 @@ class ChatCompletionTextAdapterTest {
     }
 
     @Test
+    void imagesAndAJsonAnswerAreSentOnlyWhenTheCallerAsksForThem() throws Exception {
+        respond(200, "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"{}\"}}]}");
+
+        adapter(URL, "key", "writer-1").invoke(new ProviderRequest(ModelAlias.TEXT_WRITER, 1L, "给这张图配文案",
+                Map.of("images", List.of("data:image/jpeg;base64,AAAA"), "jsonObject", true), "copy-1"));
+
+        JsonNode body = json.readTree(body(sent()));
+        assertThat(body.at("/response_format/type").asText()).isEqualTo("json_object");
+        assertThat(body.at("/messages/0/content/0/text").asText()).isEqualTo("给这张图配文案");
+        assertThat(body.at("/messages/0/content/1/image_url/url").asText()).isEqualTo("data:image/jpeg;base64,AAAA");
+
+        assertThatThrownBy(() -> adapter(URL, "key", "writer-1").invoke(new ProviderRequest(ModelAlias.TEXT_WRITER, 1L, "x",
+                Map.of("images", List.of("https://elsewhere.test/a.jpg")), "copy-2"))).isInstanceOf(BizException.class);
+    }
+
+    @Test
     void providerSpecificSwitchesAreSentAsConfiguredButCannotReplaceTheRequestItself() throws Exception {
         respond(200, "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"家人们看过来\"}}]}");
 

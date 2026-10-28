@@ -113,6 +113,18 @@ public class TaskUsageStore {
                    CASE WHEN p.status IN ('SUCCEEDED','FAILED') THEN p.updated_at
                         WHEN t.status IN ('FAILED','CANCELLED') THEN t.finished_at END, NULL::timestamptz
             FROM video_plans p LEFT JOIN tasks t ON t.id=p.task_id AND t.tenant_id=p.tenant_id WHERE p.tenant_id=:tenant
+            UNION ALL
+            SELECT 'copy-'||b.id, b.id, 'COPY',
+                   CASE WHEN b.previous_batch_id IS NULL THEN 'INITIAL' ELSE 'REGENERATE' END,
+                   COALESCE(NULLIF(b.note,''),'文案创作'), '一方志文案', NULL::text,
+                   CASE WHEN b.status IN ('SUCCEEDED','FAILED') THEN b.status
+                        WHEN t.status IN ('FAILED','CANCELLED') THEN 'FAILED' ELSE 'RUNNING' END,
+                   b.created_at, 3, CASE WHEN b.status='SUCCEEDED' THEN jsonb_array_length(b.versions) ELSE 0 END,
+                   CASE WHEN b.status='FAILED' OR (b.status<>'SUCCEEDED' AND t.status IN ('FAILED','CANCELLED'))
+                       THEN 3 ELSE 0 END, 0, '条', b.billing_reservation_id, NULL, NULL::int, b.error_message,
+                   CASE WHEN b.status IN ('SUCCEEDED','FAILED') THEN b.updated_at
+                        WHEN t.status IN ('FAILED','CANCELLED') THEN t.finished_at END, NULL::timestamptz
+            FROM copy_batches b LEFT JOIN tasks t ON t.id=b.task_id AND t.tenant_id=b.tenant_id WHERE b.tenant_id=:tenant
         ), settled_logs AS (
             SELECT s.*, CASE WHEN s.reservation_id IS NULL THEN NULL ELSE COALESCE(b.charged,0) END AS charged,
                    COALESCE(b.held,0) AS held, COALESCE(b.released,0) AS released,

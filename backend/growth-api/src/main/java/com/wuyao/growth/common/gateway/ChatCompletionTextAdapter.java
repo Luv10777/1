@@ -37,6 +37,7 @@ import java.util.Set;
 public class ChatCompletionTextAdapter implements ProviderAdapter {
     /** 这些字段由适配器自己决定，附加参数不能改写。 */
     private static final Set<String> RESERVED = Set.of("model", "messages", "stream");
+    public static final int MAX_IMAGES = 6;
     private final ObjectMapper json;
     private final HttpClient http;
     private final String url;
@@ -123,8 +124,11 @@ public class ChatCompletionTextAdapter implements ProviderAdapter {
         if (options.get("system") instanceof String system && !system.isBlank()) {
             messages.add(Map.of("role", "system", "content", system));
         }
-        messages.add(Map.of("role", "user", "content", request.prompt() == null ? "" : request.prompt()));
+        String prompt = request.prompt() == null ? "" : request.prompt();
+        messages.add(Map.of("role", "user", "content", options.get("images") instanceof List<?> images && !images.isEmpty()
+                ? withImages(prompt, images) : prompt));
         Map<String, Object> body = new LinkedHashMap<>(extraBody);
+        if (Boolean.TRUE.equals(options.get("jsonObject"))) body.put("response_format", Map.of("type", "json_object"));
         // 判断类的调用宁可慢几秒也要想清楚；写口播的调用不带这个选项，照旧走快的路。
         boolean reasoning = Boolean.TRUE.equals(options.get("reasoning"));
         if (reasoning) body.putAll(reasoningBody);
@@ -164,6 +168,21 @@ public class ChatCompletionTextAdapter implements ProviderAdapter {
             // 响应体可能带有供应商的内部信息，不向外传递。
             throw failure("文本模型响应异常或超时，请稍后重试");
         }
+    }
+
+    /**
+     * 配置的模型能看图时（例如 gpt-6-luna），调用方可以在 options.images 里附上最多 6 张 JPEG data URL，
+     * 用户消息改成「文字 + 图片」的数组。不带图片的调用照旧是纯文本。
+     */
+    private static List<Map<String, Object>> withImages(String prompt, List<?> images) {
+        if (images.size() > MAX_IMAGES) throw failure("一次最多附 " + MAX_IMAGES + " 张图片");
+        List<Map<String, Object>> content = new ArrayList<>();
+        content.add(Map.of("type", "text", "text", prompt));
+        for (Object image : images) {
+            if (!(image instanceof String url) || !url.startsWith("data:image/jpeg;base64,")) throw failure("图片格式不合法");
+            content.add(Map.of("type", "image_url", "image_url", Map.of("url", url)));
+        }
+        return content;
     }
 
     private String reason(int status) {
