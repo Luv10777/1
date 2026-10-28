@@ -133,10 +133,13 @@ public class CopyAlmanacService {
         @SuppressWarnings("unchecked") List<String> good = ready ? almanac.getGood() : (List<String>) fallback.get("good");
         @SuppressWarnings("unchecked") List<String> avoid = ready ? almanac.getAvoid() : (List<String>) fallback.get("avoid");
         String status = almanac == null ? "UNAVAILABLE" : almanac.getStatus();
+        // 生成中先不给可点的宜，等生成完一起换；失败或模型没配置时兜底的宜也可以点去写。
+        @SuppressWarnings("unchecked") List<Map<String, Object>> topics = ready ? almanac.getTopics()
+                : "GENERATING".equals(status) ? List.of() : (List<Map<String, Object>>) fallback.get("topics");
         return new CopyDtos.Almanac(status, !ready, facts.date().toString(), facts.date().getDayOfMonth(), facts.month(),
-                facts.weekday(), facts.termLabel(), facts.todays(),
+                facts.weekday(), facts.term(), facts.termLabel(), facts.todays(),
                 CopyAlmanacPrompt.GENERAL.equals(industry) ? null : industry, industryStatus, brandId, good, avoid,
-                ready ? almanac.getQuote() : null, ready ? almanac.getTopics() : List.of(), ready ? almanac.getJournalHint() : null);
+                ready ? almanac.getQuote() : null, topics, ready ? almanac.getJournalHint() : null);
     }
 
     private String facts(LocalDate day) {
