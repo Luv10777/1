@@ -19,6 +19,8 @@ import ImageCreateView from './views/ImageCreateView.vue'
 import VideoCreateView from './views/VideoCreateView.vue'
 import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
 import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
+const CopyHomeView = () => import('./views/CopyHomeView.vue')
+const CopyCreateView = () => import('./views/CopyCreateView.vue')
 import DigitalHumanStudioView from './views/DigitalHumanStudioView.vue'
 import LiveStudioView from './views/LiveStudioView.vue'
 import PlayerView from './views/PlayerView.vue'
@@ -64,6 +66,8 @@ const routes = [
   { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: '经营总览' } },
   { path: '/creative', name: 'creative', component: CreativeWorkspaceView, meta: { title: '内容创作' } },
   { path: '/chat', name: 'chat', component: PlaceholderView, meta: { title: '模型对话', description: '让模型理解你的品牌语气，快速产出下一步行动建议。' } },
+  { path: '/copy', name: 'copy', component: CopyHomeView, meta: { guest: true, title: '文案创作', navGroup: 'content' } },
+  { path: '/copy/create', name: 'copy-create', component: CopyCreateView, meta: { guest: true, title: '写文案', navGroup: 'content' } },
   { path: '/copy/extract', name: 'copy-extract', redirect: '/image/create' },
   { path: '/copy/rewrite', name: 'copy-rewrite', redirect: '/image/create' },
   { path: '/video/analyze', name: 'video-analyze', component: VideoAnalyzeView, meta: { guest: true, title: '视频反推', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },

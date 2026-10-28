@@ -191,6 +191,14 @@ public class ImageCreationService {
    collectVersions(creation,versions);
    return versions.stream().max(Comparator.comparing(ImageCreation::getId)).orElse(creation);
  }
+ /** 供文案创作看图用：作品库里一张已完成的图片。不存在或还没完成时为空。 */
+ @Transactional(readOnly=true)
+ public Optional<WorkImage> workImage(Long itemId) {
+   return items.findById(itemId).filter(i->"SUCCEEDED".equals(i.getStatus())&&i.getOutputKey()!=null)
+     .map(i->new WorkImage(i.getId(),title(root(find(i.getCreationId()))),i.getOutputKey(),
+       storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30))));
+ }
+ public record WorkImage(Long id,String title,String storageKey,String url) {}
  @Transactional(readOnly=true)
  public PageResult<ImageDtos.Work> works(int page,int size,Long userId) {
    checkPage(page,size);

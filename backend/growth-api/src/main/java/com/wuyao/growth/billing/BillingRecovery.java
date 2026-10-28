@@ -21,6 +21,7 @@ public class BillingRecovery {
     private final VideoWorkflowService videos;
     private final VideoAnalysisService analyses;
     private final VideoPlanService plans;
+    private final com.wuyao.growth.copywriting.CopyService copies;
     private final BillingService billing;
     private final BillingCheckoutService checkout;
     private final com.wuyao.growth.commerce.CommerceCheckoutService commerce;
@@ -53,11 +54,13 @@ public class BillingRecovery {
             ids.addAll(videos.billingRecoveryTaskIds(reservations));
             ids.addAll(analyses.billingRecoveryTaskIds(reservations));
             ids.addAll(plans.billingRecoveryTaskIds(reservations));
+            ids.addAll(copies.billingRecoveryTaskIds(reservations));
             for(var event:tasks.terminalFailures(ids.stream().distinct().toList())) {
                 try {
                     if(event.type().startsWith("IMAGE_")) images.taskFailed(event);
                     else if(event.type().startsWith("VIDEO_ANALYSIS_")) analyses.taskFailed(event);
                     else if(event.type().startsWith("VIDEO_PLAN_")) plans.taskFailed(event);
+                    else if(event.type().equals(com.wuyao.growth.copywriting.CopyGenerateHandler.TYPE)) copies.taskFailed(event);
                     else if(event.type().startsWith("VIDEO_")) videos.taskFailed(event);
                 } catch(RuntimeException e) { log.warn("烟火释放等待重试: tenant={} task={}",tenant,event.taskId(),e); }
             }

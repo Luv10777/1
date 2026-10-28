@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BillingLedgerReport {
     static final Set<String> TYPES = Set.of("RESERVE", "CAPTURE", "RELEASE", "PURCHASE", "GRANT");
-    static final Set<String> CAPABILITIES = Set.of("IMAGE", "VIDEO", "VIDEO_ANALYSIS", "VIDEO_PLAN", "LIVE");
+    static final Set<String> CAPABILITIES = Set.of("IMAGE", "VIDEO", "VIDEO_ANALYSIS", "VIDEO_PLAN", "COPY", "LIVE");
     private static final int PER_TENANT_LIMIT = 2000;
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 
@@ -95,7 +95,7 @@ public class BillingLedgerReport {
                 SELECT l.id, l.actor_user_id, l.type, r.capability, l.description,
                        l.gift_delta + l.purchased_delta, l.held_delta, l.available_after, l.created_at,
                        COALESCE(u.model,CASE r.capability WHEN 'IMAGE' THEN '一方志Image'
-                           WHEN 'VIDEO_ANALYSIS' THEN '一方志反推' WHEN 'VIDEO_PLAN' THEN '一方志提示词' END),
+                           WHEN 'VIDEO_ANALYSIS' THEN '一方志反推' WHEN 'VIDEO_PLAN' THEN '一方志提示词' WHEN 'COPY' THEN '一方志文案' END),
                        u.elapsed_millis, u.status, u.preview_elapsed_millis
                 FROM billing_ledger l
                 LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id

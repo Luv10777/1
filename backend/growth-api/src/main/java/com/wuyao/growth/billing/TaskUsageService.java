@@ -20,7 +20,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class TaskUsageService {
     private final TaskUsageStore store;
-    private static final Set<String> MODULES=Set.of("IMAGE_GENERATION","VIDEO_GENERATION","DIGITAL_HUMAN_VIDEO","VIDEO_ANALYSIS","VIDEO_PLAN");
+    private static final Set<String> MODULES=Set.of("IMAGE_GENERATION","VIDEO_GENERATION","DIGITAL_HUMAN_VIDEO","VIDEO_ANALYSIS","VIDEO_PLAN","COPY");
     private static final Set<String> STATUSES=Set.of("RUNNING","SUCCEEDED","PARTIAL","FAILED","CANCELLED","NEEDS_INPUT","UPSTREAM_UNKNOWN");
 
     @Transactional(readOnly=true, isolation=Isolation.REPEATABLE_READ)
