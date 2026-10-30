@@ -386,6 +386,13 @@ async function submitReset() {
                   </div>
                   <p v-if="errors.code" id="code-error" class="access-field-error">{{ errors.code }}</p>
                 </div>
+                <!-- 邀请链接带来的邀请码只读展示，不能改；没有邀请码就不显示这一栏。 -->
+                <div v-if="isRegister && inviteCode" class="access-field">
+                  <label for="login-invite">邀请码</label>
+                  <div class="access-input-shell is-locked">
+                    <input id="login-invite" :value="inviteCode" name="invite" type="text" readonly disabled />
+                  </div>
+                </div>
               </div>
               <div v-else key="password" class="access-fields">
                 <div class="access-field">
@@ -424,7 +431,6 @@ async function submitReset() {
             <div><label for="login-agreed">我已阅读并同意</label><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册协议》</RouterLink><span>和</span><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</RouterLink></div>
           </div>
           <p v-if="errors.agreed" id="agreement-error" class="access-field-error" role="alert">{{ errors.agreed }}</p>
-          <p v-if="inviteCode" class="access-invite">通过邀请码 {{ inviteCode }} 注册。新账号会归属邀请人，邀请人能看到你打码后的手机号、注册时间和充值返利记录。</p>
         </div>
       </div>
       <footer class="access-footer"><ShieldCheck :size="14" aria-hidden="true" /><span>一方志 · 为每一方商家立传</span></footer>
