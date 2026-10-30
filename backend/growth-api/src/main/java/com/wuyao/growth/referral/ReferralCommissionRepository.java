@@ -12,6 +12,8 @@ public interface ReferralCommissionRepository extends JpaRepository<ReferralComm
 
     List<ReferralCommission> findTop100ByTenantIdAndReferrerUserIdOrderByCreatedAtDesc(Long tenantId, Long referrerUserId);
 
+    List<ReferralCommission> findTop2000ByTenantIdOrderByCreatedAtDesc(Long tenantId);
+
     @Query("select coalesce(sum(c.amountMinor), 0) from ReferralCommission c where c.tenantId = :tenantId "
             + "and c.referrerUserId = :userId and c.status = 'PENDING' and c.availableAt > :now")
     long sumFrozen(@Param("tenantId") Long tenantId, @Param("userId") Long userId, @Param("now") Instant now);
