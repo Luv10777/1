@@ -456,7 +456,7 @@ async function savePassword() {
             <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
             <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
           </label>
-          <p class="hint">姓名和身份证号在服务端加密保存，只有平台审核人员能查看完整资料，每次查看都会留下记录。目前由平台人工审核，还没有接入公安等第三方核验。</p>
+          <p class="hint">姓名和身份证号在服务端加密保存，只有平台审核人员能查看完整资料，每次查看都会留下记录。提交后经阿里云实人认证核验姓名与身份证号码是否一致，无法核验时转平台人工审核。</p>
           <div class="form-footer">
             <p v-if="identityFormError" class="form-notice" role="alert">{{ identityFormError }}</p>
             <div>
