@@ -71,6 +71,9 @@
 .access-submit:active:not(:disabled) { transform: translateY(1px); }
 .access-submit svg:last-child:not(.access-spinner) { position: absolute; right: 17px; }
 .access-field-error { margin: 6px 0 0; color: #c23939; font-size: 12px; }
+.access-field-ok { margin: 6px 0 0; color: #2f7d4f; font-size: 12px; }
+.access-field-hint { margin: 6px 0 0; color: var(--access-muted); font-size: 12px; }
+.access-optional { margin-left: 6px; color: var(--access-muted); font-size: 12px; font-weight: 400; }
 .access-message { padding: 10px 12px; margin: 18px 0 -8px; border-radius: 6px; font-size: 12px; }
 .access-message.is-error { background: #fff1f1; color: #b52c2c; }
 .access-message.is-success { background: #ecfdf5; color: #18754c; }

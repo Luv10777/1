@@ -56,7 +56,7 @@ const memberTier = computed(() => {
   if (!summary.memberActive) return { label: '免费版', paid: false, until: '' }
   return { label: summary.plan?.name || '会员', paid: true, until: summary.memberUntil ? new Date(summary.memberUntil).toLocaleDateString('zh-CN') : '' }
 })
-const needsStore = computed(() => auth.isAuthenticated && billing.summary?.memberActive !== false && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
+const needsStore = computed(() => auth.isAuthenticated && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
 // 侧边栏和顶栏使用当前账号资料；未设置头像时回退到名字首字。
 const userName = computed(() => auth.isAuthenticated ? auth.user?.name || '未命名用户' : '登录')
@@ -319,7 +319,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
       </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
-        <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>您还没有加入一方志</template></small><strong>{{ userName }}<RouterLink v-if="identityMissing()" class="identity-flag" :to="{ name: 'settings', hash: '#identity' }" @click="closeMenu">未实名</RouterLink></strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>未开通直播会员</template></small><strong>{{ userName }}<RouterLink v-if="identityMissing()" class="identity-flag" :to="{ name: 'settings', hash: '#identity' }" @click="closeMenu">未实名</RouterLink></strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span></RouterLink></div>
       </div>
     </aside>

@@ -116,11 +116,11 @@ class CommunityMembershipAccessTest {
     }
 
     @Test
-    void unrelatedBusinessWritesStillRequireMembership() throws Exception {
+    void businessWritesOutsideLiveStreamingDoNotRequireMembership() throws Exception {
+        // 直播接口要会员由 FoundationIntegrationTest 覆盖；这里只加载了社区和商城两个控制器。
         mvc.perform(post("/api/merchant-alliance/applications").header("Authorization", "Bearer nonmember-token")
                         .contentType("application/json").content("{}"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001));
-        verify(billing).requirePlatformMembership();
-        verifyNoInteractions(community);
+                .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.not(9001)));
+        verify(billing, never()).requirePlatformMembership();
     }
 }

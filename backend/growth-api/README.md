@@ -22,7 +22,8 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 2026-10-29 文案创作加「今日宜发」（迁移 V70 `copy_almanacs`，接口 `GET /api/copy/almanac/today?storeId=`）：每家门店每天一份黄历（宜的 3 条带平台和风格，就是「今天可以发」），首次打开时由任务 `COPY_ALMANAC` 生成，
 每天 00:10（`growth.copy.almanac-cron`）为最近 7 天活跃的门店预生成（`COPY_ALMANAC_PREPARE`）；节气和节日由新依赖 `cn.6tail:lunar` 计算，不扣烟火。
 2026-10-30 新增邀请返利第一期（`referral` 模块，迁移 V71，设计见 [邀请返利](../../docs/referral.md)）：实名核验通过后领邀请码，带码注册归属邀请人，
-被邀请商户充值烟火到账后由任务 `REFERRAL_COMMISSION` 按平台比例（默认 10%，后台可调）记现金返利，冻结 7 天后可提现；提现在第二期。
+被邀请商户充值烟火或开通会员付款后由任务 `REFERRAL_COMMISSION` 按平台比例（充值默认 10%、开通会员默认 20%，迁移 V72，后台可分别调）记现金返利，冻结 7 天后可提现；提现在第二期。
+同日起只有 AI 实景直播要求会员（`PlatformMembershipInterceptor` 只挂直播接口，`requireEntitlement` 只校验 `LIVE`），其他功能按烟火使用。
 
 任务中心和后台烟火日志统一显示模型名：图片为「一方志Image」，视频反推为「一方志反推」，
 视频方案为「一方志提示词」，视频生成显示对应的 Seedance 型号。视频方案每批记录三个方案及实际烟火结算。

@@ -46,7 +46,7 @@ test('billing uses real account responses and isolates late responses after acco
   }
 })
 
-test('creation rechecks membership, prompts nonmembers and rejects a stale active account after network failure', async () => {
+test('creation needs a login and a readable account but no membership, and a network failure is not reported as anything else', async () => {
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-billing-tests',
     server: { middlewareMode: true, hmr: false }, appType: 'custom', optimizeDeps: { noDiscovery: true } })
   const savedFetch = globalThis.fetch
@@ -54,13 +54,13 @@ test('creation rechecks membership, prompts nonmembers and rejects a stale activ
   const events = []
   globalThis.window = { dispatchEvent: event => events.push(event.type) }
   const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
-  const { billing, refreshBilling, requireMembership } = await vite.ssrLoadModule('/src/stores/billing.js')
+  const { billing, refreshBilling, requireAccount } = await vite.ssrLoadModule('/src/stores/billing.js')
   try {
     let guestRequests = 0
     globalThis.fetch = async () => { guestRequests++; throw new Error('guests must not request account data') }
     assert.equal(await refreshBilling(), null)
     assert.deepEqual(events, [], 'guest browsing must not prompt for login')
-    await assert.rejects(requireMembership(), /请先登录/)
+    await assert.rejects(requireAccount(), /请先登录/)
     assert.deepEqual(events, ['login-required'], 'creation asks a guest to log in')
     assert.equal(guestRequests, 0, 'a guest action must not request billing or submit a generation')
     events.length = 0
@@ -70,15 +70,15 @@ test('creation rechecks membership, prompts nonmembers and rejects a stale activ
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ code: 200, data: account }) })
     await refreshBilling()
     assert.deepEqual(events, [], 'loading the account must not prompt')
-    await assert.rejects(requireMembership(), e => e.code === 9001 && e.message === '您还未开通会员')
-    assert.deepEqual(events, ['membership-required'])
+    // 只有 AI 实景直播要会员；其他创作不看会员，也不弹开通会员。
+    assert.equal((await requireAccount()).memberActive, false)
+    assert.deepEqual(events, [])
     account = { memberActive: true }
-    assert.equal((await requireMembership()).memberActive, true)
-    assert.equal(events.length, 1)
+    assert.equal((await requireAccount()).memberActive, true)
     globalThis.fetch = async () => { throw new Error('connection lost') }
-    await assert.rejects(requireMembership(), /connection lost/)
+    await assert.rejects(requireAccount(), /connection lost/)
     assert.equal(billing.summary.memberActive, true)
-    assert.equal(events.length, 1, 'network failure must not be described as missing membership')
+    assert.deepEqual(events, [], 'network failure must not be described as missing membership')
   } finally {
     auth.state.user = null; auth.state.token = null
     globalThis.fetch = savedFetch

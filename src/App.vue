@@ -44,7 +44,7 @@ function openMembership() {
     <div class="membership-position">
       <DialogPanel class="membership-panel">
         <DialogTitle as="h2">您还未开通会员</DialogTitle>
-        <DialogDescription as="p">开通会员后即可使用创作功能。</DialogDescription>
+        <DialogDescription as="p">AI 实景直播需要开通会员。图片、视频、文案等其他功能不用开会员，充值烟火就能用。</DialogDescription>
         <div class="membership-actions">
           <button type="button" class="secondary-button" @click="membershipOpen = false">稍后再说</button>
           <button type="button" class="primary-button" @click="openMembership">去开通会员</button>

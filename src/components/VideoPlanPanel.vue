@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Film, RefreshCw, Sparkles } from 'lucide-vue-next'
 import YanhuoIcon from './YanhuoIcon.vue'
-import { billing, refreshBilling, requireMembership } from '../stores/billing'
+import { refreshBilling, requireAccount } from '../stores/billing'
 import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPlanRecordImages, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
 import { auth } from '../stores/auth'
@@ -42,7 +42,6 @@ let requestKey = ''
 let signature = ''
 let disposed = false
 
-const member = computed(() => billing.summary?.memberActive && billing.summary?.plan?.videoEnabled)
 const credits = computed(() => config.value?.credits ?? 1)
 const styleText = computed(() => (customOpen.value ? customStyle.value : style.value).trim())
 const unavailable = computed(() => config.value && !config.value.configured)
@@ -100,7 +99,7 @@ const settle = async plan => {
 const run = async (previousPlanId = null) => {
   if (working.value || unavailable.value) return
   error.value = ''
-  try { await requireMembership() }
+  try { await requireAccount() }
   catch (e) { error.value = e.message; return }
   if (!props.images.length && !idea.value.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的效果。'; return }
   working.value = true
@@ -254,6 +253,5 @@ const use = (plan, index) => {
     <p v-if="working" class="vp-status" role="status">正在看图出方案，通常 20 秒左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
     <p v-if="unavailable" class="vp-status" role="status">出方案暂未开放，可以直接在左侧写描述。</p>
     <p v-if="error" class="vp-status is-error" role="alert">{{ error }}</p>
-    <RouterLink v-if="billing.summary && !member" to="/billing" class="generation-billing-link vp-billing">{{ billing.summary.memberActive ? '当前套餐未开放视频创作' : '请先开通会员' }}</RouterLink>
   </section>
 </template>

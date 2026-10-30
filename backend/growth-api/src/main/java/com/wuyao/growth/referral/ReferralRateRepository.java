@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /** referral_rates 是平台级配置，不分商户。 */
 public interface ReferralRateRepository extends JpaRepository<ReferralRate, Long> {
-    Optional<ReferralRate> findTopByOrderByIdDesc();
+    Optional<ReferralRate> findTopByKindOrderByIdDesc(String kind);
 
     List<ReferralRate> findTop10ByOrderByIdDesc();
 }

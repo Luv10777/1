@@ -3,12 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { ShieldCheck } from 'lucide-vue-next'
 import { referralApi } from '../services/referralApi'
-import { commissionStates, inviteLink, ratePercent } from '../domain/referral'
+import { commissionKinds, commissionStates, inviteLink, ratePercent } from '../domain/referral'
 import { managementDate } from '../domain/platformManagement'
 import { yuan } from '../stores/billing'
 import { auth } from '../stores/auth'
 
-// 我的邀请：实名核验通过后领专属邀请码，新商户用邀请链接注册就归属到自己名下，对方每次充值烟火按比例记现金返利。
+// 我的邀请：实名核验通过后领专属邀请码，新商户用邀请链接注册就归属到自己名下，对方每次充值烟火或开通会员按比例记现金返利。
 const overview = ref(null)
 const loading = ref(true)
 const error = ref('')
@@ -68,7 +68,7 @@ onMounted(load)
   <div class="referral-page">
     <header class="referral-header">
       <h1>我的邀请</h1>
-      <p>新商户通过你的邀请链接注册一方志，就归属到你名下；对方每次充值烟火，你按比例获得现金返利。只计一级，成为推广人不收任何费用。</p>
+      <p>新商户通过你的邀请链接注册一方志，就归属到你名下；对方每次充值烟火或开通会员，你按比例获得现金返利。只计一级，成为推广人不收任何费用。</p>
     </header>
 
     <p v-if="loading" class="referral-muted" role="status">正在读取邀请数据…</p>
@@ -82,7 +82,7 @@ onMounted(load)
         <header class="referral-card-header">
           <div>
             <h2 id="referral-code-title">专属邀请码</h2>
-            <p>当前返利比例 {{ ratePercent(overview.rateBp) }}，按被邀请商户充值烟火的实付金额计算；会员订阅不计返利。</p>
+            <p>被邀请商户充值烟火返 {{ ratePercent(overview.topupRateBp) }}，开通会员返 {{ ratePercent(overview.membershipRateBp) }}，都按实付金额计算。</p>
           </div>
         </header>
 
@@ -94,7 +94,7 @@ onMounted(load)
         <div v-else-if="!overview.code" class="referral-gate">
           <ul class="referral-rules">
             <li>新商户用你的链接或邀请码首次注册即归属你，归属不再变更；已注册的账号不受影响。</li>
-            <li>被邀请商户每次充值烟火到账，按到账时的比例记一笔返利，冻结 {{ overview.freezeDays }} 天后转为可提现，冻结期内退款则作废。</li>
+            <li>被邀请商户每次充值烟火或开通会员付款，按付款时的比例记一笔返利，冻结 {{ overview.freezeDays }} 天后转为可提现，冻结期内退款则作废。</li>
             <li>提现功能即将开放，开放后用本人实名的银行卡提现，平台依法代扣个人所得税。</li>
           </ul>
           <label class="referral-consent">
@@ -138,14 +138,15 @@ onMounted(load)
 
       <section class="referral-card" aria-labelledby="referral-commissions-title">
         <header class="referral-card-header"><div><h2 id="referral-commissions-title">返利明细</h2><p>最近 100 笔，按到账时间倒序。</p></div></header>
-        <p v-if="!overview.commissions.length" class="referral-muted">还没有返利。被邀请商户充值烟火到账后会出现在这里。</p>
+        <p v-if="!overview.commissions.length" class="referral-muted">还没有返利。被邀请商户充值烟火或开通会员后会出现在这里。</p>
         <div v-else class="referral-table-wrap">
           <table class="referral-table">
-            <thead><tr><th>到账时间</th><th>被邀请商户</th><th>充值金额</th><th>比例</th><th>返利</th><th>状态</th></tr></thead>
+            <thead><tr><th>到账时间</th><th>被邀请商户</th><th>类型</th><th>实付金额</th><th>比例</th><th>返利</th><th>状态</th></tr></thead>
             <tbody>
               <tr v-for="item in overview.commissions" :key="item.id">
                 <td>{{ managementDate(item.createdAt) }}</td>
                 <td>{{ item.inviteePhoneMasked }}</td>
+                <td>{{ commissionKinds[item.kind] || '充值烟火' }}</td>
                 <td>{{ yuan(item.paidMinor) }}</td>
                 <td>{{ ratePercent(item.rateBp) }}</td>
                 <td><strong>{{ yuan(item.amountMinor) }}</strong></td>

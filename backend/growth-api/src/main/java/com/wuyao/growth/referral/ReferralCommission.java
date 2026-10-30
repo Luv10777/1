@@ -6,7 +6,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 
-/** 一笔充值给邀请人记一条返利。PENDING 在 availableAt 之前是冻结中，之后可提现。 */
+/** 一笔充值或会员订单给邀请人记一条返利。PENDING 在 availableAt 之前是冻结中，之后可提现。 */
 @Entity
 @Table(name = "referral_commissions")
 @Getter
@@ -17,6 +17,8 @@ public class ReferralCommission {
     @Column(name = "referrer_user_id", nullable = false) private Long referrerUserId;
     @Column(name = "invitee_tenant_id", nullable = false) private Long inviteeTenantId;
     @Column(name = "order_id", nullable = false, length = 36) private String orderId;
+    /** TOPUP 充值烟火 / MEMBERSHIP 开通会员。 */
+    @Column(name = "order_kind", nullable = false, length = 16) private String orderKind;
     @Column(name = "paid_minor", nullable = false) private long paidMinor;
     @Column(name = "rate_bp", nullable = false) private int rateBp;
     @Column(name = "amount_minor", nullable = false) private long amountMinor;

@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 import { auth } from './auth'
-import { get, post, membershipRequired } from '../utils/request'
+import { get, post } from '../utils/request'
 
 export const billing = reactive({
   summary: null,
@@ -45,11 +45,11 @@ export async function loadBillingPlans() {
   return data
 }
 
-export async function requireMembership() {
+/** 开始创作前确认已登录、账户读得到。只有 AI 实景直播要开会员（由直播页和后端把关），其他功能按烟火余额使用。 */
+export async function requireAccount() {
   if (!auth.requireLogin()) throw new Error('请先登录后开始创作')
   const account = await refreshBilling()
-  if (!account) throw new Error(billing.error || '暂时无法确认会员状态，请稍后重试')
-  if (!account.memberActive) throw membershipRequired()
+  if (!account) throw new Error(billing.error || '暂时无法读取账户，请稍后重试')
   return account
 }
 
