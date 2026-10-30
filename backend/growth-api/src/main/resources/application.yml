@@ -60,6 +60,11 @@ growth:
     operator-user-ids: ${PLATFORM_OPERATOR_USER_IDS:}
   identity:
     encryption-key: ${REAL_NAME_ENCRYPTION_KEY:}
+    verifier: ${IDENTITY_VERIFIER:manual}   # manual | aliyun
+    aliyun:
+      access-key-id: ${ALIYUN_IDV_ACCESS_KEY_ID:}
+      access-key-secret: ${ALIYUN_IDV_ACCESS_KEY_SECRET:}
+      endpoint: ${ALIYUN_IDV_ENDPOINT:cloudauth.cn-shanghai.aliyuncs.com}
   video-plan:
     base-url: ${VIDEO_PLAN_BASE_URL:https://api.onlyrouter.ai/v1}
     api-key: ${VIDEO_PLAN_API_KEY:}

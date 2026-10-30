@@ -205,7 +205,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
       </div>
       <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 条记录` }}</span><div><label><span class="sr-only">每页条数</span><AppSelect v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></AppSelect></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
-    <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '当前为平台人工审核；未接入第三方权威身份核验。查看完整资料及审核操作均留存记录。' : '记录直接来自平台数据库；信息审核、上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
+    <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '服务端启用身份二要素核验后，核验一致或不一致的申请直接出结果，待审核的是无法自动核验的申请。查看完整资料及审核操作均留存记录。' : '记录直接来自平台数据库；信息审核、上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
 
     <Dialog :open="Boolean(selected)" class="management-dialog" @close="closeDetail">
       <div class="mg-backdrop" aria-hidden="true" /><div class="mg-drawer-position">

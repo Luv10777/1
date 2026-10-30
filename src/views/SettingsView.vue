@@ -46,7 +46,7 @@ const codeOnly = computed(() => !profile.value?.passwordSet)
 const canUseCode = computed(() => Boolean(profile.value?.phone))
 const maskedPhone = computed(() => profile.value?.phone?.replace(/^(\d{3})\d{4}(\d{4})$/, '$1 **** $2') || '')
 
-// 实名：本人提交姓名和身份证号，平台人员在管理后台人工审核。资料在服务端加密保存，这里只拿到脱敏后的结果。
+// 实名：本人提交姓名和身份证号，服务端先向权威数据源核验是否一致，无法核验时转平台人工审核。资料在服务端加密保存，这里只拿到脱敏后的结果。
 const identity = ref(null)
 const identityLoading = ref(true)
 const identityError = ref('')
@@ -56,9 +56,9 @@ const identityFormError = ref('')
 const identityNotice = ref('')
 const identityForm = reactive({ legalName: '', idNumber: '', declarationAccepted: false })
 const identityStates = {
-  NONE: { label: '未实名', tone: '', text: '还没有提交实名资料。提交后由平台人工审核，结果会显示在这里。' },
+  NONE: { label: '未实名', tone: '', text: '还没有提交实名资料。提交后核验姓名与身份证号码是否一致，无法自动核验时由平台人工审核，结果会显示在这里。' },
   PENDING_REVIEW: { label: '审核中', tone: 'wait', text: '资料已提交，正在等待平台人工审核，请勿重复提交。' },
-  VERIFIED: { label: '已通过', tone: 'on', text: '你的实名资料已通过平台人工审核。' },
+  VERIFIED: { label: '已通过', tone: 'on', text: '你的实名资料已通过审核。' },
   REJECTED: { label: '未通过', tone: 'off', text: '审核没有通过。请根据下面的审核意见核对资料，再重新提交。' },
 }
 const identityState = computed(() => identityStates[identity.value?.status] || identityStates.NONE)
@@ -121,7 +121,10 @@ async function submitIdentity() {
     })
     clearIdentityForm()
     identityOpen.value = false
-    identityNotice.value = '实名资料已提交，平台会人工审核。审核进度可以随时在这里查看。'
+    identityNotice.value = {
+      VERIFIED: '实名认证已通过。',
+      REJECTED: '姓名与身份证号码不一致，请核对后重新提交。',
+    }[identity.value?.status] || '实名资料已提交，平台会人工审核。审核进度可以随时在这里查看。'
   } catch (error) {
     // 网络断开或服务端出错时，申请可能其实已经保存了；先刷新状态再决定要不要重交。
     identityFormError.value = error.status === 0 || error.status >= 500
