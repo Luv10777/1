@@ -24,7 +24,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(membership).addPathPatterns("/api/**")
                 .excludePathPatterns("/api/auth/**", "/api/billing/**", "/api/team/**",
-                        "/api/public/**", "/api/information-publications/**", "/api/platform/**", "/api/identity/**",
+                        "/api/public/**", "/api/information-publications/**", "/api/platform/**", "/api/identity/**", "/api/referral/**",
                         "/api/player/ws", "/api/player/test-audio.wav", "/api/player/audio/**",
                         // 已经领出的联盟券必须能在门店核销，不能因为供券商户会员过期而失效。
                         "/api/stores/*/alliance-redemptions/**",

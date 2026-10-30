@@ -9,6 +9,7 @@ const AllianceView = () => import('../src/views/PlatformAllianceView.vue')
 const PlansView = () => import('../src/views/PlatformPlansView.vue')
 const UsersView = () => import('../src/views/PlatformUsersView.vue')
 const CreditsView = () => import('../src/views/PlatformCreditsView.vue')
+const ReferralView = () => import('../src/views/PlatformReferralView.vue')
 
 export function adminDestination(raw) {
   if (typeof raw !== 'string') return '/information'
@@ -24,8 +25,9 @@ export function createAdminRouter(history = createWebHistory()) {
       { path: '/login', name: 'admin-login', component: LoginView, meta: { title: '管理员登录' } },
       { path: '/information', alias: '/admin/information', name: 'admin-information', component: ManagementView, meta: { title: '信息管理', admin: true } },
       { path: '/merchants', name: 'admin-merchants', component: ManagementView, meta: { title: '商家管理', admin: true } },
-      { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], name: 'admin-identities', component: ManagementView, meta: { title: '用户实名审核', admin: true } },
+      { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], name: 'admin-identities', component: ManagementView, meta: { title: '用户实名', admin: true } },
       { path: '/credits', name: 'admin-credits', component: CreditsView, meta: { title: '烟火日志', admin: true } },
+      { path: '/referral', name: 'admin-referral', component: ReferralView, meta: { title: '邀请返利', admin: true } },
       { path: '/users', name: 'admin-users', component: UsersView, meta: { title: '用户管理', admin: true } },
       { path: '/plans', name: 'admin-plans', component: PlansView, meta: { title: '会员套餐', admin: true } },
       { path: '/alliance', name: 'admin-alliance', component: AllianceView, meta: { title: '联盟券', admin: true } },

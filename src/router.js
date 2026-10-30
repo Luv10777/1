@@ -30,6 +30,7 @@ import MessagesView from './views/MessagesView.vue'
 import ServiceRulesView from './views/ServiceRulesView.vue'
 import TeamView from './views/TeamView.vue'
 const SettingsView = () => import('./views/SettingsView.vue')
+const ReferralView = () => import('./views/ReferralView.vue')
 import { inDesktop } from './utils/desktop'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
@@ -53,7 +54,7 @@ const routes = [
   { path: '/', redirect: '/image/create' },
   { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
   { path: '/policies', redirect: '/policies/terms' },
-  { path: '/policies/:policy(terms|privacy|merchant|aftersales|identity|publishing)', name: 'legal-policy', component: () => import('./views/LegalPoliciesView.vue'), meta: { public: true, title: '协议中心' } },
+  { path: '/policies/:policy(terms|privacy|merchant|aftersales|identity|publishing|referral)', name: 'legal-policy', component: () => import('./views/LegalPoliciesView.vue'), meta: { public: true, title: '协议中心' } },
   { path: '/consumer', name: 'consumer', component: ConsumerPreviewView, meta: { public: true, title: '消费者预览' } },
   { path: '/store/:storeId(\\d+)', name: 'public-storefront', component: PublicStorefrontView, meta: { public: true, title: '店铺商品' } },
   { path: '/order/:token', name: 'public-order', component: PublicOrderView, meta: { public: true, title: '订单查询' } },
@@ -116,6 +117,7 @@ const routes = [
   { path: '/notifications', name: 'notifications', component: NoticesView, meta: { title: '消息通知' } },
   { path: '/tasks', name: 'tasks', component: TaskCenterView, meta: { title: '任务中心', icon: '✓', description: '按时间查看创作任务、生成结果与实际烟火消耗。' } },
   { path: '/team', name: 'team', component: TeamView, meta: { title: '员工管理', icon: '⚇', description: '添加店员、分配门店，停用或移除账号。', ownerOnly: true } },
+  { path: '/referral', name: 'referral', component: ReferralView, meta: { title: '我的邀请', navGroup: 'account', description: '领取专属邀请码，查看邀请的商户和充值返利。' } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '设置', icon: '⌘', description: '查看和修改自己的账号资料、登录密码和实名认证。' } },
   { path: '/help', name: 'help', redirect: '/image/create' },
   { path: '/403', name: 'forbidden', component: ForbiddenView, meta: { title: '没有访问权限', public: true } },

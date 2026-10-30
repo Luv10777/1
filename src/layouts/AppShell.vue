@@ -170,6 +170,7 @@ const navGroups = [
       { name: 'billing', label: '套餐与权益', path: '/billing' },
       { name: 'tasks', label: '任务中心', path: '/tasks' },
       { name: 'team', label: '员工管理', path: '/team', ownerOnly: true },
+      { name: 'referral', label: '我的邀请', path: '/referral' },
       { name: 'settings', label: '设置', path: '/settings' },
     ],
   },

@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { authService } from '../services/auth'
 import { readTokens, readUser, writeTokens, writeUser, clearAll } from '../utils/tokenStore'
+import { clearInviteCode } from '../utils/inviteCode'
 
 const state = reactive({
   user: readUser(),
@@ -40,6 +41,7 @@ function persistSession(data) {
   }
   state.user = user
   writeUser(user)
+  clearInviteCode()
   return user
 }
 

@@ -22,7 +22,12 @@ public final class AuthDtos {
             String phone,
             @NotBlank(message = "验证码不能为空")
             @Pattern(regexp = "^\\d{6}$", message = "验证码必须是 6 位数字")
-            String code) {
+            String code,
+            @Pattern(regexp = "^[A-Za-z0-9]{0,16}$", message = "邀请码格式不正确") String inviteCode) {
+    }
+
+    /** 新手机号第一次登录时建好了用户和商户。inviteCode 是注册链接带来的邀请码，可能为空。 */
+    public record UserRegistered(Long tenantId, Long userId, String phone, String inviteCode) {
     }
 
     public record SendCodeResult(boolean developmentMode, long retryAfterSeconds, long expiresInSeconds) {
@@ -54,7 +59,8 @@ public final class AuthDtos {
             @NotBlank(message = "微信登录票据不能为空") @Size(max = 128) String ticket,
             @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确") String phone,
             @Pattern(regexp = "^\\d{6}$", message = "验证码必须是 6 位数字") String code,
-            @Size(min = 8, max = 64, message = "密码长度需为 8–64 位") String password) {
+            @Size(min = 8, max = 64, message = "密码长度需为 8–64 位") String password,
+            @Pattern(regexp = "^[A-Za-z0-9]{0,16}$", message = "邀请码格式不正确") String inviteCode) {
     }
 
     public record WechatSession(boolean requiresBinding, boolean passwordRequired,

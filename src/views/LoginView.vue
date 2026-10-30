@@ -6,10 +6,12 @@ import { ChevronDown, Eye, EyeOff, ShieldCheck, X, LoaderCircle, Sun, Moon } fro
 import { auth } from '../stores/auth'
 import { theme } from '../stores/theme'
 import { accountError, codeError, passwordError, phoneError, safeRedirect } from '../utils/authValidation.js'
+import { pendingInviteCode, rememberInviteCode } from '../utils/inviteCode'
 
 const router = useRouter()
 const route = useRoute()
 const isRegister = computed(() => route.query.mode === 'register')
+const inviteCode = ref(rememberInviteCode(route.query.invite) || pendingInviteCode())
 const activeTab = ref('sms')
 const form = reactive({ country: '+86', phone: '', code: '', account: '', password: '', agreed: false })
 const errors = reactive({ phone: '', code: '', account: '', password: '', agreed: '' })
@@ -422,6 +424,7 @@ async function submitReset() {
             <div><label for="login-agreed">我已阅读并同意</label><RouterLink to="/policies/terms" target="_blank" rel="noopener noreferrer">《用户注册协议》</RouterLink><span>和</span><RouterLink to="/policies/privacy" target="_blank" rel="noopener noreferrer">《隐私协议》</RouterLink></div>
           </div>
           <p v-if="errors.agreed" id="agreement-error" class="access-field-error" role="alert">{{ errors.agreed }}</p>
+          <p v-if="inviteCode" class="access-invite">通过邀请码 {{ inviteCode }} 注册。新账号会归属邀请人，邀请人能看到你打码后的手机号、注册时间和充值返利记录。</p>
         </div>
       </div>
       <footer class="access-footer"><ShieldCheck :size="14" aria-hidden="true" /><span>一方志 · 为每一方商家立传</span></footer>

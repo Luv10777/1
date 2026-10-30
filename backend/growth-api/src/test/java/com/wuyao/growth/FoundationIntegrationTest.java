@@ -3083,7 +3083,7 @@ class FoundationIntegrationTest {
     }
 
     private AuthDtos.TokenPair login(String phone, String code) {
-        return auth.login(phone, code, "127.0.0.1", "integration-test", null);
+        return auth.login(phone, code, "127.0.0.1", "integration-test", null, null);
     }
 
     private void seedCode(String phone, String code) {

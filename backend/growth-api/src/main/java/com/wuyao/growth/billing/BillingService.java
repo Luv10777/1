@@ -173,6 +173,7 @@ public class BillingService {
             "MEMBERSHIP".equals(o.getKind())?o.getCredits():0,"TOPUP".equals(o.getKind())?o.getCredits():0,0,o.getId(),null,
             operator!=null?operator:currentUserId());
         store.flush(); // receipt_reference uniqueness also prevents reusing one receipt across tenants.
+        if("TOPUP".equals(o.getKind())) events.publishEvent(new BillingDtos.TopupPaid(o.getTenantId(),o.getId(),o.getAmountMinor()));
         return view(o);
     }
     /** Paid or granted, a membership period starts the same way: renewals extend, gifts and alliance quota follow the plan. */
