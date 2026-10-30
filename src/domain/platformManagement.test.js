@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { identityValidation, managementDate } from './platformManagement.js'
+import { IDENTITY_PROMPT_SNOOZE_MS, identityValidation, managementDate, shouldPromptIdentity } from './platformManagement.js'
 
 const valid = { legalName: '测试用户', idNumber: '11010519491231002X', declarationAccepted: true }
 test('identity form rejects malformed dates, checksum errors and missing consent before submitting', () => {
@@ -16,4 +16,13 @@ test('missing management timestamps never render Invalid Date', () => {
   assert.equal(managementDate(null), '—')
   assert.equal(managementDate('invalid'), '—')
   assert.match(managementDate('2026-10-15T08:00:00Z'), /2026/)
+})
+test('the real-name prompt stays out of live, payment and settings pages and sleeps for a day after "later"', () => {
+  const now = Date.parse('2026-10-30T16:00:00Z')
+  assert.equal(shouldPromptIdentity({ missing: true, routeName: 'image-create', dismissedAt: null, now }), true)
+  assert.equal(shouldPromptIdentity({ missing: false, routeName: 'image-create', dismissedAt: null, now }), false)
+  for (const routeName of ['digital-human', 'billing', 'settings']) assert.equal(shouldPromptIdentity({ missing: true, routeName, dismissedAt: null, now }), false)
+  assert.equal(shouldPromptIdentity({ missing: true, routeName: 'image-create', dismissedAt: now - 60_000, now }), false)
+  assert.equal(shouldPromptIdentity({ missing: true, routeName: 'image-create', dismissedAt: now - IDENTITY_PROMPT_SNOOZE_MS, now }), true)
+  assert.equal(shouldPromptIdentity({ missing: true, routeName: 'image-create', dismissedAt: 'garbage', now }), true)
 })

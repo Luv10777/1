@@ -11,7 +11,6 @@ export const platformManagementApi = {
   identities: values => get('/api/platform/identities', params(values)),
   informationStatus: (item, values) => post(`${target(item, 'information')}/status`, values),
   merchantReview: (item, values) => post(`${target(item, 'merchants')}/review`, values),
-  identityReview: (item, values) => post(`${target(item, 'identities')}/review`, values),
   revealIdentity: (item, note) => post(`${target(item, 'identities')}/reveal`, { note }),
   revealMerchant: (item, note) => post(`${target(item, 'merchants')}/reveal`, { note }),
   users: values => get('/api/platform/users', params(values)),
@@ -24,7 +23,8 @@ export const platformManagementApi = {
   myIdentity: () => get('/api/identity/me'),
   submitIdentity: async values => {
     const result = await post('/api/identity/applications', values)
-    if (!result?.id || result.status !== 'PENDING_REVIEW') throw new Error('未收到有效申请回执，请稍后刷新确认提交结果。')
+    // 服务端当场核验，只会返回通过或不一致。
+    if (!result?.id || !['VERIFIED', 'REJECTED'].includes(result.status)) throw new Error('未收到有效申请回执，请稍后刷新确认提交结果。')
     return result
   },
 }

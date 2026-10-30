@@ -7,6 +7,8 @@ import SiteFooter from '../components/SiteFooter.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import StoreFormModal from '../components/StoreFormModal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import IdentityPrompt from '../components/IdentityPrompt.vue'
+import { identityMissing } from '../stores/identity'
 import { auth } from '../stores/auth'
 import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight } from 'lucide-vue-next'
 import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
@@ -316,10 +318,11 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
       </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
-        <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>您还没有加入一方志</template></small><strong>{{ userName }}</strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
+        <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>您还没有加入一方志</template></small><strong>{{ userName }}<RouterLink v-if="identityMissing()" class="identity-flag" :to="{ name: 'settings', hash: '#identity' }" @click="closeMenu">未实名</RouterLink></strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
         <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span></RouterLink></div>
       </div>
     </aside>
+    <IdentityPrompt v-if="auth.isAuthenticated" />
     <ConfirmDialog :open="logoutConfirm" title="退出登录" message="确定要退出当前账号吗？" confirm-text="退出登录" danger @confirm="logout" @cancel="logoutConfirm = false" />
     <main class="main-area paper-main">
       <header class="topbar paper-topbar">
@@ -386,6 +389,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
 .paper-sidebar-footer .account-button { padding: 6px; border-radius: 6px; }
 .paper-sidebar-footer .account-copy { gap: 1px; }
 .account-logout { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.identity-flag { margin-left: 6px; padding: 0 5px; border-radius: 3px; background: color-mix(in srgb, var(--color-error) 8%, transparent); color: var(--color-error); font-size: 11px; font-weight: 500; }
 .account-logout:hover, .account-logout:focus-visible { background: var(--color-bg-subtle); color: var(--color-error); }
 .topbar-entry { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--night-panel); color: var(--ink); font-size: 12px; white-space: nowrap; }
 .topbar-entry:hover, .topbar-entry.is-current { border-color: var(--color-accent); color: var(--color-accent-text); }

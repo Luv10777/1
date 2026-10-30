@@ -11,7 +11,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-/** 阿里云实人认证「身份二要素核验」。只有明确的一致或不一致才算结论，其余一律转人工审核；不记录姓名、号码或供应商原始报文。 */
+/** 阿里云实人认证「身份二要素核验」。只有明确的一致或不一致才算结论，其余一律算暂时无法核验；不记录姓名、号码或供应商原始报文。 */
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "growth.identity.verifier", havingValue = "aliyun")
@@ -36,7 +36,7 @@ public class AliyunIdentityVerifier implements IdentityVerifier {
     @Override
     public Result verify(String legalName, String idNumber) {
         if (client == null) {
-            log.warn("实名核验已选择阿里云，但 AccessKey 未配置，转人工审核");
+            log.warn("实名核验已选择阿里云，但 AccessKey 未配置");
             return Result.unavailable();
         }
         try {

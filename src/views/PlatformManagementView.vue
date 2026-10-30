@@ -14,7 +14,7 @@ const router = useRouter()
 const section = computed(() => route.name === 'admin-identities' ? 'identities' : route.name === 'admin-merchants' || route.query.section === 'merchants' ? 'merchants' : 'information')
 const isIdentity = computed(() => section.value === 'identities')
 const title = computed(() => isIdentity.value ? '用户实名' : section.value === 'merchants' ? '商家管理' : '信息管理')
-const subtitle = computed(() => isIdentity.value ? '核查实名申请，让每一次审核都有依据。' : section.value === 'merchants' ? '维护经营主体档案，审核入驻申请与经营状态。' : '审核商家提交的信息，通过后公开展示，处理信息上下线。')
+const subtitle = computed(() => isIdentity.value ? '实名由阿里云当场核验，这里查看核验记录。' : section.value === 'merchants' ? '维护经营主体档案，审核入驻申请与经营状态。' : '审核商家提交的信息，通过后公开展示，处理信息上下线。')
 const statusOptions = computed(() => section.value === 'information' ? ['PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'OFFLINE', 'EXPIRED'] : section.value === 'merchants' ? ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'SUSPENDED'] : ['PENDING_REVIEW', 'VERIFIED', 'REJECTED'])
 const records = ref([])
 const total = ref(null)
@@ -43,7 +43,6 @@ let revealTimer
 const targetType = computed(() => ({ information: 'INFORMATION', merchants: 'MERCHANT', identities: 'IDENTITY' })[section.value])
 const selectionTitle = computed(() => selected.value?.title || selected.value?.merchantName || selected.value?.userName || '实名申请')
 const stats = computed(() => isIdentity.value ? [
-  { label: '待审核实名', value: summary.value?.pendingIdentity, helper: '需要平台人工核查', icon: ShieldCheck },
   { label: '已入驻商家', value: summary.value?.approvedMerchants, helper: '入驻审核通过的商家', icon: Store },
   { label: '待审入驻', value: summary.value?.pendingMerchants, helper: '等待审核的经营主体', icon: ClipboardList },
 ] : section.value === 'information' ? [
@@ -54,7 +53,6 @@ const stats = computed(() => isIdentity.value ? [
   { label: '在线信息', value: summary.value?.publishedInformation, helper: '已发布且在有效期内', icon: FileText },
   { label: '已入驻商家', value: summary.value?.approvedMerchants, helper: '入驻审核通过的商家', icon: Store },
   { label: '待审入驻', value: summary.value?.pendingMerchants, helper: '等待审核的经营主体', icon: ClipboardList },
-  { label: '待审核实名', value: summary.value?.pendingIdentity, helper: '等待人工核查的申请', icon: ShieldCheck },
 ])
 
 async function load() {
@@ -137,7 +135,7 @@ async function review(nextStatus) {
   if (note.value.trim().length < 5) { actionError.value = '请填写至少5字的处理依据或驳回原因。'; return }
   const item = selected.value
   const attempt = detailVersion
-  const method = { information: 'informationStatus', merchants: 'merchantReview', identities: 'identityReview' }[section.value]
+  const method = { information: 'informationStatus', merchants: 'merchantReview' }[section.value]
   busy.value = true
   actionError.value = ''
   try {
@@ -205,7 +203,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
       </div>
       <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 条记录` }}</span><div><label><span class="sr-only">每页条数</span><AppSelect v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></AppSelect></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
-    <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '服务端启用身份二要素核验后，核验一致或不一致的申请直接出结果，待审核的是无法自动核验的申请。查看完整资料及审核操作均留存记录。' : '记录直接来自平台数据库；信息审核、上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
+    <p class="management-footnote"><LockKeyhole :size="13" />{{ isIdentity ? '实名由阿里云当场核验姓名与身份证号码，平台不做人工审核。查看完整资料留存记录。' : '记录直接来自平台数据库；信息审核、上下线、入驻审核与暂停操作均留存处理依据。' }}</p>
 
     <Dialog :open="Boolean(selected)" class="management-dialog" @close="closeDetail">
       <div class="mg-backdrop" aria-hidden="true" /><div class="mg-drawer-position">
@@ -214,15 +212,15 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
           <template v-if="selected">
             <DialogDescription class="mg-detail-description"><span class="mg-status" :class="`mg-${selected.status.toLowerCase()}`"><i />{{ managementStatuses[selected.status] }}</span><span>{{ selected.tenantName }} · 商户 #{{ selected.tenantId }}</span></DialogDescription>
             <div class="mg-drawer-body">
-              <section v-if="isIdentity" class="mg-detail-section"><h3><ShieldCheck :size="17" />身份资料</h3><div class="mg-privacy-note"><LockKeyhole :size="15" /><p>完整资料仅用于本次核查。填写查阅用途后可查看，60秒后自动遮蔽。请勿将证件号码写入审核备注。</p></div><dl class="mg-detail-grid"><div><dt>姓名</dt><dd>{{ revealed?.legalName || selected.legalNameMasked }}</dd></div><div><dt>居民身份证号码</dt><dd class="mg-mono">{{ revealed?.idNumber || selected.idNumberMasked }}</dd></div><div><dt>账号</dt><dd>{{ selected.userName }} · #{{ selected.userId }}</dd></div><div><dt>绑定手机</dt><dd>{{ selected.phoneMasked }}</dd></div><div><dt>申请时间</dt><dd>{{ managementDate(selected.submittedAt) }}</dd></div><div><dt>审核时间</dt><dd>{{ managementDate(selected.reviewedAt) }}</dd></div></dl><button v-if="!revealed" class="mg-button" type="button" :disabled="busy" @click="reveal"><Eye :size="15" />按填写用途查看完整资料</button><button v-else class="mg-button" type="button" @click="revealed = null"><LockKeyhole :size="15" />立即遮蔽资料</button></section>
+              <section v-if="isIdentity" class="mg-detail-section"><h3><ShieldCheck :size="17" />身份资料</h3><div class="mg-privacy-note"><LockKeyhole :size="15" /><p>完整资料仅用于本次核查。填写查阅用途后可查看，60秒后自动遮蔽。请勿将证件号码写入审核备注。</p></div><dl class="mg-detail-grid"><div><dt>姓名</dt><dd>{{ revealed?.legalName || selected.legalNameMasked }}</dd></div><div><dt>居民身份证号码</dt><dd class="mg-mono">{{ revealed?.idNumber || selected.idNumberMasked }}</dd></div><div><dt>账号</dt><dd>{{ selected.userName }} · #{{ selected.userId }}</dd></div><div><dt>绑定手机</dt><dd>{{ selected.phoneMasked }}</dd></div><div><dt>申请时间</dt><dd>{{ managementDate(selected.submittedAt) }}</dd></div><div><dt>核验时间</dt><dd>{{ managementDate(selected.reviewedAt) }}</dd></div></dl><button v-if="!revealed" class="mg-button" type="button" :disabled="busy" @click="reveal"><Eye :size="15" />按填写用途查看完整资料</button><button v-else class="mg-button" type="button" @click="revealed = null"><LockKeyhole :size="15" />立即遮蔽资料</button></section>
               <section v-else-if="section === 'merchants'" class="mg-detail-section"><h3><Store :size="17" />经营主体</h3><div class="mg-privacy-note"><LockKeyhole :size="15" /><p>信用代码与联系手机默认脱敏。填写查阅用途后可核对完整资料，60秒后自动遮蔽，查阅将留存记录。</p></div><dl class="mg-detail-grid"><div class="full"><dt>企业 / 个体工商户名称</dt><dd>{{ selected.companyName }}</dd></div><div><dt>统一社会信用代码</dt><dd class="mg-mono">{{ revealed?.creditCode || selected.creditCodeMasked }}</dd></div><div><dt>经营行业</dt><dd>{{ selected.industry }}</dd></div><div><dt>所在地区</dt><dd>{{ selected.region }}</dd></div><div><dt>联系人</dt><dd>{{ selected.contactName }} · {{ revealed?.contactPhone || selected.contactPhoneMasked }}</dd></div><div class="full"><dt>商家介绍</dt><dd class="mg-content">{{ selected.introduction }}</dd></div></dl><button v-if="!revealed" class="mg-button" type="button" :disabled="busy" @click="reveal"><Eye :size="15" />按填写用途查看完整资料</button><button v-else class="mg-button" type="button" @click="revealed = null"><LockKeyhole :size="15" />立即遮蔽资料</button></section>
               <section v-else class="mg-detail-section"><h3><FileText :size="17" />发布内容</h3><dl class="mg-detail-grid"><div><dt>内容分类</dt><dd>{{ informationCategories[selected.category] }}</dd></div><div><dt>发布商家</dt><dd>{{ selected.merchantName }}</dd></div><div><dt>地区</dt><dd>{{ selected.region }}</dd></div><div><dt>有效期至</dt><dd>{{ selected.validUntil || '长期有效' }}</dd></div></dl><p v-if="selected.summary" class="mg-summary-text">{{ selected.summary }}</p><p class="mg-content">{{ selected.content }}</p></section>
-              <section v-if="selected.reviewNote" class="mg-detail-section"><h3>上次审核意见</h3><p class="mg-content">{{ selected.reviewNote }}</p></section>
-              <section class="mg-detail-section"><h3><ClipboardList :size="17" />处理与查阅依据</h3><label class="mg-note-label" for="management-review-note">{{ isIdentity ? '查阅用途 / 审核意见' : '处理依据' }}<span>必填 · 至少5字</span></label><textarea id="management-review-note" v-model="note" class="mg-note" rows="3" maxlength="500" :disabled="busy" :placeholder="isIdentity ? '填写查阅用途或线下核验依据；驳回时说明需要补充的资料。请勿填写完整证件号。' : '说明审核依据、调整原因，或需要商家补充的资料。'" /><span class="mg-note-count">{{ note.length }}/500</span><p v-if="actionError" class="mg-inline-error" role="alert">{{ actionError }}</p></section>
+              <section v-if="selected.reviewNote" class="mg-detail-section"><h3>{{ isIdentity ? '核验结果' : '上次审核意见' }}</h3><p class="mg-content">{{ selected.reviewNote }}</p></section>
+              <section class="mg-detail-section"><h3><ClipboardList :size="17" />处理与查阅依据</h3><label class="mg-note-label" for="management-review-note">{{ isIdentity ? '查阅用途' : '处理依据' }}<span>必填 · 至少5字</span></label><textarea id="management-review-note" v-model="note" class="mg-note" rows="3" maxlength="500" :disabled="busy" :placeholder="isIdentity ? '填写查阅用途。请勿填写完整证件号。' : '说明审核依据、调整原因，或需要商家补充的资料。'" /><span class="mg-note-count">{{ note.length }}/500</span><p v-if="actionError" class="mg-inline-error" role="alert">{{ actionError }}</p></section>
               <section class="mg-detail-section"><h3>最近处理记录</h3><p v-if="trailLoading" class="mg-muted" role="status">正在读取操作记录…</p><p v-else-if="trailError" class="mg-inline-error" role="alert">{{ trailError }}</p><p v-else-if="!trail.length" class="mg-muted">暂无平台处理记录。</p><ol v-else class="mg-audit"><li v-for="event in trail" :key="event.id"><span class="mg-audit-dot" /><div><strong>{{ auditActions[event.action] || event.action }}<small>运营人员 #{{ event.actorUserId }}</small></strong><p>{{ event.note }}</p><time>{{ managementDate(event.createdAt) }}</time></div></li></ol></section>
             </div>
             <footer class="mg-drawer-actions">
-              <span v-if="(isIdentity || section === 'information') && selected.status === 'PENDING_REVIEW'">平台人工审核</span>
+              <span v-if="section === 'information' && selected.status === 'PENDING_REVIEW'">平台人工审核</span>
               <button class="mg-button" type="button" :disabled="busy" @click="closeDetail">关闭</button>
               <template v-if="section === 'information'">
                 <button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('REJECTED')">驳回信息</button>
@@ -234,10 +232,6 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
                 <button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('REJECTED')">驳回申请</button>
                 <button v-if="selected.status === 'APPROVED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('SUSPENDED')">暂停入驻</button>
                 <button v-if="['PENDING_REVIEW', 'SUSPENDED'].includes(selected.status)" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('APPROVED')">{{ busy ? '正在保存…' : selected.status === 'SUSPENDED' ? '恢复入驻' : '通过入驻' }}</button>
-              </template>
-              <template v-else-if="selected.status === 'PENDING_REVIEW'">
-                <button class="mg-button mg-danger" type="button" :disabled="busy || selected.userId === auth.user?.id" @click="review('REJECTED')">驳回申请</button>
-                <button class="mg-button mg-primary" type="button" :disabled="busy || selected.userId === auth.user?.id" @click="review('VERIFIED')"><Check :size="15" />{{ busy ? '正在保存…' : '人工审核通过' }}</button>
               </template>
             </footer>
           </template>

@@ -81,12 +81,6 @@ public class PlatformManagementController {
         return ApiResponse.ok(service.revealIdentity(me, tenantId, id, input.note()));
     }
 
-    @PostMapping("/tenants/{tenantId}/identities/{id}/review")
-    public ApiResponse<Void> identityReview(@AuthenticationPrincipal AuthPrincipal me, @PathVariable Long tenantId,
-            @PathVariable Long id, @Valid @RequestBody RealNameDtos.ReviewRequest input) {
-        service.reviewIdentity(me, tenantId, id, input); return ApiResponse.ok();
-    }
-
     @GetMapping("/tenants/{tenantId}/audit/{type}/{id}")
     public ApiResponse<List<PlatformManagementAudit>> audit(@AuthenticationPrincipal AuthPrincipal me, @PathVariable Long tenantId,
             @PathVariable String type, @PathVariable Long id) {

@@ -179,26 +179,6 @@ public class PlatformManagementService {
         });
     }
 
-    public void reviewIdentity(AuthPrincipal me, Long tenantId, Long id, RealNameDtos.ReviewRequest request) {
-        requireOperator(me);
-        requireNote(request.note());
-        inScope(tenantId, false, () -> {
-            Long userId = identities.userIdForReview(id, tenantId).orElseThrow(() -> missing("实名申请"));
-            directory.lockAccount(userId);
-            // Re-read after the account lock to serialize against submission and other reviewers.
-            var value = identities.findByIdAndTenantId(id, tenantId).orElseThrow(() -> missing("实名申请"));
-            if (me.userId().equals(value.getUserId())) throw BizException.of(ErrorCode.FORBIDDEN, "不能审核本人的实名申请");
-            if (!"PENDING_REVIEW".equals(value.getStatus())) throw BizException.of(ErrorCode.CONFLICT, "该申请已审核，请刷新列表");
-            value.setStatus(request.status());
-            value.setReviewNote(request.note().trim());
-            value.setReviewedBy(me.userId());
-            value.setReviewedAt(Instant.now());
-            value.setUpdatedAt(Instant.now());
-            audit(me.userId(), "IDENTITY", id, request.status(), request.note());
-            return null;
-        });
-    }
-
     public List<PlatformManagementAudit> auditTrail(AuthPrincipal me, Long tenantId, String type, Long id) {
         requireOperator(me);
         if (!Set.of("INFORMATION", "MERCHANT", "IDENTITY", "USER").contains(type)) throw BizException.of(ErrorCode.BAD_REQUEST, "记录类型无效");

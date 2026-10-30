@@ -47,35 +47,31 @@ public class RealNameService {
             throw BizException.of(ErrorCode.CONFLICT, "已有审核中或审核通过的实名申请，请勿重复提交");
         }
         String name = request.legalName().trim();
+        // 每次核验都计费，也能被用来试探别人的号码，滚动 24 小时内不一致满 3 次就停到第二天。
+        if (audits.countByTenantIdAndActorUserIdAndTargetTypeAndActionAndCreatedAtAfter(TenantContext.require(), userId,
+                "IDENTITY", "AUTO_REJECTED", Instant.now().minus(Duration.ofDays(1))) >= MAX_DAILY_AUTO_REJECTIONS) {
+            throw BizException.of(ErrorCode.RATE_LIMITED, "今天核验不一致的次数已用完，请明天再试");
+        }
+        var result = verifier.verify(name, number);
+        // 实名不做人工审核：拿不到明确结论就什么都不保存，请用户稍后再试。
+        if (result.outcome() == IdentityVerifier.Outcome.UNAVAILABLE) {
+            throw BizException.of(ErrorCode.IDENTITY_VERIFICATION_UNAVAILABLE, "实名核验暂时不可用，请稍后再试");
+        }
+        boolean match = result.outcome() == IdentityVerifier.Outcome.MATCH;
         application.setLegalNameCiphertext(crypto.encrypt(name, application.getTenantId(), userId, "name"));
         application.setIdNumberCiphertext(crypto.encrypt(number, application.getTenantId(), userId, "number"));
         application.setLegalNameMasked(name.substring(0, 1) + "*".repeat(Math.max(1, name.length() - 1)));
         application.setIdNumberMasked(number.substring(0, 3) + "***********" + number.substring(14));
-        // 每次核验都计费，也能被用来试探别人的号码，滚动 24 小时内不一致次数用完就只走人工审核。
-        var result = audits.countByTenantIdAndActorUserIdAndTargetTypeAndActionAndCreatedAtAfter(TenantContext.require(), userId,
-                "IDENTITY", "AUTO_REJECTED", Instant.now().minus(Duration.ofDays(1))) < MAX_DAILY_AUTO_REJECTIONS
-                ? verifier.verify(name, number) : IdentityVerifier.Result.unavailable();
-        application.setStatus(switch (result.outcome()) {
-            case MATCH -> "VERIFIED";
-            case MISMATCH -> "REJECTED";
-            case UNAVAILABLE -> "PENDING_REVIEW";
-        });
-        application.setReviewNote(switch (result.outcome()) {
-            case MATCH -> "姓名与身份证号码经权威数据源核验一致";
-            case MISMATCH -> "姓名与身份证号码经权威数据源核验不一致，请核对后重新提交";
-            case UNAVAILABLE -> null;
-        });
+        application.setStatus(match ? "VERIFIED" : "REJECTED");
+        application.setReviewNote(match ? "姓名与身份证号码经权威数据源核验一致" : "姓名与身份证号码经权威数据源核验不一致，请核对后重新提交");
         application.setReviewedBy(null);
-        application.setReviewedAt(result.outcome() == IdentityVerifier.Outcome.UNAVAILABLE ? null : Instant.now());
+        application.setReviewedAt(Instant.now());
         application.setSubmittedAt(Instant.now());
         application.setUpdatedAt(Instant.now());
         var saved = applications.saveAndFlush(application);
-        audit(saved, userId, "SUBMITTED", "本人提交实名资料并确认真实性与审核用途");
-        if (result.outcome() != IdentityVerifier.Outcome.UNAVAILABLE) {
-            audit(saved, userId, result.outcome() == IdentityVerifier.Outcome.MATCH ? "AUTO_VERIFIED" : "AUTO_REJECTED",
-                    "身份二要素自动核验" + (result.outcome() == IdentityVerifier.Outcome.MATCH ? "一致" : "不一致")
-                            + "，核验请求号 " + result.requestId());
-        }
+        audit(saved, userId, "SUBMITTED", "本人提交实名资料并确认真实性与核验用途");
+        audit(saved, userId, match ? "AUTO_VERIFIED" : "AUTO_REJECTED",
+                "身份二要素自动核验" + (match ? "一致" : "不一致") + "，核验请求号 " + result.requestId());
         return view(saved);
     }
 
