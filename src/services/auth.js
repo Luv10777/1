@@ -7,6 +7,7 @@
  */
 
 import { get, post } from '../utils/request'
+import { pendingInviteCode } from '../utils/inviteCode'
 
 export const authService = {
   sendCode(phone) {
@@ -14,7 +15,7 @@ export const authService = {
   },
 
   login(phone, code) {
-    return post('/api/auth/login', { phone, code })
+    return post('/api/auth/login', { phone, code, inviteCode: pendingInviteCode() || undefined })
   },
 
   loginWithPassword(account, password) {
@@ -30,7 +31,7 @@ export const authService = {
   },
 
   completeWechat(payload) {
-    return post('/api/auth/wechat/complete', payload)
+    return post('/api/auth/wechat/complete', { ...payload, inviteCode: pendingInviteCode() || undefined })
   },
 
   refreshToken(refreshToken) {

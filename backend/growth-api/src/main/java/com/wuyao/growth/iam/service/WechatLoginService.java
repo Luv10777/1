@@ -174,7 +174,7 @@ public class WechatLoginService {
                     throw BizException.of(ErrorCode.WECHAT_PASSWORD_REQUIRED, "请设置 8–64 位密码，UTF-8 编码不超过 72 字节");
                 }
                 consumeTicket(request.ticket());
-                if (user == null) user = authService.registerNewUser(phone);
+                if (user == null) user = authService.registerNewUser(phone, request.inviteCode());
                 if (!StringUtils.hasText(user.getPasswordHash())) {
                     user.setPasswordHash(PasswordLoginVerifier.hashPassword(request.password()));
                 }

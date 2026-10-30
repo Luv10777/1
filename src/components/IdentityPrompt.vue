@@ -104,7 +104,7 @@ async function submit() {
         </template>
         <form v-else autocomplete="off" @submit.prevent="submit">
           <DialogTitle as="h2">完成实名认证</DialogTitle>
-          <DialogDescription as="p">推广返利即将上线，参与推广和提现需要先完成实名。这里只核验姓名与身份证号码是否一致，资料加密保存。</DialogDescription>
+          <DialogDescription as="p">完成实名后可以在「我的邀请」领取专属邀请码，参与推广返利。这里只核验姓名与身份证号码是否一致，资料加密保存。</DialogDescription>
           <label class="identity-field">
             <span>真实姓名</span>
             <input v-model="form.legalName" name="legal-name" autocomplete="off" maxlength="40" placeholder="与身份证上的姓名一致" :disabled="submitting" />

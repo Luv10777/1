@@ -39,6 +39,8 @@ public final class BillingDtos {
     /** 会员订单入账、会员期确定后发出，与入账同一事务。联盟券模块据此发放本期额度。 */
     public record MembershipActivated(Long tenantId, String billingOrderId, PlanSnapshot plan,
                                       Instant periodStart, Instant periodEnd) {}
+    /** 充值订单入账后发出，与入账同一事务。邀请返利模块据此给邀请人记返利。 */
+    public record TopupPaid(Long tenantId, String billingOrderId, long amountMinor) {}
     /** replacePublished：上架时把同一标识正在上架的版本一起下架，商户那边不断档。 */
     public record Publication(boolean published, boolean replacePublished) {
         public Publication(boolean published) { this(published, false); }

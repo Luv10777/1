@@ -8,7 +8,7 @@ test('each published policy is substantive, dated, navigable, and cites official
   assert.equal(LEGAL_ENTITY.creditCode, '91330483MAKMYJHC7U')
   assert.equal(LEGAL_ENTITY.address, '浙江省嘉兴市桐乡市濮院镇园区大道799号7楼704')
   assert.equal(LEGAL_ENTITY.phone, '15157376602')
-  assert.deepEqual(LEGAL_POLICY_NAVIGATION.map(({ slug }) => slug), ['terms', 'privacy', 'merchant', 'aftersales', 'identity', 'publishing'])
+  assert.deepEqual(LEGAL_POLICY_NAVIGATION.map(({ slug }) => slug), ['terms', 'privacy', 'merchant', 'aftersales', 'identity', 'publishing', 'referral'])
 
   for (const { slug, shortTitle } of LEGAL_POLICY_NAVIGATION) {
     const policy = legalPolicies[slug]

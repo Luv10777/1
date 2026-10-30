@@ -40,7 +40,7 @@ public class AuthController {
                                                  HttpServletRequest http) {
         return ApiResponse.ok(authService.login(
                 req.phone(), req.code(), clientIps.resolve(http),
-                http.getHeader("User-Agent"), http.getHeader("X-Device-Id")));
+                http.getHeader("User-Agent"), http.getHeader("X-Device-Id"), req.inviteCode()));
     }
 
     @PostMapping("/password-login")

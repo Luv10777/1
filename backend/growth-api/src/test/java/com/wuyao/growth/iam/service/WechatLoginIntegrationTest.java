@@ -287,7 +287,7 @@ class WechatLoginIntegrationTest {
     }
 
     private AuthDtos.WechatSession complete(String ticket, String phone, String code, String password) {
-        return wechat.complete(new AuthDtos.WechatCompleteRequest(ticket, phone, code, password), "127.0.0.1", "test", null);
+        return wechat.complete(new AuthDtos.WechatCompleteRequest(ticket, phone, code, password, null), "127.0.0.1", "test", null);
     }
 
     private String seedTicket(String openId) throws Exception {

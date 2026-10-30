@@ -16,6 +16,7 @@ import com.wuyao.growth.iam.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -68,6 +69,7 @@ public class AuthService {
     private final TransactionTemplate transactions;
     private final StringRedisTemplate redis;
     private final AccountAvatarService avatars;
+    private final ApplicationEventPublisher events;
 
     @Value("${growth.sms.code-length:6}")
     private int codeLength;
@@ -144,12 +146,12 @@ public class AuthService {
         }
     }
 
-    public AuthDtos.TokenPair login(String phone, String code, String ip, String userAgent, String deviceId) {
+    public AuthDtos.TokenPair login(String phone, String code, String ip, String userAgent, String deviceId, String inviteCode) {
         codeVerifier.verifyAndConsume(phone, code);
         // 校验结束后才开启账户事务，避免每个并发登录占用两条数据库连接。
         return transactions.execute(status -> {
             smsCodeRepository.lockPhone(phone);
-            User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone));
+            User user = userRepository.findByPhone(phone).orElseGet(() -> registerNewUser(phone, inviteCode));
             if (!"ACTIVE".equals(user.getStatus())) {
                 throw BizException.of(ErrorCode.UNAUTHORIZED, PlatformAccountDirectory.SUSPENDED.equals(user.getStatus())
                         ? "账号已被平台停用，如有疑问请联系客服" : "账号已停用，请联系商户管理员");
@@ -283,7 +285,7 @@ public class AuthService {
         log.info("用户登出: userId={} 作废 {} 个 refresh token", userId, revoked);
     }
 
-    User registerNewUser(String phone) {
+    User registerNewUser(String phone, String inviteCode) {
         Tenant tenant = new Tenant();
         tenant.setName("商家" + phone.substring(7));
         tenant = tenantRepository.save(tenant);
@@ -297,6 +299,7 @@ public class AuthService {
         user = userRepository.save(user);
 
         log.info("新用户注册: userId={} tenantId={}", user.getId(), tenant.getId());
+        events.publishEvent(new AuthDtos.UserRegistered(tenant.getId(), user.getId(), phone, inviteCode));
         return user;
     }
 
