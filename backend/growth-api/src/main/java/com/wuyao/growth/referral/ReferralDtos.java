@@ -31,6 +31,24 @@ public final class ReferralDtos {
 
     public record RateChange(String kind, int rateBp, String note, Long createdBy, Instant createdAt) {}
 
+    /** 后台「邀请关系」：每个商户一行，没有邀请人的 referrer* 为空，即归属公司。金额只统计已记返利的订单。 */
+    public record AdminRelation(Long tenantId, String tenantName, String ownerName, String ownerPhoneMasked, Instant registeredAt,
+                                Long referrerUserId, String referrerName, String referrerPhoneMasked, String referrerTenantName,
+                                String code, Instant boundAt, long topupPaidMinor, long membershipPaidMinor, long commissionMinor) {}
+
+    /** 后台「返利明细」的一行。 */
+    public record AdminCommission(Long id, Long referrerUserId, String referrerName, String referrerPhoneMasked,
+                                  Long inviteeTenantId, String inviteeTenantName, String inviteePhoneMasked, String kind,
+                                  long paidMinor, int rateBp, long amountMinor, String state, Instant availableAt, Instant createdAt) {}
+
+    /** 返利明细一页，外加筛选范围内冻结中、可提现的合计。 */
+    public record AdminCommissionPage(com.wuyao.growth.common.web.PageResult<AdminCommission> page, long frozenMinor, long availableMinor) {}
+
+    /** 后台「推广人排行」：领过邀请码的人。payingInviteeCount 是已经产生返利的被邀请商户数。 */
+    public record AdminPromoter(Long userId, String name, String phoneMasked, String tenantName, String code,
+                                long inviteeCount, long payingInviteeCount, long commissionMinor, long frozenMinor, long availableMinor,
+                                Instant codeCreatedAt) {}
+
     public record UpdateRate(
             @NotBlank @Pattern(regexp = "TOPUP|MEMBERSHIP", message = "返利类型不正确") String kind,
             @Min(value = 0, message = "返利比例不能小于 0") @Max(value = 5000, message = "返利比例不能超过 50%") int rateBp,

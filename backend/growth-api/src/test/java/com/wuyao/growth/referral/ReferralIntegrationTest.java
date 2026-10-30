@@ -24,6 +24,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -167,6 +168,50 @@ class ReferralIntegrationTest {
         mvc.perform(get("/api/public/referral-codes/{code}", "a-b")).andExpect(jsonPath("$.data.valid").value(false));
         owner.update("UPDATE users SET status='DISABLED' WHERE id=?", referrer);
         mvc.perform(get("/api/public/referral-codes/{code}", code)).andExpect(jsonPath("$.data.valid").value(false));
+    }
+
+    @Test void operatorsSeeWhoBelongsToWhomEveryRebateAndTheRanking() throws Exception {
+        verifyRealName(referrerTenant, referrer);
+        String code = takeCode();
+        events.publishEvent(new AuthDtos.UserRegistered(inviteeTenant, invitee, "13912345678", code));
+        topup("order-a", 10_000);
+        paid("order-b", "MEMBERSHIP", 19_900);
+
+        for (String path : List.of("/api/platform/referral/relations", "/api/platform/referral/commissions", "/api/platform/referral/promoters")) {
+            mvc.perform(get(path).header("Authorization", "Bearer " + referrerToken)).andExpect(status().isForbidden());
+        }
+        mvc.perform(get("/api/platform/referral/relations").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(3));
+        mvc.perform(get("/api/platform/referral/relations?scope=INVITED").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].tenantName").value("新商户"))
+                .andExpect(jsonPath("$.data.items[0].ownerPhoneMasked").value("139****5678"))
+                .andExpect(jsonPath("$.data.items[0].referrerName").value("推广人"))
+                .andExpect(jsonPath("$.data.items[0].referrerTenantName").value("邀请人商户"))
+                .andExpect(jsonPath("$.data.items[0].code").value(code))
+                .andExpect(jsonPath("$.data.items[0].topupPaidMinor").value(10_000))
+                .andExpect(jsonPath("$.data.items[0].membershipPaidMinor").value(19_900))
+                .andExpect(jsonPath("$.data.items[0].commissionMinor").value(1000 + 3980));
+        mvc.perform(get("/api/platform/referral/relations?scope=COMPANY").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.total").value(2)).andExpect(jsonPath("$.data.items[0].referrerUserId").doesNotExist());
+        mvc.perform(get("/api/platform/referral/relations?keyword=13912345678").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.total").value(1)).andExpect(jsonPath("$.data.items[0].ownerPhoneMasked").value("139****5678"));
+
+        mvc.perform(get("/api/platform/referral/commissions?referrerUserId=" + referrer).header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.page.total").value(2))
+                .andExpect(jsonPath("$.data.page.items[0].kind").value("MEMBERSHIP"))
+                .andExpect(jsonPath("$.data.page.items[0].inviteeTenantName").value("新商户"))
+                .andExpect(jsonPath("$.data.frozenMinor").value(4980)).andExpect(jsonPath("$.data.availableMinor").value(0));
+        mvc.perform(get("/api/platform/referral/commissions?state=AVAILABLE").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.page.total").value(0));
+        mvc.perform(get("/api/platform/referral/commissions?state=BOGUS").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(get("/api/platform/referral/promoters").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].name").value("推广人")).andExpect(jsonPath("$.data[0].code").value(code))
+                .andExpect(jsonPath("$.data[0].inviteeCount").value(1)).andExpect(jsonPath("$.data[0].payingInviteeCount").value(1))
+                .andExpect(jsonPath("$.data[0].commissionMinor").value(4980)).andExpect(jsonPath("$.data[0].frozenMinor").value(4980));
     }
 
     @Test void unknownCodeOrNoCodeLeavesTheMerchantWithTheCompany() throws Exception {
