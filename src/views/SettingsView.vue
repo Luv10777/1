@@ -1,10 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ShieldCheck } from 'lucide-vue-next'
 import { accountApi, validateAvatar } from '../services/accountApi'
 import UserAvatar from '../components/UserAvatar.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
 import { identityValidation, managementDate } from '../domain/platformManagement'
+import { setMyIdentity } from '../stores/identity'
+import { LEGAL_ENTITY } from '../domain/legalPolicies'
 import { auth } from '../stores/auth'
 import { theme } from '../stores/theme'
 
@@ -46,7 +49,7 @@ const codeOnly = computed(() => !profile.value?.passwordSet)
 const canUseCode = computed(() => Boolean(profile.value?.phone))
 const maskedPhone = computed(() => profile.value?.phone?.replace(/^(\d{3})\d{4}(\d{4})$/, '$1 **** $2') || '')
 
-// 实名：本人提交姓名和身份证号，服务端先向权威数据源核验是否一致，无法核验时转平台人工审核。资料在服务端加密保存，这里只拿到脱敏后的结果。
+// 实名：本人提交姓名和身份证号，服务端当场向权威数据源核验是否一致，不做人工审核。资料在服务端加密保存，这里只拿到脱敏后的结果。
 const identity = ref(null)
 const identityLoading = ref(true)
 const identityError = ref('')
@@ -56,10 +59,10 @@ const identityFormError = ref('')
 const identityNotice = ref('')
 const identityForm = reactive({ legalName: '', idNumber: '', declarationAccepted: false })
 const identityStates = {
-  NONE: { label: '未实名', tone: '', text: '还没有提交实名资料。提交后核验姓名与身份证号码是否一致，无法自动核验时由平台人工审核，结果会显示在这里。' },
+  NONE: { label: '未实名', tone: '', text: '还没有提交实名资料。提交后当场核验姓名与身份证号码是否一致，结果会显示在这里。' },
   PENDING_REVIEW: { label: '审核中', tone: 'wait', text: '资料已提交，正在等待平台人工审核，请勿重复提交。' },
-  VERIFIED: { label: '已通过', tone: 'on', text: '你的实名资料已通过审核。' },
-  REJECTED: { label: '未通过', tone: 'off', text: '审核没有通过。请根据下面的审核意见核对资料，再重新提交。' },
+  VERIFIED: { label: '实名核验通过', tone: 'on', text: '你的实名资料已通过审核。' },
+  REJECTED: { label: '未通过', tone: 'off', text: '核验没有通过。请根据下面的原因核对资料，再重新提交。' },
 }
 const identityState = computed(() => identityStates[identity.value?.status] || identityStates.NONE)
 const canSubmitIdentity = computed(() => !identityLoading.value && !identityError.value && (!identity.value || identity.value.status === 'REJECTED'))
@@ -89,6 +92,7 @@ async function loadIdentity() {
   identityNotice.value = ''
   try {
     identity.value = await identityApi.myIdentity()
+    setMyIdentity(identity.value)
   } catch (error) {
     identityError.value = error.message || '实名状态暂时无法读取，请稍后重试'
   } finally {
@@ -119,17 +123,18 @@ async function submitIdentity() {
       idNumber: identityForm.idNumber.trim().toUpperCase(),
       declarationAccepted: identityForm.declarationAccepted,
     })
+    setMyIdentity(identity.value)
     clearIdentityForm()
     identityOpen.value = false
     identityNotice.value = {
       VERIFIED: '实名认证已通过。',
       REJECTED: '姓名与身份证号码不一致，请核对后重新提交。',
-    }[identity.value?.status] || '实名资料已提交，平台会人工审核。审核进度可以随时在这里查看。'
+    }[identity.value?.status] || '实名资料已提交。'
   } catch (error) {
-    // 网络断开或服务端出错时，申请可能其实已经保存了；先刷新状态再决定要不要重交。
-    identityFormError.value = error.status === 0 || error.status >= 500
+    // 断网时核验可能其实已经完成；先刷新状态再决定要不要重交。
+    identityFormError.value = error.status === 0
       ? `${error.message || '提交没有完成'}。请先点“刷新状态”确认结果，再决定是否重新提交。`
-      : error.message || '提交失败，请检查资料后重试'
+      : error.message || '提交失败，请稍后再试'
   } finally {
     identitySubmitting.value = false
   }
@@ -419,7 +424,7 @@ async function savePassword() {
             <h2 id="identity-title">实名认证</h2>
             <p>{{ identityLoading ? '正在查询实名状态…' : identityError ? '实名状态暂时无法确认。' : identityState.text }}</p>
           </div>
-          <span v-if="!identityLoading && !identityError" class="state-badge" :class="identityState.tone">{{ identityState.label }}</span>
+          <span v-if="!identityLoading && !identityError" class="state-badge" :class="identityState.tone"><ShieldCheck v-if="identity?.status === 'VERIFIED'" :size="14" aria-hidden="true" />{{ identityState.label }}</span>
         </header>
         <p v-if="identityNotice" class="inline-message" role="status">{{ identityNotice }}</p>
         <p v-if="identityError" class="inline-message error" role="alert">{{ identityError }}</p>
@@ -429,11 +434,12 @@ async function savePassword() {
             <div><dt>姓名</dt><dd>{{ identity.legalNameMasked }}</dd></div>
             <div><dt>身份证号</dt><dd>{{ identity.idNumberMasked }}</dd></div>
             <div><dt>提交时间</dt><dd>{{ managementDate(identity.submittedAt) }}</dd></div>
-            <div v-if="identity.reviewedAt"><dt>审核时间</dt><dd>{{ managementDate(identity.reviewedAt) }}</dd></div>
+            <div v-if="identity.reviewedAt"><dt>核验时间</dt><dd>{{ managementDate(identity.reviewedAt) }}</dd></div>
           </dl>
-          <div v-if="identity.reviewNote" class="review-note">
-            <strong>平台审核意见</strong>
-            <p>{{ identity.reviewNote }}</p>
+          <div v-if="identity.status === 'REJECTED'" class="review-note">
+            <strong>未通过原因</strong>
+            <p v-if="identity.reviewNote">{{ identity.reviewNote }}</p>
+            <p>如有疑问请拨打人工客服：<a :href="`tel:${LEGAL_ENTITY.phone}`">{{ LEGAL_ENTITY.phone }}</a></p>
           </div>
         </template>
 
@@ -456,7 +462,7 @@ async function savePassword() {
             <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
             <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
           </label>
-          <p class="hint">姓名和身份证号在服务端加密保存，只有平台审核人员能查看完整资料，每次查看都会留下记录。提交后经阿里云实人认证核验姓名与身份证号码是否一致，无法核验时转平台人工审核。</p>
+          <p class="hint">姓名和身份证号在服务端加密保存，只有平台授权人员能查看完整资料，每次查看都会留下记录。提交后经阿里云实人认证当场核验姓名与身份证号码是否一致。</p>
           <div class="form-footer">
             <p v-if="identityFormError" class="form-notice" role="alert">{{ identityFormError }}</p>
             <div>
@@ -557,7 +563,7 @@ async function savePassword() {
 .card-header p { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
 .role-badge, .state-badge { flex: none; padding: 3px 8px; border-radius: 4px; color: var(--color-text-muted); background: var(--color-bg-subtle); font-size: 12px; font-weight: 700; }
 .role-badge.owner { color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent-text) 8%, var(--color-bg-surface)); }
-.state-badge.on { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
+.state-badge.on { display: inline-flex; align-items: center; gap: 4px; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
 
 .theme-options { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--color-border-subtle); border-radius: 6px; background: var(--color-bg-subtle); }
 .theme-option { min-width: 72px; padding: 8px 14px; border: 0; border-radius: 4px; color: var(--color-text-muted); background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }

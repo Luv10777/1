@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -21,6 +22,8 @@ import java.util.Base64;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -47,6 +50,7 @@ class PlatformManagementIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired JwtService jwt;
+    @MockitoBean IdentityVerifier verifier;
     JdbcTemplate owner;
     Long operatorTenant, merchantTenant, operator, merchantUser, staffUser;
     String operatorToken, merchantToken, staffToken;
@@ -62,13 +66,18 @@ class PlatformManagementIntegrationTest {
         operatorToken = jwt.issueAccessToken(operator, operatorTenant, "13800000001");
         merchantToken = jwt.issueAccessToken(merchantUser, merchantTenant, "13800000002");
         staffToken = jwt.issueAccessToken(staffUser, merchantTenant, "13800000003");
+        verdict(IdentityVerifier.Outcome.MATCH);
     }
 
-    private JsonNode submitIdentity(String token) throws Exception {
+    private void verdict(IdentityVerifier.Outcome outcome) {
+        when(verifier.verify(anyString(), anyString())).thenReturn(new IdentityVerifier.Result(outcome, "REQ-TEST"));
+    }
+
+    private JsonNode submitIdentity(String token, String expectedStatus) throws Exception {
         String response = mvc.perform(post("/api/identity/applications").header("Authorization", "Bearer " + token)
                         .contentType("application/json").content(json.writeValueAsBytes(Map.of("legalName", "测试用户", "idNumber", "11010519491231002X", "declarationAccepted", true))))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW")).andReturn().getResponse().getContentAsString();
+                .andExpect(jsonPath("$.data.status").value(expectedStatus)).andReturn().getResponse().getContentAsString();
         assertThat(response).doesNotContain("11010519491231002X", "测试用户");
         return json.readTree(response).path("data");
     }
@@ -86,8 +95,9 @@ class PlatformManagementIntegrationTest {
                 .andExpect(jsonPath("$.data.approvedMerchants").value(0));
     }
 
-    @Test void identitySubmissionIsEncryptedIsolatedAuditedAndCanBeReviewedWithoutMembership() throws Exception {
-        long id = submitIdentity(merchantToken).path("id").asLong();
+    @Test void identitySubmissionIsEncryptedIsolatedAuditedAndRetriedAfterAMismatchWithoutMembership() throws Exception {
+        verdict(IdentityVerifier.Outcome.MISMATCH);
+        long id = submitIdentity(merchantToken, "REJECTED").path("id").asLong();
         byte[] ciphertext = owner.queryForObject("SELECT id_number_ciphertext FROM real_name_applications WHERE id=?", byte[].class, id);
         assertThat(ciphertext).isNotEqualTo("11010519491231002X".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         assertThat(new String(ciphertext, java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("11010519491231002X");
@@ -100,26 +110,31 @@ class PlatformManagementIntegrationTest {
         mvc.perform(post("/api/platform/tenants/{t}/identities/{id}/reveal", merchantTenant, id).header("Authorization", "Bearer " + operatorToken)
                 .contentType("application/json").content("{\"note\":\"核对申请人的实名资料\"}")).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store")).andExpect(jsonPath("$.data.idNumber").value("11010519491231002X"));
-        mvc.perform(post("/api/platform/tenants/{t}/identities/{id}/review", merchantTenant, id).header("Authorization", "Bearer " + operatorToken)
-                .contentType("application/json").content("{\"status\":\"REJECTED\",\"note\":\"测试驳回，需补充核验依据\"}")).andExpect(status().isOk());
         mvc.perform(get("/api/identity/me").header("Authorization", "Bearer " + merchantToken)).andExpect(jsonPath("$.data.status").value("REJECTED"));
+        // SUBMITTED, AUTO_REJECTED, REVEAL
         assertThat(owner.queryForObject("SELECT count(*) FROM platform_management_audit WHERE target_type='IDENTITY' AND target_id=?", Long.class, id)).isEqualTo(3);
-        assertThat(submitIdentity(merchantToken).path("id").asLong()).isEqualTo(id);
+        verdict(IdentityVerifier.Outcome.MATCH);
+        assertThat(submitIdentity(merchantToken, "VERIFIED").path("id").asLong()).isEqualTo(id);
+        mvc.perform(post("/api/platform/tenants/{t}/identities/{id}/review", merchantTenant, id).header("Authorization", "Bearer " + operatorToken)
+                .contentType("application/json").content("{\"status\":\"REJECTED\",\"note\":\"人工审核已经取消\"}")).andExpect(status().is4xxClientError());
+        assertThat(owner.queryForObject("SELECT status FROM real_name_applications WHERE id=?", String.class, id)).isEqualTo("VERIFIED");
     }
 
-    @Test void identityRejectsInvalidInputDuplicateSubmissionAndSelfReview() throws Exception {
+    @Test void identityRejectsInvalidInputSavesNothingWithoutAVerdictAndRefusesDuplicates() throws Exception {
         mvc.perform(post("/api/identity/applications").header("Authorization", "Bearer " + merchantToken)
                 .contentType("application/json").content(json.writeValueAsBytes(Map.of("legalName", "测试用户", "idNumber", "110105194912310021", "declarationAccepted", true))))
                 .andExpect(status().isBadRequest());
+        verdict(IdentityVerifier.Outcome.UNAVAILABLE);
+        mvc.perform(post("/api/identity/applications").header("Authorization", "Bearer " + operatorToken)
+                .contentType("application/json").content(json.writeValueAsBytes(Map.of("legalName", "测试用户", "idNumber", "11010519491231002X", "declarationAccepted", true))))
+                .andExpect(status().isServiceUnavailable());
         assertThat(owner.queryForObject("SELECT count(*) FROM real_name_applications", Long.class)).isZero();
-        long id = submitIdentity(operatorToken).path("id").asLong();
+        assertThat(owner.queryForObject("SELECT count(*) FROM platform_management_audit WHERE target_type='IDENTITY'", Long.class)).isZero();
+        verdict(IdentityVerifier.Outcome.MATCH);
+        submitIdentity(operatorToken, "VERIFIED");
         mvc.perform(post("/api/identity/applications").header("Authorization", "Bearer " + operatorToken)
                 .contentType("application/json").content(json.writeValueAsBytes(Map.of("legalName", "测试用户", "idNumber", "11010519491231002X", "declarationAccepted", true))))
                 .andExpect(status().isConflict());
-        mvc.perform(post("/api/platform/tenants/{t}/identities/{id}/review", operatorTenant, id).header("Authorization", "Bearer " + operatorToken)
-                .contentType("application/json").content("{\"status\":\"VERIFIED\",\"note\":\"自我审核必须被拒绝测试\"}"))
-                .andExpect(status().isForbidden());
-        assertThat(owner.queryForObject("SELECT status FROM real_name_applications WHERE id=?", String.class, id)).isEqualTo("PENDING_REVIEW");
     }
 
     @Test void platformModerationPersistsAndCannotBeBypassedByThePublisher() throws Exception {

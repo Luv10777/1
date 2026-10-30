@@ -60,7 +60,7 @@ growth:
     operator-user-ids: ${PLATFORM_OPERATOR_USER_IDS:}
   identity:
     encryption-key: ${REAL_NAME_ENCRYPTION_KEY:}
-    verifier: ${IDENTITY_VERIFIER:manual}   # manual | aliyun
+    verifier: ${IDENTITY_VERIFIER:none}   # none | aliyun
     aliyun:
       access-key-id: ${ALIYUN_IDV_ACCESS_KEY_ID:}
       access-key-secret: ${ALIYUN_IDV_ACCESS_KEY_SECRET:}

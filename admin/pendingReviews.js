@@ -6,12 +6,11 @@ import { allianceAdminApi } from '../src/services/allianceApi.js'
  * 需要平台处理的事项数量，复用各页面已有的统计接口。读不到的一项保持 null，不影响其他项。
  * 管理后台打开时每分钟刷新一次，切换页面和窗口重新获得焦点时也会刷新。
  */
-export const pending = reactive({ information: null, merchants: null, identities: null, offers: null, disputes: null, accounts: null, statements: null })
+export const pending = reactive({ information: null, merchants: null, offers: null, disputes: null, accounts: null, statements: null })
 
 export const pendingItems = computed(() => [
   { key: 'information', label: '待审核信息', route: 'admin-information' },
   { key: 'merchants', label: '待审核入驻', route: 'admin-merchants' },
-  { key: 'identities', label: '待审核实名', route: 'admin-identities' },
   { key: 'offers', label: '待审核供券', route: 'admin-alliance' },
   { key: 'disputes', label: '待处理申诉', route: 'admin-alliance' },
   { key: 'accounts', label: '待核对收款账号', route: 'admin-alliance' },
@@ -33,7 +32,7 @@ export async function refreshPending() {
       allianceAdminApi.accounts('PENDING_VERIFY'),
       allianceAdminApi.statements({ status: 'OBJECTED' }),
     ])
-    if (summary.status === 'fulfilled') Object.assign(pending, { information: summary.value.pendingInformation, merchants: summary.value.pendingMerchants, identities: summary.value.pendingIdentity })
+    if (summary.status === 'fulfilled') Object.assign(pending, { information: summary.value.pendingInformation, merchants: summary.value.pendingMerchants })
     if (alliance.status === 'fulfilled') Object.assign(pending, { offers: alliance.value.pendingOffers, disputes: alliance.value.openDisputes })
     if (accounts.status === 'fulfilled') pending.accounts = Array.isArray(accounts.value) ? accounts.value.length : null
     if (statements.status === 'fulfilled') pending.statements = Array.isArray(statements.value) ? statements.value.length : null

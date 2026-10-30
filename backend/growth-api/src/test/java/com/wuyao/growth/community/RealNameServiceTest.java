@@ -1,6 +1,8 @@
 package com.wuyao.growth.community;
 
 import com.wuyao.growth.common.tenant.TenantContext;
+import com.wuyao.growth.common.web.BizException;
+import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.iam.service.PlatformAccountDirectory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -56,21 +59,23 @@ class RealNameServiceTest {
     }
 
     @Test
-    void unavailableWaitsForManualReview() {
+    void noVerdictSavesNothingAndAsksToRetry() {
         when(verifier.verify("张三", NUMBER)).thenReturn(new IdentityVerifier.Result(IdentityVerifier.Outcome.UNAVAILABLE, null));
-        var view = submit();
-        assertThat(view.status()).isEqualTo("PENDING_REVIEW");
-        assertThat(view.reviewedAt()).isNull();
-        assertThat(auditedActions()).containsExactly("SUBMITTED");
+        assertThatThrownBy(this::submit).isInstanceOfSatisfying(BizException.class,
+                e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.IDENTITY_VERIFICATION_UNAVAILABLE));
+        verify(applications, never()).saveAndFlush(any());
+        verify(audits, never()).saveAndFlush(any());
     }
 
     @Test
-    void repeatedMismatchesStopCallingTheProvider() {
+    void repeatedMismatchesStopUntilTomorrow() {
         when(audits.countByTenantIdAndActorUserIdAndTargetTypeAndActionAndCreatedAtAfter(
                 eq(7L), eq(3L), eq("IDENTITY"), eq("AUTO_REJECTED"), any()))
                 .thenReturn((long) RealNameService.MAX_DAILY_AUTO_REJECTIONS);
-        assertThat(submit().status()).isEqualTo("PENDING_REVIEW");
+        assertThatThrownBy(this::submit).isInstanceOfSatisfying(BizException.class,
+                e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.RATE_LIMITED));
         verify(verifier, never()).verify(anyString(), anyString());
+        verify(applications, never()).saveAndFlush(any());
     }
 
     private RealNameDtos.ApplicationView submit() {

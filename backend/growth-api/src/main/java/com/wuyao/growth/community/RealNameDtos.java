@@ -27,8 +27,4 @@ public final class RealNameDtos {
                              String phoneMasked, String legalName, String idNumber,
                              String legalNameMasked, String idNumberMasked, String status,
                              String reviewNote, Instant submittedAt, Instant reviewedAt) {}
-
-    public record ReviewRequest(
-            @NotBlank @Pattern(regexp = "VERIFIED|REJECTED", message = "审核状态不正确") String status,
-            @Size(max = 500) String note) {}
 }

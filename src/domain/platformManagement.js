@@ -26,3 +26,11 @@ export function identityValidation(form) {
   if (!form.declarationAccepted) return '请确认身份信息真实，并同意用于平台实名审核。'
   return ''
 }
+
+// 实名提醒弹窗：直播、付款和设置页不打扰；点「稍后再说」后 24 小时内不再弹。
+export const IDENTITY_PROMPT_SNOOZE_MS = 24 * 60 * 60 * 1000
+const IDENTITY_PROMPT_QUIET_ROUTES = new Set(['digital-human', 'billing', 'settings'])
+export function shouldPromptIdentity({ missing, routeName, dismissedAt, now = Date.now() }) {
+  if (!missing || IDENTITY_PROMPT_QUIET_ROUTES.has(routeName)) return false
+  return !(Number(dismissedAt) > 0 && now - Number(dismissedAt) < IDENTITY_PROMPT_SNOOZE_MS)
+}
