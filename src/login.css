@@ -82,7 +82,7 @@
 .access-consent-row { display: flex; align-items: flex-start; gap: 8px; color: var(--access-muted); font-size: 12px; line-height: 1.9; }
 .access-consent input { flex: 0 0 auto; width: 14px; height: 14px; margin: 4px 0 0; accent-color: var(--access-primary); cursor: pointer; }
 .access-consent label { cursor: pointer; }
-.access-invite { margin: 8px 0 0 22px; color: var(--access-muted); font-size: 12px; line-height: 1.7; }
+.access-input-shell.is-locked, .access-input-shell.is-locked:hover { border-color: var(--color-border-subtle); background: var(--color-bg-subtle); }
 .access-consent a { display: inline; color: var(--color-primary); font-size: inherit; line-height: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .access-consent a:hover { color: var(--access-primary); }
 .access-footer { display: flex; justify-content: center; align-items: center; gap: 6px; color: #818b9a; font-size: 12px; }
