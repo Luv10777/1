@@ -104,6 +104,11 @@
             <artifactId>dysmsapi20170525</artifactId>
             <version>4.6.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>cloudauth20190307</artifactId>
+            <version>3.14.0</version>
+        </dependency>
 
         <!-- Resilience4j 限流器 -->
         <dependency>

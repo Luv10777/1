@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { LEGAL_ENTITY, LEGAL_POLICY_UPDATED_AT, LEGAL_REFERENCES, LEGAL_POLICY_NAVIGATION, legalPolicies } from './legalPolicies.js'
 
 test('each published policy is substantive, dated, navigable, and cites official legal sources', () => {
-  assert.equal(LEGAL_POLICY_UPDATED_AT, '2026-10-18')
+  assert.equal(LEGAL_POLICY_UPDATED_AT, '2026-10-30')
   assert.equal(LEGAL_ENTITY.name, '嘉兴市梧曜科技有限公司')
   assert.equal(LEGAL_ENTITY.creditCode, '91330483MAKMYJHC7U')
   assert.equal(LEGAL_ENTITY.address, '浙江省嘉兴市桐乡市濮院镇园区大道799号7楼704')

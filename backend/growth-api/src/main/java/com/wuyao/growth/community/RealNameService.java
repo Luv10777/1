@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -17,10 +18,13 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 public class RealNameService {
+    static final int MAX_DAILY_AUTO_REJECTIONS = 3;
+
     private final RealNameApplicationRepository applications;
     private final PlatformAccountDirectory accounts;
     private final RealNameCrypto crypto;
     private final PlatformManagementAuditRepository audits;
+    private final IdentityVerifier verifier;
 
     @Transactional(readOnly = true)
     public RealNameDtos.ApplicationView current(Long userId) {
@@ -47,19 +51,40 @@ public class RealNameService {
         application.setIdNumberCiphertext(crypto.encrypt(number, application.getTenantId(), userId, "number"));
         application.setLegalNameMasked(name.substring(0, 1) + "*".repeat(Math.max(1, name.length() - 1)));
         application.setIdNumberMasked(number.substring(0, 3) + "***********" + number.substring(14));
-        application.setStatus("PENDING_REVIEW");
-        application.setReviewNote(null);
+        // 每次核验都计费，也能被用来试探别人的号码，滚动 24 小时内不一致次数用完就只走人工审核。
+        var result = audits.countByTenantIdAndActorUserIdAndTargetTypeAndActionAndCreatedAtAfter(TenantContext.require(), userId,
+                "IDENTITY", "AUTO_REJECTED", Instant.now().minus(Duration.ofDays(1))) < MAX_DAILY_AUTO_REJECTIONS
+                ? verifier.verify(name, number) : IdentityVerifier.Result.unavailable();
+        application.setStatus(switch (result.outcome()) {
+            case MATCH -> "VERIFIED";
+            case MISMATCH -> "REJECTED";
+            case UNAVAILABLE -> "PENDING_REVIEW";
+        });
+        application.setReviewNote(switch (result.outcome()) {
+            case MATCH -> "姓名与身份证号码经权威数据源核验一致";
+            case MISMATCH -> "姓名与身份证号码经权威数据源核验不一致，请核对后重新提交";
+            case UNAVAILABLE -> null;
+        });
         application.setReviewedBy(null);
-        application.setReviewedAt(null);
+        application.setReviewedAt(result.outcome() == IdentityVerifier.Outcome.UNAVAILABLE ? null : Instant.now());
         application.setSubmittedAt(Instant.now());
         application.setUpdatedAt(Instant.now());
         var saved = applications.saveAndFlush(application);
-        var event = new PlatformManagementAudit();
-        event.setTenantId(TenantContext.require()); event.setActorUserId(userId);
-        event.setTargetType("IDENTITY"); event.setTargetId(saved.getId());
-        event.setAction("SUBMITTED"); event.setNote("本人提交实名资料并确认真实性与审核用途");
-        audits.saveAndFlush(event);
+        audit(saved, userId, "SUBMITTED", "本人提交实名资料并确认真实性与审核用途");
+        if (result.outcome() != IdentityVerifier.Outcome.UNAVAILABLE) {
+            audit(saved, userId, result.outcome() == IdentityVerifier.Outcome.MATCH ? "AUTO_VERIFIED" : "AUTO_REJECTED",
+                    "身份二要素自动核验" + (result.outcome() == IdentityVerifier.Outcome.MATCH ? "一致" : "不一致")
+                            + "，核验请求号 " + result.requestId());
+        }
         return view(saved);
+    }
+
+    private void audit(RealNameApplication application, Long userId, String action, String note) {
+        var event = new PlatformManagementAudit();
+        event.setTenantId(application.getTenantId()); event.setActorUserId(userId);
+        event.setTargetType("IDENTITY"); event.setTargetId(application.getId());
+        event.setAction(action); event.setNote(note);
+        audits.saveAndFlush(event);
     }
 
     static void validateIdNumber(String number) {
