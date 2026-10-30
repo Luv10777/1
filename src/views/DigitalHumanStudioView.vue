@@ -11,7 +11,7 @@ import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
 import { videoMaterialLimits } from '../domain/videoMaterials'
 import { isVideoInProgress, videoConversationTitle, videoHistoryTime, videoModels, videoModelLabel } from '../services/videoConversations'
 import { get } from '../utils/request'
-import { billing, number, refreshBilling, requireMembership } from '../stores/billing'
+import { billing, number, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
 
 const avatarInput = ref(null)
@@ -144,7 +144,7 @@ const generate = async () => {
   if (isGenerating.value) return
   notice.value = ''
   try {
-    await requireMembership()
+    await requireAccount()
     if (isGenerating.value || quoting.value) return
     const input = digitalHumanVideoInput({ script: script.value, avatar: avatarFile.value,
       images: [productFile.value, packageFile.value, ...extraImages.value].filter(Boolean),
@@ -333,7 +333,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
       </aside>
     </main>
     <dialog ref="priceDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="dh-price-title" @cancel.prevent="closeQuote">
-      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" width="32" height="32" alt=""><h2 id="dh-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="isGenerating" @click="closeQuote">×</button></header><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p><p class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</p><button class="yanhuo-primary" type="button" :disabled="isGenerating || !billing.summary?.memberActive || !billing.summary?.plan?.videoEnabled || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink><p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p></template>
+      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" width="32" height="32" alt=""><h2 id="dh-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="isGenerating" @click="closeQuote">×</button></header><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p><p class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</p><button class="yanhuo-primary" type="button" :disabled="isGenerating || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink><p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p></template>
     </dialog>
     <Transition name="dh-avatar-modal" appear>
       <div v-if="showAllAvatars" class="dh-avatar-modal" role="dialog" aria-modal="true" aria-label="全部数字人形象" @click.self="showAllAvatars = false">

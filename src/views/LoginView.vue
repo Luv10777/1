@@ -6,15 +6,20 @@ import { ChevronDown, Eye, EyeOff, ShieldCheck, X, LoaderCircle, Sun, Moon } fro
 import { auth } from '../stores/auth'
 import { theme } from '../stores/theme'
 import { accountError, codeError, passwordError, phoneError, safeRedirect } from '../utils/authValidation.js'
-import { pendingInviteCode, rememberInviteCode } from '../utils/inviteCode'
+import { clearInviteCode, pendingInviteCode, rememberInviteCode } from '../utils/inviteCode'
+import { referralApi } from '../services/referralApi'
 
 const router = useRouter()
 const route = useRoute()
 const isRegister = computed(() => route.query.mode === 'register')
-const inviteCode = ref(rememberInviteCode(route.query.invite) || pendingInviteCode())
+const linkedInvite = rememberInviteCode(route.query.invite) || pendingInviteCode()
+const inviteCode = ref(linkedInvite)
+// 邀请链接带来的码只读；没有链接时注册可以自己填，离开输入框和提交前向后端核对。
+const inviteLocked = Boolean(linkedInvite)
+const inviteState = ref('')
 const activeTab = ref('sms')
 const form = reactive({ country: '+86', phone: '', code: '', account: '', password: '', agreed: false })
-const errors = reactive({ phone: '', code: '', account: '', password: '', agreed: '' })
+const errors = reactive({ phone: '', code: '', account: '', password: '', agreed: '', invite: '' })
 const busy = ref(false)
 const sending = ref(false)
 const showPassword = ref(false)
@@ -44,6 +49,41 @@ const resetNotice = ref('')
 const resetSending = ref(false)
 const resetBusy = ref(false)
 const resetForm = ref(null)
+
+/** 手填的邀请码核对通过才存起来，登录请求和微信登录回来后都会带上；清空就不带。 */
+async function checkInvite() {
+  if (inviteLocked) return true
+  const code = inviteCode.value.trim().toUpperCase()
+  inviteCode.value = code
+  errors.invite = ''
+  if (!code) {
+    inviteState.value = ''
+    clearInviteCode()
+    return true
+  }
+  if (!/^[A-Z0-9]{4,16}$/.test(code)) {
+    inviteState.value = 'invalid'
+    errors.invite = '邀请码只有字母和数字，请核对后重新填写'
+    return false
+  }
+  inviteState.value = 'checking'
+  try {
+    const result = await referralApi.check(code)
+    if (inviteCode.value !== code) return false
+    inviteState.value = result?.valid ? 'valid' : 'invalid'
+    if (!result?.valid) {
+      clearInviteCode()
+      errors.invite = '邀请码不存在，请核对后重新填写'
+      return false
+    }
+    rememberInviteCode(code)
+    return true
+  } catch (err) {
+    inviteState.value = ''
+    errors.invite = err.message || '邀请码暂时无法核对，请稍后重试'
+    return false
+  }
+}
 
 function clearMessages() {
   notice.value = ''
@@ -220,6 +260,7 @@ async function submit() {
     errors.password = passwordError(form.password)
   }
   errors.agreed = form.agreed ? '' : '请先阅读并同意用户注册协议与隐私协议'
+  if (isRegister.value && !errors.phone && !errors.code) await checkInvite()
   if (Object.values(errors).some(Boolean)) return focusInvalid()
   busy.value = true
   try {
@@ -243,9 +284,10 @@ function trustedLink(raw) {
   }
 }
 
-function loginWithWechat() {
+async function loginWithWechat() {
   clearMessages()
   if (!checkAgreement()) return
+  if (isRegister.value && !(await checkInvite())) return focusInvalid()
   const url = trustedLink(import.meta.env.VITE_WECHAT_LOGIN_URL || '/api/auth/wechat/start')
   if (!url) {
     error.value = '微信扫码登录暂未开放，请使用验证码登录。'
@@ -386,12 +428,16 @@ async function submitReset() {
                   </div>
                   <p v-if="errors.code" id="code-error" class="access-field-error">{{ errors.code }}</p>
                 </div>
-                <!-- 邀请链接带来的邀请码只读展示，不能改；没有邀请码就不显示这一栏。 -->
-                <div v-if="isRegister && inviteCode" class="access-field">
-                  <label for="login-invite">邀请码</label>
-                  <div class="access-input-shell is-locked">
-                    <input id="login-invite" :value="inviteCode" name="invite" type="text" readonly disabled />
+                <!-- 邀请链接带来的邀请码只读展示，不能改；没有链接时可以自己填，填错会提示。 -->
+                <div v-if="isRegister" class="access-field">
+                  <label for="login-invite">邀请码<span v-if="!inviteLocked" class="access-optional">选填</span></label>
+                  <div class="access-input-shell" :class="{ 'is-locked': inviteLocked, 'has-error': errors.invite }">
+                    <input v-if="inviteLocked" id="login-invite" :value="inviteCode" name="invite" type="text" readonly disabled />
+                    <input v-else id="login-invite" v-model="inviteCode" name="invite" type="text" maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="没有邀请码可不填" :disabled="busy" :aria-invalid="Boolean(errors.invite)" :aria-describedby="errors.invite ? 'invite-error' : inviteState === 'valid' ? 'invite-ok' : undefined" @input="errors.invite = ''; inviteState = ''" @blur="checkInvite" />
                   </div>
+                  <p v-if="errors.invite" id="invite-error" class="access-field-error">{{ errors.invite }}</p>
+                  <p v-else-if="inviteState === 'checking'" class="access-field-hint" role="status">正在核对邀请码…</p>
+                  <p v-else-if="inviteState === 'valid'" id="invite-ok" class="access-field-ok" role="status">邀请码有效</p>
                 </div>
               </div>
               <div v-else key="password" class="access-fields">

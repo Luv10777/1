@@ -6,7 +6,7 @@ import { copyApi, copyPlatforms, copyRewrites, copyStoreLevels, copyStyles, aiLe
   groupByDay, isCopyDone, isRewriting, missingFacts, platformLabel, validateCopyImage } from '../services/copywriting'
 import { selectedStoreId, selectedStore } from '../stores/merchantContext'
 import { auth } from '../stores/auth'
-import { billing, refreshBilling, requireMembership } from '../stores/billing'
+import { refreshBilling, requireAccount } from '../stores/billing'
 import '../copywriting.css'
 
 const route = useRoute()
@@ -163,7 +163,7 @@ async function generate(again = false) {
   notice.value = ''
   submitting.value = true
   try {
-    await requireMembership()
+    await requireAccount()
     const imageAssetIds = []
     for (const picture of form.value.pictures.filter(p => p.kind === 'ASSET')) {
       if (!picture.id) picture.id = await copyApi.uploadImage(picture.file)
@@ -365,7 +365,6 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); window.removeEventListen
         <div v-if="error" class="cw-error" role="alert">{{ error }}</div>
         <p v-if="config && !config.configured" class="cw-hint">文案模型尚未配置，暂时不能生成。</p>
         <p v-else-if="!selectedStoreId && auth.isAuthenticated" class="cw-hint">先选一家门店，文案会用到门店的名字和地址。</p>
-        <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="cw-hint cw-hint-link">请先开通会员</RouterLink>
         <button type="button" class="cw-generate" :disabled="!canGenerate" @click="generate(false)">
           {{ generating ? '正在写…' : `生成文案 · ${credits} 烟火` }}
         </button>

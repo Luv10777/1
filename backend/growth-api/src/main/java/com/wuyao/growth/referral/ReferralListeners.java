@@ -24,9 +24,9 @@ class ReferralListeners {
         }
     }
 
-    /** 与充值入账同一事务：登记返利任务失败会让这次入账一起回滚重试，不会漏记。 */
+    /** 与订单入账同一事务：登记返利任务失败会让这次入账一起回滚重试，不会漏记。 */
     @EventListener
-    void onTopupPaid(BillingDtos.TopupPaid event) {
-        service.onTopupPaid(event.tenantId(), event.billingOrderId(), event.amountMinor());
+    void onOrderPaid(BillingDtos.OrderPaid event) {
+        service.onOrderPaid(event.tenantId(), event.billingOrderId(), event.kind(), event.amountMinor());
     }
 }

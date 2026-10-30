@@ -173,7 +173,7 @@ public class BillingService {
             "MEMBERSHIP".equals(o.getKind())?o.getCredits():0,"TOPUP".equals(o.getKind())?o.getCredits():0,0,o.getId(),null,
             operator!=null?operator:currentUserId());
         store.flush(); // receipt_reference uniqueness also prevents reusing one receipt across tenants.
-        if("TOPUP".equals(o.getKind())) events.publishEvent(new BillingDtos.TopupPaid(o.getTenantId(),o.getId(),o.getAmountMinor()));
+        events.publishEvent(new BillingDtos.OrderPaid(o.getTenantId(),o.getId(),o.getKind(),o.getAmountMinor()));
         return view(o);
     }
     /** Paid or granted, a membership period starts the same way: renewals extend, gifts and alliance quota follow the plan. */
@@ -301,12 +301,11 @@ public class BillingService {
     private void requireActiveMembership(BillingAccount a) {
         if(a==null||!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,"您还未开通会员");
     }
+    /** 只有 AI 实景直播要开会员且套餐含直播；图片、视频、文案等不看会员，烟火够就能用。 */
     private void requireEntitlement(BillingAccount a,String capability) {
+        if(!"LIVE".equals(capability)) return;
         requireActiveMembership(a);
-        var p=a.getPlanSnapshot();
-        boolean enabled=switch(capability) { case "IMAGE"->p.imageEnabled(); case "VIDEO"->p.videoEnabled(); case "LIVE"->p.liveEnabled(); case "VIDEO_ANALYSIS"->true; case "VIDEO_PLAN"->p.videoEnabled(); case "COPY"->true; default->false; };
-        if(!enabled) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,
-            "LIVE".equals(capability)?"当前套餐不含直播功能，请订阅包含直播的套餐":"当前套餐尚未开放此项创作功能");
+        if(!a.getPlanSnapshot().liveEnabled()) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,"当前套餐不含直播功能，请订阅包含直播的套餐");
     }
     private void hold(BillingAccount a,BillingReservation r,long amount,String eventKey,String description) {
         if(amount<=0) throw bad("预占烟火必须大于零");

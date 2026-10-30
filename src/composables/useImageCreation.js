@@ -3,7 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, downloadImage } from '../services/imageCreation'
 import { IMAGE_QUALITIES, POSTER_PURPOSE_GROUPS, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
-import { billing, refreshBilling, requireMembership } from '../stores/billing'
+import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
 
 export function useImageCreation(workflow) {
@@ -205,7 +205,7 @@ export function useImageCreation(workflow) {
     if (busy.value) return
     busy.value = true; error.value = ''
     try {
-      if (creation) await requireMembership()
+      if (creation) await requireAccount()
       if (!alive) return
       await action()
     }

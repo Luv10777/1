@@ -245,9 +245,9 @@ class StaffAccountsIntegrationTest {
         assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
         refused(get("/api/stores/" + west), fresh.path("accessToken").asText(), null, 404, 1404);
         refused(get("/api/products/" + honey), fresh.path("accessToken").asText(), null, 404, 1404);
-        refused(post("/api/stores"), fresh.path("accessToken").asText(), Map.of("name", "未开通会员门店"), 400, 9001);
-        com.wuyao.growth.billing.BillingTestFixtures.activateMembership(owner, fresh.path("user").path("tenantId").asLong());
-        assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).isEmpty();
+        // 只有 AI 实景直播要开会员：新商户不开会员也能建自己的门店。
+        api(post("/api/stores"), fresh.path("accessToken").asText(), Map.of("name", "未开通会员门店"));
+        assertThat(api(get("/api/stores"), fresh.path("accessToken").asText(), null)).hasSize(1);
     }
 
     @Test

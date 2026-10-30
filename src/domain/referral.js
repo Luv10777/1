@@ -1,5 +1,6 @@
 // 邀请返利的展示规则。金额都是分，比例都是万分点（1000 = 10%）。
 export const commissionStates = { FROZEN: '冻结中', AVAILABLE: '可提现', VOIDED: '已作废' }
+export const commissionKinds = { TOPUP: '充值烟火', MEMBERSHIP: '开通会员' }
 
 export const inviteLink = (code, origin) => `${origin}/login?mode=register&invite=${encodeURIComponent(code)}`
 

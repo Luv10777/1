@@ -5,7 +5,7 @@ import { videoAnalysisApi, uploadAnalysisVideo } from '../services/videoAnalysis
 import { VIDEO_ANALYSIS_LIMITS, PRODUCT_REFERENCE_GUIDANCE, analysisTerminal, analysisTime, analysisAudioSummary, analysisReportMode, analysisRecreationSteps, analysisShotDetails, nearestAnalysisFrame, validateAnalysisFile } from '../domain/videoAnalysis'
 import { customizeAnalysisRecreation, analysisRecreationRoute } from '../domain/videoAnalysisCustomization'
 import { buildVideoAnalysisReport } from '../domain/videoAnalysisReport'
-import { billing, refreshBilling, requireMembership } from '../stores/billing'
+import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
 import { ChevronRight, Download, History, Upload, Video, X } from 'lucide-vue-next'
 import { videoHistoryTime } from '../services/videoConversations'
@@ -232,7 +232,7 @@ async function startScan() {
   error.value = ''
   if (!submissionKey || current.value) submissionKey = crypto.randomUUID()
   try {
-    await requireMembership()
+    await requireAccount()
     if (disposed) return
     const request = { requestKey: submissionKey, mode: videoType.value, reverseNeed: reverseNeed.value.trim() }
     let analysis
@@ -350,7 +350,6 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         </div>
         <div class="vs-footer va-footer">
           <div v-if="error" class="va-error" role="alert">{{ error }}<button v-if="pollingInterrupted" type="button" @click="error = ''; poll(current.id)">重新连接</button></div>
-          <RouterLink v-if="billing.summary && !billing.summary.memberActive" to="/billing" class="generation-billing-link">请先开通会员</RouterLink>
           <button type="button" class="vs-generate" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }}</button>
           <button v-if="current && !analysisTerminal(current.status)" type="button" class="va-text-button" :disabled="uploading" @click="cancelScan">取消分析</button>
           <small>每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火，成功后扣除，失败或取消退回{{ current ? '；重新分析会再次计费' : '' }}</small>

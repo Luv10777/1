@@ -22,18 +22,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(membership).addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/**", "/api/billing/**", "/api/team/**",
-                        "/api/public/**", "/api/information-publications/**", "/api/platform/**", "/api/identity/**", "/api/referral/**",
-                        "/api/player/ws", "/api/player/test-audio.wav", "/api/player/audio/**",
-                        // 已经领出的联盟券必须能在门店核销，不能因为供券商户会员过期而失效。
-                        "/api/stores/*/alliance-redemptions/**",
-                        // 会员过期也要能撤回供券单、对已核销的券申诉。
-                        "/api/alliance/offers/*/withdraw", "/api/alliance/vouchers/*/dispute",
-                        // 已经发生的结算要能收到钱：收款账户和对账单不受会员状态影响。
-                        "/api/alliance/settlement-account", "/api/alliance/statements/**",
-                        // 站内通知谁都要能看、能标已读，不受会员状态影响。
-                        "/api/notices/**");
+        // 只有 AI 实景直播要开会员；其他功能不看会员，按烟火余额使用。
+        registry.addInterceptor(membership).addPathPatterns("/api/live-sessions/**", "/api/stores/*/live-sessions");
     }
 
     @Bean

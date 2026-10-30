@@ -176,7 +176,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     <header class="yanhuo-heading">
       <div>
         <h1>套餐与权益</h1>
-        <p class="yanhuo-intro">开通会员后即可使用 AI 创作，创作按烟火计费，赠送的烟火优先使用。</p>
+        <p class="yanhuo-intro">图片、视频、文案等功能不用开会员，充值烟火就能用；AI 实景直播需要开通会员，开通时赠送烟火，赠送的烟火优先使用。</p>
       </div>
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>
@@ -193,11 +193,10 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           </div>
           <h2>{{ account.plan?.name || '尚未订阅套餐' }}</h2>
           <p v-if="account.memberUntil" class="yanhuo-card-meta">有效期至 {{ dateTime(account.memberUntil) }}</p>
-          <p v-else class="yanhuo-card-meta">信息发布与商品购买无需会员；AI 创作需开通会员，再按规则使用烟火。</p>
+          <p v-else class="yanhuo-card-meta">不开会员也能用图片、视频、文案等功能，按烟火计费；AI 实景直播需开通会员。</p>
           <ul class="yanhuo-entitlements">
-            <li :class="{ enabled: account.memberActive && account.plan?.imageEnabled }"><Check :size="14" />图片创作</li>
-            <li :class="{ enabled: account.memberActive && account.plan?.videoEnabled }"><Check :size="14" />视频创作</li>
-            <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />直播</li>
+            <li class="enabled"><Check :size="14" />图片、视频、文案（按烟火）</li>
+            <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />AI 实景直播</li>
           </ul>
           <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '选择套餐' }}</a>
         </article>
@@ -212,7 +211,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
 
       <section id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">
-        <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>订阅与续期，套餐赠送的烟火在开通时发放。</p></header>
+        <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>开通会员即可使用 AI 实景直播，套餐赠送的烟火在开通时发放。</p></header>
         <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
         <div v-else-if="!billing.plans.length" class="yanhuo-card yanhuo-empty"><img src="/images/brand/yifangzhi-mark.png" alt="" width="36" height="36"><h3>套餐尚未开放</h3><p>正式套餐公布后，可在这里订阅。</p></div>
         <div v-else class="yanhuo-plan-grid">
@@ -228,7 +227,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
 
 
       <section class="yanhuo-section" aria-labelledby="rules-title">
-        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>创作需有效会员，优先使用赠送的烟火。</p></header>
+        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>优先使用赠送的烟火；只有直播需要有效会员。</p></header>
         <dl class="yanhuo-rule-grid">
           <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong>生成中先预占，未交付的退回。</dd></div>
           <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
@@ -242,7 +241,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <template v-if="account">
         <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="topup-title">充值烟火</h2><button class="yanhuo-icon" type="button" aria-label="关闭充值窗口" title="关闭" @click="closeTopup"><X :size="20" /></button></header>
         <p class="yanhuo-topup-rate">1 元 = {{ account.creditsPerYuan }} 烟火，充值的烟火长期有效。</p>
-        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通或恢复会员。使用 AI 创作等会员功能前，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">订阅或续订套餐</a>。</p>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。图片、视频、文案等功能充值后就能用；使用 AI 实景直播前，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">订阅或续订套餐</a>。</p>
         <form class="yanhuo-topup-form" @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }}</small></label></fieldset>
           <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>

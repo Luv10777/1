@@ -63,9 +63,9 @@ class ReferralIntegrationTest {
     @BeforeEach void setup() {
         owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         owner.execute("TRUNCATE tenants RESTART IDENTITY CASCADE");
-        // referral_rates 引用 users，清空商户时会被一起清掉，按 V71 的默认值补回。
+        // referral_rates 引用 users，清空商户时会被一起清掉，按 V71、V72 的默认值补回。
         owner.execute("TRUNCATE referral_rates RESTART IDENTITY");
-        owner.update("INSERT INTO referral_rates(rate_bp, note) VALUES (1000, '上线默认 10%')");
+        owner.update("INSERT INTO referral_rates(kind, rate_bp, note) VALUES ('TOPUP', 1000, '上线默认 10%'), ('MEMBERSHIP', 2000, '开通会员默认 20%')");
         operatorTenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('平台') RETURNING id", Long.class);
         referrerTenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('邀请人商户') RETURNING id", Long.class);
         inviteeTenant = owner.queryForObject("INSERT INTO tenants(name) VALUES ('新商户') RETURNING id", Long.class);
@@ -90,8 +90,12 @@ class ReferralIntegrationTest {
     }
 
     private void topup(String orderId, long amountMinor) throws Exception {
+        paid(orderId, "TOPUP", amountMinor);
+    }
+
+    private void paid(String orderId, String kind, long amountMinor) throws Exception {
         TenantContext.runAs(inviteeTenant, () -> transactions.execute(s -> {
-            events.publishEvent(new BillingDtos.TopupPaid(inviteeTenant, orderId, amountMinor));
+            events.publishEvent(new BillingDtos.OrderPaid(inviteeTenant, orderId, kind, amountMinor));
             return null;
         }));
         var row = owner.queryForMap("SELECT id, tenant_id, payload::text AS payload FROM tasks WHERE type=? AND idempotency_key=?",
@@ -115,7 +119,7 @@ class ReferralIntegrationTest {
         assertThat(takeCode()).isEqualTo(code);
         mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
                 .andExpect(jsonPath("$.data.realNameVerified").value(true)).andExpect(jsonPath("$.data.code").value(code))
-                .andExpect(jsonPath("$.data.rateBp").value(1000));
+                .andExpect(jsonPath("$.data.topupRateBp").value(1000)).andExpect(jsonPath("$.data.membershipRateBp").value(2000));
     }
 
     @Test void inviteLinkBindsTheNewMerchantAndTopupsEarnFrozenCommission() throws Exception {
@@ -141,9 +145,28 @@ class ReferralIntegrationTest {
                 .andExpect(jsonPath("$.data.frozenMinor").value(0)).andExpect(jsonPath("$.data.availableMinor").value(1000))
                 .andExpect(jsonPath("$.data.commissions[0].state").value("AVAILABLE"));
 
+        // 开通 199 元会员按 20% 返 39.8 元；充值返利不受影响。
+        paid("order-member", "MEMBERSHIP", 19_900);
+        mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
+                .andExpect(jsonPath("$.data.commissions[0].kind").value("MEMBERSHIP"))
+                .andExpect(jsonPath("$.data.commissions[0].rateBp").value(2000))
+                .andExpect(jsonPath("$.data.commissions[0].amountMinor").value(3980))
+                .andExpect(jsonPath("$.data.commissions[1].kind").value("TOPUP"));
+
         // 被邀请商户看不到邀请人的任何数据。
         mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + inviteeToken))
                 .andExpect(jsonPath("$.data.inviteeCount").value(0)).andExpect(jsonPath("$.data.commissions").isEmpty());
+    }
+
+    @Test void theRegistrationPageCanCheckATypedCodeWithoutSigningIn() throws Exception {
+        verifyRealName(referrerTenant, referrer);
+        String code = takeCode();
+        mvc.perform(get("/api/public/referral-codes/{code}", code.toLowerCase())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.valid").value(true)).andExpect(jsonPath("$.data.userId").doesNotExist());
+        mvc.perform(get("/api/public/referral-codes/{code}", "NOSUCHCD")).andExpect(jsonPath("$.data.valid").value(false));
+        mvc.perform(get("/api/public/referral-codes/{code}", "a-b")).andExpect(jsonPath("$.data.valid").value(false));
+        owner.update("UPDATE users SET status='DISABLED' WHERE id=?", referrer);
+        mvc.perform(get("/api/public/referral-codes/{code}", code)).andExpect(jsonPath("$.data.valid").value(false));
     }
 
     @Test void unknownCodeOrNoCodeLeavesTheMerchantWithTheCompany() throws Exception {
@@ -151,7 +174,7 @@ class ReferralIntegrationTest {
         events.publishEvent(new AuthDtos.UserRegistered(inviteeTenant, invitee, "13912345678", null));
         assertThat(owner.queryForObject("SELECT count(*) FROM referral_attributions", Long.class)).isZero();
         TenantContext.runAs(inviteeTenant, () -> transactions.execute(s -> {
-            events.publishEvent(new BillingDtos.TopupPaid(inviteeTenant, "order-company", 10_000));
+            events.publishEvent(new BillingDtos.OrderPaid(inviteeTenant, "order-company", "TOPUP", 10_000));
             return null;
         }));
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE type=?", Long.class, ReferralCommissionHandler.TYPE)).isZero();
@@ -163,14 +186,17 @@ class ReferralIntegrationTest {
         events.publishEvent(new AuthDtos.UserRegistered(inviteeTenant, invitee, "13912345678", code));
         topup("order-old", 10_000);
 
-        String change = "{\"rateBp\":1500,\"note\":\"活动期间上调返利\"}";
+        String change = "{\"kind\":\"TOPUP\",\"rateBp\":1500,\"note\":\"活动期间上调返利\"}";
         mvc.perform(put("/api/platform/referral/rate").header("Authorization", "Bearer " + referrerToken)
                 .contentType("application/json").content(change)).andExpect(status().isForbidden());
         mvc.perform(put("/api/platform/referral/rate").header("Authorization", "Bearer " + operatorToken)
-                .contentType("application/json").content("{\"rateBp\":9000,\"note\":\"超过上限\"}")).andExpect(status().isBadRequest());
+                .contentType("application/json").content("{\"kind\":\"TOPUP\",\"rateBp\":9000,\"note\":\"超过上限\"}")).andExpect(status().isBadRequest());
+        mvc.perform(put("/api/platform/referral/rate").header("Authorization", "Bearer " + operatorToken)
+                .contentType("application/json").content("{\"kind\":\"OTHER\",\"rateBp\":100,\"note\":\"未知的返利类型\"}")).andExpect(status().isBadRequest());
         mvc.perform(put("/api/platform/referral/rate").header("Authorization", "Bearer " + operatorToken)
                 .contentType("application/json").content(change)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.rateBp").value(1500)).andExpect(jsonPath("$.data.history[0].note").value("活动期间上调返利"));
+                .andExpect(jsonPath("$.data.topupRateBp").value(1500)).andExpect(jsonPath("$.data.membershipRateBp").value(2000))
+                .andExpect(jsonPath("$.data.history[0].kind").value("TOPUP")).andExpect(jsonPath("$.data.history[0].note").value("活动期间上调返利"));
 
         topup("order-new", 10_000);
         assertThat(owner.queryForList("SELECT amount_minor FROM referral_commissions ORDER BY id", Long.class)).containsExactly(1000L, 1500L);

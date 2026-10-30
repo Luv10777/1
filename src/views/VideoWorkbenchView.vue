@@ -9,7 +9,7 @@ import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { get, post } from '../utils/request'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoHistoryTime, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
-import { billing, dateTime, number, refreshBilling, requireMembership } from '../stores/billing'
+import { billing, dateTime, number, refreshBilling, requireAccount } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
 import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
@@ -45,7 +45,6 @@ const quoteError = ref('')
 const quoteBusy = ref(false)
 const quoteDialog = ref(null)
 let quoteTarget = null
-const member = computed(() => billing.summary?.memberActive && billing.summary?.plan?.videoEnabled)
 let morphTimer
 const pollTimers = new Map()
 const objectUrls = new Set()
@@ -260,7 +259,7 @@ const pollWorkflow = async item => {
 
 const generate = async () => {
   if (isGenerating.value || activeConversation.value?.loading) return
-  try { await requireMembership() }
+  try { await requireAccount() }
   catch (error) { activeConversation.value.notice = error.message; return }
   if (disposed || isGenerating.value) return
   if (!prompt.value.trim()) { activeConversation.value.notice = '请先描述你的成片需求。'; return }
@@ -307,7 +306,7 @@ const generate = async () => {
 const closeQuote = () => { if (!quoteBusy.value) { quoteDialog.value?.close(); quoted.value = null; quoteTarget = null } }
 const confirmQuote = async () => {
   if (!quoted.value?.quote.available || quoteBusy.value || !quoteTarget) return
-  try { await requireMembership() }
+  try { await requireAccount() }
   catch (error) { quoteError.value = error.message; return }
   if (disposed || quoteBusy.value || !quoted.value || !quoteTarget) return
   const { request, quote } = quoted.value
@@ -329,7 +328,7 @@ const confirmQuote = async () => {
 const retryVideo = async () => {
   const item = activeConversation.value
   if (!item?.workflow?.retryable || item.submitting) return
-  try { await requireMembership() }
+  try { await requireAccount() }
   catch (error) { item.notice = error.message; return }
   if (disposed || item.submitting) return
   item.submitting = true
@@ -431,7 +430,6 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
       <div class="video-workbench-action vs-footer">
         <p v-if="notice" class="vs-notice" :class="{ 'is-error': activeConversation?.error }" role="status">{{ notice }}</p>
-        <RouterLink v-if="billing.summary && !member" to="/billing" class="generation-billing-link">{{ billing.summary.memberActive ? '当前套餐未开放视频创作' : '请先开通会员' }}</RouterLink>
         <button class="vs-generate" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</button>
         <small>先预估烟火，确认后开始生成</small>
         <p v-if="workflow?.chargedCredits != null" class="vs-notice">本次交付消耗 {{ number(workflow.chargedCredits) }} 烟火。</p>
@@ -506,7 +504,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       </aside>
     </VideoPreviewPanel>
     <dialog ref="quoteDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="video-price-title" @cancel.prevent="closeQuote">
-      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !member || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="!member || (billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
+      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="(billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
     </dialog>
   </div>
 </template>

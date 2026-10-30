@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 /**
  * 一代直推：新商户用邀请链接注册就永久归属邀请人，没有邀请码的归属公司。
- * 被邀请商户每次充值烟火实际到账，按当时的平台比例给邀请人记现金返利，冻结 7 天后可提现（提现在后续版本）。
+ * 被邀请商户每次充值烟火或开通会员实际付款，按当时对应的平台比例给邀请人记现金返利，冻结 7 天后可提现（提现在后续版本）。
  */
 @Slf4j
 @Service
@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 public class ReferralService {
     static final String AGREEMENT_VERSION = "2026-10-30";
     static final Duration FREEZE = Duration.ofDays(7);
+    static final String TOPUP = "TOPUP";
+    static final String MEMBERSHIP = "MEMBERSHIP";
     // 去掉容易看错的 0 O 1 I L。
     private static final String ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -54,13 +56,13 @@ public class ReferralService {
         return new ReferralDtos.Overview(
                 verified(userId),
                 codes.findById(userId).map(ReferralCode::getCode).orElse(null),
-                AGREEMENT_VERSION, currentRateBp(), (int) FREEZE.toDays(),
+                AGREEMENT_VERSION, currentRateBp(TOPUP), currentRateBp(MEMBERSHIP), (int) FREEZE.toDays(),
                 invitees.countByTenantIdAndReferrerUserId(tenantId, userId),
                 commissions.sumFrozen(tenantId, userId, now),
                 commissions.sumAvailable(tenantId, userId, now),
                 inviteeRows.stream().map(i -> new ReferralDtos.Invitee(i.getInviteePhoneMasked(), i.getRegisteredAt())).toList(),
                 commissionRows.stream().map(c -> new ReferralDtos.Commission(c.getId(), phones.getOrDefault(c.getInviteeTenantId(), "—"),
-                        c.getPaidMinor(), c.getRateBp(), c.getAmountMinor(), state(c, now), c.getAvailableAt(), c.getCreatedAt())).toList());
+                        c.getOrderKind(), c.getPaidMinor(), c.getRateBp(), c.getAmountMinor(), state(c, now), c.getAvailableAt(), c.getCreatedAt())).toList());
     }
 
     /** 实名核验通过、同意《推广协议》后领邀请码。已经领过的直接返回。 */
@@ -99,41 +101,50 @@ public class ReferralService {
         log.info("邀请注册归属: inviteeTenant={} referrerUser={}", inviteeTenantId, owner.getUserId());
     }
 
-    /** 充值入账的同一事务里调用（当前商户就是付款商户）：有邀请人就登记一个记返利的任务，按订单号去重。 */
-    public void onTopupPaid(Long tenantId, String orderId, long amountMinor) {
+    /** 注册页手动填写邀请码时核对：只回答能不能用，不透露邀请人是谁。 */
+    @Transactional(readOnly = true)
+    public boolean usableCode(String inviteCode) {
+        if (inviteCode == null || !inviteCode.trim().matches("[A-Za-z0-9]{4,16}")) return false;
+        return codes.findOwner(inviteCode.trim().toUpperCase(Locale.ROOT)).filter(o -> Boolean.TRUE.equals(o.getActive())).isPresent();
+    }
+
+    /** 订单付款入账的同一事务里调用（当前商户就是付款商户）：有邀请人就登记一个记返利的任务，按订单号去重。 */
+    public void onOrderPaid(Long tenantId, String orderId, String kind, long amountMinor) {
+        if (!TOPUP.equals(kind) && !MEMBERSHIP.equals(kind)) return;
         attributions.findById(tenantId).ifPresent(a -> tasks.submit(ReferralCommissionHandler.TYPE, null, Map.of(
-                "orderId", orderId, "paidMinor", amountMinor, "inviteeTenantId", tenantId,
+                "orderId", orderId, "kind", kind, "paidMinor", amountMinor, "inviteeTenantId", tenantId,
                 "referrerTenantId", a.getReferrerTenantId(), "referrerUserId", a.getReferrerUserId()),
                 "referral-commission:" + orderId, null));
     }
 
-    /** 任务里调用：按此刻的平台比例在邀请人所在商户记一条返利。 */
-    boolean recordCommission(Long referrerTenantId, Long referrerUserId, Long inviteeTenantId, String orderId, long paidMinor) {
-        int rateBp = currentRateBp();
+    /** 任务里调用：按此刻这类订单的平台比例，在邀请人所在商户记一条返利。 */
+    boolean recordCommission(Long referrerTenantId, Long referrerUserId, Long inviteeTenantId, String orderId, String kind, long paidMinor) {
+        int rateBp = currentRateBp(kind);
         return TenantContext.runAs(referrerTenantId, () -> store.saveCommission(referrerTenantId, referrerUserId, inviteeTenantId,
-                orderId, paidMinor, rateBp, Instant.now().plus(FREEZE)));
+                orderId, kind, paidMinor, rateBp, Instant.now().plus(FREEZE)));
     }
 
     @Transactional(readOnly = true)
     public ReferralDtos.RateView rate() {
-        return new ReferralDtos.RateView(currentRateBp(), rates.findTop10ByOrderByIdDesc().stream()
-                .map(r -> new ReferralDtos.RateChange(r.getRateBp(), r.getNote(), r.getCreatedBy(), r.getCreatedAt())).toList());
+        return new ReferralDtos.RateView(currentRateBp(TOPUP), currentRateBp(MEMBERSHIP), rates.findTop10ByOrderByIdDesc().stream()
+                .map(r -> new ReferralDtos.RateChange(r.getKind(), r.getRateBp(), r.getNote(), r.getCreatedBy(), r.getCreatedAt())).toList());
     }
 
     /** 新比例只影响之后到账的充值；已经记好的返利保留当时的比例。 */
     @Transactional
     public ReferralDtos.RateView updateRate(Long operatorId, ReferralDtos.UpdateRate request) {
         var row = new ReferralRate();
+        row.setKind(request.kind());
         row.setRateBp(request.rateBp());
         row.setNote(request.note().trim());
         row.setCreatedBy(operatorId);
         rates.save(row);
-        log.info("返利比例调整为 {} bp，操作人 {}", request.rateBp(), operatorId);
+        log.info("{} 返利比例调整为 {} bp，操作人 {}", request.kind(), request.rateBp(), operatorId);
         return rate();
     }
 
-    int currentRateBp() {
-        return rates.findTopByOrderByIdDesc().map(ReferralRate::getRateBp).orElse(0);
+    int currentRateBp(String kind) {
+        return rates.findTopByKindOrderByIdDesc(kind).map(ReferralRate::getRateBp).orElse(0);
     }
 
     private boolean verified(Long userId) {

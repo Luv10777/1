@@ -43,13 +43,14 @@ class ReferralStore {
     /** 返回 false 表示这笔充值已经记过。 */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean saveCommission(Long referrerTenantId, Long referrerUserId, Long inviteeTenantId, String orderId,
-                                  long paidMinor, int rateBp, Instant availableAt) {
+                                  String orderKind, long paidMinor, int rateBp, Instant availableAt) {
         if (commissions.existsByOrderId(orderId)) return false;
         var row = new ReferralCommission();
         row.setTenantId(referrerTenantId);
         row.setReferrerUserId(referrerUserId);
         row.setInviteeTenantId(inviteeTenantId);
         row.setOrderId(orderId);
+        row.setOrderKind(orderKind);
         row.setPaidMinor(paidMinor);
         row.setRateBp(rateBp);
         row.setAmountMinor(paidMinor * rateBp / 10_000);
