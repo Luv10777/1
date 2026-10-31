@@ -1,6 +1,9 @@
 package com.wuyao.growth.community;
 
 import com.aliyun.cloudauth20190307.Client;
+import com.aliyun.cloudauth20190307.models.BankMetaVerifyRequest;
+import com.aliyun.cloudauth20190307.models.BankMetaVerifyResponse;
+import com.aliyun.cloudauth20190307.models.BankMetaVerifyResponseBody;
 import com.aliyun.cloudauth20190307.models.Id2MetaVerifyRequest;
 import com.aliyun.cloudauth20190307.models.Id2MetaVerifyResponse;
 import com.aliyun.cloudauth20190307.models.Id2MetaVerifyResponseBody;
@@ -58,6 +61,46 @@ class AliyunIdentityVerifierTest {
     void missingCredentialsFallBackToManualReview() {
         assertThat(new AliyunIdentityVerifier(null).verify("张三", "11010519491231002X").outcome())
                 .isEqualTo(IdentityVerifier.Outcome.UNAVAILABLE);
+    }
+
+    @Test
+    void bankCardUsesFourElementsWithoutAutomaticRetry() throws Exception {
+        when(client.bankMetaVerifyWithOptions(any(), any())).thenReturn(bankResponse(200, "200", "1"));
+        var result = verifier.verifyBankCard("张三", "11010519491231002X", "6222000000001234", "13800000002");
+
+        var request = ArgumentCaptor.forClass(BankMetaVerifyRequest.class);
+        var runtime = ArgumentCaptor.forClass(RuntimeOptions.class);
+        verify(client).bankMetaVerifyWithOptions(request.capture(), runtime.capture());
+        assertThat(request.getValue().getProductType()).isEqualTo("BANK_CARD_4_META");
+        assertThat(request.getValue().getVerifyMode()).isEqualTo("VERIFY_BANK_CARD");
+        assertThat(request.getValue().getParamType()).isEqualTo("normal");
+        assertThat(request.getValue().getUserName()).isEqualTo("张三");
+        assertThat(request.getValue().getIdentifyNum()).isEqualTo("11010519491231002X");
+        assertThat(request.getValue().getBankCard()).isEqualTo("6222000000001234");
+        assertThat(request.getValue().getMobile()).isEqualTo("13800000002");
+        assertThat(runtime.getValue().getAutoretry()).isFalse();
+        assertThat(result).isEqualTo(new IdentityVerifier.Result(IdentityVerifier.Outcome.MATCH, "REQ-1"));
+    }
+
+    @Test
+    void bankCardMismatchOrNoRecordIsAMismatchAndAnythingElseUnavailable() throws Exception {
+        for (String bizCode : new String[]{"2", "3"}) {
+            when(client.bankMetaVerifyWithOptions(any(), any())).thenReturn(bankResponse(200, "200", bizCode));
+            assertThat(verifier.verifyBankCard("张三", "11010519491231002X", "6222000000001234", "13800000002").outcome())
+                    .isEqualTo(IdentityVerifier.Outcome.MISMATCH);
+        }
+        for (var response : new BankMetaVerifyResponse[]{bankResponse(200, "200", null), bankResponse(200, "401", "1"),
+                bankResponse(500, "200", "1"), new BankMetaVerifyResponse(), null}) {
+            when(client.bankMetaVerifyWithOptions(any(), any())).thenReturn(response);
+            assertThat(verifier.verifyBankCard("张三", "11010519491231002X", "6222000000001234", "13800000002").outcome())
+                    .isEqualTo(IdentityVerifier.Outcome.UNAVAILABLE);
+        }
+    }
+
+    private static BankMetaVerifyResponse bankResponse(int status, String code, String bizCode) {
+        var body = new BankMetaVerifyResponseBody().setCode(code).setRequestId("REQ-1")
+                .setResultObject(new BankMetaVerifyResponseBody.BankMetaVerifyResponseBodyResultObject().setBizCode(bizCode));
+        return new BankMetaVerifyResponse().setStatusCode(status).setBody(body);
     }
 
     private static Id2MetaVerifyResponse response(int status, String code, String bizCode) {

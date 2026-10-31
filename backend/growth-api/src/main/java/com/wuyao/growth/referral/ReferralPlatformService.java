@@ -4,6 +4,7 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.common.web.PageResult;
+import com.wuyao.growth.community.BankCardDtos;
 import com.wuyao.growth.iam.service.PlatformAccountDirectory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * 平台运营看邀请关系、返利明细和推广人排行。数据按商户隔离，这里像烟火日志一样逐个商户只读取一遍再汇总；
+ * 平台运营看邀请关系、返利明细、推广人排行和提现单，并处理作废返利、审核提现。数据按商户隔离，这里像烟火日志一样逐个商户只读取一遍再汇总；
  * 调用方必须先核对平台运营身份。每个商户最多取最近 PER_TENANT_LIMIT 条返利。
  */
 @Service
@@ -34,12 +35,15 @@ import java.util.stream.Collectors;
 public class ReferralPlatformService {
     static final int PER_TENANT_LIMIT = 2000;
     private static final Set<String> SCOPES = Set.of("ALL", "INVITED", "COMPANY");
-    private static final Set<String> STATES = Set.of("FROZEN", "AVAILABLE", "VOIDED");
+    private static final Set<String> STATES = Set.of("FROZEN", "AVAILABLE", "WITHDRAWING", "WITHDRAWN", "VOIDED");
+    private static final Set<String> WITHDRAWAL_STATUSES = Set.of("PENDING", "REJECTED", "PAID");
 
     private final PlatformAccountDirectory directory;
     private final ReferralCodeRepository codes;
     private final ReferralAttributionRepository attributions;
     private final ReferralCommissionRepository commissions;
+    private final ReferralWithdrawalRepository withdrawals;
+    private final ReferralWithdrawalService withdrawalService;
     private final PlatformTransactionManager transactionManager;
 
     public PageResult<ReferralDtos.AdminRelation> relations(String keyword, String scope, int page, int size) {
@@ -91,11 +95,11 @@ public class ReferralPlatformService {
         var views = matched.stream().map(c -> {
             var referrer = data.users().get(c.getReferrerUserId());
             var invitee = data.ownerOf(c.getInviteeTenantId());
-            return new ReferralDtos.AdminCommission(c.getId(), c.getReferrerUserId(), referrer == null ? null : referrer.name(),
+            return new ReferralDtos.AdminCommission(c.getId(), c.getTenantId(), c.getReferrerUserId(), referrer == null ? null : referrer.name(),
                     referrer == null ? "—" : ReferralService.maskPhone(referrer.phone()), c.getInviteeTenantId(),
                     data.tenants().get(c.getInviteeTenantId()), invitee == null ? "—" : ReferralService.maskPhone(invitee.phone()),
                     c.getOrderKind(), c.getPaidMinor(), c.getRateBp(), c.getAmountMinor(), ReferralService.state(c, now),
-                    c.getAvailableAt(), c.getCreatedAt());
+                    c.getVoidNote(), c.getAvailableAt(), c.getCreatedAt());
         }).toList();
         return new ReferralDtos.AdminCommissionPage(page(views, page, size), frozen, available);
     }
@@ -120,6 +124,50 @@ public class ReferralPlatformService {
         }).sorted(Comparator.comparingLong(ReferralDtos.AdminPromoter::commissionMinor).reversed()
                 .thenComparing(Comparator.comparingLong(ReferralDtos.AdminPromoter::inviteeCount).reversed())
                 .thenComparing(ReferralDtos.AdminPromoter::codeCreatedAt)).toList();
+    }
+
+    /** 提现单按申请时间倒序；待审核的合计不受筛选影响。 */
+    public ReferralDtos.AdminWithdrawalPage withdrawals(String status, int page, int size) {
+        if (StringUtils.hasText(status) && !WITHDRAWAL_STATUSES.contains(status)) throw BizException.of(ErrorCode.BAD_REQUEST, "状态不正确");
+        var tenants = new java.util.LinkedHashMap<Long, String>();
+        directory.scopes().forEach(s -> tenants.put(s.id(), s.name()));
+        var users = directory.users().stream().collect(Collectors.toMap(PlatformAccountDirectory.PlatformUser::id, Function.identity()));
+        var rows = new ArrayList<ReferralWithdrawal>();
+        for (Long tenantId : tenants.keySet()) {
+            inTenant(tenantId, () -> rows.addAll(withdrawals.findTop2000ByTenantIdOrderByCreatedAtDesc(tenantId)));
+        }
+        var pending = rows.stream().filter(w -> "PENDING".equals(w.getStatus())).toList();
+        var views = rows.stream().filter(w -> !StringUtils.hasText(status) || status.equals(w.getStatus()))
+                .sorted(Comparator.comparing(ReferralWithdrawal::getCreatedAt).reversed().thenComparing(ReferralWithdrawal::getId, Comparator.reverseOrder()))
+                .map(w -> {
+                    var user = users.get(w.getUserId());
+                    return new ReferralDtos.AdminWithdrawal(w.getId(), w.getTenantId(), tenants.get(w.getTenantId()), w.getUserId(),
+                            user == null ? null : user.name(), user == null ? "—" : ReferralService.maskPhone(user.phone()),
+                            w.getCommissionMinor(), w.getClawbackMinor(), w.getAmountMinor(), w.getStatus(), w.getBankName(),
+                            w.getCardLast4(), w.getReviewNote(), w.getTaxMinor(), w.getNetMinor(), w.getPaidReference(),
+                            w.getPaidDate(), w.getCreatedAt(), w.getReviewedAt());
+                }).toList();
+        return new ReferralDtos.AdminWithdrawalPage(page(views, page, size), pending.size(),
+                pending.stream().mapToLong(ReferralWithdrawal::getAmountMinor).sum());
+    }
+
+    public BankCardDtos.PayeeDetail revealPayee(Long operatorId, Long tenantId, Long id, String purpose) {
+        return TenantContext.runAs(tenantId, () -> withdrawalService.reveal(id, purpose, operatorId));
+    }
+
+    public ReferralDtos.Withdrawal reject(Long operatorId, Long tenantId, Long id, String note) {
+        return TenantContext.runAs(tenantId, () -> withdrawalService.reject(id, note, operatorId));
+    }
+
+    public ReferralDtos.Withdrawal markPaid(Long operatorId, Long tenantId, Long id, ReferralDtos.PayWithdrawal request) {
+        return TenantContext.runAs(tenantId, () -> withdrawalService.markPaid(id, request, operatorId));
+    }
+
+    public void voidCommission(Long operatorId, Long tenantId, Long id, String note) {
+        TenantContext.runAs(tenantId, () -> {
+            withdrawalService.voidCommission(id, note, operatorId);
+            return null;
+        });
     }
 
     private Snapshot snapshot() {

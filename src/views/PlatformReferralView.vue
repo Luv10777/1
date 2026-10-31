@@ -1,16 +1,17 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { ChevronRight, Percent, ReceiptText, RefreshCw, Trophy, Users } from 'lucide-vue-next'
+import { ChevronRight, Percent, ReceiptText, RefreshCw, Trophy, Users, Wallet } from 'lucide-vue-next'
 import ReferralCommissionsPanel from '../components/referral/ReferralCommissionsPanel.vue'
 import ReferralPromotersPanel from '../components/referral/ReferralPromotersPanel.vue'
 import ReferralRelationsPanel from '../components/referral/ReferralRelationsPanel.vue'
+import ReferralWithdrawalsPanel from '../components/referral/ReferralWithdrawalsPanel.vue'
 import { referralApi } from '../services/referralApi'
 import { commissionKinds, parseRatePercent, ratePercent } from '../domain/referral'
 import { managementDate } from '../domain/platformManagement'
 import { auth } from '../stores/auth'
 import '../platform-management.css'
 
-// 邀请返利后台：谁是谁名下、每一笔返利、推广人排行，以及返利比例。
+// 邀请返利后台：谁是谁名下、每一笔返利、推广人排行、提现审核，以及返利比例。
 const tab = ref('relations')
 const referrerFilter = ref(null)
 const reloadKey = ref(0)
@@ -84,12 +85,14 @@ onMounted(load)
       <button type="button" role="tab" :aria-selected="tab === 'relations'" :class="{ active: tab === 'relations' }" @click="tab = 'relations'"><Users :size="16" />邀请关系</button>
       <button type="button" role="tab" :aria-selected="tab === 'commissions'" :class="{ active: tab === 'commissions' }" @click="tab = 'commissions'"><ReceiptText :size="16" />返利明细</button>
       <button type="button" role="tab" :aria-selected="tab === 'promoters'" :class="{ active: tab === 'promoters' }" @click="tab = 'promoters'"><Trophy :size="16" />推广人排行</button>
+      <button type="button" role="tab" :aria-selected="tab === 'withdrawals'" :class="{ active: tab === 'withdrawals' }" @click="tab = 'withdrawals'"><Wallet :size="16" />提现审核</button>
       <button type="button" role="tab" :aria-selected="tab === 'rate'" :class="{ active: tab === 'rate' }" @click="tab = 'rate'"><Percent :size="16" />返利比例</button>
     </div>
 
     <ReferralRelationsPanel v-if="tab === 'relations'" :key="`relations-${reloadKey}`" @show-commissions="showCommissions" />
     <ReferralCommissionsPanel v-else-if="tab === 'commissions'" :key="`commissions-${reloadKey}`" :referrer-user-id="referrerFilter" @clear-referrer="referrerFilter = null" />
     <ReferralPromotersPanel v-else-if="tab === 'promoters'" :key="`promoters-${reloadKey}`" @show-commissions="showCommissions" />
+    <ReferralWithdrawalsPanel v-else-if="tab === 'withdrawals'" :key="`withdrawals-${reloadKey}`" />
     <template v-else>
       <div v-if="error" class="mg-state mg-error" role="alert"><Percent :size="30" /><h3>暂时无法读取</h3><p>{{ error }}</p><button class="mg-button" type="button" :disabled="loading" @click="load">重新读取</button></div>
       <template v-else-if="rate">

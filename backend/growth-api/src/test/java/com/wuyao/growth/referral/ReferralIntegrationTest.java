@@ -6,6 +6,8 @@ import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.common.security.JwtService;
 import com.wuyao.growth.common.task.Task;
 import com.wuyao.growth.common.tenant.TenantContext;
+import com.wuyao.growth.community.IdentityVerifier;
+import com.wuyao.growth.community.RealNameCrypto;
 import com.wuyao.growth.iam.dto.AuthDtos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,17 +19,24 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -57,6 +66,8 @@ class ReferralIntegrationTest {
     @Autowired ApplicationEventPublisher events;
     @Autowired TransactionTemplate transactions;
     @Autowired ReferralCommissionHandler handler;
+    @Autowired RealNameCrypto crypto;
+    @MockitoBean IdentityVerifier verifier;
     JdbcTemplate owner;
     Long operatorTenant, referrerTenant, inviteeTenant, operator, referrer, invitee;
     String operatorToken, referrerToken, inviteeToken;
@@ -80,7 +91,8 @@ class ReferralIntegrationTest {
 
     private void verifyRealName(Long tenantId, Long userId) {
         owner.update("INSERT INTO real_name_applications(tenant_id,user_id,legal_name_ciphertext,id_number_ciphertext,legal_name_masked,id_number_masked,status) "
-                + "VALUES (?,?,?,?,'张*','110***********002X','VERIFIED')", tenantId, userId, new byte[]{1}, new byte[]{1});
+                + "VALUES (?,?,?,?,'张*','110***********002X','VERIFIED')", tenantId, userId,
+                crypto.encrypt("张三", tenantId, userId, "name"), crypto.encrypt("11010519491231002X", tenantId, userId, "number"));
     }
 
     private String takeCode() throws Exception {
@@ -245,5 +257,140 @@ class ReferralIntegrationTest {
 
         topup("order-new", 10_000);
         assertThat(owner.queryForList("SELECT amount_minor FROM referral_commissions ORDER BY id", Long.class)).containsExactly(1000L, 1500L);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions bindCard(String cardNumber) throws Exception {
+        return mvc.perform(put("/api/identity/bank-card").header("Authorization", "Bearer " + referrerToken).contentType("application/json")
+                .content("{\"bankName\":\"中国工商银行\",\"cardNumber\":\"" + cardNumber + "\",\"mobile\":\"13800000002\",\"declarationAccepted\":true}"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions withdraw() throws Exception {
+        return mvc.perform(post("/api/referral/withdrawals").header("Authorization", "Bearer " + referrerToken)
+                .contentType("application/json").content("{\"agreementAccepted\":true}"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions operatorPost(String path, String body) throws Exception {
+        return mvc.perform(post(path).header("Authorization", "Bearer " + operatorToken).contentType("application/json").content(body));
+    }
+
+    private Long commissionOf(String orderId) {
+        return owner.queryForObject("SELECT id FROM referral_commissions WHERE order_id=?", Long.class, orderId);
+    }
+
+    private void unfreeze() {
+        owner.update("UPDATE referral_commissions SET available_at = now() - interval '1 minute' WHERE available_at > now()");
+    }
+
+    @Test void theBankCardMustBeTheVerifiedPersonsOwnAndMismatchesAreCapped() throws Exception {
+        when(verifier.verifyBankCard(any(), any(), any(), any())).thenReturn(new IdentityVerifier.Result(IdentityVerifier.Outcome.MATCH, "REQ-1"));
+        bindCard("6222 0000 0000 1234").andExpect(status().isForbidden());
+        verifyRealName(referrerTenant, referrer);
+        bindCard("6222 0000 0000 1234").andExpect(status().isOk()).andExpect(jsonPath("$.data.matched").value(true))
+                .andExpect(jsonPath("$.data.card.cardLast4").value("1234")).andExpect(jsonPath("$.data.card.bankName").value("中国工商银行"));
+        // 核验用的是实名里的姓名和身份证号，卡号去掉空格；卡号只存密文。
+        org.mockito.Mockito.verify(verifier).verifyBankCard(eq("张三"), eq("11010519491231002X"), eq("6222000000001234"), eq("13800000002"));
+        byte[] stored = owner.queryForObject("SELECT card_number_ciphertext FROM bank_cards WHERE user_id=?", byte[].class, referrer);
+        assertThat(new String(stored, StandardCharsets.ISO_8859_1)).doesNotContain("6222000000001234");
+
+        when(verifier.verifyBankCard(any(), any(), any(), any())).thenReturn(new IdentityVerifier.Result(IdentityVerifier.Outcome.MISMATCH, "REQ-2"));
+        for (int i = 0; i < 3; i++) {
+            bindCard("6222000000005678").andExpect(status().isOk()).andExpect(jsonPath("$.data.matched").value(false))
+                    .andExpect(jsonPath("$.data.card.cardLast4").value("1234"));
+        }
+        bindCard("6222000000005678").andExpect(status().isTooManyRequests());
+        mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
+                .andExpect(jsonPath("$.data.bankCard.cardLast4").value("1234")).andExpect(jsonPath("$.data.withdrawMinimumMinor").value(10_000));
+
+        when(verifier.verifyBankCard(any(), any(), any(), any())).thenReturn(new IdentityVerifier.Result(IdentityVerifier.Outcome.UNAVAILABLE, null));
+        owner.update("DELETE FROM platform_management_audit WHERE target_type='BANK_CARD'");
+        bindCard("6222000000005678").andExpect(status().isServiceUnavailable());
+    }
+
+    @Test void promotersWithdrawEverythingAvailableAndOperatorsReviewPayAndClawBack() throws Exception {
+        verifyRealName(referrerTenant, referrer);
+        String code = takeCode();
+        events.publishEvent(new AuthDtos.UserRegistered(inviteeTenant, invitee, "13912345678", code));
+        topup("order-1", 50_000);
+        topup("order-2", 60_000);
+        unfreeze();
+        topup("order-frozen", 10_000);
+
+        withdraw().andExpect(status().isConflict());
+        when(verifier.verifyBankCard(any(), any(), any(), any())).thenReturn(new IdentityVerifier.Result(IdentityVerifier.Outcome.MATCH, "REQ-1"));
+        bindCard("6222000000001234").andExpect(status().isOk());
+
+        mvc.perform(post("/api/referral/withdrawals").header("Authorization", "Bearer " + referrerToken)
+                .contentType("application/json").content("{\"agreementAccepted\":false}")).andExpect(status().isBadRequest());
+        // 可提现 50 + 60 元全部带走，冻结中的不动；提现单记下同意的协议版本。
+        String first = withdraw().andExpect(status().isOk()).andExpect(jsonPath("$.data.amountMinor").value(11_000))
+                .andExpect(jsonPath("$.data.status").value("PENDING")).andExpect(jsonPath("$.data.cardLast4").value("1234"))
+                .andReturn().getResponse().getContentAsString();
+        long firstId = json.readTree(first).path("data").path("id").asLong();
+        assertThat(owner.queryForObject("SELECT agreement_version FROM referral_withdrawals WHERE id=?", String.class, firstId))
+                .isEqualTo(ReferralService.AGREEMENT_VERSION);
+        withdraw().andExpect(status().isConflict());
+        mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
+                .andExpect(jsonPath("$.data.availableMinor").value(0)).andExpect(jsonPath("$.data.frozenMinor").value(1000))
+                .andExpect(jsonPath("$.data.withdrawals[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.data.commissions[1].state").value("WITHDRAWING"));
+
+        String base = "/api/platform/referral/withdrawals/" + referrerTenant + "/" + firstId;
+        mvc.perform(get("/api/platform/referral/withdrawals").header("Authorization", "Bearer " + referrerToken)).andExpect(status().isForbidden());
+        mvc.perform(post(base + "/reject").header("Authorization", "Bearer " + referrerToken).contentType("application/json")
+                .content("{\"note\":\"自己驳回\"}")).andExpect(status().isForbidden());
+        mvc.perform(get("/api/platform/referral/withdrawals?status=PENDING").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.page.total").value(1)).andExpect(jsonPath("$.data.pendingMinor").value(11_000))
+                .andExpect(jsonPath("$.data.page.items[0].userName").value("推广人"))
+                .andExpect(jsonPath("$.data.page.items[0].tenantId").value(referrerTenant));
+
+        // 待审核单里的返利不能直接作废。
+        operatorPost("/api/platform/referral/commissions/" + referrerTenant + "/" + commissionOf("order-1") + "/void",
+                "{\"note\":\"被邀请商户退款\"}").andExpect(status().isConflict());
+
+        operatorPost(base + "/reveal", "{\"purpose\":\"网银转账核对收款信息\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.holderName").value("张三")).andExpect(jsonPath("$.data.cardNumber").value("6222000000001234"));
+        assertThat(owner.queryForObject("SELECT count(*) FROM platform_management_audit WHERE target_type='REFERRAL_WITHDRAWAL' AND action='REVEAL'",
+                Long.class)).isEqualTo(1);
+
+        // 驳回后返利回到可提现。
+        operatorPost(base + "/reject", "{\"note\":\"收款卡信息需要更新\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("REJECTED"));
+        operatorPost(base + "/reject", "{\"note\":\"重复驳回\"}").andExpect(status().isConflict());
+        mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
+                .andExpect(jsonPath("$.data.availableMinor").value(11_000)).andExpect(jsonPath("$.data.withdrawals[0].reviewNote").value("收款卡信息需要更新"));
+
+        String second = withdraw().andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String paid = "/api/platform/referral/withdrawals/" + referrerTenant + "/" + json.readTree(second).path("data").path("id").asLong() + "/paid";
+        String today = LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
+        operatorPost(paid, "{\"taxMinor\":20000,\"reference\":\"TX-0001\",\"paidDate\":\"" + today + "\"}").andExpect(status().isBadRequest());
+        operatorPost(paid, "{\"taxMinor\":1000,\"reference\":\"TX-0001\",\"paidDate\":\"" + LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(2) + "\"}")
+                .andExpect(status().isBadRequest());
+        operatorPost(paid, "{\"taxMinor\":1000,\"reference\":\"TX-0001\",\"paidDate\":\"" + today + "\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PAID")).andExpect(jsonPath("$.data.taxMinor").value(1000))
+                .andExpect(jsonPath("$.data.netMinor").value(10_000));
+
+        // 已打款的返利作废后变成欠款；冻结中的直接作废，不算欠款。
+        operatorPost("/api/platform/referral/commissions/" + referrerTenant + "/" + commissionOf("order-1") + "/void",
+                "{\"note\":\"被邀请商户退款\"}").andExpect(status().isOk());
+        operatorPost("/api/platform/referral/commissions/" + referrerTenant + "/" + commissionOf("order-1") + "/void",
+                "{\"note\":\"被邀请商户退款\"}").andExpect(status().isConflict());
+        operatorPost("/api/platform/referral/commissions/" + referrerTenant + "/" + commissionOf("order-frozen") + "/void",
+                "{\"note\":\"冻结期内退款\"}").andExpect(status().isOk());
+        mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
+                .andExpect(jsonPath("$.data.owedMinor").value(5000)).andExpect(jsonPath("$.data.frozenMinor").value(0))
+                .andExpect(jsonPath("$.data.availableMinor").value(0));
+        mvc.perform(get("/api/platform/referral/commissions?state=WITHDRAWN").header("Authorization", "Bearer " + operatorToken))
+                .andExpect(jsonPath("$.data.page.total").value(1));
+
+        // 新返利 120 元，扣回 50 元后 70 元不满 100 元不能提；再来 50 元，提走 170 - 50 = 120 元。
+        topup("order-3", 120_000);
+        unfreeze();
+        withdraw().andExpect(status().isConflict());
+        topup("order-4", 50_000);
+        unfreeze();
+        withdraw().andExpect(status().isOk()).andExpect(jsonPath("$.data.commissionMinor").value(17_000))
+                .andExpect(jsonPath("$.data.clawbackMinor").value(5000)).andExpect(jsonPath("$.data.amountMinor").value(12_000));
+        mvc.perform(get("/api/referral/me").header("Authorization", "Bearer " + referrerToken))
+                .andExpect(jsonPath("$.data.owedMinor").value(0)).andExpect(jsonPath("$.data.availableMinor").value(0));
     }
 }

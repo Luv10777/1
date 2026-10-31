@@ -4,6 +4,7 @@ import com.wuyao.growth.common.task.TaskService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.community.BankCardService;
 import com.wuyao.growth.community.RealNameService;
 import com.wuyao.growth.iam.service.PlatformAccountDirectory;
 import lombok.RequiredArgsConstructor;
@@ -21,13 +22,14 @@ import java.util.stream.Collectors;
 
 /**
  * 一代直推：新商户用邀请链接注册就永久归属邀请人，没有邀请码的归属公司。
- * 被邀请商户每次充值烟火或开通会员实际付款，按当时对应的平台比例给邀请人记现金返利，冻结 7 天后可提现（提现在后续版本）。
+ * 被邀请商户每次充值烟火或开通会员实际付款，按当时对应的平台比例给邀请人记现金返利，冻结 7 天后可提现（见 ReferralWithdrawalService）。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReferralService {
-    static final String AGREEMENT_VERSION = "2026-10-30";
+    // 2026-10-31 写明提现规则和已提现返利作废后从下次提现扣回；每次申请提现都要同意当前版本。
+    static final String AGREEMENT_VERSION = "2026-10-31";
     static final Duration FREEZE = Duration.ofDays(7);
     static final String TOPUP = "TOPUP";
     static final String MEMBERSHIP = "MEMBERSHIP";
@@ -42,6 +44,8 @@ public class ReferralService {
     private final ReferralRateRepository rates;
     private final ReferralStore store;
     private final RealNameService realNames;
+    private final BankCardService bankCards;
+    private final ReferralWithdrawalService withdrawals;
     private final PlatformAccountDirectory accounts;
     private final TaskService tasks;
 
@@ -60,9 +64,14 @@ public class ReferralService {
                 invitees.countByTenantIdAndReferrerUserId(tenantId, userId),
                 commissions.sumFrozen(tenantId, userId, now),
                 commissions.sumAvailable(tenantId, userId, now),
+                commissions.sumOwed(tenantId, userId),
+                ReferralWithdrawalService.MINIMUM_MINOR,
+                bankCards.current(userId),
                 inviteeRows.stream().map(i -> new ReferralDtos.Invitee(i.getInviteePhoneMasked(), i.getRegisteredAt())).toList(),
                 commissionRows.stream().map(c -> new ReferralDtos.Commission(c.getId(), phones.getOrDefault(c.getInviteeTenantId(), "—"),
-                        c.getOrderKind(), c.getPaidMinor(), c.getRateBp(), c.getAmountMinor(), state(c, now), c.getAvailableAt(), c.getCreatedAt())).toList());
+                        c.getOrderKind(), c.getPaidMinor(), c.getRateBp(), c.getAmountMinor(), state(c, now), c.getVoidNote(),
+                        c.getAvailableAt(), c.getCreatedAt())).toList(),
+                withdrawals.mine(userId));
     }
 
     /** 实名核验通过、同意《推广协议》后领邀请码。已经领过的直接返回。 */
@@ -163,6 +172,8 @@ public class ReferralService {
 
     static String state(ReferralCommission c, Instant now) {
         if ("VOIDED".equals(c.getStatus())) return "VOIDED";
+        if (c.getWithdrawnAt() != null) return "WITHDRAWN";
+        if (c.getWithdrawalId() != null) return "WITHDRAWING";
         return c.getAvailableAt().isAfter(now) ? "FROZEN" : "AVAILABLE";
     }
 

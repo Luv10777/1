@@ -3,7 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { ShieldCheck } from 'lucide-vue-next'
 import { referralApi } from '../services/referralApi'
-import { commissionKinds, commissionStates, inviteLink, ratePercent } from '../domain/referral'
+import { commissionKinds, commissionStates, formatCardNumber, inviteLink, ratePercent, withdrawable, withdrawalStatuses } from '../domain/referral'
+import { LEGAL_ENTITY } from '../domain/legalPolicies'
 import { managementDate } from '../domain/platformManagement'
 import { yuan } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -55,6 +56,79 @@ async function copy(text, label) {
   }
 }
 
+// 提现：先绑本人银行卡（四要素核验，不做人工审核），再把全部可提现返利一次提走；平台审核后转账到这张卡。
+const cardOpen = ref(false)
+const card = ref({ bankName: '', cardNumber: '', mobile: '', declarationAccepted: false })
+const binding = ref(false)
+const cardError = ref('')
+const cardMismatch = ref(false)
+const confirming = ref(false)
+const withdrawAgreed = ref(false)
+const withdrawing = ref(false)
+const withdrawError = ref('')
+const withdrawNotice = ref('')
+
+const amount = computed(() => overview.value ? withdrawable(overview.value) : 0)
+const pending = computed(() => overview.value?.withdrawals?.some(w => w.status === 'PENDING'))
+const blocker = computed(() => {
+  const value = overview.value
+  if (!value) return ''
+  if (pending.value) return '有一笔提现在审核中，处理完才能再申请。'
+  if (!value.bankCard) return '绑定本人银行卡后才能申请提现。'
+  if (amount.value < value.withdrawMinimumMinor) return `还差 ${yuan(value.withdrawMinimumMinor - amount.value)} 满 ${yuan(value.withdrawMinimumMinor)} 可申请提现。`
+  return ''
+})
+
+function openCard() {
+  card.value = { bankName: '', cardNumber: '', mobile: '', declarationAccepted: false }
+  cardError.value = ''
+  cardMismatch.value = false
+  cardOpen.value = true
+}
+
+async function bindCard() {
+  if (binding.value) return
+  const values = card.value
+  if (values.bankName.trim().length < 2) { cardError.value = '请填写开户银行，例如：中国工商银行。'; return }
+  if (!/^\d{12,19}$/.test(values.cardNumber.replace(/ /g, ''))) { cardError.value = '请输入 12–19 位银行卡号。'; return }
+  if (!/^1\d{10}$/.test(values.mobile.trim())) { cardError.value = '请输入银行预留的 11 位手机号。'; return }
+  if (!values.declarationAccepted) { cardError.value = '请确认这是本人名下的银行卡。'; return }
+  binding.value = true
+  cardError.value = ''
+  cardMismatch.value = false
+  try {
+    const result = await referralApi.bindCard({ ...values, bankName: values.bankName.trim(), mobile: values.mobile.trim() })
+    if (!result.matched) {
+      cardMismatch.value = true
+      return
+    }
+    overview.value = { ...overview.value, bankCard: result.card }
+    cardOpen.value = false
+    withdrawNotice.value = `已绑定 ${result.card.bankName} 尾号 ${result.card.cardLast4} 的银行卡。`
+  } catch (failure) {
+    cardError.value = failure.message || '银行卡暂时无法核验，请稍后重试'
+  } finally {
+    binding.value = false
+  }
+}
+
+async function withdraw() {
+  if (withdrawing.value) return
+  if (!withdrawAgreed.value) { withdrawError.value = '请先阅读并同意《推广协议》中的提现规则。'; return }
+  withdrawing.value = true
+  withdrawError.value = ''
+  try {
+    const result = await referralApi.withdraw()
+    confirming.value = false
+    withdrawNotice.value = `已申请提现 ${yuan(result.amountMinor)}，平台审核后会转到尾号 ${result.cardLast4} 的银行卡。`
+    await load()
+  } catch (failure) {
+    withdrawError.value = failure.message || '提现暂时无法申请，请稍后重试'
+  } finally {
+    withdrawing.value = false
+  }
+}
+
 watch(link, async value => {
   qr.value = ''
   if (!value) return
@@ -95,7 +169,7 @@ onMounted(load)
           <ul class="referral-rules">
             <li>新商户用你的链接或邀请码首次注册即归属你，归属不再变更；已注册的账号不受影响。</li>
             <li>被邀请商户每次充值烟火或开通会员付款，按付款时的比例记一笔返利，冻结 {{ overview.freezeDays }} 天后转为可提现，冻结期内退款则作废。</li>
-            <li>提现功能即将开放，开放后用本人实名的银行卡提现，平台依法代扣个人所得税。</li>
+            <li>可提现金额满 {{ yuan(overview.withdrawMinimumMinor) }} 才能申请提现，用本人实名的银行卡收款，平台依法代扣个人所得税后实发。</li>
           </ul>
           <label class="referral-consent">
             <input v-model="agreed" type="checkbox" :disabled="taking" @change="takeError = ''" />
@@ -125,7 +199,7 @@ onMounted(load)
         <header class="referral-card-header">
           <div>
             <h2 id="referral-summary-title">推广数据</h2>
-            <p>提现功能即将开放，可提现的返利会一直保留。</p>
+            <p>返利冻结 {{ overview.freezeDays }} 天后转为可提现，可提现满 {{ yuan(overview.withdrawMinimumMinor) }} 才能申请提现，可提现的返利会一直保留。</p>
           </div>
           <span v-if="overview.realNameVerified" class="referral-badge"><ShieldCheck :size="14" aria-hidden="true" />实名核验通过</span>
         </header>
@@ -134,6 +208,79 @@ onMounted(load)
           <div><dt>冻结中</dt><dd>{{ yuan(overview.frozenMinor) }}</dd></div>
           <div><dt>可提现</dt><dd>{{ yuan(overview.availableMinor) }}</dd></div>
         </dl>
+      </section>
+
+      <section v-if="overview.code" class="referral-card" aria-labelledby="referral-withdraw-title">
+        <header class="referral-card-header">
+          <div>
+            <h2 id="referral-withdraw-title">提现</h2>
+            <p>每次把全部可提现返利一起提走。平台审核后由财务转账到你本人的银行卡，依法代扣个人所得税后实发，到账后这里会显示代扣税额和实发金额。</p>
+          </div>
+        </header>
+        <dl class="referral-facts">
+          <div><dt>本次可提现</dt><dd>{{ yuan(amount) }}</dd></div>
+          <div v-if="overview.owedMinor"><dt>待扣回</dt><dd>{{ yuan(overview.owedMinor) }}</dd></div>
+        </dl>
+        <p v-if="overview.owedMinor" class="referral-muted referral-owed">已提现的返利因退款等原因作废后，会从下一次提现里扣回。</p>
+
+        <div class="referral-bank">
+          <template v-if="overview.bankCard">
+            <span>收款卡：<strong>{{ overview.bankCard.bankName }} 尾号 {{ overview.bankCard.cardLast4 }}</strong><small>户名为本人实名，已通过银行卡核验</small></span>
+            <button v-if="!cardOpen" class="ghost-button" type="button" @click="openCard">更换银行卡</button>
+          </template>
+          <template v-else>
+            <span>还没有绑定收款银行卡。</span>
+            <button v-if="!cardOpen" class="ghost-button" type="button" @click="openCard">绑定本人银行卡</button>
+          </template>
+        </div>
+
+        <form v-if="cardOpen" class="referral-card-form" @submit.prevent="bindCard">
+          <p class="referral-muted">持卡人必须是你本人：姓名和身份证号取自你的实名，会和卡号、银行预留手机号一起向银行核验。卡号加密保存，只显示后 4 位；预留手机号只用于这次核验，不保存。</p>
+          <label>开户银行<input v-model="card.bankName" maxlength="40" autocomplete="off" placeholder="例如：中国工商银行" :disabled="binding" /></label>
+          <label>银行卡号<input :value="card.cardNumber" inputmode="numeric" autocomplete="off" placeholder="本人名下的储蓄卡" :disabled="binding" @input="card.cardNumber = formatCardNumber($event.target.value); $event.target.value = card.cardNumber" /></label>
+          <label>银行预留手机号<input v-model="card.mobile" inputmode="numeric" maxlength="11" autocomplete="off" :disabled="binding" /></label>
+          <label class="referral-consent"><input v-model="card.declarationAccepted" type="checkbox" :disabled="binding" /><span>我确认这是本人名下的银行卡，并单独同意平台把我实名的姓名、身份证号码和这张卡的卡号、银行预留手机号，经阿里云实人认证服务（客服电话 95187）提交银行核验是否一致，仅用于返利提现收款。</span></label>
+          <p v-if="cardMismatch" class="referral-error" role="alert">银行卡与本人实名信息或银行预留手机号核验不一致，请核对后重试，或换一张本人银行卡。如有疑问请拨打人工客服：{{ LEGAL_ENTITY.phone }}</p>
+          <p v-if="cardError" class="referral-error" role="alert">{{ cardError }}</p>
+          <div class="referral-actions">
+            <button class="primary-button" type="submit" :disabled="binding">{{ binding ? '正在核验…' : '核验并绑定' }}</button>
+            <button class="ghost-button" type="button" :disabled="binding" @click="cardOpen = false">取消</button>
+          </div>
+        </form>
+
+        <div class="referral-withdraw">
+          <template v-if="confirming">
+            <p>将提现 <strong>{{ yuan(amount) }}</strong> 到 {{ overview.bankCard.bankName }} 尾号 {{ overview.bankCard.cardLast4 }}，确认申请？</p>
+            <label class="referral-consent"><input v-model="withdrawAgreed" type="checkbox" :disabled="withdrawing" @change="withdrawError = ''" /><span>我已阅读并同意<a href="/policies/referral" target="_blank" rel="noopener noreferrer">《推广协议》</a>中的提现规则：平台依法代扣个人所得税后实发；已提现的返利因退款或违规作废的，从下一次提现中扣回。</span></label>
+            <div class="referral-actions">
+              <button class="primary-button" type="button" :disabled="withdrawing" @click="withdraw">{{ withdrawing ? '正在提交…' : '确认申请' }}</button>
+              <button class="ghost-button" type="button" :disabled="withdrawing" @click="confirming = false">取消</button>
+            </div>
+          </template>
+          <template v-else>
+            <button class="primary-button" type="button" :disabled="Boolean(blocker)" @click="confirming = true; withdrawAgreed = false; withdrawError = ''; withdrawNotice = ''">申请提现</button>
+            <p v-if="blocker" class="referral-muted">{{ blocker }}</p>
+          </template>
+          <p v-if="withdrawError" class="referral-error" role="alert">{{ withdrawError }}</p>
+          <p v-if="withdrawNotice" class="referral-notice" role="status">{{ withdrawNotice }}</p>
+        </div>
+
+        <div v-if="overview.withdrawals.length" class="referral-table-wrap">
+          <table class="referral-table">
+            <thead><tr><th>申请时间</th><th>提现金额</th><th>收款卡</th><th>状态</th><th>代扣税</th><th>实发</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr v-for="item in overview.withdrawals" :key="item.id">
+                <td>{{ managementDate(item.createdAt) }}</td>
+                <td><strong>{{ yuan(item.amountMinor) }}</strong><small v-if="item.clawbackMinor">返利 {{ yuan(item.commissionMinor) }}，扣回 {{ yuan(item.clawbackMinor) }}</small></td>
+                <td>{{ item.bankName }} 尾号 {{ item.cardLast4 }}</td>
+                <td><span class="referral-state" :class="`withdrawal-${item.status.toLowerCase()}`">{{ withdrawalStatuses[item.status] || item.status }}</span></td>
+                <td>{{ item.taxMinor == null ? '—' : yuan(item.taxMinor) }}</td>
+                <td>{{ item.netMinor == null ? '—' : yuan(item.netMinor) }}</td>
+                <td class="referral-wrap">{{ item.status === 'PAID' ? `${item.paidDate} 打款` : item.reviewNote || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="referral-card" aria-labelledby="referral-commissions-title">
@@ -150,7 +297,7 @@ onMounted(load)
                 <td>{{ yuan(item.paidMinor) }}</td>
                 <td>{{ ratePercent(item.rateBp) }}</td>
                 <td><strong>{{ yuan(item.amountMinor) }}</strong></td>
-                <td><span class="referral-state" :class="`state-${item.state.toLowerCase()}`">{{ commissionStates[item.state] || item.state }}</span><small v-if="item.state === 'FROZEN'">{{ managementDate(item.availableAt) }} 后可提现</small></td>
+                <td><span class="referral-state" :class="`state-${item.state.toLowerCase()}`">{{ commissionStates[item.state] || item.state }}</span><small v-if="item.state === 'FROZEN'">{{ managementDate(item.availableAt) }} 后可提现</small><small v-else-if="item.state === 'VOIDED' && item.voidNote">{{ item.voidNote }}</small></td>
               </tr>
             </tbody>
           </table>
@@ -202,6 +349,17 @@ onMounted(load)
 .referral-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin: 0; }
 .referral-facts dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .referral-facts dd { margin: 4px 0 0; font-size: 22px; font-variant-numeric: tabular-nums; }
+.referral-owed { margin-top: 8px; font-size: 12px; }
+.referral-bank { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 14px 0; border-top: 1px solid var(--color-border-subtle); font-size: 13px; }
+.referral-bank small { display: block; margin-top: 2px; color: var(--color-text-muted); font-size: 12px; }
+.referral-card-form { display: grid; gap: 12px; max-width: 460px; margin-bottom: 8px; font-size: 13px; }
+.referral-card-form > p { margin: 0; font-size: 12px; }
+.referral-card-form label:not(.referral-consent) { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
+.referral-card-form input:not([type="checkbox"]) { min-height: 40px; padding: 0 12px; border: 1px solid var(--color-border-subtle); border-radius: 4px; background: var(--color-bg-surface); color: var(--color-primary); font: 14px var(--font-sans); }
+.referral-withdraw { display: grid; gap: 10px; justify-items: start; padding: 14px 0 4px; border-top: 1px solid var(--color-border-subtle); font-size: 13px; }
+.referral-withdraw p { margin: 0; }
+.referral-withdraw + .referral-table-wrap { margin-top: 16px; }
+.referral-wrap { white-space: normal !important; min-width: 160px; }
 .referral-table-wrap { overflow-x: auto; }
 .referral-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .referral-table th, .referral-table td { padding: 10px 8px; border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; white-space: nowrap; }
@@ -211,6 +369,9 @@ onMounted(load)
 .state-frozen { color: var(--color-warning); }
 .state-available { color: var(--color-success); }
 .state-voided { color: var(--color-text-muted); }
+.state-withdrawing, .withdrawal-pending { color: var(--color-warning); }
+.state-withdrawn, .withdrawal-paid { color: var(--color-success); }
+.withdrawal-rejected { color: var(--color-error); }
 .referral-invitees { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; font-size: 13px; }
 .referral-invitees li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border-subtle); }
 .referral-invitees time { color: var(--color-text-muted); font-size: 12px; }
