@@ -10,7 +10,7 @@ import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { get, post } from '../utils/request'
 import { videoModels, videoModelLabel, isVideoInProgress, videoConversationTitle, videoHistoryTime, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
 import { billing, dateTime, number, refreshBilling, requireAccount } from '../stores/billing'
-import { getVideoQuote, submitVideoQuote } from '../services/videoWorkflow'
+import { getVideoQuote, submitVideoQuote, uploadVideoReference } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
 import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
 
@@ -49,6 +49,7 @@ let morphTimer
 const pollTimers = new Map()
 const objectUrls = new Set()
 let disposed = false
+const uploadController = new AbortController()
 
 const fallbackCapabilities = videoModels
 const ratioOptions = [
@@ -229,15 +230,21 @@ const handleMaterialChange = (type, event) => { addMaterialFiles(type, event.tar
 const handleMaterialDrop = (type, event) => { event.preventDefault(); addMaterialFiles(type, event.dataTransfer.files) }
 const removeMaterial = (type, asset) => { referenceMaterials[type].value = referenceMaterials[type].value.filter(item => item.id !== asset.id) }
 
-const uploadAsset = async (entry, type) => {
-  if (entry.assetId) return entry.assetId
-  if (!entry.file) throw new Error('参考素材已不可用，请移除后重新上传。')
-  const ticket = await post('/api/assets/upload-url', { name: entry.file.name, type, mimeType: entry.file.type })
-  const response = await fetch(ticket.uploadUrl, { method: 'PUT', headers: { 'Content-Type': entry.file.type }, body: entry.file })
-  if (!response.ok) throw new Error('参考素材上传失败')
-  const confirmed = await post(`/api/assets/${ticket.assetId}/confirm`, { sizeBytes: entry.file.size })
-  entry.assetId = confirmed.id
-  return entry.assetId
+const uploadAsset = async (entry, type, item) => {
+  // Keep the displayed draft's upload ID as well as the conversation snapshot's ID.
+  const source = activeConversationId.value === item.id
+    ? referenceMaterials[type.toLowerCase()].value.find(material => material.id === entry.id) || entry : entry
+  try {
+    return await uploadVideoReference(source, type, {
+      signal: uploadController.signal,
+      onStatus: asset => {
+        entry.assetId = source.assetId
+        if (asset.status === 'VERIFYING') item.notice = '正在校验参考视频，请稍候…'
+      },
+    })
+  } finally {
+    entry.assetId = source.assetId
+  }
 }
 
 const schedulePoll = item => {
@@ -272,9 +279,11 @@ const generate = async () => {
   item.notice = '正在上传参考素材并提交视频任务…'
   try {
     validateVideoMaterials({ model: item.selectedModel, images: item.referenceImages, videos: item.referenceVideos, audios: item.referenceAudios })
-    const imageAssetIds = await Promise.all(item.referenceImages.map(entry => uploadAsset(entry, 'IMAGE')))
-    const videoAssetIds = await Promise.all(item.referenceVideos.map(entry => uploadAsset(entry, 'VIDEO')))
-    const audioAssetIds = await Promise.all(item.referenceAudios.map(entry => uploadAsset(entry, 'AUDIO')))
+    const imageAssetIds = await Promise.all(item.referenceImages.map(entry => uploadAsset(entry, 'IMAGE', item)))
+    const videoAssetIds = await Promise.all(item.referenceVideos.map(entry => uploadAsset(entry, 'VIDEO', item)))
+    const audioAssetIds = await Promise.all(item.referenceAudios.map(entry => uploadAsset(entry, 'AUDIO', item)))
+    if (disposed) return
+    item.notice = '参考素材已就绪，正在预估费用…'
     const payload = {
       prompt: item.prompt.trim(),
       referenceImageAssetIds: imageAssetIds,
@@ -297,6 +306,7 @@ const generate = async () => {
     quoteDialog.value?.showModal()
     item.notice = quote.available ? '费用预估已完成，请确认后开始生成。' : quote.message
   } catch (error) {
+    if (disposed) return
     item.error = true
     item.notice = error.message || '视频任务提交失败，请稍后重试。'
   } finally {
@@ -376,6 +386,7 @@ const switchWorkspace = (path) => {
 }
 onBeforeUnmount(() => {
   disposed = true
+  uploadController.abort()
   objectUrls.forEach(url => URL.revokeObjectURL(url))
   pollTimers.forEach(timer => window.clearTimeout(timer))
 })

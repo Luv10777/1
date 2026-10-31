@@ -2389,6 +2389,8 @@ class FoundationIntegrationTest {
         var ticket = ticket();
         Long userId = owner.queryForObject("INSERT INTO users(tenant_id,phone) VALUES (?,?) RETURNING id", Long.class, tenantB, "13800000002");
         String otherToken = jwt.issueAccessToken(userId, tenantB, "13800000002");
+        mvc.perform(get("/api/assets/" + ticket.assetId()).header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value(3001));
         mvc.perform(get("/api/assets").header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(0));
         mvc.perform(post("/api/assets/" + ticket.assetId() + "/confirm")
@@ -2397,6 +2399,22 @@ class FoundationIntegrationTest {
         assertThat(owner.queryForObject("SELECT status FROM assets WHERE id=?", String.class, ticket.assetId())).isEqualTo("PENDING");
         assertThat(TenantContext.get()).isNull();
         assertThat(TenantContext.runAs(tenantA, () -> assets.list(0, 20)).total()).isEqualTo(1);
+    }
+
+    @Test
+    void assetStatusEndpointReportsVerificationAndCompletionWithinTenant() throws Exception {
+        Long userId = owner.queryForObject("INSERT INTO users(tenant_id,phone) VALUES (?,?) RETURNING id", Long.class, tenantA, "13800000001");
+        String token = jwt.issueAccessToken(userId, tenantA, "13800000001");
+        var ticket = TenantContext.runAs(tenantA, () -> assets.presignUpload(
+                new AssetDtos.PresignRequest("reference.mp4", "VIDEO", "video/mp4"), userId));
+        for (String state : List.of("VERIFYING", "READY", "INVALID")) {
+            owner.update("UPDATE assets SET status=? WHERE id=?", state, ticket.assetId());
+            mvc.perform(get("/api/assets/" + ticket.assetId()).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(ticket.assetId()))
+                    .andExpect(jsonPath("$.data.status").value(state));
+        }
+        mvc.perform(get("/api/assets/" + ticket.assetId()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

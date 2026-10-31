@@ -60,6 +60,28 @@ class AssetDownloadTest {
     }
 
     @Test
+    void reportsVideoVerificationStateWithoutSigningTheFile() {
+        asset.setType("VIDEO");
+        for (String status : new String[]{"VERIFYING", "READY", "INVALID"}) {
+            asset.setStatus(status);
+            var view = service.get(11L);
+            assertThat(view.id()).isEqualTo(11L);
+            assertThat(view.status()).isEqualTo(status);
+            assertThat(view.previewUrl()).isNull();
+        }
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void refusesMissingAndOtherTenantAssetStatusRequests() {
+        when(assets.findById(12L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.get(12L)).isInstanceOf(BizException.class).hasMessage("素材不存在");
+        asset.setTenantId(8L);
+        assertThatThrownBy(() -> service.get(11L)).isInstanceOf(BizException.class).hasMessage("素材不存在");
+        verifyNoInteractions(storage);
+    }
+
+    @Test
     void doesNotSignMissingOrUnconfirmedAssets() {
         when(assets.findById(12L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.presignDownload(12L)).isInstanceOf(BizException.class).hasMessage("素材不存在");
