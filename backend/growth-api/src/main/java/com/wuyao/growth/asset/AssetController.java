@@ -41,6 +41,11 @@ public class AssetController {
         return ApiResponse.ok(assetService.list(page, size));
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<AssetDtos.AssetView> get(@PathVariable Long id) {
+        return ApiResponse.ok(assetService.get(id));
+    }
+
     @GetMapping("/{id}/download-url")
     public ApiResponse<AssetDtos.DownloadTicket> downloadUrl(@PathVariable Long id) {
         return ApiResponse.ok(assetService.presignDownload(id));

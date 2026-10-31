@@ -12,7 +12,8 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
   globalThis.document = {}
   globalThis.Document = class {}
   globalThis.ShadowRoot = class {}
-  const quotes = [], uploads = []
+  const quotes = [], uploads = [], pendingVideos = []
+  let videosReady = false
   const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
   globalThis.fetch = async (url, options = {}) => {
     if (options.method === 'PUT') return { ok: true }
@@ -24,9 +25,17 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
       uploads.push({ ...body, assetId })
       return response({ assetId, uploadUrl: `/storage/${assetId}` })
     }
-    if (/\/api\/assets\/\d+\/confirm/.test(url)) return response({ id: Number(url.split('/')[3]) })
+    if (/\/api\/assets\/\d+\/confirm/.test(url)) {
+      const id = Number(url.split('/')[3])
+      return response({ id, status: uploads.find(entry => entry.assetId === id).type === 'VIDEO' ? 'VERIFYING' : 'READY' })
+    }
+    if (/^\/api\/assets\/\d+$/.test(url)) {
+      const id = Number(url.split('/')[3])
+      return videosReady ? response({ id, status: 'READY' }) : new Promise(resolve => pendingVideos.push(() => resolve(response({ id, status: 'READY' }))))
+    }
     if (url === '/api/video/quote') {
       quotes.push(JSON.parse(options.body))
+      if (quotes.length === 1) return { ok: false, status: 503, json: async () => ({ code: 500, message: '测试费用预估暂时失败' }) }
       return response({ available: false, message: '本地测试报价' })
     }
     throw new Error(`Unexpected request: ${url}`)
@@ -98,8 +107,26 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
     assert.deepEqual([count('参考图'), count('参考视频'), count('音色')], [9, 3, 3])
     find(node => node.props?.['aria-label'] === '删除参考视频').props.onClick(); await settle()
     assert.equal(count('参考视频'), 2)
-    await button('预估费用并生成').props.onClick(); await settle()
+    const submitting = button('预估费用并生成').props.onClick()
+    await settle()
+    assert.equal(pendingVideos.length, 2)
+    assert.equal(quotes.length, 0)
+    assert.match(text(root), /正在校验参考视频/)
+    assert.equal(button('正在生成视频').props.disabled, true)
+    videosReady = true
+    pendingVideos.forEach(resolve => resolve())
+    await submitting; await settle()
     assert.equal(quotes.length, 1)
+    assert.match(text(root), /测试费用预估暂时失败/)
+    const uploadCount = uploads.length
+    button('创作记录').props.onClick(); await settle()
+    find(node => node.props?.['aria-label'] === '新对话').props.onClick(); await settle()
+    button('创作记录').props.onClick(); await settle()
+    await button('多素材草稿').props.onClick(); await settle()
+    await button('预估费用并生成').props.onClick(); await settle()
+    assert.equal(quotes.length, 2)
+    assert.equal(uploads.length, uploadCount, 'retry must reuse the uploaded draft materials')
+    assert.deepEqual(quotes[1], quotes[0], 'retry must keep the same materials and request key')
     assert.equal(quotes[0].model, 'SEEDANCE_2_0_MINI')
     assert.equal(quotes[0].referenceImageAssetIds.length, 9)
     assert.equal(quotes[0].referenceVideoAssetIds.length, 2)

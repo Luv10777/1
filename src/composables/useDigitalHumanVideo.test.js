@@ -217,6 +217,7 @@ test('digital human task lifecycle follows the real video API', async t => {
     await t.test('quotes and submits every selected video and audio without losing references', async () => {
       const calls = []
       globalThis.fetch = async (url, options) => {
+        if (/^\/api\/assets\/\d+$/.test(url)) return response({ id: Number(url.split('/')[3]), status: 'READY' })
         calls.push({ url, body: JSON.parse(options.body) })
         return response(url.endsWith('/quote') ? { available: true, quoteId: 'all-materials', credits: 20 } : { id: 81, status: 'SUCCEEDED' })
       }
