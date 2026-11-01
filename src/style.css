@@ -27,9 +27,9 @@
   font-display: swap;
 }
 :root,[data-theme='light'] {
-  /* 亮色主题：曜石黑 + 石板灰（原米黄宣纸色与砖红主色已停用） */
+  /* 亮色主题：曜石黑文字 + 石板灰底，主题色青绿 #0e766e 用于按钮、链接和选中态 */
   --color-primary:#0f172a;--color-primary-hover:#1e293b;
-  --color-accent:#0f172a;--color-accent-text:#0f172a;--color-accent-hover:#1e293b;--color-on-accent:#fff;
+  --color-accent:#0e766e;--color-accent-text:#0e766e;--color-accent-hover:#115e59;--color-on-accent:#fff;
   --color-text-muted:#64748b;--color-brand-muted:#94a3b8;
   --color-bg-canvas:#f5f7fa;--color-bg-surface:#fff;--color-bg-subtle:#f1f5f9;
   --color-border-subtle:#e2e8f0;--color-border-strong:#cbd5e1;
@@ -42,12 +42,15 @@
   color-scheme:light;
 }
 :root.dark,[data-theme='dark'] {
+  /* 深色主题：深石板底 + 浅灰文字，主题色同为青绿（按钮底不变，文字链接用亮一档的青绿） */
   --color-primary:#e2e8f0;--color-primary-hover:#fff;
-  --color-accent:#de5f52;--color-accent-text:#ed7b6f;--color-accent-hover:#eb766a;--color-on-accent:#14181c;
-  --color-text-muted:#a3b1b5;--color-brand-muted:#6b7b80;
-  --color-bg-canvas:#14181c;--color-bg-surface:#1d232a;--color-bg-subtle:#262d35;
-  --color-border-subtle:#2c353f;--color-border-strong:#455260;
-  --color-success:#75c478;--color-warning:#f59e0b;--color-error:#f0887d;--color-info:#8cb4c1;
+  --color-accent:#0e766e;--color-accent-text:#5eead4;--color-accent-hover:#0f8a80;--color-on-accent:#fff;
+  --color-text-muted:#94a3b8;--color-brand-muted:#64748b;
+  --color-bg-canvas:#0b1120;--color-bg-surface:#111a2b;--color-bg-subtle:#1a2436;
+  --color-border-subtle:#253247;--color-border-strong:#475569;
+  --color-success:#34d399;--color-warning:#fbbf24;--color-error:#f87171;--color-info:#818cf8;
+  --shadow-paper:0 2px 12px -4px rgba(0,0,0,.4);
+  --shadow-paper-elevated:0 16px 36px -8px rgba(0,0,0,.55);
   color-scheme:dark;
 }
 :root {

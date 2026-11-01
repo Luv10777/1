@@ -1,0 +1,253 @@
+/* 深色模式：评价、服务规则、海报工作台原本只有浅色配色（颜色写死在组件里）。
+   这份文件由脚本按亮度把其中的浅色底、浅色线、深色字换算成深色石板 / 青绿，
+   只在 :root.dark 下生效，不影响浅色模式。这些页面新增写死的浅色时，要在这里补上对应的深色规则。 */
+/* src/views/ServiceRulesWorkbench.tsx：Tailwind 任意值类名 */
+:root.dark :is(.service-rules-workbench.border-\[\#B8D3CD\], .service-rules-workbench .border-\[\#B8D3CD\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#EDF4F2\], .service-rules-workbench .bg-\[\#EDF4F2\]) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#234D45\], .service-rules-workbench .text-\[\#234D45\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#1C3532\], .service-rules-workbench .text-\[\#1C3532\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#71817E\], .service-rules-workbench .text-\[\#71817E\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#C5D2CE\], .service-rules-workbench .border-\[\#C5D2CE\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#E8EEEB\], .service-rules-workbench .bg-\[\#E8EEEB\]) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.bg-white, .service-rules-workbench .bg-white) { background-color: #111A2B !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#E2EAE7\], .service-rules-workbench .border-\[\#E2EAE7\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#EBF3F0\], .service-rules-workbench .bg-\[\#EBF3F0\]) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#FCFDFC\], .service-rules-workbench .bg-\[\#FCFDFC\]) { background-color: #111A2B !important; }
+:root.dark :is(.service-rules-workbench.hover\:border-\[\#B8D3CD\]:hover, .service-rules-workbench .hover\:border-\[\#B8D3CD\]:hover) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#D4DFDC\], .service-rules-workbench .border-\[\#D4DFDC\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#52726B\], .service-rules-workbench .text-\[\#52726B\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#2B4641\], .service-rules-workbench .text-\[\#2B4641\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#91A09D\], .service-rules-workbench .text-\[\#91A09D\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#35504B\], .service-rules-workbench .text-\[\#35504B\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#F5F7FA\], .service-rules-workbench .bg-\[\#F5F7FA\]) { background-color: #111A2B !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#DDE7E3\], .service-rules-workbench .border-\[\#DDE7E3\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#7B8E89\], .service-rules-workbench .text-\[\#7B8E89\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#DDE7E3\], .service-rules-workbench .bg-\[\#DDE7E3\]) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#70837F\], .service-rules-workbench .text-\[\#70837F\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#5F7C75\], .service-rules-workbench .text-\[\#5F7C75\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#BFD0CB\], .service-rules-workbench .border-\[\#BFD0CB\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#4A615C\], .service-rules-workbench .text-\[\#4A615C\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.hover\:bg-\[\#F4F8F6\]:hover, .service-rules-workbench .hover\:bg-\[\#F4F8F6\]:hover) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.bg-white\/75, .service-rules-workbench .bg-white\/75) { background-color: rgba(17,26,43,0.75) !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#4C6560\], .service-rules-workbench .text-\[\#4C6560\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#74837F\], .service-rules-workbench .text-\[\#74837F\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#8E9D99\], .service-rules-workbench .text-\[\#8E9D99\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#8FA09B\], .service-rules-workbench .text-\[\#8FA09B\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.hover\:border-\[\#CBDAD6\]:hover, .service-rules-workbench .hover\:border-\[\#CBDAD6\]:hover) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#4A625D\], .service-rules-workbench .text-\[\#4A625D\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#FAF4E8\], .service-rules-workbench .bg-\[\#FAF4E8\]) { background-color: #111A2B !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#CFD9D5\], .service-rules-workbench .bg-\[\#CFD9D5\]) { background-color: #1A2436 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#6F8F87\], .service-rules-workbench .text-\[\#6F8F87\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#A5B2AE\], .service-rules-workbench .text-\[\#A5B2AE\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#9AA8A4\], .service-rules-workbench .text-\[\#9AA8A4\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#F0F4F2\], .service-rules-workbench .bg-\[\#F0F4F2\]) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#2D4742\], .service-rules-workbench .text-\[\#2D4742\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#82918D\], .service-rules-workbench .text-\[\#82918D\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#C8D5D1\], .service-rules-workbench .border-\[\#C8D5D1\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.hover\:bg-\[\#DDECE7\]:hover, .service-rules-workbench .hover\:bg-\[\#DDECE7\]:hover) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#FBFDFC\], .service-rules-workbench .bg-\[\#FBFDFC\]) { background-color: #111A2B !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#9BAAA6\], .service-rules-workbench .text-\[\#9BAAA6\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#94A39F\], .service-rules-workbench .text-\[\#94A39F\]) { color: #94A3B8 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#5E7A73\], .service-rules-workbench .text-\[\#5E7A73\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#CBD5E1\], .service-rules-workbench .border-\[\#CBD5E1\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.bg-\[\#FDF2F0\], .service-rules-workbench .bg-\[\#FDF2F0\]) { background-color: #111A2B !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#81544D\], .service-rules-workbench .text-\[\#81544D\]) { color: #E2E8F0 !important; }
+:root.dark :is(.service-rules-workbench.bg-white\/70, .service-rules-workbench .bg-white\/70) { background-color: rgba(17,26,43,0.7) !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#A4675E\], .service-rules-workbench .text-\[\#A4675E\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#AD817A\], .service-rules-workbench .text-\[\#AD817A\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#B26A61\], .service-rules-workbench .text-\[\#B26A61\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#D5E1DD\], .service-rules-workbench .border-\[\#D5E1DD\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#58716A\], .service-rules-workbench .text-\[\#58716A\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.hover\:bg-\[\#EDF4F2\]:hover, .service-rules-workbench .hover\:bg-\[\#EDF4F2\]:hover) { background-color: #11262A !important; }
+:root.dark :is(.service-rules-workbench.border-\[\#D5E2DE\], .service-rules-workbench .border-\[\#D5E2DE\]) { border-color: #253247 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#78908A\], .service-rules-workbench .text-\[\#78908A\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#5D7972\], .service-rules-workbench .text-\[\#5D7972\]) { color: #CBD5E1 !important; }
+:root.dark :is(.service-rules-workbench.text-\[\#4B625D\], .service-rules-workbench .text-\[\#4B625D\]) { color: #E2E8F0 !important; }
+/* src/views/ReviewsWorkbench.tsx：Tailwind 任意值类名 */
+:root.dark :is(.reviews-page.bg-\[\#F5F7FA\], .reviews-page .bg-\[\#F5F7FA\]) { background-color: #111A2B !important; }
+:root.dark :is(.reviews-page.text-\[\#1C3532\], .reviews-page .text-\[\#1C3532\]) { color: #E2E8F0 !important; }
+:root.dark :is(.reviews-page.bg-\[\#EDF4F2\], .reviews-page .bg-\[\#EDF4F2\]) { background-color: #11262A !important; }
+:root.dark :is(.reviews-page.text-\[\#234D45\], .reviews-page .text-\[\#234D45\]) { color: #E2E8F0 !important; }
+/* src/views/PosterStudioView.vue：Tailwind 任意值类名 */
+:root.dark :is(.poster-workbench.bg-\[\#F5F7FA\], .poster-workbench .bg-\[\#F5F7FA\]) { background-color: #111A2B !important; }
+:root.dark :is(.poster-workbench.text-\[\#2D2826\], .poster-workbench .text-\[\#2D2826\]) { color: #E2E8F0 !important; }
+/* src/views/ReviewsWorkbench.tsx：组件内样式 */
+:root.dark .reviews-page .reviews-breadcrumb { color: #CBD5E1 !important; }
+:root.dark .reviews-page .reviews-eyebrow { color: #94A3B8 !important; }
+:root.dark .reviews-page .reviews-subtitle { color: #CBD5E1 !important; }
+:root.dark .reviews-page .live-status { border: 1px solid #253247 !important; background: #111A2Ba6 !important; }
+:root.dark .reviews-page .live-status small { color: #94A3B8 !important; }
+:root.dark .reviews-page .quiet-button { background: #111A2B !important; }
+:root.dark .reviews-page .quiet-button:hover { border-color: #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .overview-card { background: #111A2Bf0 !important; }
+:root.dark .reviews-page .overline { color: #CBD5E1 !important; }
+:root.dark .reviews-page .stars span { color: #94A3B8 !important; }
+:root.dark .reviews-page .score-bottom { color: #94A3B8 !important; }
+:root.dark .reviews-page .big-metric small { color: #CBD5E1 !important; }
+:root.dark .reviews-page .overview-foot { color: #94A3B8 !important; }
+:root.dark .reviews-page .mini-bar { background: #11262A !important; }
+:root.dark .reviews-page .overview-alert { border-color: #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .alert-rule span { background: #1A2436 !important; }
+:root.dark .reviews-page .policy-ribbon { border: 1px solid #253247 !important; }
+:root.dark .reviews-page .policy-mark { border: 1px solid #253247 !important; background: #11262A !important; }
+:root.dark .reviews-page .policy-step-risk { border-left: 1px solid #253247 !important; }
+:root.dark .reviews-page .step-index { color: #94A3B8 !important; }
+:root.dark .reviews-page .policy-step-head em { color: #CBD5E1 !important; }
+:root.dark .reviews-page .policy-state { color: #CBD5E1 !important; }
+:root.dark .reviews-page .policy-chip-row { color: #CBD5E1 !important; }
+:root.dark .reviews-page .policy-flow-arrow { color: #94A3B8 !important; }
+:root.dark .reviews-page .platform-tab { color: #CBD5E1 !important; }
+:root.dark .reviews-page .platform-tab.active { border-color: #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .platform-tab small { background: #11262A !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .all-platform-mark { background: #11262A !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .search-box { background: #111A2B !important; color: #94A3B8 !important; }
+:root.dark .reviews-page .icon-ghost { color: #94A3B8 !important; }
+:root.dark .reviews-page .rating-filters button { color: #CBD5E1 !important; }
+:root.dark .reviews-page .rating-filters button.selected { border-color: #253247 !important; background: #111A2B !important; color: #E2E8F0 !important; }
+:root.dark .reviews-page .result-count { color: #CBD5E1 !important; }
+:root.dark .reviews-page .feed-section-head h2 span { color: #CBD5E1 !important; }
+:root.dark .reviews-page .feed-summary { color: #CBD5E1 !important; }
+:root.dark .reviews-page .group-label { color: #CBD5E1 !important; }
+:root.dark .reviews-page .group-rule { background: #1A2436 !important; }
+:root.dark .reviews-page .group-count { color: #94A3B8 !important; }
+:root.dark .reviews-page .review-card { background: #111A2B !important; }
+:root.dark .reviews-page .pending-card { border-color: #253247 !important; }
+:root.dark .reviews-page .review-card-head { border-bottom: 1px solid #253247 !important; }
+:root.dark .reviews-page .avatar-dianping { background: #11262A !important; }
+:root.dark .reviews-page .avatar-douyin { background: #111A2B !important; color: #E2E8F0 !important; }
+:root.dark .reviews-page .avatar-xiaohongshu { background: #111A2B !important; }
+:root.dark .reviews-page .customer-name small { color: #94A3B8 !important; }
+:root.dark .reviews-page .customer-subline { color: #94A3B8 !important; }
+:root.dark .reviews-page .dot-separator { background: #1A2436 !important; }
+:root.dark .reviews-page .sent-badge { color: #CBD5E1 !important; }
+:root.dark .reviews-page .original-column { border-right: 1px solid #253247 !important; }
+:root.dark .reviews-page .order-tag { background: #111A2B !important; color: #94A3B8 !important; }
+:root.dark .reviews-page .review-content { color: #E2E8F0 !important; }
+:root.dark .reviews-page .review-photo-wrap { background: #11262A !important; }
+:root.dark .reviews-page .ai-column { background: #11262A !important; color: #E2E8F0 !important; }
+:root.dark .reviews-page .ai-column-head { color: #CBD5E1 !important; }
+:root.dark .reviews-page .ai-time { color: #94A3B8 !important; }
+:root.dark .reviews-page .ai-tags span { border: 1px solid #253247 !important; background: #111A2B !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .ai-tags span.risk { border-color: #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .draft-label { color: #CBD5E1 !important; }
+:root.dark .reviews-page .draft-label span { color: #94A3B8 !important; }
+:root.dark .reviews-page .draft-textarea { border: 1px solid #253247 !important; background: #111A2B !important; color: #E2E8F0 !important; }
+:root.dark .reviews-page .strategy-label { color: #94A3B8 !important; }
+:root.dark .reviews-page .strategy-pill { border: 1px solid #253247 !important; background: #111A2B !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .active-strategy { background: #11262A !important; color: #E2E8F0 !important; }
+:root.dark .reviews-page .decision-bar { border-top: 1px solid #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .decision-note { color: #94A3B8 !important; }
+:root.dark .reviews-page .secondary-action { background: #111A2B !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .stamp-ring { border: 1px solid #253247b3 !important; }
+:root.dark .reviews-page .reply-disclosure { border: 1px solid #253247 !important; background: #11262A !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .reply-disclosure small { color: #94A3B8 !important; }
+:root.dark .reviews-page .sent-reply { border: 1px solid #253247 !important; background: #11262A !important; }
+:root.dark .reviews-page .sent-reply p { color: #CBD5E1 !important; }
+:root.dark .reviews-page .sent-actions { border-top: 1px solid #253247 !important; color: #94A3B8 !important; }
+:root.dark .reviews-page .text-action { color: #CBD5E1 !important; }
+:root.dark .reviews-page .empty-feed { border: 1px dashed #253247 !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .workbench-foot { color: #CBD5E1 !important; }
+:root.dark .reviews-page .strategy-drawer { border-left: 1px solid #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .drawer-head p:last-child { color: #94A3B8 !important; }
+:root.dark .reviews-page .drawer-close { background: #111A2B !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .drawer-section { border-bottom: 1px solid #253247 !important; }
+:root.dark .reviews-page .drawer-section-head b { color: #CBD5E1 !important; }
+:root.dark .reviews-page .star-toggle, :root.dark .reviews-page .keyword-chip { border: 1px solid #253247 !important; background: #111A2B !important; color: #94A3B8 !important; }
+:root.dark .reviews-page .star-toggle.selected { background: #11262A !important; }
+:root.dark .reviews-page .keyword-chip.blocked { border-color: #253247 !important; }
+:root.dark .reviews-page .keyword-input { background: #111A2B !important; }
+:root.dark .reviews-page .keyword-input input { color: #E2E8F0 !important; }
+:root.dark .reviews-page .keyword-input button { background: #11262A !important; color: #E2E8F0 !important; }
+:root.dark .reviews-page .drawer-help { color: #94A3B8 !important; }
+:root.dark .reviews-page .switch-section small { color: #94A3B8 !important; }
+:root.dark .reviews-page .switch-on span { background: #111A2B !important; }
+:root.dark .reviews-page .switch-off { background: #1A2436 !important; }
+:root.dark .reviews-page .drawer-cancel { background: #111A2B !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .editor-dock { border: 1px solid #253247 !important; background: #111A2B !important; }
+:root.dark .reviews-page .editor-dock-head button { background: #111A2B !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .editor-dock textarea { color: #E2E8F0 !important; }
+:root.dark .reviews-page .editor-dock-foot { color: #94A3B8 !important; }
+:root.dark .reviews-page .toast { border: 1px solid #253247 !important; background: #11262A !important; color: #CBD5E1 !important; }
+:root.dark .reviews-page .photo-modal>div { background: #111A2B !important; }
+:root.dark .reviews-page .photo-modal p { color: #CBD5E1 !important; }
+:root.dark .reviews-page .inline-error { background: #111A2B !important; }
+:root.dark .reviews-page .original-column { border-bottom: 1px solid #253247 !important; }
+:root.dark .reviews-page .policy-step-risk { border-top: 1px solid #253247 !important; }
+:root.dark .reviews-page .original-column { border-bottom: 1px solid #253247 !important; }
+:root.dark .reviews-page .policy-step-risk { border-top: 1px solid #253247 !important; }
+/* src/service-rules-tailwind.css */
+:root.dark .service-rules-workbench *, :root.dark .service-rules-workbench *::before, :root.dark .service-rules-workbench *::after { border: 0 solid #253247 !important; }
+/* src/poster-workbench.css */
+:root.dark .poster-control-panel { background: #111A2B !important; }
+:root.dark .poster-toolbar-end > .image-workspace-switch.video-mode-switch { background: #111A2B !important; }
+:root.dark .poster-toolbar-end .image-workspace-switch a.active { background: #11262A !important; }
+:root.dark .poster-reference-chip .app-select-button { background: rgba(17,26,43,.92) !important; }
+:root.dark .poster-reference-preview { background: #111A2B !important; }
+:root.dark .poster-quality-grid button.active { background: #111A2B !important; }
+:root.dark .poster-control-footer { background: #111A2B !important; }
+:root.dark .poster-drop-overlay span { background: #111A2B !important; }
+:root.dark .poster-workbench .poster-gallery-tabs button.active { background: #111A2B !important; }
+:root.dark .poster-result-empty { background: #111A2B !important; }
+:root.dark .poster-result-empty button { background: #111A2B !important; }
+:root.dark .poster-result-empty button:hover { border-color: #253247 !important; }
+:root.dark .poster-skeleton-card { background: #111A2B !important; }
+:root.dark .poster-skeleton-glow { background: linear-gradient(105deg, transparent 30%, rgba(17,26,43,.72) 50%, transparent 70%) !important; }
+:root.dark .poster-skeleton-line { background: #1A2436 !important; }
+:root.dark .poster-workbench .poster-variation-options button { background: #111A2B !important; }
+:root.dark .poster-conversation-editor { background: #111A2B !important; }
+:root.dark .poster-edit-form input, :root.dark .poster-edit-form textarea { background: #111A2B !important; }
+:root.dark .poster-edit-form small { color: #CBD5E1 !important; }
+:root.dark .poster-history-status { background: rgba(17,26,43,.92) !important; }
+:root.dark .poster-history-rename-trigger, :root.dark .poster-history-rename button { color: #CBD5E1 !important; }
+:root.dark .poster-history-rename-trigger:hover, :root.dark .poster-history-rename button:hover:not(:disabled) { background: #11262A !important; }
+:root.dark .poster-history-rename input { background: #111A2B !important; }
+:root.dark .poster-lightbox { border: 1px solid #253247 !important; }
+:root.dark .poster-lightbox header { background: #111A2B !important; }
+:root.dark .poster-zoom-controls { background: #111A2B !important; }
+:root.dark .poster-zoom-controls button:hover:not(:disabled) { background: #11262A !important; }
+/* src/image-studio-polish.css */
+:root.dark .poster-toolbar-end > .studio-mode-switch.video-mode-switch, :root.dark .creation-library-links > .studio-mode-switch.video-mode-switch { background: #111A2B !important; }
+:root.dark .image-create-page .studio-mode-switch a.active { background: #11262A !important; }
+:root.dark .poster-workbench :is(.poster-load-more, .poster-result-error button, .poster-result-note button), :root.dark .poster-workbench .poster-edit-form > div > button:not(.poster-small-primary), :root.dark .poster-lightbox header .poster-lightbox-download, :root.dark .product-set-studio .creation-message button, :root.dark .creation-product .creation-preview footer button { background: #111A2B !important; color: #E2E8F0 !important; }
+:root.dark .poster-workbench :is(.poster-load-more, .poster-result-error button, .poster-result-note button):hover:not(:disabled), :root.dark .poster-workbench .poster-edit-form > div > button:not(.poster-small-primary):hover:not(:disabled), :root.dark .poster-lightbox header .poster-lightbox-download:hover:not(:disabled), :root.dark .product-set-studio .creation-message button:hover:not(:disabled), :root.dark .creation-product .creation-preview footer button:hover:not(:disabled) { border-color: #253247 !important; }
+:root.dark .poster-lightbox header .poster-lightbox-close, :root.dark .creation-product .creation-preview header button { background: #111A2B !important; }
+/* 海报工作台的色板变量 */
+:root.dark .poster-workbench {
+  --poster-paper: #0B1120;
+  --poster-subtle: #1A2436;
+  --poster-ink: #E2E8F0;
+  --poster-muted: #94A3B8;
+  --poster-faint: #64748B;
+  --poster-line: #253247;
+  --poster-hairline: #1A2436;
+  --poster-red: #0E766E;
+  --poster-red-hover: #0F8A80;
+  --poster-red-text: #5EEAD4;
+  --poster-red-wash: rgba(45, 212, 191, 0.12);
+  background-color: #0B1120 !important;
+  color: #E2E8F0 !important;
+}
+/* 评价工作台的色板变量 */
+:root.dark .reviews-page {
+  --ri: #E2E8F0;
+  --rl: #253247;
+  --rp: #0B1120;
+  --rr: #F87171;
+  --rs: rgba(248, 113, 113, 0.14);
+  --ra: #FBBF24;
+  --rg: #5EEAD4;
+  --gs: #11262A;
+}
+
+/* 图片创作两个工作区的色板变量 */
+:root.dark .image-create-page {
+  --studio-ink: #E2E8F0;
+  --studio-muted: #94A3B8;
+  --studio-line: #253247;
+  --studio-wash: #1A2436;
+  --studio-red: #5EEAD4;
+}
+
+/* 消息页自带深色色板，只补选中标签 */
+:root.dark .messages-workspace .state-tab.active { background: var(--sage-2) !important; }
+:root.dark .messages-workspace .state-tab.draft.active { background: #1A2436 !important; color: #5EEAD4 !important; }

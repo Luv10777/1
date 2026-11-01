@@ -38,4 +38,5 @@ async function startApp() {
 startApp()
 
 import './tech-studio-theme.css'
+import './workbench-dark.css'
 
