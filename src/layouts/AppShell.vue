@@ -102,11 +102,11 @@ const navGroups = [
     key: 'content',
     label: '内容工具',
     items: [
+      { name: 'copy', label: '文案创作', path: '/copy' },
       { name: 'image-create', label: '图片创作', path: '/image/create' },
       { name: 'video-create', label: '视频创作', path: '/video/create' },
-      { name: 'digital-human', label: '实景直播', path: '/digital-human' },
       { name: 'video-analyze', label: '视频反推', path: '/video/analyze' },
-      { name: 'copy', label: '文案创作', path: '/copy' },
+      { name: 'digital-human', label: '实景直播', path: '/digital-human' },
     ],
   },
   {
