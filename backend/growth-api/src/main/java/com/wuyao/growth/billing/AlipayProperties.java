@@ -16,6 +16,8 @@ public class AlipayProperties {
     private String privateKeyPath = "";
     private String alipayPublicKeyPath = "";
     private String notifyUrl = "";
+    private boolean mobileEnabled = false;
+    private String returnUrl = "";
     public boolean configured() {
         return gateway.startsWith("https://")&&!appId.isBlank()&&!sellerId.isBlank()&&notifyUrl.startsWith("https://")
             &&!privateKeyPath.isBlank()&&!alipayPublicKeyPath.isBlank()

@@ -132,4 +132,16 @@ class BillingCheckoutServiceTest {
         when(billing.order(wechatOrder.id())).thenReturn(wechatOrder);
         assertThatThrownBy(()->checkout.alipayUrl(wechatOrder.id())).hasMessageContaining("不是支付宝订单");
     }
+    @Test void mobileCashierUsesTheSameOwnedPendingOrderAndRejectsExpiredOrders() {
+        TenantContext.set(7L);
+        var pending=order("PENDING_PAYMENT","ALIPAY");
+        when(billing.order(pending.id())).thenReturn(pending);
+        when(alipay.wapUrl(pending,7L)).thenReturn("https://alipay.test/mobile");
+        assertThat(checkout.alipayUrl(pending.id(),true)).isEqualTo("https://alipay.test/mobile");
+        verify(alipay,never()).pageUrl(any(),anyLong());
+        var expired=order("EXPIRED","ALIPAY");
+        when(billing.order(expired.id())).thenReturn(expired);
+        assertThatThrownBy(()->checkout.alipayUrl(expired.id(),true)).hasMessageContaining("不能支付");
+        verify(alipay,never()).wapUrl(eq(expired),anyLong());
+    }
 }
