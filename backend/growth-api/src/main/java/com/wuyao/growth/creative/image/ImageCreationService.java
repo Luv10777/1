@@ -73,8 +73,8 @@ public class ImageCreationService {
          return view(old.get());
        }
    requireConfigured(req);
-   if(req.workflow().equals("POSTER") && req.count()!=1) throw bad("海报每次生成 1 张");
-   if(req.brief().isBlank() && req.references().isEmpty()) throw bad("说一句需求，或上传商品照片");
+   if(req.workflow().equals("POSTER") && req.count()!=1) throw bad("灵感绘图每次生成 1 张");
+   if(req.brief().isBlank() && req.references().isEmpty()) throw bad("描述想画的内容，或上传参考图片");
    if(req.workflow().equals("PRODUCT_SET") && req.references().stream().noneMatch(r->r.role().equals("SUBJECT")))
      throw bad("产品套图需要至少一张商品照片");
    if(req.templateId()!=null && !Set.of("romantic","newyear","seasonal").contains(req.templateId()))
@@ -278,7 +278,7 @@ public class ImageCreationService {
    requireConfigured(req);
    Long tenantId=TenantContext.require();
    acquirePermit(tenantId);
-   var spec=new ImageDtos.Spec(source.getSpec().role(),"参考原图修改文字，尽量保持商品、构图、色彩与风格；去除旧标题和说明，按新的文案重新设计文字。",edit.headline(),edit.caption(),source.getId());
+   var spec=new ImageDtos.Spec(source.getSpec().role(),"参考原图修改文字，尽量保持主体、构图、色彩与风格；去除旧标题和说明，按新的文案重新设计文字。",edit.headline(),edit.caption(),source.getId());
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(edit.requestKey());c.setRequestHash(hash);c.setRequest(req);
    c.setBillingReservationId(billing.reserve("image-create:"+edit.requestKey(),"IMAGE",BillingService.IMAGE_CREDITS,"图片文字修改 · 预占 1 张"));
@@ -297,13 +297,13 @@ public class ImageCreationService {
        || originals.stream().noneMatch(i->i.getId().equals(itemId))) throw bad("整组完成后可以单独重做一张");
    if("POSTER".equals(original.getRequest().workflow())) {
      String direction=variation==null?"LAYOUT":variation;
-     if(!Set.of("LAYOUT","SCENE","MESSAGE").contains(direction)) throw bad("不支持的海报换版方向");
+     if(!Set.of("LAYOUT","SCENE","MESSAGE").contains(direction)) throw bad("不支持的绘图换版方向");
      var r=original.getRequest();
      var req=new ImageDtos.Create(requestKey,r.workflow(),r.brief(),r.references(),r.ratio(),r.quality(),
        1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
      return createVersion(req,userId,id,direction);
    }
-   if(variation!=null) throw bad("产品套图不支持海报换版方向");
+   if(variation!=null) throw bad("产品套图不支持该换版方向");
    creations.lockRequest(TenantContext.require()+":"+requestKey);
    String fingerprint=hash(List.of("regenerate",id,itemId),id);
    var previous=creations.findByRequestKey(requestKey);

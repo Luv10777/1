@@ -6,7 +6,7 @@ const route = useRoute()
 const router = useRouter()
 const switching = ref(false)
 const workspaces = [
-  { path: '/image/create/poster', label: '营销海报', icon: 'campaign' },
+  { path: '/image/create/poster', label: '灵感绘图', icon: 'campaign' },
   { path: '/image/create/product-set', label: '产品套图', icon: 'grid_view' },
 ]
 

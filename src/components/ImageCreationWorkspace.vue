@@ -66,8 +66,8 @@ async function saveTitle(entry) {
     </div>
     <div v-else-if="!studio.current" class="creation-empty-result">
       <img class="creation-empty-mark" src="/images/brand/yifangzhi-mark.png" alt="一方志" />
-      <h2>{{ studio.product ? '你的产品套图，会出现在这里' : '你的第一张海报，会展示在这里。' }}</h2>
-      <p>{{ studio.product ? '上传商品照片，点「立即生成」' : '在下方说一句需求，点一下「生成海报」。这里会展示进度和完成的大图。' }}</p>
+      <h2>{{ studio.product ? '你的产品套图，会出现在这里' : '你的第一张绘图，会展示在这里。' }}</h2>
+      <p>{{ studio.product ? '上传商品照片，点「立即生成」' : '在下方说一句需求，点一下「生成图片」。这里会展示进度和完成的大图。' }}</p>
     </div>
     <div v-else class="creation-output" :aria-busy="studio.active">
       <div class="creation-output-head">

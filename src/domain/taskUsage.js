@@ -20,7 +20,7 @@ export const taskModel = (model, module) => ({
   return label === alias ? name : label
 }).join(' / ') : '未记录模型')
 export const taskWorkflow = task => task.module === 'IMAGE_GENERATION'
-  ? ({ POSTER: '营销海报', PRODUCT_SET: '产品套图' }[task.workflow] || '图片创作')
+  ? ({ POSTER: '灵感绘图', PRODUCT_SET: '产品套图' }[task.workflow] || '图片创作')
   : task.module === 'VIDEO_PLAN' ? (task.workflow === 'REGENERATE' ? '换一批方案' : '生成 3 个方案')
   : task.module === 'COPY' ? (task.workflow === 'REGENERATE' ? '换一批文案' : '写 3 条文案')
   : [task.resolution, task.durationSeconds ? `${task.durationSeconds} 秒` : ''].filter(Boolean).join(' · ')

@@ -46,6 +46,7 @@ public class ImageRenderHandler implements TaskHandler {
      options.put("operation",directUrl?"submit":item.getProviderJobId()==null?"submit":"query");
      options.put("width",nativeSize.width());options.put("height",nativeSize.height());options.put("quality",c.getRequest().quality());
      options.put("seriesKey","creation-"+c.getId());
+     options.put("workflow",c.getRequest().workflow());
      if(!directUrl && item.getProviderJobId()!=null) options.put("jobId",item.getProviderJobId());
      else {
        var refs=new ArrayList<Map<String,Object>>();

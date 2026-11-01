@@ -11,7 +11,7 @@ const isProductSet = computed(() => route.name === 'image-create-product-set')
 const isLanding = computed(() => !isPoster.value && !isProductSet.value)
 // 封面跟随入口数据，避免循环卡片共用同一张图片。
 const flows = [
-  { to: '/image/create/poster', name: '营销海报', intro: '说一句活动需求，自动安排文案与画面。', cover: '/images/marketing-poster-full.jpg' },
+  { to: '/image/create/poster', name: '灵感绘图', intro: '把想象画出来，摄影、插画与创意图都能做。', cover: '/images/marketing-poster-full.jpg' },
   { to: '/image/create/product-set', name: '产品套图', intro: '一件商品，生成主图、细节与场景。', cover: '/images/product-set-full.jpg' },
 ]
 

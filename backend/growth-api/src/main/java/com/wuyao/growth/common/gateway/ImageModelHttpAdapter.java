@@ -112,8 +112,18 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    if("query".equals(req.options().get("operation"))) throw failure("OpenAI 图片接口不支持此异步任务查询，请核对原任务接口协议");
    var endpoint=config.getGenerator();var refs=references(req);
    StringBuilder prompt=new StringBuilder(req.prompt());
-   for(int n=0;n<refs.size();n++) prompt.append("\n参考图 ").append(n+1).append("STYLE".equals(refs.get(n).get("role"))?
-     "：只参考风格，不复制商品、品牌或文字。":"：真实商品或门店主体，保持外观、包装与标识一致。");
+   for(int n=0;n<refs.size();n++) {
+     String role=String.valueOf(refs.get(n).get("role"));
+     String guidance;
+     if("POSTER".equals(req.options().get("workflow"))) guidance=switch(role) {
+       case "STYLE" -> "：只参考画风、色彩、笔触和光线，不复制其主体或文字。";
+       case "LAYOUT" -> "：参考构图和空间关系，具体内容按用户需求。";
+       case "BACKGROUND" -> "：参考环境与背景，主体按用户需求。";
+       default -> "：主体内容依据；保留未要求修改的身份和视觉特征，明确的修改、替换和删除要求优先。";
+     };
+     else guidance="STYLE".equals(role)?"：只参考风格，不复制商品、品牌或文字。":"：真实商品或门店主体，保持外观、包装与标识一致。";
+     prompt.append("\n参考图 ").append(n+1).append(guidance);
+   }
    var body=new LinkedHashMap<String,Object>();
    body.put("model",endpoint.getModel());body.put("prompt",prompt.toString());body.put("n",1);
    body.put("size",req.options().get("width")+"x"+req.options().get("height"));

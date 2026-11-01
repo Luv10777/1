@@ -1,7 +1,7 @@
 import { computed, reactive, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, downloadImage } from '../services/imageCreation'
-import { IMAGE_QUALITIES, POSTER_PURPOSE_GROUPS, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
+import { IMAGE_QUALITIES, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
 import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -16,7 +16,7 @@ export function useImageCreation(workflow) {
   const count = ref(product.value ? 3 : 1)
   const platform = ref(product.value ? 'LOCAL' : 'LOCAL')
   const imageType = ref(product.value ? 'PRODUCT_MAIN' : 'POSTER')
-  const purpose = ref(product.value ? '美团 / 大众点评商品展示' : '朋友圈活动宣传')
+  const purpose = ref(product.value ? '美团 / 大众点评商品展示' : '')
   const style = ref('帮我搭配')
   const files = ref([])
   const busy = ref(false)
@@ -88,15 +88,6 @@ export function useImageCreation(workflow) {
   }
   const locked = computed(() => busy.value || !!pending.value)
   const workspaceTab = ref('inspiration')
-  const posterPlatform = purposeValue => {
-    if (purposeValue.includes('小红书')) return 'XIAOHONGSHU'
-    if (purposeValue.includes('抖音')) return purposeValue.includes('团购') ? 'DOUYIN_GROUP' : 'DOUYIN'
-    if (purposeValue.includes('视频号') || purposeValue.includes('朋友圈') || purposeValue.includes('微信群')) return 'WECHAT'
-    if (purposeValue.includes('美团') || purposeValue.includes('点评')) return 'MEITUAN'
-    if (purposeValue.includes('外卖')) return 'ELEME'
-    if (purposeValue.includes('门店')) return 'OFFLINE'
-    return 'LOCAL'
-  }
   function persistPending(value) {
     pending.value = value
     if (value) sessionStorage.setItem(pendingKey, JSON.stringify(value))
@@ -220,7 +211,7 @@ export function useImageCreation(workflow) {
     if (active.value || (!configured.value && !pending.value)) return
     run(async () => {
       if (pending.value) return deliver(pending.value)
-      if (!brief.value.trim() && !files.value.length) throw new Error('说一句需求，或上传商品照片')
+      if (!brief.value.trim() && !files.value.length) throw new Error('描述想画的内容，或上传参考图片')
       if (product.value && !files.value.some(f => f.role === 'SUBJECT')) throw new Error('先上传至少一张商品照片')
       const submittedBrief = brief.value.trim()
       const submittedFiles = [...files.value]
@@ -239,7 +230,7 @@ export function useImageCreation(workflow) {
           references: submittedFiles.map(f => ({ assetId: f.assetId, role: f.role })),
           ratio: ratio.value, quality: quality.value, count: product.value ? Number(count.value) : 1,
           platform: platform.value, imageType: imageType.value,
-          purpose: purpose.value, style: style.value,
+          purpose: product.value ? purpose.value : '', style: style.value,
         } })
         if (!product.value) submittedFiles.forEach(file => { if (file.file) URL.revokeObjectURL(file.preview) })
       } catch (error) {
@@ -264,11 +255,11 @@ export function useImageCreation(workflow) {
     if (!item || !changes) return
     const instructions = []
     if (changes.headline != null || changes.caption != null) {
-      instructions.push(`请将海报文字严格修改为：标题「${changes.headline || ''}」；活动说明「${changes.caption || ''}」。除文字外保持商品事实不变。`)
+      instructions.push(`请将图片文字严格修改为：标题「${changes.headline || ''}」；说明文字「${changes.caption || ''}」。除文字外保持画面其他内容不变。`)
     }
-    if (changes.options?.includes('LAYOUT')) instructions.push('换一种版式，改变主体与文字区的构图关系。')
-    if (changes.options?.includes('SCENE')) instructions.push('换一个有依据的场景与光线，保持商品身份真实。')
-    if (changes.options?.includes('MESSAGE')) instructions.push('换一个传播角度，调整信息强调与视线引导。')
+    if (changes.options?.includes('LAYOUT')) instructions.push('换一种构图，调整主体位置、裁切与空间关系；仅在已有文字时调整文字区。')
+    if (changes.options?.includes('SCENE')) instructions.push('换一个符合需求的场景与光线，保持未要求修改的主体身份和特征。')
+    if (changes.options?.includes('MESSAGE')) instructions.push('换一种画面表达，调整视觉重点与叙事角度。')
     if (changes.instruction?.trim()) instructions.push(changes.instruction.trim())
     if (!instructions.length) return
     run(() => deliver({ kind: 'revision', id: current.value.id, data: {
@@ -327,17 +318,6 @@ export function useImageCreation(workflow) {
     if (route.query.creation) await load(route.query.creation)
   })
   watch(() => route.query.creation, id => { if (id && String(current.value?.id) !== String(id)) load(id) })
-  watch(purpose, value => {
-    if (!product.value) {
-      platform.value = posterPlatform(value)
-      imageType.value = 'POSTER'
-    }
-    if (!product.value) {
-      const option = POSTER_PURPOSE_GROUPS.flatMap(group => group.options).find(option => option.label === value)
-      if (option && supportsRatio(option.ratio)) ratio.value = option.ratio
-      syncHighestQuality()
-    }
-  })
   watch(ratio, syncHighestQuality)
   onBeforeUnmount(() => {
     alive = false; refreshSequence++; clearTimeout(pollTimer)

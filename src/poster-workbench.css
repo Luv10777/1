@@ -88,13 +88,6 @@
 .poster-quality-grid button { min-height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--poster-muted); font-size: 12px; transition: background .18s, color .18s; }
 .poster-quality-grid button.active { background: #fff; color: var(--poster-ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44,62,80,.12); }
 .poster-quality-grid button:disabled { opacity: .38; }
-.poster-purpose-picker { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; color: var(--poster-ink); font-size: 15px; }
-.poster-purpose-groups { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; padding: 3px; border-radius: 8px; background: var(--poster-subtle); }
-.poster-purpose-groups button { min-height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--poster-muted); font-size: 12px; transition: background .18s, color .18s; }
-.poster-purpose-groups button.active { background: #fff; color: var(--poster-ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44,62,80,.12); }
-.poster-purpose-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.poster-purpose-options button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: var(--poster-subtle); color: var(--poster-ink); font-size: 12px; transition: background .18s, color .18s; }
-.poster-purpose-options button.active { background: var(--poster-red-wash); color: var(--poster-red-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--poster-red); }
 .poster-control-footer { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; padding: 16px 28px 28px; background: #fff; }
 .poster-footer-meta { margin: 0; color: var(--poster-muted); font-size: 13px; text-align: center; }
 .poster-control-footer .generation-billing-link { align-self: center; padding: 0; font-size: 13px; }
@@ -264,7 +257,6 @@
 .poster-workbench :is(.poster-variation > strong) { font-size: 13px; font-weight: 600; }
 .poster-workbench :is(.poster-load-more, .poster-variation-options button, .poster-variation-submit, .poster-small-primary) { font-size: 12px; font-weight: 500; }
 .poster-workbench :is(.poster-edit-form input, .poster-edit-form textarea, .poster-reference-library > input) { font-size: 13px; line-height: 1.6; }
-.poster-workbench :is(.poster-purpose-options button) { font-weight: 500; }
 .poster-fade-enter-active, .poster-fade-leave-active { transition: opacity .22s ease, transform .22s ease; }
 .poster-fade-enter-from, .poster-fade-leave-to { opacity: 0; transform: translateY(7px); }
 @keyframes poster-shimmer { to { transform: translateX(135%); } }

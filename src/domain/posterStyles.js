@@ -1,13 +1,13 @@
 // Names are sent as the request `style`; the server keeps the matching art-direction notes.
 export const POSTER_STYLES = [
-  { key: 'editorial', name: '杂志封面', fit: '招牌产品、新品' },
-  { key: 'quiet', name: '日式留白', fit: '咖啡、甜品、轻食' },
-  { key: 'ink', name: '新中式', fit: '茶饮、节气、老字号' },
-  { key: 'hongkong', name: '港风复古', fit: '夜宵、冰室、小酒馆' },
-  { key: 'bold', name: '大字报', fit: '促销、限时活动' },
-  { key: 'film', name: '胶片生活感', fit: '到店氛围、服务' },
-  { key: 'drawn', name: '手绘插画', fit: '甜品、亲子、烘焙' },
-  { key: 'lowkey', name: '暗调质感', fit: '酒吧、精品、高客单' },
+  { key: 'photo', name: '写实摄影', fit: '人物、动物、静物与自然场景', image: '/images/drawing-styles/photo.webp' },
+  { key: 'cinema', name: '电影质感', fit: '场景叙事、人物与氛围画面', image: '/images/drawing-styles/cinema.webp' },
+  { key: 'watercolor', name: '手绘水彩', fit: '故事插画、植物与轻盈色彩', image: '/images/drawing-styles/watercolor.webp' },
+  { key: 'ink', name: '国风意境', fit: '山水、花鸟与东方意境', image: '/images/drawing-styles/ink.webp' },
+  { key: 'minimal', name: '极简留白', fit: '静物、抽象画面与简洁构图', image: '/images/drawing-styles/minimal.webp' },
+  { key: 'film', name: '胶片纪实', fit: '日常生活、街景与真实瞬间', image: '/images/drawing-styles/film.webp' },
+  { key: 'graphic', name: '平面设计', fit: '图形、封面与视觉设计', image: '/images/drawing-styles/graphic.webp' },
+  { key: 'lowkey', name: '暗调光影', fit: '静物、人物与戏剧光影', image: '/images/drawing-styles/lowkey.webp' },
 ]
 
 export const SEASONAL_PREFIX = '应时·'

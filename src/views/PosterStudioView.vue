@@ -19,7 +19,7 @@ watch(() => [studio.optimistic, studio.current?.id], async ([optimistic, id], [w
 </script>
 
 <template>
-  <section class="poster-workbench bg-[#FAF8F5] text-[#2D2826]" aria-label="营销海报工作区">
+  <section class="poster-workbench bg-[#FAF8F5] text-[#2D2826]" aria-label="灵感绘图工作区">
     <PosterControlPanel :studio="studio" />
     <div class="poster-showcase">
       <PosterGalleryView ref="gallery" :studio="studio" @choose="chooseStyle" />

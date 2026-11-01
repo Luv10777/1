@@ -52,7 +52,7 @@ function mapImage(row) {
     typeLabel: '图片',
     title: row.title || '图片作品',
     createdAt: row.createdAt,
-    tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '图片海报', row.quality],
+    tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '灵感绘图', row.quality],
     url: row.url,
     quality: row.quality,
     dimensions: row.width && row.height ? `${row.width} × ${row.height} px` : '未记录尺寸',

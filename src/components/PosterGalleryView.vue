@@ -110,8 +110,8 @@ function historyDate(value) {
   return new Date(value).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 function turnPrompt(turn) {
-  if (!turn.parentId) return turn.brief || "这次海报创作";
-  return turn.brief?.split("\n本次修改：").at(-1) || "继续修改海报";
+  if (!turn.parentId) return turn.brief || "这次绘图创作";
+  return turn.brief?.split("\n本次修改：").at(-1) || "继续修改图片";
 }
 watch(() => studio.value.current?.id, () => { editorOptions.value = []; });
 watch(() => studio.value.thread, turns => {
@@ -129,7 +129,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
 </script>
 
 <template>
-  <section class="poster-gallery" aria-label="海报展示工作台">
+  <section class="poster-gallery" aria-label="图片展示工作台">
     <header class="poster-gallery-toolbar">
       <nav class="poster-gallery-tabs" aria-label="展示内容">
         <button
@@ -140,7 +140,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           "
           @click="showTab('inspiration')"
         >
-          海报风格</button
+          绘图风格</button
         ><button
           type="button"
           :class="{ active: studio.workspaceTab === 'result' }"
@@ -195,7 +195,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           <PosterStyleCard
             v-for="style in POSTER_STYLES"
             :key="style.key"
-            :image="`/images/poster-styles/${style.key}.webp`"
+            :image="style.image"
             :name="style.name"
             :fit="style.fit"
             :selected="studio.style === style.name"
@@ -209,11 +209,11 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         v-else-if="studio.workspaceTab === 'history'"
         class="poster-history-view"
       >
-        <p v-if="!studio.history.length" class="poster-empty-history">还没有海报</p>
+        <p v-if="!studio.history.length" class="poster-empty-history">还没有绘图作品</p>
         <ul v-else class="poster-history-grid">
           <li v-for="entry in studio.history" :key="entry.id" class="poster-history-card">
-            <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" :aria-label="`打开${entry.title || '海报创作'}`" @click="studio.openCreation(entry.id)">
-              <img v-if="entry.previewUrl" :src="entry.previewUrl" :alt="`${entry.title || '海报创作'}缩略图`" loading="lazy" />
+            <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" :aria-label="`打开${entry.title || '灵感绘图'}`" @click="studio.openCreation(entry.id)">
+              <img v-if="entry.previewUrl" :src="entry.previewUrl" :alt="`${entry.title || '灵感绘图'}缩略图`" loading="lazy" />
               <span v-else class="poster-history-placeholder"><img src="/images/brand/yifangzhi-mark.png" alt="" /><span>待成图</span></span>
               <span v-if="entry.status !== 'SUCCEEDED'" class="poster-history-status">{{ IMAGE_STATUS[entry.status] }}</span>
             </button>
@@ -223,7 +223,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
               <button type="button" title="取消" aria-label="取消" @click="editingTitleId = null"><X :size="14" /></button>
             </form>
             <div v-else class="poster-history-meta">
-              <strong :title="entry.title || '海报创作'">{{ entry.title || "海报创作" }}</strong>
+              <strong :title="entry.title || '灵感绘图'">{{ entry.title || "灵感绘图" }}</strong>
               <button type="button" class="poster-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="13" /></button>
             </div>
             <time class="poster-history-date" :datetime="entry.createdAt">{{ historyDate(entry.createdAt) }}</time>
@@ -279,12 +279,12 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           class="poster-result-empty"
         >
           <img class="poster-empty-emblem" src="/images/brand/yifangzhi-mark.png" alt="一方志" />
-          <h3>让一张海报，讲好门店的故事。</h3>
+          <h3>让想象，成为看得见的画面。</h3>
           <p>
-            写下真实商品和活动，再挑一个海报风格。生成后海报会完整出现在这里。
+            描述人物、场景或创意，选择喜欢的画风。生成的图片会出现在这里。
           </p>
           <button type="button" @click="showTab('inspiration')">
-            挑选海报风格
+            挑选绘图风格
           </button>
         </div>
         <div class="poster-thread">
@@ -310,7 +310,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
               {{ turn.question }}
             </p>
             <form v-if="turn.id === studio.current?.id && turn.status === 'NEEDS_INPUT'" class="poster-conversation-editor" @submit.prevent="studio.revise">
-              <textarea v-model="studio.revision" class="poster-conversation-input" maxlength="1000" aria-label="补充信息" placeholder="补充上面问到的信息，提交后继续规划这张海报" />
+              <textarea v-model="studio.revision" class="poster-conversation-input" maxlength="1000" aria-label="补充信息" placeholder="补充上面问到的信息，提交后继续规划这张图片" />
               <button type="submit" class="poster-conversation-submit" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">补充并继续</button>
             </form>
             <p v-if="turn.error" class="poster-result-error">
@@ -400,7 +400,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                     </div>
                   </div>
                 <p v-if="item.similarityWarning" class="poster-result-note">
-                  这张与近期海报较相似，可换版式或场景。
+                  这张与近期图片较相似，可换构图或场景。
                 </p>
                 <p v-if="item.error" class="poster-result-error">
                   {{ item.error }}
@@ -408,14 +408,14 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                 <form v-if="item.url && turn.id === studio.current?.id && turn.status === 'SUCCEEDED'" class="poster-conversation-editor" @submit.prevent="submitEditor(item)">
                   <div class="poster-conversation-heading"><strong>继续修改</strong></div>
                   <div class="poster-conversation-options" role="group" aria-label="选择修改项">
-                    <label v-for="option in [{ type: 'TEXT', label: '修改文字' }, { type: 'LAYOUT', label: '换版式' }, { type: 'SCENE', label: '换场景' }, { type: 'MESSAGE', label: '换传播角度' }]" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" /><Check v-if="editorOptions.includes(option.type)" :size="12" :stroke-width="2.4" aria-hidden="true" />{{ option.label }}</label>
+                    <label v-for="option in [{ type: 'TEXT', label: '修改文字' }, { type: 'LAYOUT', label: '换构图' }, { type: 'SCENE', label: '换场景' }, { type: 'MESSAGE', label: '换表达角度' }]" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" /><Check v-if="editorOptions.includes(option.type)" :size="12" :stroke-width="2.4" aria-hidden="true" />{{ option.label }}</label>
                   </div>
                   <div v-if="editorOptions.includes('TEXT')" class="poster-conversation-copy">
                     <label><span>标题</span><input v-model="editorHeadline" maxlength="40" /></label>
-                    <label><span>活动说明</span><input v-model="editorCaption" maxlength="100" placeholder="可不填" /></label>
+                    <label><span>说明文字</span><input v-model="editorCaption" maxlength="100" placeholder="可不填" /></label>
                   </div>
                   <div class="poster-conversation-bar">
-                    <input v-model="editorInstruction" class="poster-conversation-input" maxlength="1000" aria-label="补充修改说明" placeholder="还可以补充一句，例如：背景更清爽，商品保持不变" />
+                    <input v-model="editorInstruction" class="poster-conversation-input" maxlength="1000" aria-label="补充修改说明" placeholder="还可以补充一句，例如：背景更清爽，主体保持不变" />
                     <button type="submit" class="poster-conversation-submit" aria-label="生成这一版" title="生成这一版" :disabled="studio.busy || !!studio.pending || !studio.configured || (!editorOptions.length && !editorInstruction.trim())"><ArrowUp :size="18" :stroke-width="2" aria-hidden="true" /></button>
                   </div>
                   <small class="poster-conversation-note">{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</small>
@@ -430,7 +430,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
     <dialog
       ref="previewDialog"
       class="poster-lightbox"
-      aria-label="海报大图预览"
+      aria-label="图片大图预览"
       @close="preview = null"
     >
       <template v-if="preview">

@@ -139,6 +139,20 @@ class ImageModelHttpAdapterTest {
      assertThat(request).contains("name=\"quality\"","\r\nhigh\r\n").doesNotContain("data:image","response_format");
    }
  }
+ @Test void drawingReferencesKeepGeneralSubjectsAndExplicitEditsInsteadOfProductDefaults() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+     var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"b64_json\":\"aW1hZ2U=\"}]}"));
+     var refs=List.<Map<String,Object>>of(Map.of("role","SUBJECT","dataUrl","data:image/png;base64,c3ViamVjdA=="),
+       Map.of("role","STYLE","dataUrl","data:image/jpeg;base64,c3R5bGU="));
+     var original=imageRequest(refs);
+     var options=new LinkedHashMap<String,Object>(original.options());options.put("workflow","POSTER");
+     new ImageModelHttpAdapter(openAiConfig(server),new ObjectMapper()).invoke(new ProviderRequest(
+       original.alias(),original.tenantId(),"把人物改为水彩画，保留身份，无文字",options,original.idempotencyKey()));
+     String request=captured.get(5,TimeUnit.SECONDS);
+     assertThat(request).contains("主体内容依据","修改、替换和删除要求优先","只参考画风")
+       .doesNotContain("真实商品或门店主体","保持外观、包装与标识一致");
+   }
+ }
  @Test void imageUrlIsReturnedWithoutDownloading() throws Exception {
    try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
      String origin="http://127.0.0.1:"+server.getLocalPort();

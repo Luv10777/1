@@ -30,3 +30,25 @@ test('poster gallery offers an answer box only while the current turn waits for 
     assert.doesNotMatch(html, /补充并继续/)
   } finally { await vite.close() }
 })
+
+
+test('drawing controls and style gallery describe general images without a purpose picker', async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' })
+  try {
+    const { default: Control } = await vite.ssrLoadModule('/src/components/PosterControlPanel.vue')
+    const { default: Gallery } = await vite.ssrLoadModule('/src/components/PosterGalleryView.vue')
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:path(.*)*', component: { render: () => null } }] })
+    await router.push('/image/create/poster')
+    const studio = reactive({ workspaceTab: 'inspiration', history: [], thread: [], current: null, busy: false, pending: null,
+      configured: true, capabilityState: 'ready', revision: '', error: '', optimistic: false, locked: false,
+      style: '手绘水彩', ratio: '3:4', quality: '2K', purpose: '朋友圈活动宣传', files: [],
+      supportsRatio: () => true, supportsQuality: () => true })
+    const html = await renderToString(createSSRApp({ render: () => h('main', [h(Control, { studio }), h(Gallery, { studio })]) }).use(router))
+    assert.match(html, /灵感绘图/)
+    assert.match(html, /生成图片/)
+    assert.match(html, /森林里.*小狐狸/)
+    for (const style of ['写实摄影', '电影质感', '手绘水彩', '国风意境', '极简留白', '胶片纪实', '平面设计', '暗调光影']) assert.ok(html.includes(style))
+    assert.doesNotMatch(html, /poster-purpose-picker|朋友圈活动宣传|海报风格|营销海报/)
+    assert.match(html, /drawing-styles\/watercolor\.webp/)
+  } finally { await vite.close() }
+})

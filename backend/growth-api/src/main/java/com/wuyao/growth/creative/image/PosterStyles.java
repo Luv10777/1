@@ -3,25 +3,27 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-/** Art-direction notes for the poster styles the merchant can pick; written as visible facts, not praise. */
+/** Medium and quality notes for general drawing; never adds marketing copy by default. */
 final class PosterStyles {
  private PosterStyles() {}
  private static final Map<String,String> GUIDES=Map.of(
-  "杂志封面","Editorial magazine cover. Warm cream paper background; one hero subject in soft window light, 85mm, shallow depth of field; large high-contrast serif title across the top third; small monospace caption bottom-left. Palette: cream, ink black, one accent taken from the product. Avoid: stickers, badges, price bursts.",
-  "日式留白","Quiet Japanese minimalism. Off-white linen background; subject small in the lower third; about 70% negative space; overcast diffused daylight; at most one short line of thin light sans-serif text. Palette: off-white, sand, pale grey. Avoid: saturated color, multiple text blocks.",
-  "新中式","Neo-Chinese. Xuan rice-paper texture; sparse ink-wash branch or mountain; vertical brush-calligraphy title on the right; one small vermilion seal stamp; wide margins. Palette: ink, paper beige, vermilion. Avoid: dragons, gold clip-art, crowded red-and-gold decoration.",
-  "港风复古","1980s Hong Kong film still. Tungsten street light and a lit shop sign; 35mm film grain; red-green contrast; condensed Song-style title. Palette: bottle green, signal red, warm cream. Avoid: modern UI elements, invented Cantonese slogans.",
-  "大字报","Swiss grid promotional poster. Flat saturated color field; oversized heavy sans-serif headline filling about 40% of the frame; strict grid; one product cut-out; offer details only when the merchant provided them. Palette: one primary color, black, white. Avoid: photo backgrounds, invented discounts.",
-  "胶片生活感","Lifestyle film photograph. Portra-like warm tones; natural late-afternoon light; hands using the product in a real shop setting; candid off-centre crop; small white caption in a corner. Avoid: studio backdrop, posed models, heavy retouching.",
-  "手绘插画","Hand-drawn gouache illustration. Soft pastel palette; rounded hand-lettered title; simple friendly shapes; visible paper texture; the product drawn faithfully in its real color and shape. Avoid: 3D render look, generic mascots.",
-  "暗调质感","Low-key studio still life. Charcoal background; single hard side light; deep shadows; rich surface texture on the subject; thin muted-gold serif title. Avoid: glossy luxury clichés, sparkles, lens flares.");
+  "写实摄影","Natural photographic realism. Use a deliberate viewpoint, coherent perspective, plausible light direction and contact shadows. Preserve natural skin, fur, fabric and surface texture; distinguish the focal subject from the background. Avoid: waxy skin, excessive smoothing, oversharpened halos, implausible anatomy. Match framing and depth of field to the requested subject, not a fixed lens or commercial setup.",
+  "电影质感","Cinematic visual storytelling. Choose an intentional framing and scene scale, foreground-to-background depth, motivated key light and controlled shadow falloff. Use a coherent color relationship and restrained highlight rolloff. Avoid: unrelated props, arbitrary lens flares and blanket teal-orange grading. Keep the requested subject and action clear.",
+  "手绘水彩","Hand-painted watercolor. Transparent layered washes, soft pigment blooms, selective crisp edges, visible paper tooth and controlled color mixing. Use simplified shapes and detail concentrated around the focal subject. Avoid: plastic 3D surfaces, muddy indiscriminate texture and automatically added lettering.",
+  "国风意境","East Asian ink-and-color visual language. Varied ink density, dry-brush edges, restrained mineral colors, deliberate empty space and balanced visual rhythm. Choose imagery from the user's subject instead of automatically adding seals, calligraphy or festival decoration. Avoid: generic red-and-gold ornament and uncontrolled ink clutter.",
+  "极简留白","Minimal composition with purposeful negative space. Few well-defined shapes, clean silhouettes, controlled spacing, restrained palette and soft tonal separation. Preserve recognizable subject details; do not reduce every scene to a small centered product on white. Avoid: unnecessary ornaments, arbitrary labels and blankness that loses the requested content.",
+  "胶片纪实","Documentary film-photograph treatment. Natural gestures and interactions, believable everyday textures, restrained film grain, gentle highlight rolloff and coherent ambient light. Use a candid viewpoint that serves the described scene. Avoid: waxy faces, heavy beauty retouching, staged advertising poses and automatic captions.",
+  "平面设计","Graphic visual design. Strong shape hierarchy, controlled geometric relationships, confident cropping, a coherent palette and clean edges. Typography is included only when requested, with exact wording and clear placement. Avoid: random badges, invented promotional text and excessive decorative elements.",
+  "暗调光影","Low-key visual treatment. Define the focal subject through selective directional light, readable shadow detail, restrained highlights and a controlled dark palette. Surface details and silhouette remain distinguishable. Avoid: crushed featureless blacks, arbitrary gold decoration and overexposed reflections.");
+ private static final Map<String,String> LEGACY_NAMES=Map.of(
+  "杂志封面","平面设计","日式留白","极简留白","新中式","国风意境","港风复古","电影质感",
+  "大字报","平面设计","胶片生活感","胶片纪实","手绘插画","手绘水彩","暗调质感","暗调光影");
  private static final Pattern SEASONAL=Pattern.compile("应时·(\\p{IsHan}{2,6})");
 
- /** The guide for a known style, or empty for "帮我搭配" and styles saved before this list existed. */
  static Optional<String> guide(String style) {
    if(style==null) return Optional.empty();
    var seasonal=SEASONAL.matcher(style);
-   if(seasonal.matches()) return Optional.of("Seasonal moment: "+seasonal.group(1)+". Express it through the real produce, light, temperature and colors of this time of year in China; keep the store's own product or service as the hero. Avoid: generic festival clip-art, invented events or offers.");
-   return Optional.ofNullable(GUIDES.get(style));
+   if(seasonal.matches()) return Optional.of("Seasonal moment: "+seasonal.group(1)+". Express seasonal light, atmosphere, natural textures and colors in the user's requested subject or scene. Avoid: automatic festival clip-art, invented events or offers; do not force a store or product into the image.");
+   return Optional.ofNullable(GUIDES.get(LEGACY_NAMES.getOrDefault(style,style)));
  }
 }

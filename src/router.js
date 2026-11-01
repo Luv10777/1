@@ -73,7 +73,7 @@ const routes = [
   { path: '/copy/rewrite', name: 'copy-rewrite', redirect: '/image/create' },
   { path: '/video/analyze', name: 'video-analyze', component: VideoAnalyzeView, meta: { guest: true, title: '视频反推', icon: '◌', description: '反向拆解视频节奏、镜头意图与可复制的内容骨架。' } },
   { path: '/image/create', name: 'image-create', component: ImageCreateView, meta: { guest: true, title: '图片创作', icon: '▧', description: '为门店活动生成可编辑、可追踪的视觉素材。', navGroup: 'content' } },
-  { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { guest: true, title: '营销海报', description: '为一次活动定下主视觉。', navGroup: 'content' } },
+  { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { guest: true, title: '灵感绘图', description: '把想象画出来，创作人物、风景、插画与任何创意画面。', navGroup: 'content' } },
   { path: '/image/create/product-set', name: 'image-create-product-set', component: ImageCreateView, meta: { guest: true, title: '产品套图', icon: '▦', description: '围绕同一件商品生成一组有秩序的画面。', navGroup: 'content' } },
   { path: '/video/create', name: 'video-create', component: VideoCreateView, meta: { guest: true, title: '视频创作', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
   { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { guest: true, title: '视频工作台', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },

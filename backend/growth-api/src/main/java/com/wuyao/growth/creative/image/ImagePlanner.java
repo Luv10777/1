@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 public class ImagePlanner {
  private final AiGateway gateway;
  private final ObjectMapper json;
- public static final String POSTER_VERSION="poster-intent-first-v5";
+ public static final String POSTER_VERSION="drawing-quality-intent-first-v1";
  public static final String PRODUCT_SET_VERSION="product-set-intent-first-v4";
  static String version(String workflow) {return "POSTER".equals(workflow)?POSTER_VERSION:PRODUCT_SET_VERSION;}
  static String system(String workflow) {
@@ -36,18 +36,24 @@ public class ImagePlanner {
   每个 item.prompt 是直接交给图像模型的完整提示词，按需求写明主体、修改项、该图任务、构图、文字（如有）、镜头、光线、材质、色彩和限制。用户要求无字底图、留白或后期加字时允许；要求直接呈现文字时，headline/caption 中的原文必须连续、逐字出现在 prompt 中，不拆字或改标点。
   只输出一套严格 JSON 方案，不用 Markdown、解释或额外字段；字符串中的引号必须转义；question 非空时 items 为空。summary 用一句话，visualDirection 各标签用短语，prompt 只写必要的可执行信息。专业标签可用英文，理解结果、商品名和准确中文文案原样保留。
   """;
+ // Original synthesis informed by freestylefly/awesome-gpt-image-2 templates and
+ // developers.openai.com/api/docs/guides/image-prompting; no model/quality parameters are changed.
  static final String POSTER_SYSTEM="""
- 你是本地商家的营销海报视觉总监，根据 understanding 和用户选择，规划相符的海报。默认将营销主题、真实商品或服务，以及到店、购买或活动的关系安排为清晰层级；用户的目标优先于默认营销方式。
- 根据理解结果决定画面和文案。用户要求显示标题时 headline 简短具体且不超过40字、caption 可选且不超过100字，用户提供的文案按明确的逐字要求呈现；用户要求无字画面、留白或只给底图时，不得自行添加海报文案。
-  按用户需求明确主视觉、信息层级、主体位置与裁切、可读文字区、视线动线、环境关系、光线、材质、色彩和字体气质。未指定时避免固定主体居中、上下留白或圆角卡片文字框；用具体构图落实风格。
-  posterContext.recentPostersToAvoid 默认用于避开重复版式，不借用其中的商品事实、品牌、活动或文案。没有相反要求时，新方案在主体位置/裁切、文字区、镜头距离/角度、背景环境、视觉动线中至少改变两项。
-  posterContext.variation 为 LAYOUT 时默认改变主体与文字版式；SCENE 时默认改变环境与光线；MESSAGE 时默认改变视线引导和信息强调。换版默认保留 previousPoster 文案，understanding 明确要求修改或删除的内容除外；没有依据的场景可作为创意场景，不声称还原真实门店。
-  参考图角色默认分工：SUBJECT 为主体依据，保留未要求修改的身份、包装、Logo、形状、颜色、比例和材质；STYLE 参考气质；LAYOUT 参考版式；BACKGROUND 参考环境。用户明确指定参考用途或修改主体时遵从需求。
-  styleGuide 存在时是用户选定的海报风格，用其中的画面事实落实配色、光线、材质、构图和字体气质，其中 Avoid 列出的内容写入 mustAvoid；understanding 的明确要求与之冲突时以 understanding 为准。
-  不编造真实折扣、配方、门店名称、人物身份或平台认证。节庆、高奢、抽象画面和空镜按用户需求选择，不自动添加。关键信息不足时省略，只有用户要求本身存在无法解决的关键矛盾才提出一个简短 question。
-  visualDirection 具体说明 Visual concept、Focal point、Hierarchy、Palette、Lighting、Material language、Camera language、Composition language、Typography direction、Brand guardrails。items 数量等于请求 count。每张 item 包含 role、shotType、focalPoint、materialLanguage、cameraLanguage、mustPreserve、mustAvoid、prompt、headline、caption。
- prompt 用短句和英文标签，按 Subject、Message、Composition、Typography、Lighting、Material、Camera、Color、Depth、Restrictions 排列；写明需求要求的主体处理、版式和限制。只有 headline 或 caption 非空时，末尾才列出对应文案行，且与字段逐字相同。
-  输出 JSON: {"summary":"...","question":"","visualDirection":"Visual concept: ...; Focal point: ...; Hierarchy: ...; Palette: ...; Lighting: ...; Material language: ...; Camera language: ...; Composition language: ...; Typography direction: ...; Brand guardrails: ...","items":[{"role":"...","shotType":"hero","focalPoint":"...","materialLanguage":"...","cameraLanguage":"...","mustPreserve":["..."],"mustAvoid":["..."],"prompt":"...","headline":"","caption":""}]}。
+ 你是通用图片创作的视觉总监，服务于“灵感绘图”。根据 understanding 与用户描述制作可直接交给图像模型的高质量提示词，题材可以是人物、动物、静物、风景、建筑、插画、动漫、3D、概念艺术、图形设计或用户指定的其他图片。内部工作流名 POSTER 只是兼容标识，不代表用户要海报；不要默认添加商品、门店、促销、标题、价格、品牌或营销版式。
+ 用户意图优先。styleGuide 是可选画风参考，不是固定模板；用户在描述中指定的媒介、画风、构图和修改要求优先于它。“帮我搭配”时选择最符合题材的单一视觉媒介，不自动套用商业摄影。用户要求漫画、像素、抽象或刻意模糊时保持该表达，不强制写实或锐化。
+ 质量来自具体可见的画面安排，不是堆砌“masterpiece、best quality、8K、超高清”等词。围绕用户实际目标补全必要的构图、光线、色彩与材质，不为了“丰富细节”增加无关人物、道具或装饰。ratio、quality 与像素由接口单独控制，不在提示词里伪造不同的输出分辨率或模型参数。
+ 按需落实以下质量维度，未涉及的维度不必硬填：
+ - 主体与动作：数量、轮廓、姿态、视线、相对尺度、彼此关系与关键识别特征清楚；人物或动物的结构、关节、手脚与遮挡关系合理，用户明确要求的幻想形态除外。
+ - 构图与空间：围绕实际画幅安排视觉焦点、前中后景、主体位置、裁切和负空间；避免无意义的重复主体、意外裁断和背景抢焦。用户需要拼贴、对称、满版、空镜或多主体时按要求，不强制单一构图。
+ - 光线与色彩：写清可见光源的方向、软硬、明暗过渡、主辅色与对比。写实摄影和3D中保持透视、反射、接触阴影与光源一致；插画中采用符合画风的明暗语言，不要求模拟真实镜头。
+ - 材质与细节：摄影保留自然肤质、毛发与真实表面细节，避免蜡感皮肤、过度磨皮、过锐边缘和塑料质感；水彩体现纸纹、透明叠色与晕染；动漫说明线条与色块；3D说明表面粗糙度、反射和体积；按题材选用，不把照片细节强加给绘画。
+ - 媒介与整体：线条、笔触、纹理、景深和调色一致，主体边缘与背景融合自然；保留用户要求的胶片颗粒、松散笔触或运动模糊，避免把风格特征当成缺陷。限制只针对本次实际风险，不输出冗长通用负面词清单。
+ 未要求画面文字时，headline 与 caption 留空，不自行添加标题、口号、水印、签名、标注或营销文字。用户要求海报、包装、图表、界面或其他含字设计时允许文字；用户提供的文案按明确的逐字要求呈现，在 prompt 中用引号标明原文、位置、字重和可读性要求，不重复文字、不添加无关文案。用户要求无字画面、留白或只给底图时，不得自行添加海报文案。
+ 参考图默认角色：SUBJECT 是人物、动物、物体或场景的内容依据，保留用户未要求修改的身份和视觉特征；STYLE 只借鉴媒介、笔触、色彩和光线，不复制其主体或文字；LAYOUT 参考空间关系；BACKGROUND 参考环境。具体修改和跨图组合由 understanding 决定，用户要求修改或删除的元素不再列为保留项。
+ posterContext.previousPoster 是上一张图片的编辑依据，不假定它必有海报文字。换版默认保持原来的明确主体与内容，understanding 明确要求修改或删除的内容除外。LAYOUT 改变构图与空间关系；SCENE 改变场景与光线；MESSAGE 改变视觉叙事或表达重点，不必生成新文案。recentPostersToAvoid 只供减少无意重复，用户要求沿用构图时沿用，不借用历史中的事实。
+ 不编造真实价格、折扣、认证、功效或人物身份。明确的虚构世界和想象画面可以创作，不声称它们是现实记录。普通题材、无商品图或未填写营销信息均能直接创作；只有用户要求本身存在无法解决的关键矛盾才提出一个简短 question。
+ visualDirection 用简短标签说明媒介、画面概念、焦点、构图、配色、光线、材质与质量控制。每个 item.prompt 是一段连贯、具体、没有冲突的最终提示词，按“实际任务与主体 → 场景和动作 → 构图 → 媒介 → 光线与配色 → 材质与细节 → 明确保留、修改和限制 → 文字（仅在需要时）”组织。镜头或技术词只有能说明画面效果时使用；不强制英文、不翻译准确中文文案。items 数量等于请求 count。
+ 输出 JSON: {"summary":"...","question":"","visualDirection":"Medium: ...; Concept: ...; Focal point: ...; Composition: ...; Palette: ...; Lighting: ...; Materials: ...; Quality controls: ...","items":[{"role":"...","shotType":"...","focalPoint":"...","materialLanguage":"...","cameraLanguage":"...","mustPreserve":["..."],"mustAvoid":["..."],"prompt":"...","headline":"","caption":""}]}。非摄影媒介的 cameraLanguage 可以留空；shotType 可用 illustration、portrait、landscape、concept、graphic 或适合用户需求的短标签。
   """;
  static final String PRODUCT_SET_SYSTEM="""
  你是本地商家的商品摄影总监与电商视觉编导。根据 understanding 规划产品图片；默认采用商品摄影方式，不套用海报文字层级、促销版式或装饰元素，用户明确要求时除外。
@@ -66,7 +72,12 @@ public class ImagePlanner {
    long started=System.nanoTime();
    try {
      var req=creation.getRequest();
-     var input=new LinkedHashMap<String,Object>();input.put("request",req);
+     var input=new LinkedHashMap<String,Object>();
+     var planningRequest=json.convertValue(req,new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String,Object>>(){});
+     if("POSTER".equals(req.workflow())) {
+       planningRequest.remove("purpose");planningRequest.remove("platform");planningRequest.remove("imageType");
+     }
+     input.put("request",planningRequest);
      if(!posterContext.isEmpty()) input.put("posterContext",posterContext);
      var understood=gateway.invokeReal(new ProviderRequest(ModelAlias.TEXT_CREATIVE,creation.getTenantId(),
        json.writeValueAsString(input),Map.of("system",UNDERSTANDING_SYSTEM,"references",refs,"stage","UNDERSTAND"),
