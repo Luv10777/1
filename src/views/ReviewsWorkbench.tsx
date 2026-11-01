@@ -841,7 +841,7 @@ export default function ReviewsWorkbench() {
                                   : "联系线下巡店核实"}
                               </button>
                               <button
-                                className="stamp-button bg-[#0F172A]"
+                                className="stamp-button bg-[#0E766E]"
                                 disabled={
                                   !review.draft.trim() ||
                                   sending.includes(review.id)
@@ -1254,14 +1254,14 @@ const workbenchCSS = `
   position:relative;
   width:46px;
   height:46px;
-  border:1px solid #0f172a;
-  color:#0f172a;
+  border:1px solid var(--ri);
+  color:var(--ri);
   font:23px 'Yifangzhi Serif'}
 .reviews-page .title-seal:after {
   content:'';
   position:absolute;
   inset:4px;
-  border:1px solid #c43d2a40}
+  border:1px solid rgba(14,118,110,.25)}
 .reviews-page .reviews-eyebrow {
   margin:0;
   color:#86a29a;
@@ -1938,13 +1938,13 @@ const workbenchCSS = `
   gap:6px;
   height:36px;
   padding:0 12px;
-  border:1px solid var(--rr);
+  border:1px solid #0e766e;
   border-radius:3px;
-  background:var(--rr);
+  background:#0e766e;
   color:#fff;
   font-size:11px;
   font-weight:600;
-  box-shadow:0 2px 0 #8f281b;
+  box-shadow:0 2px 0 #134e4a;
   transition:transform .12s,box-shadow .12s}
 .reviews-page .stamp-button:active {
   transform:translateY(2px);

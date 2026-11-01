@@ -146,7 +146,7 @@ fieldset { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border
 legend { margin-bottom: 8px; padding: 0; font-size: 13px; }
 .amenity-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .amenity-chip { padding: 7px 12px; border: 1px solid var(--border, #cbd5e1); border-radius: 999px; color: inherit; background: transparent; font-size: 12px; cursor: pointer; }
-.amenity-chip.selected { border-color: var(--color-accent, #0f172a); color: var(--color-accent-text, #0f172a); background: color-mix(in srgb, var(--color-accent, #0f172a) 7%, transparent); font-weight: 600; }
+.amenity-chip.selected { border-color: var(--color-accent, #0e766e); color: var(--color-accent-text, #0e766e); background: color-mix(in srgb, var(--color-accent, #0e766e) 7%, transparent); font-weight: 600; }
 .amenity-add { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .rule { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; }
 .rule-controls { display: grid; grid-template-columns: 1fr 1fr 1.2fr auto; gap: 8px; align-items: center; }
@@ -154,7 +154,7 @@ legend { margin-bottom: 8px; padding: 0; font-size: 13px; }
 .rule-remove { width: 34px; height: 34px; border: 0; border-radius: 8px; color: var(--muted, #77716a); background: transparent; font-size: 18px; cursor: pointer; }
 .rule-remove:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 .rule-preview { color: var(--muted, #77716a); font-size: 12px; }
-.rule-add { justify-self: start; padding: 8px 0; border: 0; color: var(--color-accent-text, #0f172a); background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rule-add { justify-self: start; padding: 8px 0; border: 0; color: var(--color-accent-text, #0e766e); background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; }
 button:disabled { cursor: default; opacity: .6; }
 @media (max-width: 540px) { .store-dialog-row { grid-template-columns: 1fr; } .rule-controls { grid-template-columns: 1fr 1fr; } }
 </style>

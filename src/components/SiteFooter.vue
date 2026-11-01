@@ -22,6 +22,6 @@ import { LEGAL_ENTITY } from '../domain/legalPolicies'
 .site-legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; }
 .site-footer a { color: var(--site-footer-link); white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
 .site-footer a:hover, .site-footer a:focus-visible { text-decoration-thickness: 2px; }
-:global(:root.dark) .site-footer, :global([data-theme='dark']) .site-footer { --site-footer-link: #8dbdff; }
+:global(:root.dark .site-footer), :global([data-theme='dark'] .site-footer) { --site-footer-link: #8dbdff; }
 @media print { .site-footer { display: none; } }
 </style>

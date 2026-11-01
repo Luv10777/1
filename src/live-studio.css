@@ -495,18 +495,18 @@
 .ls-cost-warning{margin:0;padding:10px 12px;border-radius:8px;color:var(--color-warning);background:color-mix(in srgb,var(--color-warning) 10%,transparent);font-size:12px;line-height:1.6}
 .ls-cost-warning a,.ls-fact-list dd a{color:var(--color-accent-text)}
 
-/* 科技风（曜石黑 · 石板灰）：只换颜色、圆角和阴影，不动布局与文案；暗色主题保持原样。
+/* 科技风（曜石黑 · 石板灰，主题色青绿）：只换颜色、圆角和阴影，不动布局与文案；暗色主题保持原样。
    本页大量规则引用全局变量，这里在页面根上重定义一遍；原来写死的玫瑰褐色选中态在后面逐条覆盖。 */
 [data-theme='light'] .ls-page{
   --color-primary:#0F172A;--color-primary-hover:#1E293B;
-  --color-accent:#0F172A;--color-accent-hover:#1E293B;--color-accent-text:#334155;--color-on-accent:#fff;
+  --color-accent:#0E766E;--color-accent-hover:#115E59;--color-accent-text:#0E766E;--color-on-accent:#fff;
   --color-text-muted:#64748B;--color-brand-muted:#94A3B8;
   --color-bg-canvas:#F8FAFC;--color-bg-surface:#fff;--color-bg-subtle:#F1F5F9;
   --color-border-subtle:#E2E8F0;--color-border-strong:#CBD5E1;
   --color-success:#047857;--color-warning:#B45309;--color-error:#B91C1C;
   --ink:#0F172A;--ink-soft:#334155;--ink-muted:#64748B;
   --night:#F5F7FA;--night-panel:#fff;--line:#E2E8F0;--line-strong:#CBD5E1;
-  --cinnabar:#0F172A;--cinnabar-bright:#0F172A;--green:#047857;--amber:#B45309;--red:#B91C1C;
+  --cinnabar:#0E766E;--cinnabar-bright:#0E766E;--green:#047857;--amber:#B45309;--red:#B91C1C;
   --shadow-paper:0 2px 12px -4px rgba(15,23,42,.06);
   --shadow-paper-elevated:0 16px 36px -8px rgba(15,23,42,.14);
 }
@@ -519,21 +519,21 @@
 [data-theme='light'] .ls-page .ls-stage-pill.live .status-pulse{background:#10B981;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
 [data-theme='light'] .ls-page .ls-stage-pill.review{border-color:#C7D2FE;color:#4338CA;background:#EEF2FF}
 [data-theme='light'] .ls-page .ls-stage-pill.review .status-pulse{background:#6366F1}
-/* 流程切换：分段胶囊，当前项曜石黑 */
+/* 流程切换：分段胶囊，当前项主题色浅底 */
 [data-theme='light'] .ls-page .ls-stage-nav{display:inline-flex;gap:2px;padding:4px;border:1px solid #E2E8F0;border-radius:12px;background:#fff}
 [data-theme='light'] .ls-page .ls-stage-nav button{height:32px;padding:0 16px;border:0;border-radius:8px;color:#64748B;transition:background .18s ease,color .18s ease}
 [data-theme='light'] .ls-page .ls-stage-nav button:hover:not(.active){color:#0F172A;background:#F8FAFC}
-[data-theme='light'] .ls-page .ls-stage-nav button.active{color:#fff;background:#0F172A;font-weight:600}
+[data-theme='light'] .ls-page .ls-stage-nav button.active{color:#0E766E;background:rgba(14,118,110,.1);font-weight:600}
 /* 按钮 */
-[data-theme='light'] .ls-page .primary-button{border-radius:10px;background:#0F172A}
-[data-theme='light'] .ls-page .primary-button:hover:not(:disabled){background:#1E293B}
+[data-theme='light'] .ls-page .primary-button{border-radius:10px;background:#0E766E}
+[data-theme='light'] .ls-page .primary-button:hover:not(:disabled){background:#115E59}
 [data-theme='light'] .ls-page .ls-ghost{border-color:#E2E8F0;border-radius:10px;color:#334155;background:#fff}
 [data-theme='light'] .ls-page .ls-ghost:hover:not(:disabled){border-color:#CBD5E1;color:#0F172A;background:#F8FAFC}
 [data-theme='light'] .ls-page .ls-danger{border-color:#FECACA;border-radius:10px;color:#B91C1C;background:#fff;font-weight:600}
 [data-theme='light'] .ls-page .ls-danger:hover:not(:disabled){color:#991B1B;background:#FEF2F2}
 [data-theme='light'] .ls-page .ls-outline-button{border-color:#E2E8F0;color:#0F172A}
 [data-theme='light'] .ls-page .ls-outline-button:hover:not(:disabled){border-color:#CBD5E1;color:#0F172A;background:#F8FAFC}
-[data-theme='light'] .ls-page .ls-card-link,[data-theme='light'] .ls-page .ls-check-list li>button,[data-theme='light'] .ls-page .ls-check-list li>a{color:#0F172A;font-weight:600}
+[data-theme='light'] .ls-page .ls-card-link,[data-theme='light'] .ls-page .ls-check-list li>button,[data-theme='light'] .ls-page .ls-check-list li>a{color:#0E766E;font-weight:600}
 [data-theme='light'] .ls-page .ls-session-tools summary{border-color:#E2E8F0;border-radius:10px}
 [data-theme='light'] .ls-page .ls-session-menu{border-color:#E2E8F0;border-radius:16px}
 [data-theme='light'] .ls-page .ls-session-list button.current{background:#F1F5F9}
@@ -541,28 +541,28 @@
 [data-theme='light'] .ls-page .panel{border-color:#E2E8F0;border-radius:20px;box-shadow:var(--shadow-paper)}
 [data-theme='light'] .ls-page .ls-card-head>.mono{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;color:#fff;background:#0F172A;font-size:11px;font-weight:600}
 [data-theme='light'] .ls-page .ls-card-head h3{font-weight:700;letter-spacing:-.01em}
-/* 输入框：聚焦时曜石黑描边加浅光圈 */
+/* 输入框：聚焦时主题色描边加浅光圈 */
 [data-theme='light'] .ls-page :is(.ls-field input,.ls-field textarea,.ls-qa-add input,.ls-room-input input,.ls-qa-new>input,.ls-qa-new>textarea,.ls-qa-inline-edit input,.ls-qa-inline-edit textarea,.ls-product-search){border-color:#E2E8F0;border-radius:10px;background:#fff}
-[data-theme='light'] .ls-page :is(.ls-field input,.ls-field textarea,.ls-qa-new>input,.ls-qa-new>textarea,.ls-qa-inline-edit input,.ls-qa-inline-edit textarea,.ls-product-search,.ls-qa-add input):focus{border-color:#0F172A;box-shadow:0 0 0 3px rgba(15,23,42,.08)}
+[data-theme='light'] .ls-page :is(.ls-field input,.ls-field textarea,.ls-qa-new>input,.ls-qa-new>textarea,.ls-qa-inline-edit input,.ls-qa-inline-edit textarea,.ls-product-search,.ls-qa-add input):focus{border-color:#0E766E;box-shadow:0 0 0 3px rgba(14,118,110,.12)}
 [data-theme='light'] .ls-page :is(.ls-field input,.ls-field textarea,.ls-qa-add input,.ls-room-input input)::placeholder{color:#94A3B8}
 /* 开关、滑杆 */
 [data-theme='light'] .ls-page .ls-switch span{border-color:#CBD5E1;background:#E2E8F0}
 [data-theme='light'] .ls-page .ls-switch span:after{background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.2)}
-[data-theme='light'] .ls-page .ls-switch input:checked+span{border-color:#0F172A;background:#0F172A}
-[data-theme='light'] .ls-page .ls-switch input:focus-visible+span{outline-color:#0F172A}
-/* 选项：选中为曜石黑实心 */
+[data-theme='light'] .ls-page .ls-switch input:checked+span{border-color:#0E766E;background:#0E766E}
+[data-theme='light'] .ls-page .ls-switch input:focus-visible+span{outline-color:#0E766E}
+/* 选项：选中为主题色描边 + 浅底 */
 [data-theme='light'] .ls-page .ls-tone-options button{border-color:#E2E8F0;border-radius:10px;color:#334155;background:#fff}
 [data-theme='light'] .ls-page .ls-tone-options button:hover:not(.on){border-color:#CBD5E1;background:#F8FAFC}
-[data-theme='light'] .ls-page .ls-tone-options button.on{border-color:#0F172A;color:#fff;background:#0F172A}
-[data-theme='light'] .ls-page .ls-qa-filters button.on{border-color:#0F172A;color:#fff;background:#0F172A}
-[data-theme='light'] .ls-page :is(.ls-role-toggle button.on,.ls-role-toggle button.readonly.on,.ls-tabs button.on){border-color:#0F172A;color:#fff;background:#0F172A}
+[data-theme='light'] .ls-page .ls-tone-options button.on{border-color:#0E766E;color:#0E766E;background:rgba(14,118,110,.08);font-weight:600}
+[data-theme='light'] .ls-page .ls-qa-filters button.on{border-color:#0E766E;color:#0E766E;background:rgba(14,118,110,.08);font-weight:600}
+[data-theme='light'] .ls-page :is(.ls-role-toggle button.on,.ls-role-toggle button.readonly.on,.ls-tabs button.on){border-color:#0E766E;color:#0E766E;background:rgba(14,118,110,.08);font-weight:600}
 [data-theme='light'] .ls-page .ls-tabs{border-color:#E2E8F0;background:#fff}
-[data-theme='light'] .ls-page .voice-role-seg button.on{color:#0F172A}
+[data-theme='light'] .ls-page .voice-role-seg button.on{color:#0E766E}
 /* 声音卡片 */
 [data-theme='light'] .ls-page .ls-voice-card{border-color:#E2E8F0;border-radius:16px;background:#fff}
 [data-theme='light'] .ls-page .ls-voice-card:not(.ls-clone-card):hover{border-color:#CBD5E1}
 [data-theme='light'] .ls-page .ls-voice-card.assigned{border-color:#CBD5E1;background:#F8FAFC}
-[data-theme='light'] .ls-page .ls-voice-card.selected{border-color:#0F172A;box-shadow:0 0 0 1px #0F172A,0 8px 20px -10px rgba(15,23,42,.25)}
+[data-theme='light'] .ls-page .ls-voice-card.selected{border-color:#0E766E;box-shadow:0 0 0 1px #0E766E,0 8px 20px -10px rgba(14,118,110,.3)}
 [data-theme='light'] .ls-page .ls-voice-avatar{border-color:#1E293B;color:#fff;background:#0F172A}
 [data-theme='light'] .ls-page .ls-wave i{background:#CBD5E1}
 [data-theme='light'] .ls-page .ls-wave.active i{background:#10B981}
@@ -573,11 +573,11 @@
 [data-theme='light'] .ls-page .ls-product-item:hover{border-color:#CBD5E1;background:#F8FAFC}
 [data-theme='light'] .ls-page .ls-product-no{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;color:#475569;background:#F1F5F9;font-weight:600}
 [data-theme='light'] .ls-page .ls-product-order button{border-color:#E2E8F0;border-radius:8px;color:#475569;background:#fff}
-[data-theme='light'] .ls-page .ls-product-order button:hover:not(:disabled){border-color:#0F172A;color:#0F172A}
+[data-theme='light'] .ls-page .ls-product-order button:hover:not(:disabled){border-color:#0E766E;color:#0E766E}
 [data-theme='light'] .ls-page .ls-product-none{border-color:#CBD5E1;border-radius:12px;background:#F8FAFC}
 [data-theme='light'] .ls-page .ls-product-row{border-color:#E2E8F0;border-radius:12px}
-[data-theme='light'] .ls-page .ls-product-row.on{border-color:#0F172A;background:#F8FAFC}
-[data-theme='light'] .ls-page .ls-product-row.on .ls-radio{border-color:#0F172A;background:#0F172A;box-shadow:none}
+[data-theme='light'] .ls-page .ls-product-row.on{border-color:#0E766E;background:rgba(14,118,110,.08)}
+[data-theme='light'] .ls-page .ls-product-row.on .ls-radio{border-color:#0E766E;background:#0E766E;box-shadow:none}
 [data-theme='light'] .ls-page .ls-product-index{color:#fff;background:#0F172A}
 /* 开关说明块、问答 */
 [data-theme='light'] .ls-page .ls-toggle-box{border-color:#E2E8F0;border-radius:12px;background:#F8FAFC}
@@ -586,7 +586,7 @@
 [data-theme='light'] .ls-page .ls-qa-rows{border-color:#E2E8F0;border-radius:12px}
 [data-theme='light'] .ls-page .ls-qa-row+.ls-qa-row{border-top-color:#F1F5F9}
 [data-theme='light'] .ls-page .ls-qa-tag{border-radius:6px;color:#475569;background:#F1F5F9}
-[data-theme='light'] .ls-page .ls-qa-row-actions button:hover:not(:disabled){color:#0F172A}
+[data-theme='light'] .ls-page .ls-qa-row-actions button:hover:not(:disabled){color:#0E766E}
 [data-theme='light'] .ls-page .ls-qa-new{border-color:#CBD5E1;border-radius:12px;background:#F8FAFC}
 [data-theme='light'] .ls-page .ls-qa-new-foot :is(select,.app-select-button){border-color:#E2E8F0;border-radius:10px}
 [data-theme='light'] .ls-page .ls-qa-notice{color:#047857}
