@@ -2,9 +2,9 @@
 .image-create-page {
   --studio-ink: #2d2826;
   --studio-muted: #6b645f;
-  --studio-line: #e8e0d9;
-  --studio-wash: #f8f3ef;
-  --studio-red: #b9382c;
+  --studio-line: #e2e8f0;
+  --studio-wash: #f1f5f9;
+  --studio-red: #0f172a;
   --studio-ease: cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -23,7 +23,7 @@
 .image-create-page .studio-mode-switch a:hover { background: var(--studio-wash); transform: translateY(-1px); }
 .image-create-page .studio-mode-switch a.active {
   color: var(--studio-ink);
-  background: #f8eeea;
+  background: #f1f5f9;
   box-shadow: inset 0 1px rgb(255 255 255 / 90%), 0 1px 5px rgb(97 45 34 / 9%);
 }
 .image-create-page .studio-mode-switch a:active { transform: translateY(0); }
@@ -55,7 +55,7 @@
 .poster-lightbox header .poster-lightbox-download:hover:not(:disabled),
 .product-set-studio .creation-message button:hover:not(:disabled),
 .creation-product .creation-preview footer button:hover:not(:disabled) {
-  border-color: #d9c6bb;
+  border-color: #cbd5e1;
   background: var(--studio-wash);
   color: var(--studio-ink);
   box-shadow: 0 3px 9px rgb(55 37 28 / 7%);

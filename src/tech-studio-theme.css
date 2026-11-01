@@ -15,7 +15,7 @@
   --accent-slate: #334155;
 }
 
-/* 1. 全局背景与精密微点阵肌理 */
+/* 1. 全局背景：纯色石板灰，不加点阵 */
 .site-layout,
 .site-content,
 .app-frame.paper-app,
@@ -27,13 +27,12 @@
 
 .page-scroll {
   background-color: var(--bg-studio) !important;
-  background-image: radial-gradient(rgba(15, 23, 42, 0.055) 1px, transparent 1px) !important;
-  background-size: 18px 18px !important;
+  background-image: none !important;
 }
 
 /* 2. 左侧导航栏 (paper-sidebar) */
 .sidebar.paper-sidebar {
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: var(--bg-studio) !important;
   backdrop-filter: blur(16px) !important;
   border-right: 1px solid var(--border-hairline) !important;
   box-shadow: none !important;
@@ -51,7 +50,7 @@
 }
 
 .nav-item.paper-nav-item:hover {
-  background: rgba(241, 245, 249, 0.85) !important;
+  background: #E8ECF2 !important;
   color: #0F172A !important;
 }
 
@@ -70,7 +69,7 @@
 
 /* 3. 顶部工具栏 (paper-topbar) */
 .topbar.paper-topbar {
-  background: rgba(255, 255, 255, 0.82) !important;
+  background: rgba(245, 247, 250, 0.9) !important;
   backdrop-filter: blur(16px) !important;
   border-bottom: 1px solid var(--border-hairline) !important;
 }

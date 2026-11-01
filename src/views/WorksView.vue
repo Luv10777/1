@@ -320,7 +320,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .empty-state { display: grid; justify-items: center; gap: 9px; padding: 72px 16px; color: var(--muted); }
 .empty-state strong { color: var(--ink); font-size: 13px; font-weight: 500; }
 .loading-state { padding: 28px 0; color: var(--muted); font-size: 12px; text-align: center; }
-.works-error { margin: 0 0 12px; color: var(--color-accent-text); font-size: 12px; }
+.works-error { margin: 0 0 12px; color: var(--color-error); font-size: 12px; }
 .works-error button { padding: 0; border: 0; color: inherit; background: transparent; text-decoration: underline; cursor: pointer; }
 .works-load-more { display: block; margin: 20px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
 .works-load-more:disabled { opacity: .55; cursor: default; }

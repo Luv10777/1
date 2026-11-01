@@ -23,7 +23,7 @@ function apply(themeName = current.value) {
   document.documentElement.dataset.theme = themeName
   document.documentElement.classList.toggle('dark', themeName === 'dark')
   document.documentElement.style.colorScheme = themeName
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeName === 'dark' ? '#14181C' : '#F8F6F3')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeName === 'dark' ? '#14181C' : '#F5F7FA')
 }
 
 function set(themeName) {

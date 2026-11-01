@@ -386,7 +386,7 @@ export default function ReviewsWorkbench() {
   }
 
   return (
-    <div className="reviews-page bg-[#F8F6F1] text-[#1C3532]">
+    <div className="reviews-page bg-[#F5F7FA] text-[#1C3532]">
       <style>{workbenchCSS}</style>
       <header className="reviews-heading">
         <div>
@@ -841,7 +841,7 @@ export default function ReviewsWorkbench() {
                                   : "联系线下巡店核实"}
                               </button>
                               <button
-                                className="stamp-button bg-[#C43D2A]"
+                                className="stamp-button bg-[#0F172A]"
                                 disabled={
                                   !review.draft.trim() ||
                                   sending.includes(review.id)
@@ -1197,7 +1197,7 @@ const workbenchCSS = `
 .reviews-page {
   --ri:#1c3532;
   --rl:#e3ece9;
-  --rp:#f8f6f1;
+  --rp:#f5f7fa;
   --rr:#c43d2a;
   --rs:#fbeceb;
   --ra:#ce8f2a;
@@ -1254,8 +1254,8 @@ const workbenchCSS = `
   position:relative;
   width:46px;
   height:46px;
-  border:1px solid var(--rr);
-  color:var(--rr);
+  border:1px solid #0f172a;
+  color:#0f172a;
   font:23px 'Yifangzhi Serif'}
 .reviews-page .title-seal:after {
   content:'';
@@ -1419,8 +1419,8 @@ const workbenchCSS = `
   height:100%;
   background:#6a998a}
 .reviews-page .overview-alert {
-  border-color:#e9c8c2;
-  background:#fffdfc}
+  border-color:#cbd5e1;
+  background:#ffffff}
 .reviews-page .clickable {
   cursor:pointer}
 .reviews-page .alert-icon {
@@ -1434,7 +1434,7 @@ const workbenchCSS = `
   margin-top:15px}
 .reviews-page .alert-rule span {
   height:3px;
-  background:#e9c8c2}
+  background:#cbd5e1}
 .reviews-page .alert-rule span:nth-child(1) {
   width:44%}
 .reviews-page .alert-rule span:nth-child(2) {
@@ -1685,7 +1685,7 @@ const workbenchCSS = `
   box-shadow:0 2px 5px #1c353204;
   animation:review-enter .28s ease both}
 .reviews-page .pending-card {
-  border-color:#e6c6c0}
+  border-color:#cbd5e1}
 .reviews-page .review-card+.review-card {
   margin-top:12px}
 .reviews-page .review-card.sending {
@@ -1713,7 +1713,7 @@ const workbenchCSS = `
   border-radius:3px;
   font:15px 'Yifangzhi Serif'}
 .reviews-page .avatar-dianping {
-  background:#fff0e6;
+  background:#f1f5f9;
   color:#df6e24}
 .reviews-page .avatar-meituan {
   background:#fff4d9;
@@ -1850,7 +1850,7 @@ const workbenchCSS = `
   color:#598076;
   font-size:10px}
 .reviews-page .ai-tags span.risk {
-  border-color:#ebc5bf;
+  border-color:#cbd5e1;
   color:var(--rr);
   background:#fff7f6}
 .reviews-page .draft-label {
@@ -2054,7 +2054,7 @@ const workbenchCSS = `
   height:100%;
   padding:26px 25px 20px;
   border-left:1px solid #dbe7e2;
-  background:#fffefa;
+  background:#ffffff;
   box-shadow:-12px 0 30px #1c35321f;
   animation:drawer-in .25s}
 .reviews-page .drawer-head {
@@ -2119,10 +2119,10 @@ const workbenchCSS = `
   flex:1}
 .reviews-page .star-toggle.selected {
   border-color:#efcc87;
-  background:#fbf5ea;
+  background:#f1f5f9;
   color:var(--ra)}
 .reviews-page .keyword-chip.blocked {
-  border-color:#efc6be;
+  border-color:#cbd5e1;
   background:var(--rs);
   color:var(--rr)}
 .reviews-page .keyword-input {
@@ -2217,7 +2217,7 @@ const workbenchCSS = `
   padding:15px;
   border:1px solid #cadfd7;
   border-radius:5px;
-  background:#fffefa;
+  background:#ffffff;
   box-shadow:0 10px 30px #1c353224;
   animation:review-enter .2s}
 .reviews-page .editor-dock-head,.reviews-page .editor-dock-foot {
