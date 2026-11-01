@@ -2,10 +2,10 @@
 import { RouterLink } from 'vue-router'
 import { ChevronRight, Play } from 'lucide-vue-next'
 
-// 与图片创作入口页共用卡片样式：每个入口三张示意图，前两张在后，第三张居中在前。
+// 与图片创作入口页共用全幅封面卡片。
 const flows = [
-  { to: '/video/workbench', name: '视频生成', intro: '文本、图片或素材，剪成营销短视频。', cta: '进入创作台', video: true, images: ['/images/publishing/restaurant.jpg', '/images/product-wall/pasta-special.png', '/images/product-wall/fur-coat.png'] },
-  { to: '/digital-human/studio', name: '数字人视频生成', intro: '输入文案或语音，生成数字人播报视频。', cta: '进入录影棚', video: false, images: ['/images/digital-human/avatar-8.png', '/images/digital-human/avatar-9.png', '/images/digital-human/avatar-7.png'] },
+  { to: '/video/workbench', name: '视频生成', intro: '文本、图片或素材，剪成营销短视频。', cta: '进入创作台', cover: '/images/video-gen-full.jpg' },
+  { to: '/digital-human/studio', name: '数字人视频生成', intro: '输入文案或语音，生成数字人播报视频。', cta: '进入录影棚', cover: '/images/digital-human-full.jpg' },
 ]
 </script>
 
@@ -19,8 +19,9 @@ const flows = [
     <section class="image-home-grid" aria-label="视频创作入口">
       <RouterLink v-for="flow in flows" :key="flow.to" :to="flow.to" class="image-home-tile">
         <div class="image-home-stage" aria-hidden="true">
-          <img v-for="(image, index) in flow.images" :key="image" :src="image" alt="" :class="`image-home-shot image-home-shot-${index + 1}`" />
-          <span v-if="flow.video" class="video-home-play"><Play :size="20" fill="currentColor" :stroke-width="0" /></span>
+          <img :src="flow.cover" class="wuyao-cover-img" alt="" decoding="async" />
+          <div class="wuyao-vignette"></div>
+          <span class="video-home-play"><Play :size="20" fill="currentColor" :stroke-width="0" /></span>
         </div>
         <div class="image-home-copy">
           <div><h2>{{ flow.name }}</h2><p>{{ flow.intro }}</p></div>

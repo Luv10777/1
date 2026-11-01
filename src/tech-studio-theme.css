@@ -86,174 +86,168 @@
   border-radius: 10px !important;
 }
 
-/* 4. 图片创作主视图与双卡片 (.image-create-page & .image-home-tile) */
-.image-home-head h1 {
+/* 4. 图片、视频创作入口：按入口绑定真实封面，缩放只作用于图片。 */
+:is(.image-create-page, .video-create-page) .image-home-head h1 {
   font-size: 28px !important;
   font-weight: 700 !important;
   letter-spacing: -0.02em !important;
   color: #0F172A !important;
 }
 
-.image-home-head p {
+:is(.image-create-page, .video-create-page) .image-home-head p {
   color: #64748B !important;
   font-size: 14px !important;
 }
 
-.image-home-grid {
+.video-create-page {
+  background: transparent !important;
+}
+
+:is(.image-create-page, .video-create-page) .image-home-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: 28px !important;
 }
 
-.image-home-tile {
+:is(.image-create-page, .video-create-page) .image-home-tile {
   display: flex !important;
   flex-direction: column !important;
+  min-width: 0;
   padding: 10px !important;
   border-radius: 24px !important;
   background: #FFFFFF !important;
   border: 1px solid var(--border-hairline) !important;
   box-shadow: 0 2px 12px -4px rgba(15, 23, 42, 0.05) !important;
-  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+  transition: transform .3s ease, box-shadow .3s ease, border-color .2s ease !important;
   text-decoration: none !important;
 }
 
-.image-home-tile:hover {
-  transform: translateY(-3px) !important;
+:is(.image-create-page, .video-create-page) .image-home-tile:hover {
+  transform: translateY(-4px);
   border-color: #CBD5E1 !important;
-  box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.14) !important;
 }
 
-/* 上部图框：全画幅撑满样式 (Full-Bleed Object-Cover) */
-.image-home-stage {
+:is(.image-create-page, .video-create-page) .image-home-tile:focus-visible {
+  outline: 3px solid var(--accent-slate);
+  outline-offset: 4px;
+}
+
+:is(.image-create-page, .video-create-page) .image-home-stage {
   position: relative !important;
-  height: 340px !important;
+  height: clamp(220px, calc(100vh - 360px), 340px) !important;
   border-radius: 16px !important;
   overflow: hidden !important;
   background: #0F172A !important;
   padding: 0 !important;
-  display: block !important;
 }
 
-/* 即使不改 Vue 模板，也自动把第一张图全画幅撑满并隐藏其余两张小图 */
-.image-home-stage .image-home-shot-1,
-.image-home-stage .full-bleed-cover {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  object-fit: cover !important;
-  object-position: center !important;
-  border-radius: 0 !important;
-  transform: none !important;
-  margin: 0 !important;
-  box-shadow: none !important;
-  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1) !important;
+:is(.image-create-page, .video-create-page) .wuyao-cover-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform .65s cubic-bezier(.16, 1, .3, 1), filter .4s ease;
 }
 
-.image-home-tile:hover .image-home-stage .image-home-shot-1,
-.image-home-tile:hover .image-home-stage .full-bleed-cover {
-  transform: scale(1.035) !important;
+:is(.image-create-page, .video-create-page) .image-home-tile:hover .wuyao-cover-img {
+  transform: scale(1.045);
+  filter: brightness(1.04);
 }
 
-.image-home-stage .image-home-shot-2,
-.image-home-stage .image-home-shot-3 {
-  display: none !important;
-}
-
-/* 营销海报与产品套图自动挂载高定全画幅背景图 */
-.image-home-tile[href*="poster"] .image-home-stage {
-  background: url('/images/marketing-poster-full.jpg') center / cover no-repeat !important;
-}
-
-.image-home-tile[href*="product"] .image-home-stage {
-  background: url('/images/product-set-full.jpg') center / cover no-repeat !important;
-}
-
-/* 如果使用 CSS 背景撑满，隐藏旧的 3 张堆叠小图 */
-.image-home-tile[href*="poster"] .image-home-shot,
-.image-home-tile[href*="product"] .image-home-shot {
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-/* 顶部悬浮磨砂玻璃光学胶囊（纯 CSS 伪元素自动注入，无需改后端或复杂模板） */
-.image-home-stage::before {
-  content: "Ratio 3:4";
+:is(.image-create-page, .video-create-page) .wuyao-vignette {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 10;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.52);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.95);
-  font-family: "JetBrains Mono", Consolas, monospace;
-  font-size: 11px;
-  letter-spacing: 0.02em;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, .22), transparent 55%);
+  pointer-events: none;
 }
 
-.image-home-tile[href*="poster"] .image-home-stage::after {
-  content: "4K Rendering  ·  Cinema Light";
+.video-create-page .video-home-play {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.52);
+  top: 50%;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 23, 42, .48);
+  border: 1px solid rgba(255, 255, 255, .3);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.95);
-  font-family: "JetBrains Mono", Consolas, monospace;
-  font-size: 11px;
+  pointer-events: none;
+  transition: transform .3s ease, box-shadow .3s ease;
 }
 
-.image-home-tile[href*="product"] .image-home-stage::after {
-  content: "Cinema Light";
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.52);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.95);
-  font-family: "JetBrains Mono", Consolas, monospace;
-  font-size: 11px;
+.video-create-page .image-home-tile:hover .video-home-play {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .16);
 }
 
-/* 下部文字说明区 (.image-home-copy) */
-.image-home-copy {
+:is(.image-create-page, .video-create-page) .image-home-copy {
   display: flex !important;
   align-items: flex-end !important;
   justify-content: space-between !important;
-  padding: 20px 18px 14px !important;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 16px 14px !important;
   background: #FFFFFF !important;
 }
 
-.image-home-copy h2 {
+:is(.image-create-page, .video-create-page) .image-home-copy h2 {
   font-size: 19px !important;
   font-weight: 700 !important;
   color: #0F172A !important;
 }
 
-.image-home-copy p {
+:is(.image-create-page, .video-create-page) .image-home-copy p {
   font-size: 13px !important;
   color: #64748B !important;
-  margin-top: 4px !important;
+  text-wrap: pretty;
 }
 
-/* “开始创作 >” 按钮文字改为深邃曜石黑 */
-.image-home-copy a,
-.image-home-copy span,
-.image-home-tile .start-link {
-  color: #0F172A !important;
+:is(.image-create-page, .video-create-page) .image-home-link {
+  color: var(--accent-obsidian) !important;
   font-weight: 600 !important;
+  transition: transform .25s ease, color .25s ease !important;
+}
+
+:is(.image-create-page, .video-create-page) .image-home-tile:hover .image-home-link {
+  color: var(--accent-slate) !important;
+  transform: translateX(4px);
+}
+
+@media (max-width: 1100px) {
+  :is(.image-create-page, .video-create-page) .image-home-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  :is(.image-create-page, .video-create-page) .image-home-tile {
+    border-radius: 20px !important;
+  }
+  :is(.image-create-page, .video-create-page) .image-home-stage {
+    height: auto !important;
+    aspect-ratio: 16 / 10;
+  }
+  :is(.image-create-page, .video-create-page) .wuyao-cover-img {
+    position: absolute;
+    inset: 0;
+  }
+  :is(.image-create-page, .video-create-page) .image-home-copy {
+    padding: 16px 10px 12px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.image-create-page, .video-create-page) :is(.image-home-tile, .wuyao-cover-img, .image-home-link, .video-home-play) {
+    transition: none !important;
+    transform: none !important;
+  }
+  .video-create-page .video-home-play,
+  .video-create-page .image-home-tile:hover .video-home-play {
+    transform: translate(-50%, -50%) !important;
+  }
 }
 
 /* 5. 页脚备案区 (.site-footer) */
