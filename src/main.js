@@ -1,4 +1,4 @@
-import './utils/crypto-polyfill.js'
+﻿import './utils/crypto-polyfill.js'
 import { createApp } from 'vue'
 import App from './App.vue'
 import router, { handleAuthExpired } from './router'
@@ -36,3 +36,6 @@ async function startApp() {
   createApp(App).use(router).mount('#app')
 }
 startApp()
+
+import './tech-studio-theme.css'
+

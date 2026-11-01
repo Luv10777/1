@@ -1,0 +1,38 @@
+import './utils/crypto-polyfill.js'
+import { createApp } from 'vue'
+import App from './App.vue'
+import router, { handleAuthExpired } from './router'
+import { theme } from './stores/theme'
+import { auth } from './stores/auth'
+import './style.css'
+import './creative.css'
+import './image.css'
+import './product-set.css'
+import './consumer.css'
+import './billing.css'
+import './ecosystem.css'
+import './video-create.css'
+import './video-workbench.css'
+import './video-analyze.css'
+import './studio.css'
+import './live-studio.css'
+import './publishing.css'
+import './brand.css'
+import './publishing-workspace.css'
+import './image-studio-polish.css'
+import './business-community.css'
+import './public-commerce.css'
+
+theme.apply()
+
+window.addEventListener('login-required', () => {
+  if (router.currentRoute.value.name !== 'login') router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+})
+
+window.addEventListener('auth-expired', handleAuthExpired)
+
+async function startApp() {
+  if (auth.isAuthenticated) await auth.restore()
+  createApp(App).use(router).mount('#app')
+}
+startApp()

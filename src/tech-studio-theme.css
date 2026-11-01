@@ -1,0 +1,263 @@
+/* ==========================================================================
+   一方志 (yifangzhi.com) · 高定科技风 (Titanium & Slate Studio) 全局主题覆盖
+   精准匹配线上 Vue 3 DOM 类名，不改动任何后端与路由逻辑
+   ========================================================================== */
+
+:root {
+  --bg-studio: #F5F7FA;
+  --bg-surface: #FFFFFF;
+  --ink: #0F172A;
+  --ink-secondary: #64748B;
+  --ink-muted: #94A3B8;
+  --night-panel: #FFFFFF;
+  --border-hairline: rgba(226, 232, 240, 0.9);
+  --accent-obsidian: #0F172A;
+  --accent-slate: #334155;
+}
+
+/* 1. 全局背景与精密微点阵肌理 */
+.site-layout,
+.site-content,
+.app-frame.paper-app,
+.main-area.paper-main {
+  background-color: var(--bg-studio) !important;
+  color: var(--ink) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+}
+
+.page-scroll {
+  background-color: var(--bg-studio) !important;
+  background-image: radial-gradient(rgba(15, 23, 42, 0.055) 1px, transparent 1px) !important;
+  background-size: 18px 18px !important;
+}
+
+/* 2. 左侧导航栏 (paper-sidebar) */
+.sidebar.paper-sidebar {
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(16px) !important;
+  border-right: 1px solid var(--border-hairline) !important;
+  box-shadow: none !important;
+}
+
+.brand-lockup.paper-brand {
+  border-bottom: 1px solid #F1F5F9 !important;
+}
+
+/* 导航激活态：替换原有刺眼砖红色，改为深邃曜石黑胶囊 */
+.nav-item.paper-nav-item {
+  border-radius: 10px !important;
+  color: #475569 !important;
+  transition: all 0.18s ease !important;
+}
+
+.nav-item.paper-nav-item:hover {
+  background: rgba(241, 245, 249, 0.85) !important;
+  color: #0F172A !important;
+}
+
+.nav-item.paper-nav-item.active,
+.nav-item.paper-nav-item.router-link-active {
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12) !important;
+}
+
+.nav-item.paper-nav-item.active::before,
+.nav-item.paper-nav-item.router-link-active::before {
+  display: none !important;
+}
+
+/* 3. 顶部工具栏 (paper-topbar) */
+.topbar.paper-topbar {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid var(--border-hairline) !important;
+}
+
+/* 顶部主操作按钮（如“信息发布”）改为曜石黑科技质感 */
+.topbar-actions button[class*="primary"],
+.topbar-actions a[class*="primary"],
+.topbar-actions .publish-btn,
+.topbar-actions > *:nth-last-child(2) {
+  background: #0F172A !important;
+  border-color: #0F172A !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
+}
+
+/* 4. 图片创作主视图与双卡片 (.image-create-page & .image-home-tile) */
+.image-home-head h1 {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  color: #0F172A !important;
+}
+
+.image-home-head p {
+  color: #64748B !important;
+  font-size: 14px !important;
+}
+
+.image-home-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)) !important;
+  gap: 28px !important;
+}
+
+.image-home-tile {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 10px !important;
+  border-radius: 24px !important;
+  background: #FFFFFF !important;
+  border: 1px solid var(--border-hairline) !important;
+  box-shadow: 0 2px 12px -4px rgba(15, 23, 42, 0.05) !important;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+  text-decoration: none !important;
+}
+
+.image-home-tile:hover {
+  transform: translateY(-3px) !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.12) !important;
+}
+
+/* 上部图框：全画幅撑满样式 (Full-Bleed Object-Cover) */
+.image-home-stage {
+  position: relative !important;
+  height: 340px !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  background: #0F172A !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+/* 即使不改 Vue 模板，也自动把第一张图全画幅撑满并隐藏其余两张小图 */
+.image-home-stage .image-home-shot-1,
+.image-home-stage .full-bleed-cover {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: 0 !important;
+  transform: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.image-home-tile:hover .image-home-stage .image-home-shot-1,
+.image-home-tile:hover .image-home-stage .full-bleed-cover {
+  transform: scale(1.035) !important;
+}
+
+.image-home-stage .image-home-shot-2,
+.image-home-stage .image-home-shot-3 {
+  display: none !important;
+}
+
+/* 营销海报与产品套图自动挂载高定全画幅背景图 */
+.image-home-tile[href*="poster"] .image-home-stage {
+  background: url('/images/marketing-poster-full.jpg') center / cover no-repeat !important;
+}
+
+.image-home-tile[href*="product"] .image-home-stage {
+  background: url('/images/product-set-full.jpg') center / cover no-repeat !important;
+}
+
+/* 如果使用 CSS 背景撑满，隐藏旧的 3 张堆叠小图 */
+.image-home-tile[href*="poster"] .image-home-shot,
+.image-home-tile[href*="product"] .image-home-shot {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 顶部悬浮磨砂玻璃光学胶囊（纯 CSS 伪元素自动注入，无需改后端或复杂模板） */
+.image-home-stage::before {
+  content: "Ratio 3:4";
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.image-home-tile[href*="poster"] .image-home-stage::after {
+  content: "4K Rendering  ·  Cinema Light";
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px;
+}
+
+.image-home-tile[href*="product"] .image-home-stage::after {
+  content: "Cinema Light";
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.52);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.95);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px;
+}
+
+/* 下部文字说明区 (.image-home-copy) */
+.image-home-copy {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: space-between !important;
+  padding: 20px 18px 14px !important;
+  background: #FFFFFF !important;
+}
+
+.image-home-copy h2 {
+  font-size: 19px !important;
+  font-weight: 700 !important;
+  color: #0F172A !important;
+}
+
+.image-home-copy p {
+  font-size: 13px !important;
+  color: #64748B !important;
+  margin-top: 4px !important;
+}
+
+/* “开始创作 >” 按钮文字改为深邃曜石黑 */
+.image-home-copy a,
+.image-home-copy span,
+.image-home-tile .start-link {
+  color: #0F172A !important;
+  font-weight: 600 !important;
+}
+
+/* 5. 页脚备案区 (.site-footer) */
+.site-footer {
+  border-top: 1px solid rgba(226, 232, 240, 0.7) !important;
+  color: #94A3B8 !important;
+}
