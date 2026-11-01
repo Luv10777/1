@@ -111,7 +111,8 @@ Native 订单有效期 30 分钟。创建、查询、关单请求使用商户 RS
 
 ## 支付宝配置
 
-`BILLING_PAYMENT_METHOD=ALIPAY` 时使用支付宝电脑网站支付（`alipay.trade.page.pay`），同一时间只开一种收款方式。
+`BILLING_PAYMENT_METHOD=ALIPAY` 时默认使用支付宝电脑网站支付（`alipay.trade.page.pay`），
+启用手机通道后手机浏览器使用手机网站支付（`alipay.trade.wap.pay`），同一时间只开一种收款方式。
 接口加签方式为**公钥模式**（RSA2），不支持公钥证书模式。
 
 配置前需要：
@@ -130,11 +131,39 @@ Native 订单有效期 30 分钟。创建、查询、关单请求使用商户 RS
 | `ALIPAY_PRIVATE_KEY_PATH` | 服务进程可读的应用私钥文件绝对路径；密钥工具导出的裸 Base64 或 PEM 均可 |
 | `ALIPAY_PUBLIC_KEY_PATH` | 支付宝公钥文件绝对路径 |
 | `ALIPAY_NOTIFY_URL` | 例如 `https://yifangzhi.com/api/billing/alipay/notify` |
+| `ALIPAY_MOBILE_ENABLED` | 默认 `false`；应用已签约并绑定手机网站支付后才设置 `true` |
+| `ALIPAY_RETURN_URL` | 例如 `https://yifangzhi.com/billing`，手机付款完成或退出后返回的 HTTPS 页面，不带查询参数或锚点 |
 
 正式与沙箱是两套 APPID、PID 和密钥，不能混用。
 
 订单有效期 30 分钟，作为 `time_expire` 传给支付宝。收银台链接在用户点「前往支付宝付款」时由服务端现签，
-不保存：支付宝拒绝过期的请求时间戳。页面在点击时先打开新窗口，再把签好的链接填进去，避免被浏览器拦截弹窗。
+不保存：支付宝拒绝过期的请求时间戳。电脑在点击时先打开新窗口，再把签好的链接填进去，
+避免被浏览器拦截弹窗。手机等待接口成功后在当前标签页打开收银台，失败时留在充值页面显示原因。
+
+### 手机支付配置
+
+更新于 2026-11-01。在[支付宝开放平台控制台](https://open.alipay.com/develop/manage)进入
+当前 APPID 对应的应用，核实“手机网站支付”产品已签约、已绑定、可使用。
+已有电脑网站支付的签约不代表手机产品也已开通；未确认时保持开关关闭。
+
+在 API 的服务端配置文件中添加以下配置，发布包含手机支付代码的后端和前端后重启 API：
+
+```properties
+ALIPAY_MOBILE_ENABLED=true
+ALIPAY_RETURN_URL=https://yifangzhi.com/billing
+```
+
+手机请求 `POST /api/billing/orders/{id}/alipay?mobile=true`，使用 `QUICK_WAP_WAY` 产品码。
+沿用原有 APPID、RSA2 密钥、通知地址、订单号和到账核验；不另建订单，不接受浏览器传入返回地址。
+服务端将订单号附在已配置的返回地址中，并对 `return_url`、`quit_url` 一起加签。
+
+手机跳转前在本站地址中保留 `paymentOrder`，从收银台返回或浏览器后退时恢复原订单。
+页面向服务端查单核实结果，返回地址中的参数不作为支付成功凭据；切回页面时也主动核实付款状态。
+验收须覆盖真实 iPhone/Android 付款、退出收银台、跳转失败和重复查询不重复入账。
+代码与本地测试不代表支付宝产品已开通或真实手机付款已通过，线上启用后仍需实测。
+
+2026-11-01 使用正式商户配置检查手机收银台，支付宝返回 `insufficient-isv-permissions`
+（ISV 权限不足），当前应用尚无可用的手机网站支付接口权限。检查没有付款，手机通道保持关闭。
 
 支付宝只在买家打开收银台后才建立交易，所以待支付订单查单得到已验签的 `ACQ.TRADE_NOT_EXIST` 是正常状态，
 不重建订单；订单过期后才在本地关闭，远端已建立交易的先关单。取消订单同样先查真实支付结果。

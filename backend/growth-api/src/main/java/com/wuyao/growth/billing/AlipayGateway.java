@@ -28,7 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/** Alipay 电脑网站支付 in public-key mode. Both responses and notifications must pass RSA2 verification. */
+/** Alipay website payments in public-key mode. Both responses and notifications must pass RSA2 verification. */
 @Component @RequiredArgsConstructor
 public class AlipayGateway {
     private static final ZoneId SHANGHAI=ZoneId.of("Asia/Shanghai");
@@ -45,15 +45,34 @@ public class AlipayGateway {
             order.expiresAt(),tenantId+"_"+order.id());
     }
     public String pageUrl(String tradeNo,BigDecimal amount,String subject,Instant expiresAt,String passback) {
+        return cashierUrl(tradeNo,amount,subject,expiresAt,passback,false,"");
+    }
+    public String wapUrl(BillingDtos.OrderView order,long tenantId) {
+        requireConfigured();
+        if(!config.isMobileEnabled()) throw unavailable("手机支付宝支付暂未开放，请使用电脑扫码付款");
+        java.net.URI destination;
+        try { destination=java.net.URI.create(config.getReturnUrl()); }
+        catch(IllegalArgumentException e) { throw unavailable("手机支付返回地址未配置，请联系一方志客服"); }
+        if(!"https".equals(destination.getScheme())||destination.getHost()==null||destination.getRawQuery()!=null
+            ||destination.getRawFragment()!=null||destination.getUserInfo()!=null)
+            throw unavailable("手机支付返回地址未配置，请联系一方志客服");
+        String returnUrl=destination+"?paymentOrder="+order.id();
+        return cashierUrl(tradeNo(order.id()),BigDecimal.valueOf(order.amountMinor(),2),
+            order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name(),
+            order.expiresAt(),tenantId+"_"+order.id(),true,returnUrl);
+    }
+    private String cashierUrl(String tradeNo,BigDecimal amount,String subject,Instant expiresAt,String passback,
+        boolean mobile,String returnUrl) {
         requireConfigured();
         var biz=new LinkedHashMap<String,Object>();
         biz.put("out_trade_no",tradeNo); biz.put("total_amount",amount.setScale(2).toPlainString());
         biz.put("subject",subject);
-        biz.put("product_code","FAST_INSTANT_TRADE_PAY");
+        biz.put("product_code",mobile?"QUICK_WAP_WAY":"FAST_INSTANT_TRADE_PAY");
+        if(mobile) biz.put("quit_url",returnUrl);
         biz.put("time_expire",TIME.format(expiresAt.atZone(SHANGHAI)));
         // Only URL-safe characters, so Alipay returns it unchanged in the notification.
         biz.put("passback_params",passback);
-        try { return config.getGateway()+"?"+form(signed("alipay.trade.page.pay",biz,true)); }
+        try { return config.getGateway()+"?"+form(signed(mobile?"alipay.trade.wap.pay":"alipay.trade.page.pay",biz,true,returnUrl)); }
         catch(Exception e) { throw unavailable("支付宝收银台暂时无法打开，请稍后重试"); }
     }
     public JsonNode query(String id) { return queryTrade(tradeNo(id)); }
@@ -113,11 +132,15 @@ public class AlipayGateway {
         return tree.path(root);
     }
     private SortedMap<String,String> signed(String method,Map<String,Object> biz,boolean notify) throws Exception {
+        return signed(method,biz,notify,"");
+    }
+    private SortedMap<String,String> signed(String method,Map<String,Object> biz,boolean notify,String returnUrl) throws Exception {
         var params=new TreeMap<String,String>();
         params.put("app_id",config.getAppId()); params.put("method",method); params.put("format","JSON");
         params.put("charset","utf-8"); params.put("sign_type","RSA2"); params.put("version","1.0");
         params.put("timestamp",TIME.format(ZonedDateTime.now(SHANGHAI)));
         if(notify) params.put("notify_url",config.getNotifyUrl());
+        if(!returnUrl.isBlank()) params.put("return_url",returnUrl);
         params.put("biz_content",json.writeValueAsString(biz));
         Signature rsa=Signature.getInstance("SHA256withRSA"); rsa.initSign(privateKey());
         rsa.update(content(params,false).getBytes(StandardCharsets.UTF_8));

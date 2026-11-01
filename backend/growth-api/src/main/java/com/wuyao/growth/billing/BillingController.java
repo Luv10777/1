@@ -39,7 +39,8 @@ public class BillingController {
     @PostMapping("/orders/{id}/refresh") public ApiResponse<BillingDtos.OrderView> refresh(@PathVariable String id,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.refresh(id)); }
     @PostMapping("/orders/{id}/alipay") public ApiResponse<String> alipay(@PathVariable String id,
-        @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.alipayUrl(id)); }
+        @RequestParam(defaultValue="false") boolean mobile,
+        @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.alipayUrl(id,mobile)); }
     @PostMapping("/orders/{id}/cancel") public ApiResponse<BillingDtos.OrderView> cancel(@PathVariable String id,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.cancel(id)); }
     private boolean owner(AuthPrincipal me) {

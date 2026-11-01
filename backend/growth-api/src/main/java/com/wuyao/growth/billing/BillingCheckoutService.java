@@ -26,10 +26,13 @@ public class BillingCheckoutService {
         return billing.savePaymentCode(o.id(),code);
     }
     public String alipayUrl(String id) {
+        return alipayUrl(id,false);
+    }
+    public String alipayUrl(String id,boolean mobile) {
         var o=billing.order(id);
         if(!"ALIPAY".equals(o.paymentMethod())) throw BizException.of(ErrorCode.BAD_REQUEST,"该订单不是支付宝订单");
         if(!"PENDING_PAYMENT".equals(o.state())) throw BizException.of(ErrorCode.BAD_REQUEST,"订单已不能支付，请刷新后重新下单");
-        return alipay.pageUrl(o,TenantContext.require());
+        return mobile?alipay.wapUrl(o,TenantContext.require()):alipay.pageUrl(o,TenantContext.require());
     }
     public BillingDtos.OrderView refresh(String id) {
         var o=billing.order(id);

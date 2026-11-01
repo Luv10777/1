@@ -7,9 +7,11 @@ import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling
 import BillingCheckoutTerms from '../components/BillingCheckoutTerms.vue'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { auth } from '../stores/auth'
+import { isMobilePayment, openBillingCashier } from '../utils/billingPayment'
 
 const route = useRoute()
 const router = useRouter()
+const mobilePayment = isMobilePayment()
 const account = computed(() => billing.summary)
 const returnTo = computed(() => typeof route.query.redirect === 'string'
   && route.query.redirect.startsWith('/') && !route.query.redirect.startsWith('//')
@@ -67,7 +69,10 @@ watch(() => route.query.topup, value => { if (value && account.value) openTopup(
 const choosePlan = async (plan) => { pendingPlan.value = plan; await nextTick(); planDialog.value?.showModal() }
 const closePlan = () => { planDialog.value?.close(); pendingPlan.value = null }
 const closeSuccess = () => { successDialog.value?.close(); topupResult.value = null }
-const closePayment = () => { clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus() }
+const closePayment = () => {
+  clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus()
+  if (route.query.paymentOrder) router.replace({ query: { ...route.query, paymentOrder: undefined } })
+}
 const applyPayment = async (order) => {
   if (disposed || !payment.value) return
   payment.value = order
@@ -105,24 +110,33 @@ const pollPayment = async (remote = false) => {
 // Coming back from the Alipay tab: ask the provider at once instead of waiting for its notification or the next poll.
 const checkOnReturn = () => { if (document.visibilityState === 'visible' && payment.value?.state === 'PENDING_PAYMENT') pollPayment(true) }
 const openPayment = async (order) => {
+  if (disposed) return
   balanceBefore = order.state === 'PENDING_PAYMENT' ? billing.summary?.available ?? null : null
   payment.value = order
   paymentError.value = ''
   qr.value = ''
   await nextTick()
+  if (disposed) return
   paymentDialog.value?.showModal()
   await applyPayment(order)
   if (order.state === 'PENDING_PAYMENT') paymentTimer = setTimeout(pollPayment, 4000)
 }
-// The tab opens inside the click so popup blockers allow it; the signed URL is fetched fresh because Alipay rejects stale ones.
+// Keep the order in the URL so browser back and the cashier return can recover it.
 const openAlipay = async () => {
-  if (!payment.value || paymentLoading.value) return
-  const tab = window.open('', '_blank')
-  if (!tab) { paymentError.value = '浏览器拦截了新窗口，请允许本站弹出窗口后重试'; return }
-  tab.opener = null
+  if (payment.value?.state !== 'PENDING_PAYMENT' || paymentLoading.value) return
+  const id = payment.value.id
   paymentLoading.value = true
-  try { tab.location.href = await billingApi.alipay(payment.value.id); paymentError.value = '' }
-  catch (e) { tab.close(); paymentError.value = e.message || '支付宝收银台暂时无法打开' }
+  try {
+    await openBillingCashier(mobile => billingApi.alipay(id, mobile), {
+      mobile: mobilePayment,
+      beforeNavigate: async () => {
+        if (disposed || payment.value?.id !== id || payment.value.state !== 'PENDING_PAYMENT') throw new Error('订单已关闭，请重新查看支付状态')
+        if (mobilePayment) await router.replace({ query: { ...route.query, topup: undefined, paymentOrder: id } })
+      },
+    })
+    paymentError.value = ''
+  }
+  catch (e) { paymentError.value = e.message || '支付宝收银台暂时无法打开' }
   finally { paymentLoading.value = false }
 }
 const checkPurchaseConsent = (message, terms, at) => {
@@ -164,11 +178,19 @@ const cancelPayment = async () => {
 }
 onMounted(async () => {
   await refresh()
+  if (disposed) return
+  const returningOrder = route.query.paymentOrder
+  if (typeof returningOrder === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(returningOrder)) {
+    try { await openPayment(await billingApi.order(returningOrder)); await pollPayment(true) }
+    catch (e) { errorAt.value = 'payment'; error.value = e.message || '支付订单暂时无法读取，请刷新后重试' }
+  }
+  if (disposed) return
   if (route.query.topup && account.value) openTopup()
   balanceTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBilling() }, 30000)
   globalThis.window?.addEventListener('focus', checkOnReturn)
+  globalThis.document?.addEventListener?.('visibilitychange', checkOnReturn)
 })
-onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterval(balanceTimer); globalThis.window?.removeEventListener('focus', checkOnReturn); qrVersion += 1 })
+onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterval(balanceTimer); globalThis.window?.removeEventListener('focus', checkOnReturn); globalThis.document?.removeEventListener?.('visibilitychange', checkOnReturn); qrVersion += 1 })
 </script>
 
 <template>
@@ -184,6 +206,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     <RouterLink v-if="route.query.membership && account?.memberActive" :to="returnTo" class="generation-billing-link">会员已生效，继续使用{{ route.query.module || '平台功能' }}</RouterLink>
     <div v-if="billing.error" class="yanhuo-alert" role="alert">{{ billing.error }}<button type="button" @click="refresh">重新读取</button></div>
     <div v-else-if="!account" class="yanhuo-empty" role="status">正在读取烟火账户...</div>
+    <div v-if="errorAt === 'payment' && error" class="yanhuo-alert" role="alert">{{ error }}</div>
     <template v-if="account">
       <section class="yanhuo-overview" aria-label="会员与烟火">
         <article class="yanhuo-card yanhuo-member-card">
@@ -286,7 +309,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           </template>
           <template v-else-if="payment.paymentMethod === 'ALIPAY'">
             <button class="yanhuo-primary" type="button" :disabled="paymentLoading" @click="openAlipay">前往支付宝付款</button>
-            <p class="yanhuo-payment-caption">在新窗口完成付款后回到这里，到账后自动更新</p>
+            <p class="yanhuo-payment-caption">{{ mobilePayment ? '将打开支付宝收银台，付款后返回网站核实到账' : '在新窗口完成付款后回到这里，到账后自动更新' }}</p>
           </template>
           <template v-else>
             <dl class="yanhuo-manual-details"><div><dt>收款方</dt><dd>{{ payment.payment.recipient }}</dd></div><div v-if="payment.payment.account"><dt>收款账号</dt><dd>{{ payment.payment.account }}</dd></div><div v-if="payment.payment.bank"><dt>开户行</dt><dd>{{ payment.payment.bank }}</dd></div></dl>

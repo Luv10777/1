@@ -235,6 +235,8 @@ growth:
       private-key-path: ${ALIPAY_PRIVATE_KEY_PATH:}
       alipay-public-key-path: ${ALIPAY_PUBLIC_KEY_PATH:}
       notify-url: ${ALIPAY_NOTIFY_URL:}
+      mobile-enabled: ${ALIPAY_MOBILE_ENABLED:false}
+      return-url: ${ALIPAY_RETURN_URL:}
     video:
       # Supply verified rates through an external Spring YAML file. No default commercial rate.
       rates: []
