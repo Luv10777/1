@@ -59,7 +59,7 @@
 @media(max-width:640px){.binding-platforms{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.binding-platforms article{padding:12px}.account-center-page{padding:0!important}.account-center-page h1{font-family:var(--font-serif)}}
 /* Generic state transitions are deliberately quiet in the paper system. */
 :root .paper-app :is(.rb-aurora,.rb-splash-cursor,.device-glow-layer,.product-showcase-glow){display:none}
-.platform-preview-title{display:flex;flex-shrink:0;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#14181c;color:#ece8e1;font-size:12px}.platform-preview-title b{font-size:12px;font-weight:500}.platform-preview-title.is-redbook{background:#fff;color:#2c3e50}
+.platform-preview-title{display:flex;flex-shrink:0;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#14181c;color:#e2e8f0;font-size:12px}.platform-preview-title b{font-size:12px;font-weight:500}.platform-preview-title.is-redbook{background:#fff;color:#2c3e50}
 .paper-nav .nav-group { margin-bottom: 4px; }
 .paper-nav .nav-group-trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 4px; background: transparent; color: var(--color-primary); font-family: var(--font-sans); font-size: 14px; font-weight: 600; letter-spacing: .02em; line-height: 1.55; text-align: left; }
 .paper-nav .nav-group-trigger:hover { background: var(--color-bg-subtle); color: var(--ink); }

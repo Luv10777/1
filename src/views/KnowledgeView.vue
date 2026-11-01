@@ -631,7 +631,7 @@ async function restoreSet(set) {
 .kb-sets-group{margin-top:10px;padding-top:12px;border-top:1px solid var(--color-border-subtle)}
 .kb-sets-head h2 small{display:block;margin-top:2px;color:var(--color-text-muted);font-size:12px;font-weight:400}
 .kb-set strong svg{vertical-align:-2px}
-.kb-attention{color:var(--color-accent-text)!important;font-weight:600}
+.kb-attention{color:var(--color-warning)!important;font-weight:600}
 .kb-owner{margin:0 0 4px;color:var(--color-text-muted);font-size:12px}
 .kb-welcome-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
 .kb-tag-doc{color:var(--color-info);background:color-mix(in srgb,var(--color-info) 10%,var(--color-bg-surface))}

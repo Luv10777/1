@@ -27,21 +27,22 @@
   font-display: swap;
 }
 :root,[data-theme='light'] {
-  --color-primary:#2c3e50;--color-primary-hover:#1d2e3e;
-  --color-accent:#c84a3d;--color-accent-text:#b43f33;--color-accent-hover:#ac3b30;--color-on-accent:#fff;
-  --color-text-muted:#58696e;--color-brand-muted:#7a8b8f;
-  --color-bg-canvas:#f8f6f3;--color-bg-surface:#fff;--color-bg-subtle:#efece6;
-  --color-border-subtle:#e6e1d8;--color-border-strong:#2c3e50;
-  --color-success:#2e7d32;--color-warning:#985300;--color-error:#b33d32;--color-info:#3b6978;
+  /* 亮色主题：曜石黑 + 石板灰（原米黄宣纸色与砖红主色已停用） */
+  --color-primary:#0f172a;--color-primary-hover:#1e293b;
+  --color-accent:#0f172a;--color-accent-text:#0f172a;--color-accent-hover:#1e293b;--color-on-accent:#fff;
+  --color-text-muted:#64748b;--color-brand-muted:#94a3b8;
+  --color-bg-canvas:#f5f7fa;--color-bg-surface:#fff;--color-bg-subtle:#f1f5f9;
+  --color-border-subtle:#e2e8f0;--color-border-strong:#cbd5e1;
+  --color-success:#047857;--color-warning:#b45309;--color-error:#b91c1c;--color-info:#4f46e5;
   --font-serif:'Yifangzhi Serif','Noto Serif SC','Source Han Serif SC','SimSun',serif;
   --font-sans:'Yifangzhi Sans','PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
   --font-mono:'JetBrains Mono',monospace;
-  --shadow-paper:0 1px 2px rgba(44,62,80,.04),0 4px 12px rgba(44,62,80,.03);
-  --shadow-paper-elevated:0 8px 24px rgba(44,62,80,.08);
+  --shadow-paper:0 2px 12px -4px rgba(15,23,42,.06);
+  --shadow-paper-elevated:0 16px 36px -8px rgba(15,23,42,.12);
   color-scheme:light;
 }
 :root.dark,[data-theme='dark'] {
-  --color-primary:#ece8e1;--color-primary-hover:#fff;
+  --color-primary:#e2e8f0;--color-primary-hover:#fff;
   --color-accent:#de5f52;--color-accent-text:#ed7b6f;--color-accent-hover:#eb766a;--color-on-accent:#14181c;
   --color-text-muted:#a3b1b5;--color-brand-muted:#6b7b80;
   --color-bg-canvas:#14181c;--color-bg-surface:#1d232a;--color-bg-subtle:#262d35;

@@ -2,8 +2,8 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 @custom-variant dark (&:where(.dark, .dark *));
 @theme {
- --color-bg-canvas:#f8f6f3;--color-bg-surface:#ffffff;--color-bg-subtle:#efece6;
- --color-border-subtle:#e6e1d8;--color-border-strong:#2c3e50;
+ --color-bg-canvas:#f5f7fa;--color-bg-surface:#ffffff;--color-bg-subtle:#f1f5f9;
+ --color-border-subtle:#e2e8f0;--color-border-strong:#cbd5e1;
 }
 @theme inline {
  --color-brand-accent-ink:var(--color-accent-text);
@@ -98,7 +98,7 @@
   --pub-border: #e2e8f0;
   --pub-control-border: #cbd5e1;
   --pub-hover-border: #64748b;
-  --pub-accent-text: #ae5d47;
+  --pub-accent-text: #0f172a;
   --pub-selected: #eff6ff;
   --pub-accent-border: #93b8ee;
   --pub-ai-surface: #eff6ff;
@@ -109,7 +109,7 @@
   --pub-success-surface: #ecfdf5;
   --pub-success-border: #9edfc5;
   --pub-commerce: #92400e;
-  --pub-commerce-surface: #fffbeb;
+  --pub-commerce-surface: #f8fafc;
   --pub-commerce-border: #dca83a;
   --pub-error: #be123c;
   --pub-error-surface: #fff1f2;
@@ -1035,7 +1035,7 @@
 }
 :where(.publishing-page) .publish-btn {
   flex: 1;
-  background: linear-gradient(100deg, var(--color-accent) 0%, var(--color-accent) 55%, #ae5d47 100%);
+  background: linear-gradient(100deg, var(--color-accent) 0%, var(--color-accent) 55%, #334155 100%);
   border: 1px solid var(--color-accent);
   color: white !important;
   border-radius: 12px;
@@ -1790,7 +1790,7 @@
   height: 24px;
 }
 :where(.publishing-page) .pub-platform-icon--channels {
-  background: #fff7ed;
+  background: #f5f7fa;
   color: #c65d0e;
 }
 :where(.publishing-page) .pub-platform-check {
@@ -2108,7 +2108,7 @@
 :where(.publishing-page) .pub-overlay-copy span { display: flex; align-items: center; gap: 3px; color: #fcd34d; font-size: 12px; }
 :where(.publishing-page) .pub-overlay-actions { display: flex; flex-direction: column; gap: 16px; }
 :where(.publishing-page) .asset-actions .pub-upload-primary { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
-:where(.publishing-page) .asset-actions .pub-upload-primary:hover { background: #ae5d47; }
+:where(.publishing-page) .asset-actions .pub-upload-primary:hover { background: #1e293b; }
 :where(.publishing-page) .pub-upload-zone { width: 100%; min-height: 178px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 22px; border: 1px dashed var(--pub-control-border); border-radius: 12px; background: var(--pub-muted-surface); color: var(--pub-muted); transition: border-color .2s, background .2s; }
 :where(.publishing-page) .pub-upload-zone:hover { border-color: var(--color-accent); background: var(--pub-selected); }
 :where(.publishing-page) .pub-upload-zone > svg { color: var(--pub-accent-text); }
