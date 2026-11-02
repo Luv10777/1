@@ -1,0 +1,35 @@
+package com.wuyao.growth.billing;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.Instant;
+
+/** 平台级兑换码，不属于任何商户；兑换后记下兑换商户。 */
+@Entity @Table(name="billing_redeem_codes") @Getter @Setter
+public class BillingRedeemCode {
+    @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
+    @Column(length=16) private String code;
+    @Column(length=80) private String batchKey;
+    @Column(length=12) private String kind;
+    private long credits;
+    /** 充值码的实收金额（分），按它记邀请返利；赠送码为 0。 */
+    private long amountMinor;
+    @Column(length=200) private String note;
+    private Instant expiresAt;
+    private Long createdBy;
+    private Instant createdAt = Instant.now();
+    private Long voidedBy;
+    private Instant voidedAt;
+    private Long redeemedTenantId;
+    private Long redeemedBy;
+    private Instant redeemedAt;
+
+    /** UNUSED、REDEEMED、VOIDED 或 EXPIRED。 */
+    public String status(Instant now) {
+        if (voidedAt != null) return "VOIDED";
+        if (redeemedAt != null) return "REDEEMED";
+        if (expiresAt != null && !expiresAt.isAfter(now)) return "EXPIRED";
+        return "UNUSED";
+    }
+}

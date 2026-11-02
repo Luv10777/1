@@ -223,6 +223,22 @@ public class BillingService {
         ledger(a,key,"GRANT","平台赠送烟火",credits,0,0,null,null,operator);
         return true;
     }
+    /**
+     * 兑换码入账：TOPUP 记充值烟火（PURCHASE），GIFT 记赠送烟火（GRANT）。调用方已锁住账户和兑换码。
+     * 有实收金额的充值码同时发出 OrderPaid，邀请返利按实收金额记充值返利。
+     * @return 入账后的可用烟火
+     */
+    @Transactional
+    public long creditRedeemCode(Long codeId,String kind,long credits,long amountMinor) {
+        var a=store.lockAccount(); String key="redeem-code:"+codeId;
+        if(store.eventExists(key)) return a.available();
+        boolean topUp="TOPUP".equals(kind);
+        if(topUp) a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),credits));
+        else a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),credits));
+        ledger(a,key,topUp?"PURCHASE":"GRANT",topUp?"兑换码充值烟火":"兑换码赠送烟火",topUp?0:credits,topUp?credits:0,0,null,null);
+        if(topUp&&amountMinor>0) events.publishEvent(new BillingDtos.OrderPaid(TenantContext.require(),"redeem-code-"+codeId,"TOPUP",amountMinor));
+        return a.available();
+    }
     private void requireBillingOperator(Long operator) {
         if(!config.getOperatorUserIds().contains(operator)) throw BizException.of(ErrorCode.FORBIDDEN,"没有会员与烟火管理权限");
     }

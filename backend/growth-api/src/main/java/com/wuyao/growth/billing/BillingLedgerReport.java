@@ -89,6 +89,62 @@ public class BillingLedgerReport {
         return new BillingDtos.PlatformLedgerSummary(days, consumed, consumedToday, refunded, purchased, granted, byCapability);
     }
 
+    /** 烟火看板：每个商户的当前余额和累计数，再合计全平台。商户按当前可用烟火从多到少排。 */
+    public BillingDtos.CreditOverview overview() {
+        long purchased = 0, granted = 0, consumed = 0, available = 0, held = 0;
+        Map<String, Long> purchasedBySource = new TreeMap<>(), grantedBySource = new TreeMap<>();
+        var merchants = new ArrayList<BillingDtos.MerchantCredits>();
+        for (var tenant : directory.scopes()) {
+            var data = inTenant(tenant.id(), () -> new TenantCredits(balance(tenant.id()), lifetime(tenant.id())));
+            Object[] account = data.account();
+            List<Object[]> sources = data.sources();
+            long tenantPurchased = 0, tenantGranted = 0, tenantConsumed = 0;
+            for (Object[] s : sources) {
+                String type = (String) s[0], source = (String) s[1];
+                long amount = ((Number) s[2]).longValue();
+                switch (type) {
+                    case "PURCHASE" -> { tenantPurchased += amount; purchasedBySource.merge(source, amount, Long::sum); }
+                    case "GRANT" -> { tenantGranted += amount; grantedBySource.merge(source, amount, Long::sum); }
+                    case "CAPTURE" -> tenantConsumed += amount;
+                    default -> { }
+                }
+            }
+            long gift = account == null ? 0 : ((Number) account[0]).longValue();
+            long bought = account == null ? 0 : ((Number) account[1]).longValue();
+            long tenantHeld = account == null ? 0 : ((Number) account[2]).longValue();
+            merchants.add(new BillingDtos.MerchantCredits(tenant.id(), tenant.name(), gift, bought, tenantHeld,
+                    tenantPurchased, tenantGranted, tenantConsumed));
+            purchased += tenantPurchased; granted += tenantGranted; consumed += tenantConsumed;
+            available += gift + bought; held += tenantHeld;
+        }
+        merchants.sort(Comparator.comparingLong((BillingDtos.MerchantCredits m) -> m.giftAvailable() + m.purchasedAvailable()).reversed()
+                .thenComparing(BillingDtos.MerchantCredits::tenantId));
+        return new BillingDtos.CreditOverview(purchased, granted, consumed, available, held, purchasedBySource, grantedBySource, merchants);
+    }
+
+    private record TenantCredits(Object[] account, List<Object[]> sources) {}
+
+    private Object[] balance(Long tenantId) {
+        return (Object[]) em.createNativeQuery("SELECT gift_available, purchased_available, held FROM billing_accounts WHERE tenant_id = :tenant")
+                .setParameter("tenant", tenantId).getResultStream().findFirst().orElse(null);
+    }
+
+    /** 累计金额按类型和来源分组；来源从账本事件编号的前缀判断，CAPTURE 不区分来源。 */
+    @SuppressWarnings("unchecked")
+    private List<Object[]> lifetime(Long tenantId) {
+        return em.createNativeQuery("""
+                SELECT l.type,
+                       CASE WHEN l.event_key LIKE 'redeem-code:%' THEN 'REDEEM_CODE'
+                            WHEN l.event_key LIKE 'admin-credits:%' THEN 'ADMIN'
+                            WHEN l.event_key LIKE 'admin-membership:%' THEN 'ADMIN_MEMBERSHIP'
+                            ELSE 'ORDER' END,
+                       COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' THEN -l.held_delta ELSE l.gift_delta + l.purchased_delta END), 0)
+                FROM billing_ledger l
+                WHERE l.tenant_id = :tenant AND l.type IN ('CAPTURE', 'PURCHASE', 'GRANT')
+                GROUP BY 1, 2""")
+                .setParameter("tenant", tenantId).getResultList();
+    }
+
     @SuppressWarnings("unchecked")
     private List<Object[]> rows(Long tenantId, Instant since, String type, String capability) {
         return em.createNativeQuery(TaskUsageStore.REPORT + """
