@@ -63,6 +63,7 @@ export const billingApi = {
   orders: (page = 0) => get('/api/billing/orders', { page, size: 20 }),
   topups: (page = 0) => get('/api/billing/topups', { page, size: 20 }),
   ledger: (page = 0) => get('/api/billing/ledger', { page, size: 20 }),
+  redeem: code => post('/api/billing/redeem', { code }),
 }
 
 export function number(value) {

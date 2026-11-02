@@ -39,7 +39,10 @@ public final class BillingDtos {
     /** 会员订单入账、会员期确定后发出，与入账同一事务。联盟券模块据此发放本期额度。 */
     public record MembershipActivated(Long tenantId, String billingOrderId, PlanSnapshot plan,
                                       Instant periodStart, Instant periodEnd) {}
-    /** 充值或会员订单实际付款入账后发出，与入账同一事务；kind 为 TOPUP 或 MEMBERSHIP。邀请返利模块据此给邀请人记返利。 */
+    /**
+     * 充值或会员订单实际付款入账后发出，与入账同一事务；kind 为 TOPUP 或 MEMBERSHIP。邀请返利模块据此给邀请人记返利。
+     * 有实收金额的充值兑换码兑换后也发出，billingOrderId 为 redeem-code-{兑换码编号}。
+     */
     public record OrderPaid(Long tenantId, String billingOrderId, String kind, long amountMinor) {}
     /** replacePublished：上架时把同一标识正在上架的版本一起下架，商户那边不断档。 */
     public record Publication(boolean published, boolean replacePublished) {
@@ -68,4 +71,31 @@ public final class BillingDtos {
     /** 时间窗口内的全平台合计；consumed 只算实际扣除（CAPTURE），预占不算消耗。 */
     public record PlatformLedgerSummary(int days, long consumed, long consumedToday, long refunded, long purchased,
                                         long granted, java.util.Map<String, Long> consumedByCapability) {}
+
+    /**
+     * 批量生成兑换码；kind 为 TOPUP（记充值烟火）或 GIFT（记赠送烟火），expiresAt 为空表示长期有效。
+     * amountMinor 是每个充值码的实收金额（分），兑换后按它记邀请返利，0 表示不记；赠送码必须为 0。
+     */
+    public record NewRedeemCodes(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
+                                 @NotBlank @Pattern(regexp="TOPUP|GIFT") String kind,
+                                 @Min(1) @Max(100000) long credits, @Min(0) @Max(10000000) long amountMinor,
+                                 @Min(1) @Max(200) int quantity,
+                                 Instant expiresAt, @Size(max=200) String note) {}
+    /** status 为 UNUSED、REDEEMED、VOIDED 或 EXPIRED。 */
+    public record RedeemCodeView(Long id, String code, String kind, long credits, long amountMinor, String status, String note,
+                                 Instant expiresAt, Instant createdAt, Long redeemedTenantId, String redeemedTenantName,
+                                 Instant redeemedAt, Instant voidedAt) {}
+    public record Redeem(@NotBlank @Size(max=40) String code) {}
+    public record Redeemed(String kind, long credits, long available) {}
+
+    /**
+     * 烟火看板，全部为累计数。purchasedBySource / grantedBySource 按来源拆分：
+     * ORDER（在线付款：充值或会员赠送）、ADMIN（平台赠送）、ADMIN_MEMBERSHIP（平台开通会员）、REDEEM_CODE（兑换码）。
+     */
+    public record CreditOverview(long purchased, long granted, long consumed, long available, long held,
+                                 java.util.Map<String, Long> purchasedBySource, java.util.Map<String, Long> grantedBySource,
+                                 List<MerchantCredits> merchants) {}
+    /** 一个商户的当前余额与累计充值、赠送、消耗；消耗只算实际扣除。 */
+    public record MerchantCredits(Long tenantId, String tenantName, long giftAvailable, long purchasedAvailable, long held,
+                                  long purchased, long granted, long consumed) {}
 }

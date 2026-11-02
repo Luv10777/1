@@ -157,6 +157,21 @@ const topUp = async () => {
   catch (e) { error.value = e.message || '充值订单创建失败' }
   finally { busy.value = false }
 }
+const redeemCode = ref('')
+const redeeming = ref(false)
+const redeemResult = ref(null)
+const redeemError = ref('')
+const redeem = async () => {
+  if (!redeemCode.value.trim() || redeeming.value) return
+  redeeming.value = true; redeemError.value = ''; redeemResult.value = null
+  try {
+    redeemResult.value = await billingApi.redeem(redeemCode.value.trim())
+    redeemCode.value = ''
+    await refreshBilling()
+  }
+  catch (e) { redeemError.value = e.message || '兑换失败，请稍后重试' }
+  finally { redeeming.value = false }
+}
 const subscribe = async (plan) => {
   if (!canPay.value) return
   if (!checkPurchaseConsent('订阅前请阅读并同意用户协议、隐私协议和售后服务规则。', planTerms, 'plan')) return
@@ -231,6 +246,16 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <dl class="yanhuo-sources"><div><dt>赠送烟火</dt><dd>{{ number(account.giftAvailable) }}</dd></div><div><dt>充值余额</dt><dd>{{ number(account.purchasedAvailable) }}</dd></div><div><dt>生成中预占</dt><dd>{{ number(account.held) }}</dd></div></dl>
           <button type="button" class="yanhuo-secondary" @click="openTopup">充值烟火</button>
         </article>
+      </section>
+
+      <section class="yanhuo-section" aria-labelledby="redeem-title">
+        <header class="yanhuo-section-head"><h2 id="redeem-title">兑换烟火</h2><p>输入平台发放的兑换码，烟火立即到账、全店共用；每个兑换码只能使用一次。</p></header>
+        <form class="yanhuo-redeem" @submit.prevent="redeem">
+          <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="兑换码">
+          <button class="yanhuo-primary" type="submit" :disabled="redeeming || !redeemCode.trim()">{{ redeeming ? '兑换中…' : '兑换' }}</button>
+        </form>
+        <p v-if="redeemResult" class="yanhuo-redeem-done" role="status">已到账 {{ number(redeemResult.credits) }} {{ redeemResult.kind === 'TOPUP' ? '充值' : '赠送' }}烟火，当前可用 {{ number(redeemResult.available) }}。</p>
+        <div v-if="redeemError" class="yanhuo-alert" role="alert">{{ redeemError }}</div>
       </section>
 
       <section id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">

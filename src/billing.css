@@ -106,6 +106,10 @@ button.yanhuo-secondary { background: transparent; font-family: inherit; cursor:
 @media (prefers-reduced-motion: reduce) { .yanhuo-payment[open], .yanhuo-payment[open]::backdrop { animation: none; } }
 .yanhuo-payment .yanhuo-pay-methods label { flex: 1; }
 .yanhuo-note { font-size: 12px; color: var(--ink-muted); line-height: 1.8; margin: 12px 0 0; }
+.yanhuo-redeem { display: flex; gap: 12px; max-width: 520px; }
+.yanhuo-redeem-input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--color-bg-surface); color: var(--ink); font-size: 15px; letter-spacing: .06em; text-transform: uppercase; }
+.yanhuo-redeem-input::placeholder { letter-spacing: .06em; color: var(--ink-muted); }
+.yanhuo-redeem-done { margin: 12px 0 0; font-size: 13px; color: var(--color-accent-text); }
 .yanhuo-empty { display: grid; justify-items: center; text-align: center; padding: 34px 16px; color: var(--ink-muted); font-size: 13px; line-height: 1.8; }
 .yanhuo-empty img { margin-bottom: 10px; object-fit: contain; }
 .yanhuo-empty h3 { font-size: 16px; margin: 4px 0; font-weight: 500; }

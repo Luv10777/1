@@ -6,7 +6,12 @@ const params = values => Object.fromEntries(Object.entries(values || {}).filter(
 export const ledgerAdminApi = {
   entries: values => get('/api/billing/operations/ledger', params(values)),
   summary: days => get('/api/billing/operations/ledger/summary', { days }),
+  overview: () => get('/api/billing/operations/overview'),
 }
+
+/** 烟火看板的来源拆分：同一个来源键在「购买」和「赠送」里含义不同。 */
+export const purchasedSources = { ORDER: '在线充值', REDEEM_CODE: '兑换码充值' }
+export const grantedSources = { ORDER: '会员赠送', ADMIN_MEMBERSHIP: '平台开通会员', ADMIN: '平台赠送', REDEEM_CODE: '兑换码赠送' }
 
 export const ledgerTypes = { CAPTURE: '扣除', RESERVE: '预占', RELEASE: '退回', PURCHASE: '充值', GRANT: '赠送' }
 export const ledgerCapabilities = { IMAGE: '图片创作', VIDEO: '视频创作', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', COPY: '文案创作', LIVE: '实景直播' }

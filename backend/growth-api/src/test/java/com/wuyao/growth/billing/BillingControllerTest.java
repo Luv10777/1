@@ -15,7 +15,7 @@ class BillingControllerTest {
         var users=mock(UserRepository.class);
         var owner=new User(); owner.setTenantId(7L); owner.setRole("OWNER");
         when(users.findById(1L)).thenReturn(Optional.of(owner));
-        var controller=new BillingController(service,new BillingProperties(),checkout,users);
+        var controller=new BillingController(service,new BillingProperties(),checkout,users,mock(BillingRedeemCodeService.class));
         var principal=new AuthPrincipal(1L,7L,"",0);
         controller.alipay("test-order",true,principal);
         verify(checkout).alipayUrl("test-order",true);
@@ -35,7 +35,7 @@ class BillingControllerTest {
         var users=mock(UserRepository.class);
         var owner=new User(); owner.setTenantId(7L); owner.setRole("OWNER");
         when(users.findById(1L)).thenReturn(Optional.of(owner));
-        var controller=new BillingController(service,new BillingProperties(),checkout,users);
+        var controller=new BillingController(service,new BillingProperties(),checkout,users,mock(BillingRedeemCodeService.class));
         var principal=new AuthPrincipal(1L,7L,"",0);
         controller.order("test-order",principal);
         verify(service).order("test-order");

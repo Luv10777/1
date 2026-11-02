@@ -479,7 +479,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 
 | V67 | 「入驻商户」栏改为按入驻商户列出：`public_alliance_merchants` 函数（只交出申请编号、租户编号和商户名） | `claude/alliance-merchants` |
 
-下一个可用编号：V68（V64、V65 已在主干）。
+| V74 | 烟火兑换码：`billing_redeem_codes`（平台级，不分商户；一码一用，兑换后记兑换商户；充值码记实收金额用于返利） | `claude/redeem-codes` |
+
+下一个可用编号：V75（V68–V73 已在主干）。
 
 后端检查：
 

@@ -15,6 +15,7 @@ public class BillingController {
     private final BillingProperties config;
     private final BillingCheckoutService checkout;
     private final UserRepository users;
+    private final BillingRedeemCodeService redeemCodes;
     @GetMapping("/summary")
     public ApiResponse<BillingDtos.Summary> summary(@AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(service.summary(owner(me),config.getOperatorUserIds().contains(me.userId())));
@@ -30,6 +31,10 @@ public class BillingController {
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.topUp(input)); }
     @PostMapping("/orders/subscription") public ApiResponse<BillingDtos.OrderView> subscribe(@Valid @RequestBody BillingDtos.Subscribe input,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.subscribe(input)); }
+    @PostMapping("/redeem") public ApiResponse<BillingDtos.Redeemed> redeem(@Valid @RequestBody BillingDtos.Redeem input,
+        @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(redeemCodes.redeem(input.code(),me.userId(),me.tenantId()));
+    }
     @GetMapping("/topups") public ApiResponse<BillingDtos.History<BillingDtos.TopupRecord>> topups(
         @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,@AuthenticationPrincipal AuthPrincipal me) {
         requireOwner(me); return ApiResponse.ok(service.topups(page,size));

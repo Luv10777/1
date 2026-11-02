@@ -10,11 +10,13 @@ const PlansView = () => import('../src/views/PlatformPlansView.vue')
 const UsersView = () => import('../src/views/PlatformUsersView.vue')
 const CreditsView = () => import('../src/views/PlatformCreditsView.vue')
 const ReferralView = () => import('../src/views/PlatformReferralView.vue')
+const CreditOverviewView = () => import('../src/views/PlatformCreditOverviewView.vue')
+const RedeemCodesView = () => import('../src/views/PlatformRedeemCodesView.vue')
 
 export function adminDestination(raw) {
   if (typeof raw !== 'string') return '/information'
   const path = raw.split(/[?#]/)[0]
-  return ['/information', '/merchants', '/identities', '/users', '/alliance', '/plans', '/credits'].includes(path) ? raw : '/information'
+  return ['/information', '/merchants', '/identities', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes'].includes(path) ? raw : '/information'
 }
 
 export function createAdminRouter(history = createWebHistory()) {
@@ -26,7 +28,9 @@ export function createAdminRouter(history = createWebHistory()) {
       { path: '/information', alias: '/admin/information', name: 'admin-information', component: ManagementView, meta: { title: '信息管理', admin: true } },
       { path: '/merchants', name: 'admin-merchants', component: ManagementView, meta: { title: '商家管理', admin: true } },
       { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], name: 'admin-identities', component: ManagementView, meta: { title: '用户实名', admin: true } },
+      { path: '/credit-overview', name: 'admin-credit-overview', component: CreditOverviewView, meta: { title: '烟火看板', admin: true } },
       { path: '/credits', name: 'admin-credits', component: CreditsView, meta: { title: '烟火日志', admin: true } },
+      { path: '/redeem-codes', name: 'admin-redeem-codes', component: RedeemCodesView, meta: { title: '兑换码', admin: true } },
       { path: '/referral', name: 'admin-referral', component: ReferralView, meta: { title: '邀请返利', admin: true } },
       { path: '/users', name: 'admin-users', component: UsersView, meta: { title: '用户管理', admin: true } },
       { path: '/plans', name: 'admin-plans', component: PlansView, meta: { title: '会员套餐', admin: true } },
