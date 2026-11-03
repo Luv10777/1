@@ -1,10 +1,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
-import { ShieldCheck } from 'lucide-vue-next'
+import { CircleCheck, Landmark, Plus, ShieldCheck } from 'lucide-vue-next'
+import BankCardDialog from '../components/referral/BankCardDialog.vue'
+import BankCardVisual from '../components/referral/BankCardVisual.vue'
+import { myIdentity } from '../stores/identity'
 import { referralApi } from '../services/referralApi'
-import { commissionKinds, commissionStates, formatCardNumber, inviteLink, ratePercent, withdrawable, withdrawalStatuses } from '../domain/referral'
-import { LEGAL_ENTITY } from '../domain/legalPolicies'
+import { commissionKinds, commissionStates, inviteLink, ratePercent, withdrawable, withdrawalStatuses } from '../domain/referral'
 import { managementDate } from '../domain/platformManagement'
 import { yuan } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -58,7 +60,6 @@ async function copy(text, label) {
 
 // 提现：先绑本人银行卡（四要素核验，不做人工审核），再把全部可提现返利一次提走；平台审核后转账到这张卡。
 const cardOpen = ref(false)
-const card = ref({ bankName: '', cardNumber: '', mobile: '', declarationAccepted: false })
 const binding = ref(false)
 const cardError = ref('')
 const cardMismatch = ref(false)
@@ -79,16 +80,16 @@ const blocker = computed(() => {
   return ''
 })
 
+const holder = computed(() => myIdentity.application?.legalNameMasked || '')
+
 function openCard() {
-  card.value = { bankName: '', cardNumber: '', mobile: '', declarationAccepted: false }
   cardError.value = ''
   cardMismatch.value = false
   cardOpen.value = true
 }
 
-async function bindCard() {
+async function bindCard(values) {
   if (binding.value) return
-  const values = card.value
   if (values.bankName.trim().length < 2) { cardError.value = '请填写开户银行，例如：中国工商银行。'; return }
   if (!/^\d{12,19}$/.test(values.cardNumber.replace(/ /g, ''))) { cardError.value = '请输入 12–19 位银行卡号。'; return }
   if (!/^1\d{10}$/.test(values.mobile.trim())) { cardError.value = '请输入银行预留的 11 位手机号。'; return }
@@ -224,29 +225,42 @@ onMounted(load)
         <p v-if="overview.owedMinor" class="referral-muted referral-owed">已提现的返利因退款等原因作废后，会从下一次提现里扣回。</p>
 
         <div class="referral-bank">
-          <template v-if="overview.bankCard">
-            <span>收款卡：<strong>{{ overview.bankCard.bankName }} 尾号 {{ overview.bankCard.cardLast4 }}</strong><small>户名为本人实名，已通过银行卡核验</small></span>
-            <button v-if="!cardOpen" class="ghost-button" type="button" @click="openCard">更换银行卡</button>
-          </template>
-          <template v-else>
-            <span>还没有绑定收款银行卡。</span>
-            <button v-if="!cardOpen" class="ghost-button" type="button" @click="openCard">绑定本人银行卡</button>
-          </template>
+          <header class="referral-bank-head">
+            <span class="referral-bank-icon" :class="{ ok: overview.bankCard }" aria-hidden="true"><Landmark :size="22" /></span>
+            <div>
+              <h3>收款银行卡</h3>
+              <p>{{ overview.bankCard ? '提现审核通过后，平台转账到这张卡' : '返利提现只会转入本人实名名下的储蓄卡' }}</p>
+            </div>
+            <span class="referral-badge" :class="{ idle: !overview.bankCard }">{{ overview.bankCard ? '已核验' : '未绑定' }}</span>
+          </header>
+          <div class="referral-bank-body">
+            <template v-if="overview.bankCard">
+              <BankCardVisual :bank-name="overview.bankCard.bankName" :number="`•••• •••• •••• ${overview.bankCard.cardLast4}`" :holder="holder" />
+              <div class="referral-bank-info">
+                <strong>尾号 {{ overview.bankCard.cardLast4 }}</strong>
+                <dl>
+                  <div><dt>核验结果</dt><dd>四要素一致，已通过银行核验</dd></div>
+                  <div><dt>户名</dt><dd>{{ holder ? `${holder}（本人实名）` : '本人实名' }}</dd></div>
+                  <div v-if="overview.bankCard.verifiedAt"><dt>绑定时间</dt><dd>{{ managementDate(overview.bankCard.verifiedAt) }}</dd></div>
+                </dl>
+                <button class="ghost-button" type="button" @click="openCard">更换银行卡</button>
+              </div>
+            </template>
+            <template v-else>
+              <button class="referral-bank-slot" type="button" @click="openCard"><Plus :size="28" aria-hidden="true" />绑定收款银行卡</button>
+              <div class="referral-bank-info">
+                <ul class="referral-bank-reqs">
+                  <li><CircleCheck :size="16" aria-hidden="true" />实名认证已通过</li>
+                  <li class="off"><CircleCheck :size="16" aria-hidden="true" />银行核验姓名、身份证号、卡号、预留手机号是否一致</li>
+                  <li class="off"><CircleCheck :size="16" aria-hidden="true" />卡号加密保存，只显示后 4 位</li>
+                </ul>
+                <button class="primary-button" type="button" @click="openCard">绑定银行卡</button>
+              </div>
+            </template>
+          </div>
         </div>
 
-        <form v-if="cardOpen" class="referral-card-form" @submit.prevent="bindCard">
-          <p class="referral-muted">持卡人必须是你本人：姓名和身份证号取自你的实名，会和卡号、银行预留手机号一起向银行核验。卡号加密保存，只显示后 4 位；预留手机号只用于这次核验，不保存。</p>
-          <label>开户银行<input v-model="card.bankName" maxlength="40" autocomplete="off" placeholder="例如：中国工商银行" :disabled="binding" /></label>
-          <label>银行卡号<input :value="card.cardNumber" inputmode="numeric" autocomplete="off" placeholder="本人名下的储蓄卡" :disabled="binding" @input="card.cardNumber = formatCardNumber($event.target.value); $event.target.value = card.cardNumber" /></label>
-          <label>银行预留手机号<input v-model="card.mobile" inputmode="numeric" maxlength="11" autocomplete="off" :disabled="binding" /></label>
-          <label class="referral-consent"><input v-model="card.declarationAccepted" type="checkbox" :disabled="binding" /><span>我确认这是本人名下的银行卡，并单独同意平台把我实名的姓名、身份证号码和这张卡的卡号、银行预留手机号，经阿里云实人认证服务（客服电话 95187）提交银行核验是否一致，仅用于返利提现收款。</span></label>
-          <p v-if="cardMismatch" class="referral-error" role="alert">银行卡与本人实名信息或银行预留手机号核验不一致，请核对后重试，或换一张本人银行卡。如有疑问请拨打人工客服：{{ LEGAL_ENTITY.phone }}</p>
-          <p v-if="cardError" class="referral-error" role="alert">{{ cardError }}</p>
-          <div class="referral-actions">
-            <button class="primary-button" type="submit" :disabled="binding">{{ binding ? '正在核验…' : '核验并绑定' }}</button>
-            <button class="ghost-button" type="button" :disabled="binding" @click="cardOpen = false">取消</button>
-          </div>
-        </form>
+        <BankCardDialog :open="cardOpen" :binding="binding" :error="cardError" :mismatch="cardMismatch" :holder="holder" @submit="bindCard" @close="cardOpen = false" />
 
         <div class="referral-withdraw">
           <template v-if="confirming">
@@ -350,12 +364,29 @@ onMounted(load)
 .referral-facts dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .referral-facts dd { margin: 4px 0 0; font-size: 22px; font-variant-numeric: tabular-nums; }
 .referral-owed { margin-top: 8px; font-size: 12px; }
-.referral-bank { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 14px 0; border-top: 1px solid var(--color-border-subtle); font-size: 13px; }
-.referral-bank small { display: block; margin-top: 2px; color: var(--color-text-muted); font-size: 12px; }
-.referral-card-form { display: grid; gap: 12px; max-width: 460px; margin-bottom: 8px; font-size: 13px; }
-.referral-card-form > p { margin: 0; font-size: 12px; }
-.referral-card-form label:not(.referral-consent) { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
-.referral-card-form input:not([type="checkbox"]) { min-height: 40px; padding: 0 12px; border: 1px solid var(--color-border-subtle); border-radius: 4px; background: var(--color-bg-surface); color: var(--color-primary); font: 14px var(--font-sans); }
+.referral-bank { margin-top: 18px; padding: 18px 0 8px; border-top: 1px solid var(--color-border-subtle); font-size: 13px; }
+.referral-bank-head { display: flex; align-items: center; gap: 14px; }
+.referral-bank-head > div { flex: 1; min-width: 0; }
+.referral-bank-head h3 { margin: 0; font-family: var(--font-serif); font-size: 16px; font-weight: 750; }
+.referral-bank-head p { margin: 2px 0 0; color: var(--color-text-muted); font-size: 12px; }
+.referral-bank-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-surface)); }
+.referral-bank-icon.ok { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
+.referral-badge.idle { color: var(--color-text-muted); background: var(--color-bg-subtle); }
+.referral-bank-body { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-top: 16px; }
+.referral-bank-info { flex: 1; min-width: 230px; }
+.referral-bank-info > strong { font-size: 15px; }
+.referral-bank-info dl { display: grid; gap: 6px; margin: 12px 0 16px; }
+.referral-bank-info dl div { display: flex; gap: 10px; }
+.referral-bank-info dt { flex: none; width: 76px; color: var(--color-text-muted); }
+.referral-bank-info dd { margin: 0; }
+.referral-bank-info .ghost-button { border: 1px solid var(--color-border-strong); }
+.referral-bank-slot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; width: 100%; max-width: 300px; aspect-ratio: 1.586; border: 1.5px dashed var(--color-border-strong); border-radius: 12px; color: var(--color-text-muted); background: var(--color-bg-surface); font: 13px var(--font-sans); cursor: pointer; }
+.referral-bank-slot svg { color: var(--color-accent-text); }
+.referral-bank-slot:hover { border-color: var(--color-accent); color: var(--color-accent-text); }
+.referral-bank-reqs { display: grid; gap: 7px; margin: 0 0 18px; padding: 0; list-style: none; }
+.referral-bank-reqs li { display: flex; gap: 8px; align-items: flex-start; }
+.referral-bank-reqs svg { flex: none; margin-top: 2px; color: var(--color-success); }
+.referral-bank-reqs li.off svg { color: var(--color-border-strong); }
 .referral-withdraw { display: grid; gap: 10px; justify-items: start; padding: 14px 0 4px; border-top: 1px solid var(--color-border-subtle); font-size: 13px; }
 .referral-withdraw p { margin: 0; }
 .referral-withdraw + .referral-table-wrap { margin-top: 16px; }

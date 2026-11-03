@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ShieldCheck } from 'lucide-vue-next'
+import { Check, ChevronRight, CircleCheck, Coins, Lock, RefreshCw, ShieldCheck, Ticket, User } from 'lucide-vue-next'
 import { accountApi, validateAvatar } from '../services/accountApi'
 import UserAvatar from '../components/UserAvatar.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
@@ -59,9 +59,9 @@ const identityFormError = ref('')
 const identityNotice = ref('')
 const identityForm = reactive({ legalName: '', idNumber: '', declarationAccepted: false })
 const identityStates = {
-  NONE: { label: '未实名', tone: '', text: '还没有提交实名资料。提交后当场核验姓名与身份证号码是否一致，结果会显示在这里。' },
+  NONE: { label: '未实名', tone: '', text: '核验本人身份，解锁推广返利与提现。' },
   PENDING_REVIEW: { label: '审核中', tone: 'wait', text: '资料已提交，正在等待平台人工审核，请勿重复提交。' },
-  VERIFIED: { label: '实名核验通过', tone: 'on', text: '你的实名资料已通过审核。' },
+  VERIFIED: { label: '已通过', tone: 'on', text: '你的身份已核验，无需再次提交。' },
   REJECTED: { label: '未通过', tone: 'off', text: '核验没有通过。请根据下面的原因核对资料，再重新提交。' },
 }
 const identityState = computed(() => identityStates[identity.value?.status] || identityStates.NONE)
@@ -419,17 +419,42 @@ async function savePassword() {
       </section>
 
       <section id="identity" class="settings-card" aria-labelledby="identity-title">
-        <header class="card-header">
+        <header class="card-header identity-header">
+          <span class="identity-icon" :class="{ ok: identity?.status === 'VERIFIED' }" aria-hidden="true"><ShieldCheck :size="24" /></span>
           <div>
             <h2 id="identity-title">实名认证</h2>
             <p>{{ identityLoading ? '正在查询实名状态…' : identityError ? '实名状态暂时无法确认。' : identityState.text }}</p>
           </div>
-          <span v-if="!identityLoading && !identityError" class="state-badge" :class="identityState.tone"><ShieldCheck v-if="identity?.status === 'VERIFIED'" :size="14" aria-hidden="true" />{{ identityState.label }}</span>
+          <span v-if="!identityLoading && !identityError" class="state-badge" :class="identityState.tone"><Check v-if="identity?.status === 'VERIFIED'" :size="14" aria-hidden="true" /><i v-else class="state-dot" aria-hidden="true" />{{ identityState.label }}</span>
         </header>
         <p v-if="identityNotice" class="inline-message" role="status">{{ identityNotice }}</p>
         <p v-if="identityError" class="inline-message error" role="alert">{{ identityError }}</p>
 
-        <template v-if="identity">
+        <template v-if="identity?.status === 'VERIFIED'">
+          <div class="id-card">
+            <span class="id-avatar" aria-hidden="true"><User :size="24" /><i><Check :size="12" /></i></span>
+            <div class="id-main">
+              <strong>{{ identity.legalNameMasked }}</strong>
+              <span class="id-number">{{ identity.idNumberMasked }}</span>
+            </div>
+            <div v-if="identity.reviewedAt" class="id-time">核验时间<span>{{ managementDate(identity.reviewedAt) }}</span></div>
+          </div>
+          <div class="unlocked">
+            <p>已为你解锁</p>
+            <div class="unlocked-row">
+              <CircleCheck :size="18" aria-hidden="true" />
+              <span>专属邀请码<small>邀请商户注册，赚取充值与会员返利</small></span>
+              <RouterLink :to="{ name: 'referral' }">去领取<ChevronRight :size="14" aria-hidden="true" /></RouterLink>
+            </div>
+            <div class="unlocked-row">
+              <CircleCheck :size="18" aria-hidden="true" />
+              <span>返利提现<small>还需绑定一张本人名下的银行卡</small></span>
+              <RouterLink :to="{ name: 'referral' }">去绑定<ChevronRight :size="14" aria-hidden="true" /></RouterLink>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="identity">
           <dl class="facts">
             <div><dt>姓名</dt><dd>{{ identity.legalNameMasked }}</dd></div>
             <div><dt>身份证号</dt><dd>{{ identity.idNumberMasked }}</dd></div>
@@ -443,9 +468,24 @@ async function savePassword() {
           </div>
         </template>
 
-        <div v-if="!identityOpen" class="card-actions">
-          <button v-if="canSubmitIdentity" class="ghost-button" @click="openIdentity">{{ identity ? '重新提交实名资料' : '去实名' }}</button>
-          <button class="link-button" :disabled="identityLoading" @click="loadIdentity">刷新状态</button>
+        <template v-else-if="!identityLoading && !identityError && !identityOpen">
+          <ol class="id-steps">
+            <li class="on"><span>1</span><div><b>填写信息</b><small>姓名与身份证号</small></div></li>
+            <li><span>2</span><div><b>当场核验</b><small>阿里云实人认证</small></div></li>
+            <li><span>3</span><div><b>解锁权益</b><small>邀请码与提现</small></div></li>
+          </ol>
+          <div class="id-perks">
+            <div><Ticket :size="20" aria-hidden="true" /><span><b>专属邀请码</b><small>邀请商户注册，对方充值、开通会员按比例返现</small></span></div>
+            <div><Coins :size="20" aria-hidden="true" /><span><b>返利提现</b><small>绑定本人银行卡，平台审核后转账到账</small></span></div>
+          </div>
+        </template>
+
+        <div v-if="!identityOpen" class="id-foot">
+          <p class="id-secure"><Lock :size="15" aria-hidden="true" />{{ identity?.status === 'VERIFIED' ? '姓名与号码仅脱敏显示，完整资料加密保存' : '资料加密保存，只核验姓名与号码是否一致，不做人工审核' }}</p>
+          <div class="id-foot-actions">
+            <button class="link-button" :disabled="identityLoading" @click="loadIdentity"><RefreshCw :size="13" aria-hidden="true" /> 刷新状态</button>
+            <button v-if="canSubmitIdentity" class="primary-button" @click="openIdentity">{{ identity ? '重新提交实名资料' : '去实名' }}</button>
+          </div>
         </div>
 
         <form v-else class="password-form" autocomplete="off" @submit.prevent="submitIdentity">
@@ -462,7 +502,7 @@ async function savePassword() {
             <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
             <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
           </label>
-          <p class="hint">姓名和身份证号在服务端加密保存，只有平台授权人员能查看完整资料，每次查看都会留下记录。提交后经阿里云实人认证当场核验姓名与身份证号码是否一致。</p>
+          <p class="hint">姓名和身份证号在服务端加密保存，只有平台授权人员能查看完整资料，每次查看都会留下记录。</p>
           <div class="form-footer">
             <p v-if="identityFormError" class="form-notice" role="alert">{{ identityFormError }}</p>
             <div>
@@ -612,6 +652,47 @@ async function savePassword() {
 .consent a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 2px; }
 .hint { margin: 0 0 14px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
 #identity { scroll-margin-top: 20px; }
+.identity-header { align-items: center; margin-bottom: 0; }
+.identity-header > div { flex: 1; min-width: 0; }
+.identity-icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-surface)); }
+.identity-icon.ok { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-bg-surface)); }
+.identity-header .state-badge { border-radius: 99px; padding: 3px 10px; }
+.state-dot { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
+.id-steps { display: grid; grid-template-columns: repeat(3, 1fr); margin: 22px 0 0; padding: 0; list-style: none; }
+.id-steps li { position: relative; display: flex; gap: 10px; align-items: flex-start; padding-right: 10px; }
+.id-steps li:not(:last-child)::after { content: ""; position: absolute; top: 13px; right: 8px; left: 34px; height: 1px; background: var(--color-border-subtle); }
+.id-steps li > span { position: relative; z-index: 1; flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--color-border-strong); border-radius: 50%; color: var(--color-text-muted); background: var(--color-bg-surface); font-size: 12px; font-weight: 700; }
+.id-steps li.on > span { border-color: var(--color-accent); color: var(--color-on-accent); background: var(--color-accent); }
+.id-steps b { position: relative; z-index: 1; display: block; width: max-content; padding-right: 6px; font-size: 13px; background: var(--color-bg-surface); }
+.id-steps small { display: block; margin-top: 1px; color: var(--color-text-muted); font-size: 12px; }
+.id-perks { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 20px; }
+.id-perks > div { display: flex; gap: 12px; padding: 14px; border-radius: 8px; background: var(--color-bg-subtle); }
+.id-perks svg { flex: none; margin-top: 1px; color: var(--color-accent-text); }
+.id-perks b { display: block; font-size: 13px; }
+.id-perks small { display: block; margin-top: 2px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.id-card { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 20px; padding: 18px; border-radius: 8px; background: var(--color-bg-subtle); }
+.id-avatar { position: relative; flex: none; display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid var(--color-border-subtle); border-radius: 50%; color: var(--color-text-muted); background: var(--color-bg-surface); }
+.id-avatar i { position: absolute; right: -3px; bottom: -3px; display: grid; place-items: center; width: 20px; height: 20px; border: 2px solid var(--color-bg-subtle); border-radius: 50%; color: #fff; background: var(--color-success); }
+.id-main { flex: 1; min-width: 150px; }
+.id-main strong { display: block; font-size: 17px; }
+.id-number { color: var(--color-text-muted); font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; letter-spacing: .06em; }
+.id-time { color: var(--color-text-muted); font-size: 12px; text-align: right; }
+.id-time span { display: block; color: var(--color-primary); font-size: 13px; }
+.unlocked { margin-top: 16px; border: 1px solid var(--color-border-subtle); border-radius: 8px; }
+.unlocked > p { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 12px; }
+.unlocked-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; font-size: 13px; }
+.unlocked-row + .unlocked-row { border-top: 1px solid var(--color-border-subtle); }
+.unlocked-row > svg { flex: none; color: var(--color-success); }
+.unlocked-row > span { flex: 1; min-width: 0; }
+.unlocked-row small { display: block; color: var(--color-text-muted); font-size: 12px; }
+.unlocked-row a { display: inline-flex; align-items: center; gap: 2px; color: var(--color-accent-text); text-decoration: none; }
+.id-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border-subtle); }
+.id-secure { display: flex; gap: 6px; align-items: flex-start; flex: 1 1 260px; margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.id-secure svg { flex: none; margin-top: 2px; }
+.id-foot-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+.id-foot .link-button { display: inline-flex; align-items: center; gap: 4px; color: var(--color-text-muted); font-weight: 500; }
+.identity-header ~ .password-form { margin-top: 20px; }
+.id-foot .link-button:hover:not(:disabled) { color: var(--color-accent-text); }
 
 .danger-card { border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border-subtle)); }
 .danger-button { flex: none; border: 1px solid var(--color-error); border-radius: 4px; padding: 10px 17px; color: var(--color-error); background: transparent; font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -630,6 +711,9 @@ async function savePassword() {
   .settings-header h1 { font-size: 30px; }
   .settings-card { padding: 18px 16px; }
   .card-header { flex-direction: column-reverse; gap: 10px; }
+  .identity-header { flex-direction: row; flex-wrap: wrap; }
+  .id-steps { grid-template-columns: 1fr; gap: 12px; }
+  .id-steps li::after { display: none; }
   .form-footer { flex-direction: column; align-items: stretch; }
   .form-footer > div { margin-left: 0; justify-content: flex-end; }
 }
