@@ -55,8 +55,8 @@ npm run dist:win -- --test http://192.168.x.x:4173      # 测试包：软件连�
 
 ```json
 {
-  "windows": { "version": "0.1.3", "url": "/downloads/yifangzhi-setup.exe" },
-  "mac": { "version": "0.1.3", "url": "/downloads/yifangzhi-mac.dmg" }
+  "windows": { "version": "0.1.4", "url": "/downloads/yifangzhi-setup.exe" },
+  "mac": { "version": "0.1.4", "url": "/downloads/yifangzhi-mac.dmg" }
 }
 ```
 
