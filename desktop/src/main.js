@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const metadata = createRequire(import.meta.url)('../package.json')
 // 窗口里显示的是网页版的直播页（页面发现自己开在桌面端里，会收起平台的其余导航）。
 // 正式包连正式平台，开发时连本机的开发服务器。测试包在打包时写入了别的地址（scripts/dist-win.js）。
-const CONSOLE_URL = process.env.YIFANGZHI_CONSOLE_URL || metadata.consoleUrl || (app.isPackaged ? 'https://yifangzhi.com' : 'http://localhost:4173')
+const CONSOLE_URL = process.env.YIFANGZHI_CONSOLE_URL || metadata.consoleUrl || (app.isPackaged ? 'https://wy.yifangzhi.com' : 'http://localhost:4173')
 // 测试包和开发时留着开发者工具，方便看出了什么问题；正式包不给。
 const DIAGNOSTICS = !app.isPackaged || Boolean(metadata.consoleUrl)
 // 网页版里的“打开桌面端”是一条 yifangzhi://live?store=<门店编号> 链接。安装包登记了这个协议；这里只有正式包认领它。

@@ -16,7 +16,15 @@
 | `WECHAT_APP_ID` | `wx616f6e728d7d9a67` |
 | `WECHAT_APP_SECRET` | 仅存服务端私有环境文件，不写入仓库 |
 | `WECHAT_CALLBACK_URL` | `https://yifangzhi.com/api/auth/wechat/callback` |
+| `WECHAT_CALLBACK_HOSTS` | 可选，逗号分隔，例如 `wy.yifangzhi.com`；见下文「多个站点域名」 |
 | `WECHAT_FRONTEND_LOGIN_PATH` | `/login` |
+
+### 多个站点域名
+
+同一站点同时用 `yifangzhi.com` 和 `wy.yifangzhi.com` 提供时，登录状态按域名分开保存。
+默认从任何域名发起的扫码登录都先跳到 `WECHAT_CALLBACK_URL` 的域名，登录完成后停在那个域名。
+把其他域名列进 `WECHAT_CALLBACK_HOSTS` 后，从这些域名发起的登录把回调地址换成原域名，登录完成后留在原域名。
+只能列已经在开放平台「授权回调域」里的域名，否则微信会报 redirect_uri 参数错误。
 
 本地 Java 配置位于 `backend/growth-api/.env`，正式 systemd 配置位于
 `/etc/wuyao/growth-api.env`。文件采用 Java properties 格式；更新正式配置时只修改

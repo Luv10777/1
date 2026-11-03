@@ -114,7 +114,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 依赖先从阿里云的镜像取，镜像没有的再回到原站（`settings.gradle`）。打出来的是调试包，用的是本机自动生成的调试签名，
 只能用来测试，不能发给商家。
 
-调试包连的是 `http://localhost:4173`，和桌面端开发时一样；正式包连 `https://yifangzhi.com`（`app/build.gradle` 里的 `CONSOLE_URL`）。
+调试包连的是 `http://localhost:4173`，和桌面端开发时一样；正式包连 `https://wy.yifangzhi.com`（`app/build.gradle` 里的 `CONSOLE_URL`）。
 手机上的 localhost 要转到电脑上的开发服务器，所以电脑上照常启动前端和后端之后，还要连上手机（USB 调试或无线调试）执行一次：
 
 ```bash
@@ -125,7 +125,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 调试包里的网页可以从电脑上检查（Chrome 的 `chrome://inspect`），正式包不行。
 
 还有一种**预览包**（`./gradlew :app:assemblePreview`，出 `app/build/outputs/apk/preview/app-preview.apk`）：和调试包一样用调试签名，
-但连的是线上 `https://yifangzhi.com`，不需要 `adb reverse`。它的包名多一个 `.preview`，可以和调试包并排装在一台手机上，
+但连的是线上 `https://wy.yifangzhi.com`，不需要 `adb reverse`。它的包名多一个 `.preview`，可以和调试包并排装在一台手机上，
 桌面上叫“一方志预览版”。用来拿真实账号自己试，同样不能发给商家。
 
 ## 三种安装包

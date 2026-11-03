@@ -237,6 +237,8 @@ growth:
       notify-url: ${ALIPAY_NOTIFY_URL:}
       mobile-enabled: ${ALIPAY_MOBILE_ENABLED:false}
       return-url: ${ALIPAY_RETURN_URL:}
+      # 其他也提供本站的域名（逗号分隔），从这些域名发起的手机支付付完回到原域名
+      return-hosts: ${ALIPAY_RETURN_HOSTS:}
     video:
       # Supply verified rates through an external Spring YAML file. No default commercial rate.
       rates: []
@@ -271,6 +273,8 @@ growth:
     app-id: ${WECHAT_APP_ID:}
     app-secret: ${WECHAT_APP_SECRET:}
     callback-url: ${WECHAT_CALLBACK_URL:}
+    # 其他也在微信授权回调域里的站点域名（逗号分隔），从这些域名发起的扫码登录回到原域名
+    callback-hosts: ${WECHAT_CALLBACK_HOSTS:}
     frontend-login-path: ${WECHAT_FRONTEND_LOGIN_PATH:/login}
   security:
     trusted-proxies: ${TRUSTED_PROXY_CIDRS:}

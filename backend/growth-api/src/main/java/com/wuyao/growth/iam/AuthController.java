@@ -67,7 +67,7 @@ public class AuthController {
             response.sendRedirect(canonical);
             return;
         }
-        var authorization = wechatLoginService.start(redirect);
+        var authorization = wechatLoginService.start(http.getServerName(), redirect);
         setWechatCookie(response, authorization.state(), 600);
         response.sendRedirect(authorization.url());
     }

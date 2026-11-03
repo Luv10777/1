@@ -74,19 +74,32 @@ public class WechatLoginService {
     @Value("${growth.wechat.frontend-login-path:/login}")
     private String frontendLoginPath;
 
+    /** 其他也在微信授权回调域里的站点域名：从这些域名发起的登录直接回到原域名，不先跳到 callback-url 的域名。 */
+    @Value("${growth.wechat.callback-hosts:}")
+    private List<String> callbackHosts;
+
     public String canonicalStartUrl(String requestHost, String redirect) {
         requireConfigured();
         URI callback = URI.create(callbackUrl);
-        return callback.getHost().equalsIgnoreCase(requestHost) ? null
+        return callback.getHost().equalsIgnoreCase(requestHost) || isCallbackHost(requestHost) ? null
                 : "https://" + callback.getRawAuthority() + "/api/auth/wechat/start?redirect=" + encode(safeRedirect(redirect));
     }
 
     public Authorization start(String redirect) {
+        return start(URI.create(callbackUrl).getHost(), redirect);
+    }
+
+    public Authorization start(String requestHost, String redirect) {
         requireConfigured();
+        URI callback = URI.create(callbackUrl);
+        String redirectUri = isCallbackHost(requestHost)
+                ? "https://" + requestHost.toLowerCase() + (callback.getPort() < 0 ? "" : ":" + callback.getPort())
+                        + callback.getRawPath() + (callback.getRawQuery() == null ? "" : "?" + callback.getRawQuery())
+                : callbackUrl;
         String state = randomToken();
         redis.opsForValue().set(key("state", state), write(Map.of("redirect", safeRedirect(redirect))), STATE_TTL);
         String url = "https://open.weixin.qq.com/connect/qrconnect?appid=" + encode(appId)
-                + "&redirect_uri=" + encode(callbackUrl)
+                + "&redirect_uri=" + encode(redirectUri)
                 + "&response_type=code&scope=snsapi_login&state=" + encode(state)
                 + "#wechat_redirect";
         return new Authorization(url, state);
@@ -285,6 +298,10 @@ public class WechatLoginService {
                 || !frontendLoginPath.matches("^/(?!/)[^\\s\\\\?#]*$")) {
             throw BizException.of(ErrorCode.WECHAT_NOT_CONFIGURED, "微信回调地址和登录页路径配置不正确");
         }
+    }
+
+    private boolean isCallbackHost(String host) {
+        return host != null && callbackHosts.stream().anyMatch(allowed -> allowed.trim().equalsIgnoreCase(host));
     }
 
     private boolean validPassword(String password) {

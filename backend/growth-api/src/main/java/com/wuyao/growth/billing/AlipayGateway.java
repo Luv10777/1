@@ -47,7 +47,7 @@ public class AlipayGateway {
     public String pageUrl(String tradeNo,BigDecimal amount,String subject,Instant expiresAt,String passback) {
         return cashierUrl(tradeNo,amount,subject,expiresAt,passback,false,"");
     }
-    public String wapUrl(BillingDtos.OrderView order,long tenantId) {
+    public String wapUrl(BillingDtos.OrderView order,long tenantId,String requestHost) {
         requireConfigured();
         if(!config.isMobileEnabled()) throw unavailable("手机支付宝支付暂未开放，请使用电脑扫码付款");
         java.net.URI destination;
@@ -56,7 +56,11 @@ public class AlipayGateway {
         if(!"https".equals(destination.getScheme())||destination.getHost()==null||destination.getRawQuery()!=null
             ||destination.getRawFragment()!=null||destination.getUserInfo()!=null)
             throw unavailable("手机支付返回地址未配置，请联系一方志客服");
-        String returnUrl=destination+"?paymentOrder="+order.id();
+        // The browser's login lives on the host it paid from, so send it back there when that host is ours.
+        String base=requestHost!=null&&config.getReturnHosts().stream().anyMatch(h->h.trim().equalsIgnoreCase(requestHost))
+            ?"https://"+requestHost.toLowerCase()+(destination.getPort()<0?"":":"+destination.getPort())+destination.getRawPath()
+            :destination.toString();
+        String returnUrl=base+"?paymentOrder="+order.id();
         return cashierUrl(tradeNo(order.id()),BigDecimal.valueOf(order.amountMinor(),2),
             order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name(),
             order.expiresAt(),tenantId+"_"+order.id(),true,returnUrl);

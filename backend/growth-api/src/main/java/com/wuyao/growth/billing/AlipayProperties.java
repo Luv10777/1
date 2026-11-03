@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /** Alipay open platform in public-key mode. The sandbox only differs by gateway and keys. */
 @Component @ConfigurationProperties(prefix="growth.billing.alipay") @Getter @Setter
@@ -18,6 +19,8 @@ public class AlipayProperties {
     private String notifyUrl = "";
     private boolean mobileEnabled = false;
     private String returnUrl = "";
+    /** Other site hosts serving the same app. A mobile payment started on one of them returns to it instead of returnUrl's host. */
+    private List<String> returnHosts = List.of();
     public boolean configured() {
         return gateway.startsWith("https://")&&!appId.isBlank()&&!sellerId.isBlank()&&notifyUrl.startsWith("https://")
             &&!privateKeyPath.isBlank()&&!alipayPublicKeyPath.isBlank()

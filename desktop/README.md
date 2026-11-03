@@ -28,7 +28,7 @@ npm test           # 解码器和消息格式的测试
 npm run probe -- <抖音分享链接或直播间号> [分钟]   # 不开控制台，只把读到的弹幕打印出来
 ```
 
-`npm start` 之前要先照常启动后端和前端开发服务器。开发时连 `http://localhost:4173`，打包后连 `https://yifangzhi.com`，都可以用环境变量 `YIFANGZHI_CONSOLE_URL` 改。
+`npm start` 之前要先照常启动后端和前端开发服务器。开发时连 `http://localhost:4173`，打包后连 `https://wy.yifangzhi.com`，都可以用环境变量 `YIFANGZHI_CONSOLE_URL` 改。
 
 桌面端只做直播：打开就是直播页，没有平台的其余导航（页面这边由 `src/utils/desktop.js`、`src/layouts/DesktopShell.vue` 和路由守卫负责）。直播工作台里、自动讲解下面的“直播间弹幕”就是入口：粘贴抖音 App 里“分享 → 复制链接”的内容，点“连接直播间”。这一块只有在桌面端里才出现，浏览器里打开控制台看不到。
 
@@ -41,7 +41,7 @@ Windows 安装包可以直接在 macOS 上打，不需要 Windows 电脑，也�
 export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 export ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
 
-npm run dist:win                                        # 正式包：软件连 https://yifangzhi.com
+npm run dist:win                                        # 正式包：软件连 https://wy.yifangzhi.com
 npm run dist:win -- --test http://192.168.x.x:4173      # 测试包：软件连给定的地址
 ```
 
@@ -69,7 +69,7 @@ npm run dist:win -- --test http://192.168.x.x:4173      # 测试包：软件连�
 ### macOS
 
 ```bash
-npm run dist:mac    # 出 dist/yifangzhi-<版本>-mac.dmg，软件连 https://yifangzhi.com
+npm run dist:mac    # 出 dist/yifangzhi-<版本>-mac.dmg，软件连 https://wy.yifangzhi.com
 ```
 
 打出来的是“通用版”：一个安装包里同时带 Intel 芯片和苹果芯片（M 系列）两份程序，两种 Mac 都能装，代价是体积大一倍（0.1.2 是 216 MB；只带苹果芯片那一份时是 114 MB）。要求 macOS 13 及以上。两份程序都在一台 M2 的 Mac 上跑过（Intel 那一份靠系统的转译运行）：能打开线上的登录页、播报的长连接能建立、直播间号能解析。**没有在真正的 Intel Mac 上试过。**
