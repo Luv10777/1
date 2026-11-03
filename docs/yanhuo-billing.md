@@ -152,6 +152,7 @@ Native 订单有效期 30 分钟。创建、查询、关单请求使用商户 RS
 | `ALIPAY_NOTIFY_URL` | 例如 `https://yifangzhi.com/api/billing/alipay/notify` |
 | `ALIPAY_MOBILE_ENABLED` | 默认 `false`；应用已签约并绑定手机网站支付后才设置 `true` |
 | `ALIPAY_RETURN_URL` | 例如 `https://yifangzhi.com/billing`，手机付款完成或退出后返回的 HTTPS 页面，不带查询参数或锚点 |
+| `ALIPAY_RETURN_HOSTS` | 可选，逗号分隔，例如 `wy.yifangzhi.com`。从这些域名发起的手机付款返回原域名的同一路径（登录状态按域名保存）；其他域名仍返回 `ALIPAY_RETURN_URL`。电脑付款不带返回地址，不受影响 |
 
 正式与沙箱是两套 APPID、PID 和密钥，不能混用。
 

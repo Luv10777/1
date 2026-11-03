@@ -136,12 +136,12 @@ class BillingCheckoutServiceTest {
         TenantContext.set(7L);
         var pending=order("PENDING_PAYMENT","ALIPAY");
         when(billing.order(pending.id())).thenReturn(pending);
-        when(alipay.wapUrl(pending,7L)).thenReturn("https://alipay.test/mobile");
-        assertThat(checkout.alipayUrl(pending.id(),true)).isEqualTo("https://alipay.test/mobile");
+        when(alipay.wapUrl(pending,7L,"wy.example.com")).thenReturn("https://alipay.test/mobile");
+        assertThat(checkout.alipayUrl(pending.id(),true,"wy.example.com")).isEqualTo("https://alipay.test/mobile");
         verify(alipay,never()).pageUrl(any(),anyLong());
         var expired=order("EXPIRED","ALIPAY");
         when(billing.order(expired.id())).thenReturn(expired);
-        assertThatThrownBy(()->checkout.alipayUrl(expired.id(),true)).hasMessageContaining("不能支付");
-        verify(alipay,never()).wapUrl(eq(expired),anyLong());
+        assertThatThrownBy(()->checkout.alipayUrl(expired.id(),true,"wy.example.com")).hasMessageContaining("不能支付");
+        verify(alipay,never()).wapUrl(eq(expired),anyLong(),any());
     }
 }

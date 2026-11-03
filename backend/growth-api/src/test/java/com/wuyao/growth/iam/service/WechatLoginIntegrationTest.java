@@ -56,7 +56,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "growth.storage.secret-key=testadmin123", "growth.storage.bucket=test-assets",
         "spring.data.redis.client-type=jedis", "growth.wechat.app-id=wx-test-app",
         "growth.wechat.app-secret=test-only-secret",
-        "growth.wechat.callback-url=https://login.example.com/api/auth/wechat/callback"})
+        "growth.wechat.callback-url=https://login.example.com/api/auth/wechat/callback",
+        "growth.wechat.callback-hosts=wy.login.example.com"})
 @AutoConfigureMockMvc
 @Testcontainers
 class WechatLoginIntegrationTest {
@@ -125,6 +126,21 @@ class WechatLoginIntegrationTest {
         var authorization = wechat.start("/login?mode=register");
         JsonNode saved = json.readTree(redis.opsForValue().get("auth:wechat:state:" + authorization.state()));
         assertThat(saved.path("redirect").asText()).isEqualTo("/dashboard");
+    }
+
+    @Test
+    void startOnAListedCallbackHostStaysOnThatHost() throws Exception {
+        var response = mvc.perform(get("/api/auth/wechat/start").header("Host", "wy.login.example.com").param("redirect", "/works"))
+                .andExpect(status().isFound()).andReturn().getResponse();
+        String location = response.getRedirectedUrl();
+        assertThat(location).startsWith("https://open.weixin.qq.com/connect/qrconnect?");
+        assertThat(param(URI.create(location).getRawQuery(), "redirect_uri"))
+                .isEqualTo("https://wy.login.example.com/api/auth/wechat/callback");
+        assertThat(response.getHeader("Set-Cookie")).contains("Path=/api/auth/wechat");
+        String main = mvc.perform(get("/api/auth/wechat/start").header("Host", "login.example.com"))
+                .andExpect(status().isFound()).andReturn().getResponse().getRedirectedUrl();
+        assertThat(param(URI.create(main).getRawQuery(), "redirect_uri"))
+                .isEqualTo("https://login.example.com/api/auth/wechat/callback");
     }
 
     @Test

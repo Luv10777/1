@@ -79,7 +79,7 @@ class AlipayGatewayTest {
     @Test void mobileCashierUsesWapProductAndSignedReturnUrlWithTheSameOrderAndNotification() throws Exception {
         config.setMobileEnabled(true);config.setReturnUrl("https://test.invalid/billing");
         String id=UUID.randomUUID().toString();
-        String url=gateway.wapUrl(order(id,1234,Instant.parse("2030-01-02T03:04:05Z")),7);
+        String url=gateway.wapUrl(order(id,1234,Instant.parse("2030-01-02T03:04:05Z")),7,null);
         var params=new HashMap<String,String>();
         for(String pair:URI.create(url).getRawQuery().split("&")) {
             String[] kv=pair.split("=",2);params.put(kv[0],URLDecoder.decode(kv[1],StandardCharsets.UTF_8));
@@ -96,14 +96,29 @@ class AlipayGatewayTest {
         assertThat(biz.path("time_expire").asText()).isEqualTo("2030-01-02 11:04:05");
         assertThat(biz.path("passback_params").asText()).isEqualTo("7_"+id);
     }
+    @Test void mobileReturnFollowsTheRequestHostOnlyWhenItIsAListedSiteHost() throws Exception {
+        config.setMobileEnabled(true);config.setReturnUrl("https://test.invalid/billing");
+        config.setReturnHosts(List.of("test.invalid"," wy.test.invalid"));
+        var order=order(UUID.randomUUID().toString(),100,Instant.now().plusSeconds(600));
+        assertThat(returnUrl(gateway.wapUrl(order,7,"WY.test.invalid"))).isEqualTo("https://wy.test.invalid/billing?paymentOrder="+order.id());
+        assertThat(returnUrl(gateway.wapUrl(order,7,"evil.example.com"))).isEqualTo("https://test.invalid/billing?paymentOrder="+order.id());
+        assertThat(returnUrl(gateway.wapUrl(order,7,null))).isEqualTo("https://test.invalid/billing?paymentOrder="+order.id());
+    }
+    private static String returnUrl(String cashier) {
+        for(String pair:URI.create(cashier).getRawQuery().split("&")) {
+            String[] kv=pair.split("=",2);
+            if(kv[0].equals("return_url")) return URLDecoder.decode(kv[1],StandardCharsets.UTF_8);
+        }
+        return null;
+    }
     @Test void mobilePaymentRequiresExplicitEnablementAndAConfiguredHttpsReturnUrl() {
         var order=order(UUID.randomUUID().toString(),100,Instant.now().plusSeconds(600));
-        assertThatThrownBy(()->gateway.wapUrl(order,7)).hasMessageContaining("暂未开放");
+        assertThatThrownBy(()->gateway.wapUrl(order,7,null)).hasMessageContaining("暂未开放");
         config.setMobileEnabled(true);
         for(String address:List.of("","http://test.invalid/billing","https://","https://test.invalid/billing?x=1",
             "https://test.invalid/billing#x","https://user@test.invalid/billing","invalid uri")) {
             config.setReturnUrl(address);
-            assertThatThrownBy(()->gateway.wapUrl(order,7)).hasMessageContaining("返回地址未配置");
+            assertThatThrownBy(()->gateway.wapUrl(order,7,null)).hasMessageContaining("返回地址未配置");
         }
         // A missing mobile return configuration must not break desktop payments.
         assertThat(gateway.pageUrl(order,7)).contains("alipay.trade.page.pay");

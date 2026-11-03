@@ -4,6 +4,7 @@ import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.iam.entity.User;
 import com.wuyao.growth.iam.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 import java.util.Optional;
 import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.*;
@@ -17,16 +18,17 @@ class BillingControllerTest {
         when(users.findById(1L)).thenReturn(Optional.of(owner));
         var controller=new BillingController(service,new BillingProperties(),checkout,users,mock(BillingRedeemCodeService.class));
         var principal=new AuthPrincipal(1L,7L,"",0);
-        controller.alipay("test-order",true,principal);
-        verify(checkout).alipayUrl("test-order",true);
-        controller.alipay("test-order",false,principal);
-        verify(checkout).alipayUrl("test-order",false);
+        var request=new MockHttpServletRequest();request.setServerName("wy.example.com");
+        controller.alipay("test-order",true,request,principal);
+        verify(checkout).alipayUrl("test-order",true,"wy.example.com");
+        controller.alipay("test-order",false,request,principal);
+        verify(checkout).alipayUrl("test-order",false,"wy.example.com");
         clearInvocations(checkout);
         owner.setRole("STAFF");
-        assertThatThrownBy(()->controller.alipay("test-order",true,principal)).hasMessageContaining("管理员");
+        assertThatThrownBy(()->controller.alipay("test-order",true,request,principal)).hasMessageContaining("管理员");
         verifyNoInteractions(checkout);
         owner.setRole("OWNER");owner.setTenantId(8L);
-        assertThatThrownBy(()->controller.alipay("test-order",true,principal)).hasMessageContaining("管理员");
+        assertThatThrownBy(()->controller.alipay("test-order",true,request,principal)).hasMessageContaining("管理员");
         verifyNoInteractions(checkout);
     }
     @Test void automaticPollingReadsLocalStateAndOnlyExplicitRefreshReconciles() {
