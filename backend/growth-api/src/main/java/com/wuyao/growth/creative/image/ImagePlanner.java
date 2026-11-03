@@ -104,7 +104,10 @@ public class ImagePlanner {
        item.mustPreserve(),item.mustAvoid())).toList();
      return new ImageDtos.Plan(understanding.summary(),plan.question(),plan.visualDirection(),items,
        trace(result,req.workflow(),Map.of("understanding",usage(understood),"refinement",usage(result))),understanding);
-   } catch(IllegalArgumentException e) {throw new IllegalArgumentException("规划模型未返回有效创作方案");}
+   } catch(IllegalArgumentException e) {
+     log.warn("图片规划校验未通过: creationId={} reason={}",creation.getId(),e.getMessage());
+     throw new IllegalArgumentException("规划模型未返回有效创作方案");
+   }
    catch(com.fasterxml.jackson.core.JsonProcessingException e) {throw new IllegalStateException(e);}
  }
  private static Map<String,Object> output(ProviderResult result) {
