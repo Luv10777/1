@@ -1,5 +1,5 @@
 // 打 Windows 安装包。
-//   npm run dist:win                       正式包：软件连 https://yifangzhi.com
+//   npm run dist:win                       正式包：软件连 https://wy.yifangzhi.com
 //   npm run dist:win -- --test <控制台地址>   测试包：软件连给定的地址（例如局域网里的开发服务器），
 //                                           名字、安装位置和数据目录都和正式包分开，可以同时装在一台电脑上
 import { build, Platform, Arch } from 'electron-builder'
@@ -23,5 +23,5 @@ const config = consoleUrl ? {
 } : {}
 
 const artifacts = await build({ targets: Platform.WINDOWS.createTarget('nsis', Arch.x64), config })
-console.log(consoleUrl ? `测试包（连 ${new URL(consoleUrl).origin}）：` : '正式包（连 https://yifangzhi.com）：')
+console.log(consoleUrl ? `测试包（连 ${new URL(consoleUrl).origin}）：` : '正式包（连 https://wy.yifangzhi.com）：')
 for (const file of artifacts) console.log('  ' + file)

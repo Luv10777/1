@@ -11,7 +11,8 @@ function splitLinks(text) {
     parts.push({ text: text.slice(cursor, match.index) })
     try {
       const url = new URL(href)
-      const internal = url.origin === 'https://yifangzhi.com'
+      // 站点从 yifangzhi.com 搬到 wy.yifangzhi.com，已发布内容里的旧链接仍按站内处理。
+      const internal = url.origin === 'https://wy.yifangzhi.com' || url.origin === 'https://yifangzhi.com'
       parts.push({ text: href, href, to: internal ? url.pathname + url.search + url.hash : null })
     } catch {
       parts.push({ text: href })

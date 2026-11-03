@@ -46,12 +46,12 @@ android {
         preview {
             initWith debug
             applicationIdSuffix '.preview'
-            buildConfigField 'String', 'CONSOLE_URL', '"https://yifangzhi.com"'
+            buildConfigField 'String', 'CONSOLE_URL', '"https://wy.yifangzhi.com"'
             resValue 'string', 'app_name', '一方志预览版'
             matchingFallbacks = ['debug']
         }
         release {
-            buildConfigField 'String', 'CONSOLE_URL', '"https://yifangzhi.com"'
+            buildConfigField 'String', 'CONSOLE_URL', '"https://wy.yifangzhi.com"'
             resValue 'string', 'app_name', '一方志'
             minifyEnabled false
             signingConfig signing['storeFile'] ? signingConfigs.release : null
