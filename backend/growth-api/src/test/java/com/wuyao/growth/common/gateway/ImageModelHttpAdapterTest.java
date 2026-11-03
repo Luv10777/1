@@ -126,6 +126,13 @@ class ImageModelHttpAdapterTest {
      assertThat(logged).doesNotContain("relay.example","signed-123","sk-live-secret","test-key",token);
    }
  }
+ @Test void responseWithSeveralImagesUsesTheFirstOne() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+     pool.submit(()->respond(server,200,"{\"data\":[{\"b64_json\":\"Zmlyc3Q=\"},{\"b64_json\":\"c2Vjb25k\"}]}"));
+     var result=new ImageModelHttpAdapter(openAiConfig(server),new ObjectMapper()).invoke(imageRequest(List.of()));
+     assertThat(result.output()).containsEntry("status","SUCCEEDED").containsEntry("imageBase64","Zmlyc3Q=");
+   }
+ }
  @Test void referencesUseMultipartEditsWithOrderedRolesAndBinaryFiles() throws Exception {
    try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
      var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"b64_json\":\"aW1hZ2U=\"}]}"));

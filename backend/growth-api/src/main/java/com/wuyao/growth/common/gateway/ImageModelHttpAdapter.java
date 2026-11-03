@@ -153,11 +153,13 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      response=post(config.editsUrl(),endpoint,req,"multipart/form-data; boundary="+boundary,chunks);
    }
    var root=json.readTree(response);var data=root.path("data");
-   if(!data.isArray() || data.size()!=1) {
+   if(!data.isArray() || data.isEmpty()) {
      log.warn("图片响应缺少单张图片: model={} dataSize={} fields={} error={}",endpoint.getModel(),
        data.isArray()?data.size():"none",fieldNames(root,endpoint.getApiKey()),relayError(root,endpoint.getApiKey()));
      throw failure("图片服务未返回单张有效图片");
    }
+   // 中转站有时无视 n=1 返回多张；图已生成，取第一张，不要整单判失败。
+   if(data.size()>1) log.warn("图片响应多于一张，取第一张: model={} dataSize={}",endpoint.getModel(),data.size());
    String url=data.get(0).path("url").asText("");
    var output=new LinkedHashMap<String,Object>();output.put("status","SUCCEEDED");
    if(!url.isBlank()) {
