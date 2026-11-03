@@ -5,6 +5,7 @@ import { Check, ChevronRight, CircleCheck, Coins, Lock, RefreshCw, ShieldCheck, 
 import { accountApi, validateAvatar } from '../services/accountApi'
 import UserAvatar from '../components/UserAvatar.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
+import { referralApi } from '../services/referralApi'
 import { identityValidation, managementDate } from '../domain/platformManagement'
 import { setMyIdentity } from '../stores/identity'
 import { LEGAL_ENTITY } from '../domain/legalPolicies'
@@ -64,6 +65,8 @@ const identityStates = {
   VERIFIED: { label: '已通过', tone: 'on', text: '你的身份已核验，无需再次提交。' },
   REJECTED: { label: '未通过', tone: 'off', text: '核验没有通过。请根据下面的原因核对资料，再重新提交。' },
 }
+// 实名通过后的「已解锁」列表要知道邀请码领了没有、银行卡绑了没有；读不到时按未领取、未绑定显示，链接照常可点。
+const referral = ref(null)
 const identityState = computed(() => identityStates[identity.value?.status] || identityStates.NONE)
 const canSubmitIdentity = computed(() => !identityLoading.value && !identityError.value && (!identity.value || identity.value.status === 'REJECTED'))
 
@@ -93,11 +96,18 @@ async function loadIdentity() {
   try {
     identity.value = await identityApi.myIdentity()
     setMyIdentity(identity.value)
+    if (identity.value?.status === 'VERIFIED') loadReferral()
   } catch (error) {
     identityError.value = error.message || '实名状态暂时无法读取，请稍后重试'
   } finally {
     identityLoading.value = false
   }
+}
+
+async function loadReferral() {
+  try {
+    referral.value = await referralApi.me()
+  } catch { /* 读不到就按未领取、未绑定显示 */ }
 }
 
 function openIdentity() {
@@ -444,12 +454,14 @@ async function savePassword() {
             <div class="unlocked-row">
               <CircleCheck :size="18" aria-hidden="true" />
               <span>专属邀请码<small>邀请商户注册，赚取充值与会员返利</small></span>
-              <RouterLink :to="{ name: 'referral' }">去领取<ChevronRight :size="14" aria-hidden="true" /></RouterLink>
+              <span v-if="referral?.code" class="unlocked-done">已领取</span>
+              <RouterLink v-else :to="{ name: 'referral' }">去领取<ChevronRight :size="14" aria-hidden="true" /></RouterLink>
             </div>
             <div class="unlocked-row">
               <CircleCheck :size="18" aria-hidden="true" />
-              <span>返利提现<small>还需绑定一张本人名下的银行卡</small></span>
-              <RouterLink :to="{ name: 'referral' }">去绑定<ChevronRight :size="14" aria-hidden="true" /></RouterLink>
+              <span>返利提现<small>{{ referral?.bankCard ? `收款卡：${referral.bankCard.bankName} 尾号 ${referral.bankCard.cardLast4}` : '还需绑定一张本人名下的银行卡' }}</small></span>
+              <span v-if="referral?.bankCard" class="unlocked-done">已绑定</span>
+              <RouterLink v-else :to="{ name: 'referral' }">去绑定<ChevronRight :size="14" aria-hidden="true" /></RouterLink>
             </div>
           </div>
         </template>
@@ -685,6 +697,7 @@ async function savePassword() {
 .unlocked-row > svg { flex: none; color: var(--color-success); }
 .unlocked-row > span { flex: 1; min-width: 0; }
 .unlocked-row small { display: block; color: var(--color-text-muted); font-size: 12px; }
+.unlocked-row > .unlocked-done { flex: none; color: var(--color-success); font-weight: 700; }
 .unlocked-row a { display: inline-flex; align-items: center; gap: 2px; color: var(--color-accent-text); text-decoration: none; }
 .id-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border-subtle); }
 .id-secure { display: flex; gap: 6px; align-items: flex-start; flex: 1 1 260px; margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
