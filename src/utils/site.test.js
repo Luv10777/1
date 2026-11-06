@@ -22,7 +22,7 @@ test('main domain sends AI creation routes to the mall and keeps the rest', asyn
   })
   try {
     const { default: router } = await vite.ssrLoadModule('/src/router.js')
-    for (const path of ['/', '/help', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio', '/copy', '/copy/create', '/copy/extract', '/assets']) {
+    for (const path of ['/', '/help', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio', '/copy', '/copy/create', '/copy/extract', '/assets', '/knowledge', '/referral']) {
       await router.push('/information')
       await router.push(path)
       assert.equal(router.currentRoute.value.path, '/merchant-alliance', path)
