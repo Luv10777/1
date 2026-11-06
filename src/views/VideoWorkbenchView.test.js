@@ -46,6 +46,7 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
       load(id) {
         if (id.endsWith('.css')) return ''
         if (id.endsWith('/VideoPreviewPanel.vue')) return "import { h } from 'vue'; export default { inheritAttrs: false, setup(_, { slots }) { return () => h('div', slots.default?.()) } }"
+        if (id.endsWith('/VideoPlanPanel.vue')) return 'export default { inheritAttrs: false, setup(_, { attrs }) { globalThis.videoPlanUpload = attrs.upload; return () => null } }'
         if (id.endsWith('/VideoWorkbenchView.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
           { id: 'video-materials-test', inlineTemplate: true }).content
         if (id.endsWith('.vue')) return 'export default { render() { return null } }'
@@ -133,7 +134,12 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
     assert.equal(quotes[0].referenceAudioAssetIds.length, 3)
     assert.deepEqual(quotes[0].referenceVideoAssetIds, uploads.filter(entry => entry.type === 'VIDEO').map(entry => entry.assetId))
     assert.deepEqual(quotes[0].referenceAudioAssetIds, uploads.filter(entry => entry.type === 'AUDIO').map(entry => entry.assetId))
+    // 「帮我出方案」只传素材和类型，不属于任何一条创作记录。
+    const planImage = { id: 'plan-image', name: 'plan.png', file: new File(['fixture'], 'plan.png', { type: 'image/png' }) }
+    assert.equal(await globalThis.videoPlanUpload(planImage, 'IMAGE'), uploads.length)
+    assert.equal(planImage.assetId, uploads.length)
   } finally {
+    delete globalThis.videoPlanUpload
     app.unmount(); auth.state.user = null; auth.state.token = null
     await vite.close()
     for (const [key, descriptor] of Object.entries(saved)) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }

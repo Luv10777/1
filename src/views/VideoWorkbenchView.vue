@@ -230,16 +230,17 @@ const handleMaterialChange = (type, event) => { addMaterialFiles(type, event.tar
 const handleMaterialDrop = (type, event) => { event.preventDefault(); addMaterialFiles(type, event.dataTransfer.files) }
 const removeMaterial = (type, asset) => { referenceMaterials[type].value = referenceMaterials[type].value.filter(item => item.id !== asset.id) }
 
+// item is the conversation being generated; the plan panel uploads the displayed materials and passes none.
 const uploadAsset = async (entry, type, item) => {
   // Keep the displayed draft's upload ID as well as the conversation snapshot's ID.
-  const source = activeConversationId.value === item.id
+  const source = item && activeConversationId.value === item.id
     ? referenceMaterials[type.toLowerCase()].value.find(material => material.id === entry.id) || entry : entry
   try {
     return await uploadVideoReference(source, type, {
       signal: uploadController.signal,
       onStatus: asset => {
         entry.assetId = source.assetId
-        if (asset.status === 'VERIFYING') item.notice = '正在校验参考视频，请稍候…'
+        if (item && asset.status === 'VERIFYING') item.notice = '正在校验参考视频，请稍候…'
       },
     })
   } finally {
