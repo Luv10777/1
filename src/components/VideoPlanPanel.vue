@@ -45,7 +45,7 @@ let disposed = false
 const credits = computed(() => config.value?.credits ?? 1)
 const styleText = computed(() => (customOpen.value ? customStyle.value : style.value).trim())
 const unavailable = computed(() => config.value && !config.value.configured)
-const planImages = computed(() => props.images.slice(0, config.value?.maxImages ?? 6))
+const planImages = computed(() => props.images.slice(0, config.value?.maxImages ?? 30))
 const missingRecordImages = computed(() => record.value?.images.filter(image => !image.url).length || 0)
 
 const fetchRecords = async page => {
@@ -250,7 +250,7 @@ const use = (plan, index) => {
       </div>
     </template>
 
-    <p v-if="working" class="vp-status" role="status">正在看图出方案，通常 20 秒左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
+    <p v-if="working" class="vp-status" role="status">正在看图出方案，通常 1 分钟左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
     <p v-if="unavailable" class="vp-status" role="status">出方案暂未开放，可以直接在左侧写描述。</p>
     <p v-if="error" class="vp-status is-error" role="alert">{{ error }}</p>
   </section>

@@ -16,7 +16,8 @@ public class VideoPlanProperties {
     private String apiKey = "";
     private String model = "gpt-6-luna";
     private int timeoutSeconds = 120;
-    private int maxTokens = 8000;
+    /** 30 张图时实测输出最高约 6900；超出上限会整单失败。 */
+    private int maxTokens = 12000;
     /** 送给模型的参考图边长上限，缩小后再编码，控制请求体积。 */
     private int imageLongEdge = 1024;
 

@@ -13,10 +13,13 @@ import java.util.Map;
 public final class VideoPlanDtos {
     private VideoPlanDtos() {}
 
+    /** 和视频生成的参考图上限（VideoDtos.referenceImageAssetIds）保持一致：左侧放多少张，方案就看多少张。 */
+    public static final int MAX_IMAGES = 30;
+
     /** previousPlanId 有值表示「换一批」：同样的素材和要求，避开上一批的方向。 */
     public record Create(
             @NotBlank @Pattern(regexp = "[A-Za-z0-9:_-]{8,80}") String requestKey,
-            @NotNull @Size(max = 6) List<@NotNull @Positive Long> imageAssetIds,
+            @NotNull @Size(max = MAX_IMAGES) List<@NotNull @Positive Long> imageAssetIds,
             boolean referenceVideo,
             @Size(max = 40) String style,
             @Size(max = 500) String idea,

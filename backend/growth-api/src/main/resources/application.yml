@@ -70,7 +70,7 @@ growth:
     api-key: ${VIDEO_PLAN_API_KEY:}
     model: ${VIDEO_PLAN_MODEL:gpt-6-luna}
     timeout-seconds: ${VIDEO_PLAN_TIMEOUT_SECONDS:120}
-    max-tokens: ${VIDEO_PLAN_MAX_TOKENS:8000}
+    max-tokens: ${VIDEO_PLAN_MAX_TOKENS:12000}
   video-analysis:
     base-url: ${VIDEO_ANALYSIS_BASE_URL:https://api.onlyrouter.ai/v1}
     api-key: ${VIDEO_ANALYSIS_API_KEY:}

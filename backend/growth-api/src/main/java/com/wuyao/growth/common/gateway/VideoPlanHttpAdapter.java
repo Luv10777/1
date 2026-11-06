@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.video.plan.VideoPlanDtos;
 import com.wuyao.growth.video.plan.VideoPlanProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +38,7 @@ public class VideoPlanHttpAdapter implements ProviderAdapter {
             var content = new ArrayList<Map<String, Object>>();
             content.add(Map.of("type", "text", "text", request.prompt()));
             Object images = request.options().getOrDefault("images", List.of());
-            if (!(images instanceof List<?> list) || list.size() > 6) throw failure("参考图数量不合法");
+            if (!(images instanceof List<?> list) || list.size() > VideoPlanDtos.MAX_IMAGES) throw failure("参考图数量不合法");
             for (Object value : list) {
                 if (!(value instanceof String url) || !url.startsWith("data:image/jpeg;base64,")) throw failure("参考图格式不合法");
                 content.add(Map.of("type", "image_url", "image_url", Map.of("url", url)));

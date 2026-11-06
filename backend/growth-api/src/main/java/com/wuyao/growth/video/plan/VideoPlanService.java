@@ -33,7 +33,7 @@ public class VideoPlanService {
     private final BillingService billing;
 
     public VideoPlanDtos.Config config() {
-        return new VideoPlanDtos.Config(gateway.configured(ModelAlias.VIDEO_PLANNER), BillingService.VIDEO_PLAN_CREDITS, 6);
+        return new VideoPlanDtos.Config(gateway.configured(ModelAlias.VIDEO_PLANNER), BillingService.VIDEO_PLAN_CREDITS, VideoPlanDtos.MAX_IMAGES);
     }
 
     @Transactional

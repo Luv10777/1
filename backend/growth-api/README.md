@@ -9,6 +9,7 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 
 2026-10-23 新增视频工作台「帮我出方案」（可选，商家仍可自己写提示词）：OnlyRouter `gpt-6-luna`
 看最多 6 张参考图（缩到长边 1024 的 JPEG），按风格和一句话需求出 3 个方案，每个方案自己判断每张图的用途并写进中文提示词和分镜。
+2026-11-06 上限从 6 张改为 30 张，和视频生成的参考图上限一致；输出上限默认值从 8000 提到 12000。
 每次（含「换一批」）预占 1 烟火，结果校验通过才扣除，失败或校验不过退回。任务 `VIDEO_PLAN_GENERATE` 走 `DEFAULT` 队列。
 接口：`GET /api/video/plans/config`、`POST /api/video/plans`（`requestKey` 幂等，`previousPlanId` 表示换一批）、`GET /api/video/plans/{id}`。
 服务端配置 `VIDEO_PLAN_API_KEY`（必填）、`VIDEO_PLAN_BASE_URL`、`VIDEO_PLAN_MODEL`、`VIDEO_PLAN_TIMEOUT_SECONDS`、`VIDEO_PLAN_MAX_TOKENS`；未配置密钥时入口显示未开放。

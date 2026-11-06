@@ -141,6 +141,17 @@ test('a larger video image selection respects the planner limit without changing
   } finally { await panel.close() }
 })
 
+test('every video reference image goes to the planner, even before its limit has loaded', async () => {
+  const images = Array.from({ length: 30 }, (_, id) => ({ id, assetId: id + 1, name: `图${id + 1}`, url: `/image-${id}.png` }))
+  const panel = await mountPanel({ configured: true, credits: 1 }, { images })
+  try {
+    assert.doesNotMatch(panel.text(panel.root), /方案仅参考前/)
+    panel.videoPlanApi.create = async body => { panel.requests.push(body); return { id: 9, status: 'SUCCEEDED', plans } }
+    await panel.button('生成提示词').props.onClick()
+    assert.equal(panel.requests[0].imageAssetIds.length, 30)
+  } finally { await panel.close() }
+})
+
 test('leaving the page while plans are generating picks the batch up again on return and opens it when done', async () => {
   const first = await mountPanel()
   const storage = first.storage
