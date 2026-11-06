@@ -157,7 +157,6 @@ onMounted(load)
         <header class="referral-card-header">
           <div>
             <h2 id="referral-code-title">专属邀请码</h2>
-            <p>被邀请商户充值烟火返 {{ ratePercent(overview.topupRateBp) }}，开通会员返 {{ ratePercent(overview.membershipRateBp) }}，都按实付金额计算。</p>
           </div>
         </header>
 
