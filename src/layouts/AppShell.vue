@@ -16,6 +16,7 @@ import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { billing, number, refreshBilling } from '../stores/billing'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
+import { aiCreationHidden, isHiddenRoute } from '../utils/site'
 
 const route = useRoute()
 let billingTimer
@@ -174,7 +175,7 @@ const navGroups = [
       { name: 'settings', label: '设置', path: '/settings' },
     ],
   },
-].filter(group => !['workspace', 'analytics', 'acquisition', 'publishing', 'customer-service', 'geo'].includes(group.key))
+].filter(group => !['workspace', 'analytics', 'acquisition', 'publishing', 'customer-service', 'geo'].includes(group.key) && !(aiCreationHidden && group.key === 'content'))
 
 const getRouteGroup = () => navGroups.find(group => (
   group.name === route.name || route.meta.navGroup === group.key || group.items?.some(item => item.name === route.name)
@@ -235,7 +236,8 @@ const expandActiveGroup = () => {
 // 只有管理员能用的入口对店员收起；接口本身也会拒绝。
 const { approved: merchantApproved, reload: reloadMerchantApproval } = useMerchantApproval()
 watch(() => auth.user?.id, reloadMerchantApproval)
-const canSee = item => (!item.ownerOnly || auth.isOwner) && !(item.hideWhenApproved && merchantApproved.value === true)
+// 套餐页写的都是创作计费，主域名不放入口；页面还留着，手机支付宝付完会回到这里。
+const canSee = item => (!item.ownerOnly || auth.isOwner) && !(item.hideWhenApproved && merchantApproved.value === true) && !isHiddenRoute(item.name) && !(aiCreationHidden && item.name === 'billing')
 const closeMenu = () => { menuOpen.value = false }
 // 清掉会话后返回可直接浏览的功能首页。
 const loginLocation = computed(() => ({ name: 'login', query: { redirect: route.fullPath } }))
@@ -320,7 +322,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
 
       <div class="sidebar-footer paper-sidebar-footer">
         <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>未开通直播会员</template></small><strong>{{ userName }}<RouterLink v-if="identityMissing()" class="identity-flag" :to="{ name: 'settings', hash: '#identity' }" @click="closeMenu">未实名</RouterLink></strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
-        <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>登录后开始创作</small></span></RouterLink></div>
+        <div v-else class="account-wrap"><RouterLink :to="loginLocation" class="account-button" aria-label="登录" @click="closeMenu"><span class="user-avatar"><UserRound :size="18" aria-hidden="true" /></span><span class="account-copy"><strong>登录</strong><small>{{ aiCreationHidden ? '登录后管理店铺' : '登录后开始创作' }}</small></span></RouterLink></div>
       </div>
     </aside>
     <IdentityPrompt v-if="auth.isAuthenticated" />
@@ -331,7 +333,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
           <button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
-            <RouterLink v-if="auth.isAuthenticated" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
+            <RouterLink v-if="auth.isAuthenticated && !aiCreationHidden" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
             <RouterLink to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
@@ -352,7 +354,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
         <SiteFooter v-if="route.matched.length" />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
-      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>好物</small></RouterLink></nav>
+      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink v-if="!aiCreationHidden" to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink v-if="!aiCreationHidden" to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink v-if="!aiCreationHidden" to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>好物</small></RouterLink></nav>
     </main>
   </div>
 </template>

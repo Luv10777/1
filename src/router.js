@@ -32,6 +32,7 @@ import TeamView from './views/TeamView.vue'
 const SettingsView = () => import('./views/SettingsView.vue')
 const ReferralView = () => import('./views/ReferralView.vue')
 import { inDesktop } from './utils/desktop'
+import { isHiddenRoute } from './utils/site'
 const ReviewsView = () => import('./views/ReviewsView.vue')
 const PlatformAccountsView = () => import('./views/PlatformAccountsView.vue')
 const PublishingPlanView = () => import('./views/PublishingPlanView.vue')
@@ -139,6 +140,8 @@ export function handleAuthExpired() {
 }
 
 router.beforeEach(async (to, from) => {
+  if (isHiddenRoute(to.name)) return '/merchant-alliance'
+
   if (to.meta.public) {
     const wechatCallback = [to, from].some(location => location.query.wechat_ticket || location.hash.startsWith('#wechat_ticket=') || location.query.wechat_error)
     if (to.name === 'login' && !wechatCallback) {
