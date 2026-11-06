@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Asynchronous video provider boundary. Volcengine tasks return their video URL in
@@ -40,6 +41,8 @@ import java.util.Map;
 @Slf4j
 public class VideoProviderGateway {
     private static final int MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+    private static final Set<String> UPSCALE_MODELS = Set.of("doubao-seedance-2.5-480p-720p", "doubao-seedance-2.5-720p-1080p",
+            "doubao-seedance-2.0-480p-720p", "doubao-seedance-2.0-720p-1080p");
     private static final int LOG_PAGE_SIZE = 100;
     private static final int MAX_LOG_PAGES = 10;
     private static final Duration LOG_CLOCK_SKEW = Duration.ofMinutes(5);
@@ -54,6 +57,7 @@ public class VideoProviderGateway {
     @Value("${growth.video.provider.api-key-seedance-2-0:}") private String seedance20ApiKey;
     @Value("${growth.video.provider.api-key-seedance-2-0-mini:}") private String seedance20MiniApiKey;
     @Value("${growth.video.provider.api-key-seedance-2-0-fast:}") private String seedance20FastApiKey;
+    @Value("${growth.video.provider.api-key-seedance-special:}") private String seedanceSpecialApiKey;
     @Value("${growth.video.provider.submit-path:/api/v3/contents/generations/tasks}") private String submitPath;
     @Value("${growth.video.provider.poll-path:/api/v3/contents/generations/tasks/{jobId}}") private String pollPath;
     @Value("${growth.video.provider.content-path:/v1/videos/{jobId}/content}") private String contentPath;
@@ -86,7 +90,7 @@ public class VideoProviderGateway {
             throw BizException.of(ErrorCode.VIDEO_PARAMETER_INVALID, "当前视频供应商协议不支持多个参考视频或音频素材");
         }
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", providerModel(request.model()));
+        body.put("model", providerModel(request.model(), request.resolution()));
         body.put("seconds", request.durationSeconds());
         body.put("resolution", request.resolution());
         String prompt = request.prompt();
@@ -118,7 +122,7 @@ public class VideoProviderGateway {
 
     private Map<String, Object> buildVolcengineRequest(VideoDtos.Create request) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", providerModel(request.model()));
+        body.put("model", providerModel(request.model(), request.resolution()));
         var content = new ArrayList<Map<String, Object>>();
         if (!request.prompt().isBlank()) content.add(Map.of("type", "text", "text", request.prompt()));
         for (Long assetId : request.referenceImageAssetIds()) {
@@ -349,6 +353,7 @@ public class VideoProviderGateway {
         if (!volcengine()) return requireApiKey(apiKey);
         try {
             String model = json.readTree(body).path("model").asText();
+            if (UPSCALE_MODELS.contains(model)) return requireApiKey(seedanceSpecialApiKey);
             for (String alias : new String[]{"SEEDANCE_2_5", "SEEDANCE_2_0", "SEEDANCE_2_0_MINI", "SEEDANCE_2_0_FAST"}) {
                 if (providerModel(alias).equals(model)) return apiKeyForModel(alias);
             }
@@ -359,6 +364,8 @@ public class VideoProviderGateway {
     }
 
     private String apiKeyForModel(String model) {
+        // The upscale models live in their own relay group; the shared key cannot reach them.
+        if (model.endsWith("_SPECIAL")) return requireApiKey(seedanceSpecialApiKey);
         String override = switch (model) {
             case "SEEDANCE_2_5" -> seedance25ApiKey;
             case "SEEDANCE_2_0" -> seedance20ApiKey;
@@ -464,6 +471,21 @@ public class VideoProviderGateway {
         };
     }
 
+    /** The special models pick an upscale tier by resolution, so their provider model depends on both. */
+    public String providerModel(String model, String resolution) {
+        String family = switch (model) {
+            case "SEEDANCE_2_5_SPECIAL" -> "doubao-seedance-2.5";
+            case "SEEDANCE_2_0_SPECIAL" -> "doubao-seedance-2.0";
+            default -> null;
+        };
+        if (family == null) return providerModel(model);
+        return switch (resolution) {
+            case "720p" -> family + "-480p-720p";
+            case "1080p" -> family + "-720p-1080p";
+            default -> throw providerError("不支持的视频分辨率: " + resolution);
+        };
+    }
+
     private String errorMessage(JsonNode node) {
         JsonNode error = node.get("error");
         if (error != null && error.isObject()) {
@@ -477,7 +499,7 @@ public class VideoProviderGateway {
 
     private String redactCredentials(String message) {
         if (message == null) return null;
-        for (String key : new String[]{apiKey, seedance25ApiKey, seedance20ApiKey, seedance20MiniApiKey, seedance20FastApiKey}) {
+        for (String key : new String[]{apiKey, seedance25ApiKey, seedance20ApiKey, seedance20MiniApiKey, seedance20FastApiKey, seedanceSpecialApiKey}) {
             if (hasText(key)) message = message.replace(key, "[redacted]");
         }
         return message;

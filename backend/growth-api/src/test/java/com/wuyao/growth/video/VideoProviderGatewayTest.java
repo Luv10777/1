@@ -159,7 +159,8 @@ class VideoProviderGatewayTest {
 
     @ParameterizedTest
     @CsvSource({"SEEDANCE_2_0, seedance-2.0, shared-key", "SEEDANCE_2_5, seedance-2.5, shared-key",
-            "SEEDANCE_2_0_FAST, seedance-2.0-fast, fast-key", "SEEDANCE_2_0_MINI, seedance-2.0-mini, mini-key"})
+            "SEEDANCE_2_0_FAST, seedance-2.0-fast, fast-key", "SEEDANCE_2_0_MINI, seedance-2.0-mini, mini-key",
+            "SEEDANCE_2_5_SPECIAL, doubao-seedance-2.5-480p-720p, special-key", "SEEDANCE_2_0_SPECIAL, doubao-seedance-2.0-720p-1080p, special-key"})
     void volcengineSubmitAndPollUseTheSameModelCredential(String alias, String model, String key) throws Exception {
         var http = mock(HttpClient.class);
         var requests = new ArrayList<ClassicHttpRequest>();
@@ -306,6 +307,30 @@ class VideoProviderGatewayTest {
                 .hasMessageContaining("[redacted]").hasMessageNotContaining("mini-key");
     }
 
+    @ParameterizedTest
+    @CsvSource({"SEEDANCE_2_5_SPECIAL, 720p, doubao-seedance-2.5-480p-720p", "SEEDANCE_2_5_SPECIAL, 1080p, doubao-seedance-2.5-720p-1080p",
+            "SEEDANCE_2_0_SPECIAL, 720p, doubao-seedance-2.0-480p-720p", "SEEDANCE_2_0_SPECIAL, 1080p, doubao-seedance-2.0-720p-1080p",
+            "SEEDANCE_2_0, 1080p, seedance-2.0", "SEEDANCE_2_5, 720p, seedance-2.5"})
+    void specialModelsPickTheirUpscaleTierByResolution(String alias, String resolution, String model) {
+        var gateway = volcengineGateway(mock(AssetService.class), mock(HttpClient.class));
+        assertThat(gateway.providerModel(alias, resolution)).isEqualTo(model);
+        var request = new VideoDtos.Create("special-request", "旋转", List.of(), null, alias, "9:16", 5, resolution);
+        assertThat(gateway.buildSubmitRequest(request)).containsEntry("model", model).containsEntry("resolution", resolution);
+    }
+
+    @Test
+    void specialModelsRejectOtherResolutionsAndNeverFallBackToTheSharedKey() throws Exception {
+        var http = mock(HttpClient.class);
+        var gateway = volcengineGateway(mock(AssetService.class), http);
+        assertThatThrownBy(() -> gateway.providerModel("SEEDANCE_2_0_SPECIAL", "480p")).hasMessageContaining("不支持");
+        ReflectionTestUtils.setField(gateway, "seedanceSpecialApiKey", "");
+        assertThatThrownBy(() -> gateway.submit("{\"model\":\"doubao-seedance-2.0-480p-720p\"}", "submit-key"))
+                .hasMessageContaining("密钥尚未配置");
+        assertThatThrownBy(() -> gateway.poll("job-1", "SEEDANCE_2_0_SPECIAL", "poll-key"))
+                .hasMessageContaining("密钥尚未配置");
+        verify(http, never()).execute(any(ClassicHttpRequest.class), any(HttpClientResponseHandler.class));
+    }
+
     @Test
     void modelCredentialsWorkWithoutACommonKeyAndAnUnconfiguredModelFailsBeforeHttp() throws Exception {
         var http = mock(HttpClient.class);
@@ -435,6 +460,7 @@ class VideoProviderGatewayTest {
         ReflectionTestUtils.setField(gateway, "apiKey", "shared-key");
         ReflectionTestUtils.setField(gateway, "seedance20FastApiKey", "fast-key");
         ReflectionTestUtils.setField(gateway, "seedance20MiniApiKey", "mini-key");
+        ReflectionTestUtils.setField(gateway, "seedanceSpecialApiKey", "special-key");
         return gateway;
     }
 

@@ -26,7 +26,9 @@ test('digital human inputs use the selected model limits and preserve all media'
   assert.deepEqual(input.videos, videos)
   assert.deepEqual(input.audios, voices)
   assert.throws(() => digitalHumanVideoInput(form({ images: [...images, { assetId: 51 }] })), /30 张图片/)
-  for (const model of ['SEEDANCE_2_0', 'SEEDANCE_2_0_MINI', 'SEEDANCE_2_0_FAST']) {
+  assert.equal(digitalHumanVideoInput(form({ model: 'SEEDANCE_2_5_SPECIAL', images })).images.length, 30)
+  assert.throws(() => digitalHumanVideoInput(form({ model: 'SEEDANCE_2_5_SPECIAL', images: [...images, { assetId: 51 }] })), /30 张图片/)
+  for (const model of ['SEEDANCE_2_0', 'SEEDANCE_2_0_SPECIAL', 'SEEDANCE_2_0_MINI', 'SEEDANCE_2_0_FAST']) {
     const smaller = { model, images: images.slice(0, 8), videos: videos.slice(0, 3), voices: voices.slice(0, 3) }
     assert.equal(digitalHumanVideoInput(form(smaller)).images.length, 9)
     assert.throws(() => digitalHumanVideoInput(form({ ...smaller, images: images.slice(0, 9) })), /9 张图片/)

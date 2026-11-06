@@ -22,7 +22,7 @@ class VideoPricingServiceTest {
     @BeforeEach void setup() {
         TenantContext.set(7L);
         when(provider.baseUrl()).thenReturn("https://test.invalid");
-        when(provider.providerModel(anyString())).thenAnswer(i->"actual-"+i.getArgument(0));
+        when(provider.providerModel(anyString(),anyString())).thenAnswer(i->"actual-"+i.getArgument(0));
         rate=new VideoPricingProperties.Rate();
         rate.setProviderBaseUrl("https://test.invalid");rate.setProviderModel("actual-SEEDANCE_2_0");
         rate.setResolution("720p");rate.setVideoInput("t2v");rate.setUsdPerMillionTokens(new BigDecimal("2"));
@@ -71,6 +71,23 @@ class VideoPricingServiceTest {
         assertThat(service.actualCredits(quote,425000L,54000L,1920,1080,10000)).isEqualTo(12);
         assertThat(service.actualCredits(quote,99999999L,54000L,1920,1080,10000)).isEqualTo(20);
         assertThat(service.actualCredits(quote,null,54000L,1920,1080,10000)).isEqualTo(10);
+    }
+    @Test void specialModelsQuotePerResolutionTierAndSettleOnWhatTheRelayCharged() {
+        when(provider.providerModel("SEEDANCE_2_0_SPECIAL","720p")).thenReturn("upscale-720");
+        when(provider.providerModel("SEEDANCE_2_0_SPECIAL","1080p")).thenReturn("upscale-1080");
+        rate.setProviderModel("upscale-720");rate.setSellingMultiplier(new BigDecimal("2"));
+        rate.setMaxOutputPixels(480*854);config.setRates(List.of(rate));
+        config.setRelayQuotaPerUnit(500000);config.setRelayCnyPerUnit(BigDecimal.ONE);
+        var request720=new VideoDtos.Create("pricing-special-1","画面",List.of(),null,"SEEDANCE_2_0_SPECIAL","9:16",5,"720p");
+        var quote=service.quote(request720);
+        assertThat(quote.available()).isTrue();assertThat(quote.providerModel()).isEqualTo("upscale-720");
+        // Reservation counts low-resolution tokens; a 720p output must not push settlement past it.
+        assertThat(quote.estimatedTokens()).isEqualTo(48038);
+        assertThat(service.actualCredits(quote,50000L,48000L,720,1256,5000)).isEqualTo(2);
+        service.validateDispatch(request720,quote);
+        var request1080=new VideoDtos.Create("pricing-special-2","画面",List.of(),null,"SEEDANCE_2_0_SPECIAL","9:16",5,"1080p");
+        assertThat(service.quote(request1080).available()).isFalse();
+        assertThatThrownBy(()->service.validateDispatch(request1080,quote)).isInstanceOf(BizException.class);
     }
     @Test void referenceVideoUsesPersistedDurationAndVerifiedFormula() {
         rate.setVideoInput("v2v");rate.setReferenceVideoBilled(true);config.setRates(List.of(rate));

@@ -58,6 +58,9 @@ worker 将结果下载到对象存储，再向前端签发内部预览地址。
 `VIDEO_PROVIDER_API_KEY_SEEDANCE_2_5`、`VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0`、
 `VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_FAST`、`VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_MINI`
 可分别覆盖公共密钥；提交和轮询必须使用同一模型对应的密钥。密钥只存于服务端配置。
+「Seedance 2.5-特价」「Seedance 2.0-特价」（`SEEDANCE_2_5_SPECIAL`、`SEEDANCE_2_0_SPECIAL`）只开放 720p 和 1080p，按分辨率映射到中转站的超分模型
+（720p → `doubao-seedance-*-480p-720p`，1080p → `doubao-seedance-*-720p-1080p`），必须单独配置 `VIDEO_PROVIDER_API_KEY_SEEDANCE_SPECIAL`，不回退到公共密钥。
+超分模型按低分辨率计 token，所以费率的 `max-output-pixels` 填生成时低分辨率的上限，不是成片分辨率。费率未配置时报价不可用。
 接口依据：[Haomaotoken 提交文档](https://haomaotoken.apifox.cn/513007162e0)、
 [轮询结果文档](https://haomaotoken.apifox.cn/513007171e0)。
 更换供应商前先停止视频 worker，确认没有在途或可能已提交的待恢复任务，再切换配置。

@@ -1,6 +1,8 @@
 export const videoModels = [
   { id: 'SEEDANCE_2_5', label: 'Seedance 2.5', maxDurationSeconds: 30, resolutions: ['480p', '720p', '1080p'] },
+  { id: 'SEEDANCE_2_5_SPECIAL', label: 'Seedance 2.5-特价', maxDurationSeconds: 30, resolutions: ['720p', '1080p'] },
   { id: 'SEEDANCE_2_0', label: 'Seedance 2.0', maxDurationSeconds: 15, resolutions: ['480p', '720p', '1080p', '4K'] },
+  { id: 'SEEDANCE_2_0_SPECIAL', label: 'Seedance 2.0-特价', maxDurationSeconds: 15, resolutions: ['720p', '1080p'] },
   { id: 'SEEDANCE_2_0_MINI', label: 'Seedance 2.0 Mini', maxDurationSeconds: 15, resolutions: ['480p', '720p'] },
   { id: 'SEEDANCE_2_0_FAST', label: 'Seedance 2.0 Fast', maxDurationSeconds: 15, resolutions: ['480p', '720p'] },
 ]

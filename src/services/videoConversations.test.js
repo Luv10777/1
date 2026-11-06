@@ -1,6 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { isVideoInProgress, snapshotVideoForm, videoFormFromWorkflow } from './videoConversations.js'
+import { isVideoInProgress, snapshotVideoForm, videoFormFromWorkflow, videoModelLabel, videoModels } from './videoConversations.js'
+import { videoMaterialLimits } from '../domain/videoMaterials.js'
+
+test('special models offer 720p and 1080p with their base model limits', () => {
+  for (const [id, label, seconds, images] of [['SEEDANCE_2_5_SPECIAL', 'Seedance 2.5-特价', 30, 30], ['SEEDANCE_2_0_SPECIAL', 'Seedance 2.0-特价', 15, 9]]) {
+    const model = videoModels.find(item => item.id === id)
+    assert.deepEqual(model.resolutions, ['720p', '1080p'])
+    assert.equal(model.maxDurationSeconds, seconds)
+    assert.equal(videoModelLabel(id), label)
+    assert.equal(videoMaterialLimits(id).image, images)
+  }
+})
 
 test('shared video state checks treat CANCELLED as terminal in both video screens', () => {
   for (const status of ['SUCCEEDED', 'FAILED', 'CANCELLED']) {

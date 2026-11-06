@@ -30,7 +30,7 @@ public class VideoPricingService {
                         long maxOutputPixels, int framesPerSecond, int tokenAreaDivisor,
                         String sourceUrl, Instant verifiedAt, Instant validUntil, String quoteId) {}
     public Quote quote(VideoDtos.Create request) {
-        String model=provider.providerModel(request.model());
+        String model=provider.providerModel(request.model(),request.resolution());
         String mode=request.videoReferences().isEmpty()?"t2v":"v2v";
         var now=Instant.now();
         var matches=prices.getRates().stream().filter(r->Objects.equals(r.getProviderBaseUrl(),provider.baseUrl())
@@ -59,7 +59,7 @@ public class VideoPricingService {
     }
     public void validateDispatch(VideoDtos.Create request,Quote q) {
         if(q==null||!q.available()||!q.validUntil().isAfter(Instant.now())||!Objects.equals(q.providerBaseUrl(),provider.baseUrl())
-            ||!Objects.equals(q.providerModel(),provider.providerModel(request.model())))
+            ||!Objects.equals(q.providerModel(),provider.providerModel(request.model(),request.resolution())))
             throw BizException.of(ErrorCode.BILLING_QUOTE_EXPIRED,"视频计价或供应商配置已变化，预占烟火将退回，请重新创建视频");
     }
     public long actualCredits(Quote q,Long billedQuota,Long reportedTokens,int width,int height,int durationMs) {

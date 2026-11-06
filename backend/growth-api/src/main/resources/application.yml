@@ -195,6 +195,7 @@ growth:
       api-key-seedance-2-0: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0:}
       api-key-seedance-2-0-mini: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_MINI:}
       api-key-seedance-2-0-fast: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0_FAST:}
+      api-key-seedance-special: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_SPECIAL:}
       submit-path: ${VIDEO_PROVIDER_SUBMIT_PATH:/api/v3/contents/generations/tasks}
       poll-path: ${VIDEO_PROVIDER_POLL_PATH:/api/v3/contents/generations/tasks/{jobId}}
       content-path: ${VIDEO_PROVIDER_CONTENT_PATH:/v1/videos/{jobId}/content}

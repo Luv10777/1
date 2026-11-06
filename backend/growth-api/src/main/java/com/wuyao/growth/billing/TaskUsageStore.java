@@ -78,6 +78,7 @@ public class TaskUsageStore {
                    NULL, v.request->>'prompt',
                    CASE v.model WHEN 'SEEDANCE_2_5' THEN 'Seedance 2.5' WHEN 'SEEDANCE_2_0' THEN 'Seedance 2.0'
                        WHEN 'SEEDANCE_2_0_MINI' THEN 'Seedance 2.0 Mini' WHEN 'SEEDANCE_2_0_FAST' THEN 'Seedance 2.0 Fast'
+                       WHEN 'SEEDANCE_2_5_SPECIAL' THEN 'Seedance 2.5-特价' WHEN 'SEEDANCE_2_0_SPECIAL' THEN 'Seedance 2.0-特价'
                        ELSE v.model END,
                    COALESCE(NULLIF(v.provider_submit_request->>'model',''),NULLIF(v.billing_quote->>'providerModel',''),v.model),
                    CASE WHEN v.status IN ('SUCCEEDED','FAILED','CANCELLED') THEN v.status

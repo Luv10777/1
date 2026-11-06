@@ -9,6 +9,10 @@ final class VideoCapabilities {
     private static final Map<String, VideoDtos.Capability> MODELS = Map.of(
             "SEEDANCE_2_5", new VideoDtos.Capability("SEEDANCE_2_5", "Seedance 2.5", 30,
                     List.of("480p", "720p", "1080p"), new VideoDtos.MaterialLimits(30, 10, 10)),
+            "SEEDANCE_2_5_SPECIAL", new VideoDtos.Capability("SEEDANCE_2_5_SPECIAL", "Seedance 2.5-特价", 30,
+                    List.of("720p", "1080p"), new VideoDtos.MaterialLimits(30, 10, 10)),
+            "SEEDANCE_2_0_SPECIAL", new VideoDtos.Capability("SEEDANCE_2_0_SPECIAL", "Seedance 2.0-特价", 15,
+                    List.of("720p", "1080p"), new VideoDtos.MaterialLimits(9, 3, 3)),
             "SEEDANCE_2_0", new VideoDtos.Capability("SEEDANCE_2_0", "Seedance 2.0", 15,
                     List.of("480p", "720p", "1080p", "4K"), new VideoDtos.MaterialLimits(9, 3, 3)),
             "SEEDANCE_2_0_MINI", new VideoDtos.Capability("SEEDANCE_2_0_MINI", "Seedance 2.0 Mini", 15,
@@ -18,7 +22,8 @@ final class VideoCapabilities {
     );
 
     static List<VideoDtos.Capability> all() {
-        return List.of(MODELS.get("SEEDANCE_2_5"), MODELS.get("SEEDANCE_2_0"),
+        return List.of(MODELS.get("SEEDANCE_2_5"), MODELS.get("SEEDANCE_2_5_SPECIAL"),
+                MODELS.get("SEEDANCE_2_0"), MODELS.get("SEEDANCE_2_0_SPECIAL"),
                 MODELS.get("SEEDANCE_2_0_MINI"), MODELS.get("SEEDANCE_2_0_FAST"));
     }
 
