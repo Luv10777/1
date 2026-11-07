@@ -31,7 +31,8 @@ export async function uploadImageReference(file) {
   return ticket.assetId
 }
 export async function downloadImage(url, filename) {
-  const response = await fetch(url)
+  // 页面上的 <img> 已按非跨域方式加载并缓存过同一地址；复用那份缓存会被浏览器判为跨域失败。
+  const response = await fetch(url, { cache: 'no-store' })
   if (!response.ok) throw new Error('下载地址可能已过期，请刷新记录后重试')
   const objectUrl = URL.createObjectURL(await response.blob())
   const a = document.createElement('a')
