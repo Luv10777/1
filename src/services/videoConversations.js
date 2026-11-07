@@ -8,6 +8,7 @@ export const videoModels = [
 ]
 
 export const videoModelLabel = id => videoModels.find(model => model.id === id)?.label || id
+export const videoModelBadge = id => (id.endsWith('_SPECIAL') ? '9折特惠' : '')
 export const isVideoInProgress = workflow => Boolean(workflow && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(workflow.status))
 export const videoConversationTitle = prompt => prompt.trim().replace(/\s+/g, ' ').slice(0, 28) || '新的视频创作'
 // 创作记录里的时间：当天显示「今天 14:20」，更早的显示「10月20日」。

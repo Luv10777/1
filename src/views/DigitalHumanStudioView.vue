@@ -9,7 +9,7 @@ import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { useDigitalHumanVideo } from '../composables/useDigitalHumanVideo'
 import { digitalHumanVideoInput } from '../domain/digitalHumanVideo'
 import { videoMaterialLimits } from '../domain/videoMaterials'
-import { isVideoInProgress, videoConversationTitle, videoHistoryTime, videoModels, videoModelLabel } from '../services/videoConversations'
+import { isVideoInProgress, videoConversationTitle, videoHistoryTime, videoModels, videoModelLabel, videoModelBadge } from '../services/videoConversations'
 import { get } from '../utils/request'
 import { billing, number, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -257,7 +257,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           <section class="vs-settings">
             <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="dh-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ currentModel.label }} · {{ ratioOptions.find(option => option.value === ratio)?.label }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
             <div v-show="settingsOpen" id="dh-settings" class="vs-settings-body">
-              <div class="vs-segmented vs-models" role="group" aria-label="视频模型"><button v-for="model in videoModels" :key="model.id" type="button" :aria-pressed="selectedModel === model.id" :class="{ active: selectedModel === model.id }" @click="selectModel(model.id)">{{ model.label }}</button></div>
+              <div class="vs-segmented vs-models" role="group" aria-label="视频模型"><button v-for="model in videoModels" :key="model.id" type="button" :aria-pressed="selectedModel === model.id" :class="{ active: selectedModel === model.id }" @click="selectModel(model.id)">{{ model.label }}<span v-if="videoModelBadge(model.id)" class="vs-model-badge">{{ videoModelBadge(model.id) }}</span></button></div>
               <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="ratio" class="vs-row-select" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
               <div class="vs-setting-row vs-duration"><label for="dh-duration">视频时长</label><strong>{{ duration }} 秒</strong><input id="dh-duration" v-model.number="duration" class="vs-range" type="range" min="5" :max="currentModel.maxDurationSeconds" step="1"></div>
               <div class="vs-setting-row"><span>分辨率</span><div class="vs-segmented" role="group" aria-label="分辨率"><button v-for="item in availableResolutions" :key="item" type="button" :aria-pressed="resolution === item" :class="{ active: resolution === item }" @click="resolution = item">{{ item }}</button></div></div>

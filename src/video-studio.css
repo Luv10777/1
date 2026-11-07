@@ -48,6 +48,8 @@
 .vs-segmented button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-muted); font-size: 13px; cursor: pointer; transition: background .18s, color .18s; }
 .vs-segmented button.active { background: var(--night-panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(44, 62, 80, .12); }
 .vs-segmented button:disabled { opacity: .45; cursor: not-allowed; }
+.vs-models button { position: relative; }
+.vs-model-badge { position: absolute; top: -6px; right: -4px; padding: 0 6px; border-radius: 999px; background: linear-gradient(135deg, #ff6a55, #e8323c); box-shadow: 0 0 0 1.5px var(--night-panel), 0 2px 6px rgba(232, 50, 60, .28); color: #fff; font-size: 9px; font-weight: 500; letter-spacing: .5px; line-height: 14px; white-space: nowrap; pointer-events: none; }
 .vs-setting-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 48px; color: var(--ink); font-size: 15px; }
 .vs-setting-row > .vs-segmented { min-width: 160px; }
 .vs-row-select .app-select-button { min-height: 32px; padding: 0 4px 0 10px; border: 0; background: transparent; color: var(--ink-muted); font-size: 13px; }
