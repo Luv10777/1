@@ -90,7 +90,8 @@ test('video plans validate inputs, poll, apply with model limits and preserve th
     panel.timers.shift()(); await generating; await panel.settle()
     assert.match(panel.text(panel.root), /方案 A.*方案 B.*方案 C/)
     panel.button('用这个').props.onClick(); await panel.settle()
-    assert.deepEqual(panel.applied[0], [{ prompt: '晨光中的商品展示\n避免：画面文字', format: '9:16', duration: 10, shortened: true }, 'A', null])
+    assert.deepEqual(panel.applied[0], [{ prompt: '晨光中的商品展示\n避免：画面文字', format: '9:16', duration: 10, shortened: true }, 'A', null, 7])
+    assert.equal('sceneKey' in panel.requests[0], false)
     assert.match(panel.text(panel.root), /已填入描述框/)
     panel.videoPlanApi.get = async () => ({ id: 8, status: 'FAILED', errorMessage: '校验失败，烟火已退回' })
     const regenerating = panel.button('换一批').props.onClick()
@@ -183,5 +184,26 @@ test('reusing a record from the inspiration list brings back the reference image
     assert.match(panel.text(panel.root), /1 张参考图已删除/)
     panel.button('用这个').props.onClick(); await panel.settle()
     assert.deepEqual(panel.applied[0][2], [{ id: 'asset-11', assetId: 11, name: '瓶身.png', url: '/a.png', file: null }])
+    assert.equal(panel.applied[0][3], 5)
+  } finally { await panel.close() }
+})
+
+test('plans follow the workbench scene, and opening a record switches the workbench back to its scene', async () => {
+  const scenes = [{ key: 'free', name: '自由创作' }, { key: 'ecommerce', name: '电商带货' }, { key: 'drama', name: '剧情短片' }]
+  const record = { id: 5, style: '', idea: '', sceneKey: 'drama', createdAt: new Date().toISOString(), plans, images: [] }
+  const picked = []
+  const panel = await mountPanel(undefined, { scene: 'ecommerce', scenes, onScene: key => picked.push(key) }, { history: [record] })
+  try {
+    assert.match(panel.text(panel.root), /按「电商带货」场景出方案/)
+    assert.match(panel.text(panel.root), /剧情短片/)
+    panel.button('晨光 / 窗边 / 静物').props.onClick(); await panel.settle()
+    assert.deepEqual(picked, ['drama'])
+    panel.button('改设置').props.onClick(); await panel.settle()
+    panel.idea('新品上新'); await panel.settle()
+    panel.videoPlanApi.get = async () => ({ id: 7, status: 'SUCCEEDED', plans })
+    const generating = panel.button('生成提示词').props.onClick()
+    await panel.settle()
+    assert.equal(panel.requests[0].sceneKey, 'ecommerce')
+    panel.timers.shift()(); await generating; await panel.settle()
   } finally { await panel.close() }
 })

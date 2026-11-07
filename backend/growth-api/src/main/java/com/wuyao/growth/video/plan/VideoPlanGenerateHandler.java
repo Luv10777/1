@@ -42,7 +42,7 @@ public class VideoPlanGenerateHandler implements TaskHandler {
                 images.add("data:image/jpeg;base64," + Base64.getEncoder().encodeToString(jpeg(bytes)));
             }
             String prompt = VideoPlanOutput.prompt(images.size(), plan.isReferenceVideo(), plan.getStyle(), plan.getIdea(),
-                    service.previousPlans(plan.getPreviousPlanId()));
+                    service.previousPlans(plan.getPreviousPlanId()), plan.getSceneKey());
             var response = gateway.invokeReal(new ProviderRequest(ModelAlias.VIDEO_PLANNER, task.getTenantId(), prompt,
                     Map.of("system", VideoPlanOutput.SYSTEM, "images", images), "video-plan-" + id));
             if (!response.succeeded() || response.output() == null) throw new IllegalStateException("出方案模型未返回有效结果");

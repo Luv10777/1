@@ -93,7 +93,7 @@ public class VideoProviderGateway {
         body.put("model", providerModel(request.model(), request.resolution()));
         body.put("seconds", request.durationSeconds());
         body.put("resolution", request.resolution());
-        String prompt = request.prompt();
+        String prompt = VideoScenes.providerPrompt(request);
         if (!prompt.isBlank() && !"auto".equals(request.ratio())) prompt += "\n画幅：" + request.ratio();
         body.put("mode", !request.videoReferences().isEmpty() ? "video-to-video"
                 : request.referenceImageAssetIds().isEmpty() ? "text-to-video" : "image-to-video");
@@ -124,7 +124,8 @@ public class VideoProviderGateway {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", providerModel(request.model(), request.resolution()));
         var content = new ArrayList<Map<String, Object>>();
-        if (!request.prompt().isBlank()) content.add(Map.of("type", "text", "text", request.prompt()));
+        String prompt = VideoScenes.providerPrompt(request);
+        if (!prompt.isBlank()) content.add(Map.of("type", "text", "text", prompt));
         for (Long assetId : request.referenceImageAssetIds()) {
             content.add(Map.of("type", "image_url", "role", "reference_image",
                     "image_url", Map.of("url", assets.presignedReference(assetId, "IMAGE"))));

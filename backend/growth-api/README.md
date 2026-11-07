@@ -10,6 +10,10 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 2026-10-23 新增视频工作台「帮我出方案」（可选，商家仍可自己写提示词）：OnlyRouter `gpt-6-luna`
 看最多 6 张参考图（缩到长边 1024 的 JPEG），按风格和一句话需求出 3 个方案，每个方案自己判断每张图的用途并写进中文提示词和分镜。
 2026-11-06 上限从 6 张改为 30 张，和视频生成的参考图上限一致；输出上限默认值从 8000 提到 12000。
+2026-11-08 新增视频工作台「创作场景」（设计见 [创作场景](../../docs/video-scenes.md)）：`GET /api/video/scenes` 返回 6 个场景（不含分镜参考），
+场景和分镜参考内置在 `VideoScenes`。生成请求可带 `sceneKey`（空或 `free` 即自由创作）和 `planId`（提示词来自已采纳方案）；
+有场景且不是来自方案时，网关把分镜参考附在用户提示词之后，用户原文不改。两个字段为空时不写进请求 JSON，旧请求的幂等哈希不变。
+出方案请求也可带 `sceneKey`，「换一批」改用上一批的场景，迁移 V75 给 `video_plans` 加 `scene_key`。
 每次（含「换一批」）预占 1 烟火，结果校验通过才扣除，失败或校验不过退回。任务 `VIDEO_PLAN_GENERATE` 走 `DEFAULT` 队列。
 接口：`GET /api/video/plans/config`、`POST /api/video/plans`（`requestKey` 幂等，`previousPlanId` 表示换一批）、`GET /api/video/plans/{id}`。
 服务端配置 `VIDEO_PLAN_API_KEY`（必填）、`VIDEO_PLAN_BASE_URL`、`VIDEO_PLAN_MODEL`、`VIDEO_PLAN_TIMEOUT_SECONDS`、`VIDEO_PLAN_MAX_TOKENS`；未配置密钥时入口显示未开放。
@@ -478,6 +482,7 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 | V60 | 知识库简化：问答集只有启用/归档，问答只有启用/停用；去掉商品专属问答、命中次数等无用字段 | `refactor/knowledge-simplify` |
 | V61 | 问答集可以挂在品牌上，品牌下所有门店共用；问答来源增加 DOCUMENT | `refactor/knowledge-simplify` |
 | V62 | 知识库文档：`knowledge_documents`、`knowledge_suggestions`（文档整理出的待确认建议） | `refactor/knowledge-simplify` |
+| V75 | 视频方案记下创作场景：`video_plans.scene_key` | `claude/video-scenes` |
 | V63 | 视频工作台「帮我出方案」：`video_plans`（参考图、风格、一句话、3 个方案、预占烟火） | `claude/video-plan` |
 | V66 | 商城好物「入驻商户」栏：`public_alliance_stores` 函数（只交出已入驻商户营业中门店的编号和名称） | `claude/alliance-stores-tab` |
 

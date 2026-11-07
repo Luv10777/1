@@ -29,10 +29,22 @@ public final class VideoDtos {
             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
             @Size(max = 10) List<@NotNull @Positive Long> referenceVideoAssetIds,
             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
-            @Size(max = 10) List<@NotNull @Positive Long> referenceAudioAssetIds) {
+            @Size(max = 10) List<@NotNull @Positive Long> referenceAudioAssetIds,
+            // 创作场景，空或 free 即自由创作；不写进 JSON 的空值保持旧请求的幂等哈希不变。
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @Pattern(regexp = "[a-z_]{1,40}") String sceneKey,
+            // 提示词来自已采纳的方案时带上方案批次编号：方案已参考过场景，生成时不再附加场景参考。
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @Positive Long planId) {
         public Create {
             referenceVideoAssetIds = referenceVideoAssetIds == null ? List.of() : referenceVideoAssetIds;
             referenceAudioAssetIds = referenceAudioAssetIds == null ? List.of() : referenceAudioAssetIds;
+        }
+        public Create(String requestKey, String prompt, List<Long> references, Long videoReference,
+                      String model, String ratio, int seconds, String resolution, String quoteId, String sourceModule,
+                      List<Long> videoReferences, List<Long> audioReferences) {
+            this(requestKey, prompt, references, videoReference, model, ratio, seconds, resolution, quoteId, sourceModule,
+                    videoReferences, audioReferences, null, null);
         }
         public Create(String requestKey, String prompt, List<Long> references, Long videoReference,
                       String model, String ratio, int seconds, String resolution, String quoteId, String sourceModule) {
@@ -68,10 +80,11 @@ public final class VideoDtos {
 
     public record History(Long id, String prompt, String model, String ratio,
                           int durationSeconds, String resolution, String status, Instant createdAt,
-                          String outputUrl, Integer actualWidth, Integer actualHeight, Integer actualDurationMs) {
+                          String outputUrl, Integer actualWidth, Integer actualHeight, Integer actualDurationMs,
+                          String sceneKey) {
         public History(Long id, String prompt, String model, String ratio,
                        int durationSeconds, String resolution, String status, Instant createdAt) {
-            this(id, prompt, model, ratio, durationSeconds, resolution, status, createdAt, null, null, null, null);
+            this(id, prompt, model, ratio, durationSeconds, resolution, status, createdAt, null, null, null, null, null);
         }
     }
 
@@ -113,5 +126,7 @@ public final class VideoDtos {
             List<Long> referenceVideoAssetIds,
             List<Long> referenceAudioAssetIds,
             List<Reference> referenceVideos,
-            List<Reference> referenceAudios) {}
+            List<Reference> referenceAudios,
+            String sceneKey,
+            Long planId) {}
 }

@@ -23,14 +23,20 @@ public final class VideoPlanDtos {
             boolean referenceVideo,
             @Size(max = 40) String style,
             @Size(max = 500) String idea,
-            @Positive Long previousPlanId) {}
+            @Positive Long previousPlanId,
+            // 工作台选的创作场景；「换一批」时服务端改用上一批的场景。
+            @Pattern(regexp = "[a-z_]{1,40}") String sceneKey) {
+        public Create(String requestKey, List<Long> imageAssetIds, boolean referenceVideo, String style, String idea, Long previousPlanId) {
+            this(requestKey, imageAssetIds, referenceVideo, style, idea, previousPlanId, null);
+        }
+    }
 
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
                        Long previousPlanId, Instant createdAt) {}
 
     /** 灵感记录里的一批方案，带上当初的素材和要求，方便再看或换回这些参考图复用。图片已删除时 url 为空。 */
     public record History(Long id, String style, String idea, boolean referenceVideo, List<Image> images,
-                         List<Map<String, Object>> plans, Instant createdAt) {}
+                         List<Map<String, Object>> plans, Instant createdAt, String sceneKey) {}
 
     public record Image(Long assetId, String name, String url) {}
 

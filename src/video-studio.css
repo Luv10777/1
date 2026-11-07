@@ -201,6 +201,49 @@
 .vp-record-text strong, .vp-record-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vp-record-text strong { font-size: 13px; font-weight: 600; }
 .vp-record-text small { color: var(--ink-muted); font-size: 12px; }
+.vp-scene { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--vs-fill); color: var(--ink-muted); font-size: 13px; }
+
+/* 创作场景：工作台的一栏 + 点开的场景面板。封面先用图标和浅色底，运营的封面图到位后换成图片。 */
+.vs-scene-field { display: flex; align-items: center; gap: 6px; }
+.vs-scene-pick { display: flex; flex: 1; align-items: center; gap: 12px; min-width: 0; padding: 8px 12px 8px 8px; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .18s; }
+.vs-scene-pick:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.vs-scene-text { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.vs-scene-text :is(strong, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-scene-text strong { font-size: 14px; font-weight: 600; }
+.vs-scene-text small { color: var(--ink-muted); font-size: 12px; }
+.vs-scene-action { flex: 0 0 auto; color: var(--color-accent-text); font-size: 13px; }
+.vs-scene-clear { display: grid; flex: 0 0 auto; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: var(--vs-fill); color: var(--ink-muted); cursor: pointer; }
+.vs-scene-clear:hover:not(:disabled) { color: var(--ink); }
+.vs-scene-hint { color: var(--ink-muted); font-size: 12px; line-height: 1.5; }
+.vs-scene-cover { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 10; border-radius: 6px; background: linear-gradient(135deg, #eef0f3, #dfe4ea); color: rgba(44, 62, 80, .72); }
+.vs-scene-cover .material-symbols-outlined { font-size: 32px; }
+.vs-scene-cover.is-small { width: 52px; flex: 0 0 auto; aspect-ratio: 4 / 3; }
+.vs-scene-cover.is-small .material-symbols-outlined { font-size: 20px; }
+.vs-scene-cover[data-scene="ecommerce"] { background: linear-gradient(135deg, #fdeee2, #f6d6bf); }
+.vs-scene-cover[data-scene="local_life"] { background: linear-gradient(135deg, #fdf3dc, #f3dca8); }
+.vs-scene-cover[data-scene="event"] { background: linear-gradient(135deg, #fce7e6, #f1c3c1); }
+.vs-scene-cover[data-scene="brand"] { background: linear-gradient(135deg, #e6eef7, #c8d8ea); }
+.vs-scene-cover[data-scene="drama"] { background: linear-gradient(135deg, #eee8f7, #d5c9ea); }
+.vs-scene-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 0; border-radius: 12px; background: var(--night-panel); color: var(--ink); box-shadow: 0 24px 64px rgba(44, 62, 80, .24); }
+.vs-scene-dialog::backdrop { background: rgba(20, 28, 36, .42); }
+.vs-scene-sheet { display: flex; flex-direction: column; gap: 12px; padding: 20px 24px 24px; }
+.vs-scene-sheet header { display: flex; align-items: center; justify-content: space-between; }
+.vs-scene-sheet h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.vs-scene-close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.vs-scene-close:hover { background: var(--vs-fill); color: var(--ink); }
+.vs-scene-intro { margin: 0; color: var(--ink-muted); font-size: 13px; }
+.vs-scene-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.vs-scene-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 8px 12px; border: 0; border-radius: 10px; background: var(--vs-fill); color: var(--ink); text-align: left; cursor: pointer; transition: box-shadow .18s; }
+.vs-scene-card:hover, .vs-scene-card.active { box-shadow: inset 0 0 0 2px var(--color-accent); }
+.vs-scene-card .vs-scene-cover { margin-bottom: 6px; }
+.vs-scene-card strong { padding: 0 4px; font-size: 14px; font-weight: 600; }
+.vs-scene-card small { padding: 0 4px; overflow: hidden; color: var(--ink-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.vs-scene-check { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 4px; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); }
+@media (max-width: 760px) {
+  .vs-scene-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .vs-scene-sheet { padding: 16px 16px 24px; }
+  .vs-scene-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 1180px) { .vp-cards { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
   .video-canvas-heading .vp-tabs button { padding: 0 12px; }

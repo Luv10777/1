@@ -26,6 +26,8 @@ public class VideoPlan {
     @Column(name = "reference_video", nullable = false) private boolean referenceVideo;
     @Column(length = 40) private String style;
     @Column(columnDefinition = "text") private String idea;
+    /** 创作场景，空即自由创作。 */
+    @Column(name = "scene_key", length = 40) private String sceneKey;
     @Column(name = "previous_plan_id") private Long previousPlanId;
     @Column(nullable = false, length = 20) private String status = "QUEUED";
     @Column(name = "task_id") private Long taskId;
