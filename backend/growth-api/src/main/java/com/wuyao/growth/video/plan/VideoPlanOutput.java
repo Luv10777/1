@@ -1,6 +1,7 @@
 package com.wuyao.growth.video.plan;
 
 import com.wuyao.growth.common.task.NonRetryableTaskException;
+import com.wuyao.growth.video.VideoScenes;
 
 import java.util.*;
 
@@ -33,10 +34,13 @@ final class VideoPlanOutput {
             plans 必须正好 3 个。images 填这一镜用到的参考图序号，没用到就填 []。
             """;
 
-    static String prompt(int imageCount, boolean hasVideo, String style, String idea, List<Map<String, Object>> previous) {
+    static String prompt(int imageCount, boolean hasVideo, String style, String idea, List<Map<String, Object>> previous, String sceneKey) {
         var text = new StringBuilder("商家上传了 ").append(imageCount).append(" 张参考图（按顺序附在后面）");
         if (hasVideo) text.append("，另有一段参考视频，生成时只参考它的运镜节奏");
+        var scene = VideoScenes.planBrief(sceneKey);
         text.append("。\n风格：").append(blank(style) ? "未指定，按素材判断" : style.strip());
+        if (scene.isPresent() && !blank(style)) text.append("（风格只管语气、节奏和画面质感，不改变场景决定的内容方向）");
+        scene.ifPresent(brief -> text.append("\n").append(brief));
         text.append("\n商家的一句话需求：").append(blank(idea) ? "未填写，按素材判断用途" : idea.strip());
         if (previous != null && !previous.isEmpty()) {
             text.append("\n这是「换一批」，以下是上一批的方案名和思路，这次要换成不同的方向：");

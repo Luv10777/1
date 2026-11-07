@@ -18,6 +18,7 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
   globalThis.fetch = async (url, options = {}) => {
     if (options.method === 'PUT') return { ok: true }
     if (url === '/api/video/capabilities') return response([])
+    if (url === '/api/video/scenes') return response([{ key: 'free', name: '自由创作', summary: '', icon: 'edit_note' }])
     if (url.startsWith('/api/video/workflows')) return response({ items: [], totalPages: 0 })
     if (url === '/api/billing/summary') return response({ memberActive: true, available: 100, plan: { videoEnabled: true } })
     if (url === '/api/assets/upload-url') {

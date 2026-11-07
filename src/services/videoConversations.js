@@ -1,3 +1,5 @@
+import { videoSceneKey } from './videoScenes.js'
+
 export const videoModels = [
   { id: 'SEEDANCE_2_5', label: 'Seedance 2.5', maxDurationSeconds: 30, resolutions: ['480p', '720p', '1080p'] },
   { id: 'SEEDANCE_2_5_SPECIAL', label: 'Seedance 2.5-特价', maxDurationSeconds: 30, resolutions: ['720p', '1080p'] },
@@ -32,6 +34,8 @@ export function snapshotVideoForm(form) {
     referenceImages: form.referenceImages.map(entry => ({ ...entry })),
     referenceVideos: (form.referenceVideos || (form.referenceVideo ? [form.referenceVideo] : [])).map(entry => ({ ...entry })),
     referenceAudios: (form.referenceAudios || []).map(entry => ({ ...entry })),
+    sceneKey: videoSceneKey(form.sceneKey),
+    planId: form.planId ?? null,
   }
 }
 
@@ -46,5 +50,7 @@ export function videoFormFromWorkflow(workflow) {
     referenceImages: (workflow.referenceImages || []).map(entry),
     referenceVideos: (workflow.referenceVideos || (workflow.referenceVideo ? [workflow.referenceVideo] : [])).map(entry),
     referenceAudios: (workflow.referenceAudios || []).map(entry),
+    sceneKey: videoSceneKey(workflow.sceneKey),
+    planId: workflow.planId ?? null,
   }
 }

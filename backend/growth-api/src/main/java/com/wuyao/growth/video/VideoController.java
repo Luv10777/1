@@ -19,6 +19,8 @@ public class VideoController {
 
     @GetMapping("/capabilities")
     public ApiResponse<List<VideoDtos.Capability>> capabilities() { return ApiResponse.ok(service.capabilities()); }
+    @GetMapping("/scenes")
+    public ApiResponse<List<VideoScenes.View>> scenes() { return ApiResponse.ok(service.scenes()); }
     @PostMapping("/quote")
     public ApiResponse<com.wuyao.growth.billing.VideoPricingService.Quote> quote(@Valid @RequestBody VideoDtos.Create request) {
         try { VideoCapabilities.validate(request); }

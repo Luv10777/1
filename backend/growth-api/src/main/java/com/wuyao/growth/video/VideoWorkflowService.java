@@ -317,7 +317,8 @@ public class VideoWorkflowService {
         var result = workflows.findAllByOrderByIdDesc(PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size))));
         return PageResult.of(result, result.getContent().stream().map(w -> new VideoDtos.History(
                 w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(), w.getDurationSeconds(),
-                w.getResolution(), w.getStatus(), w.getCreatedAt())).toList());
+                w.getResolution(), w.getStatus(), w.getCreatedAt(), null, null, null, null,
+                VideoScenes.normalize(w.getRequest().sceneKey()))).toList());
     }
 
     @Transactional(readOnly = true)
@@ -330,12 +331,14 @@ public class VideoWorkflowService {
             return new VideoDtos.History(w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(),
                     w.getDurationSeconds(), w.getResolution(), w.getStatus(), w.getCreatedAt(), url,
                     output == null ? null : output.getWidth(), output == null ? null : output.getHeight(),
-                    output == null ? null : output.getDurationMs());
+                    output == null ? null : output.getDurationMs(), VideoScenes.normalize(w.getRequest().sceneKey()));
         }).toList());
     }
 
     @Transactional(readOnly = true)
     public List<VideoDtos.Capability> capabilities() { return VideoCapabilities.all(); }
+
+    public List<VideoScenes.View> scenes() { return VideoScenes.views(); }
 
     @Transactional
     public boolean beginSubmit(Long workflowId, Task task) {
@@ -888,7 +891,8 @@ public class VideoWorkflowService {
                 actualWidth, actualHeight, actualDurationMs, workflow.getBillingQuote(), workflow.getBillingCapturedCredits(),
                 request.videoReferences(), request.referenceAudioAssetIds(),
                 request.videoReferences().stream().map(this::referenceView).toList(),
-                request.referenceAudioAssetIds().stream().map(this::referenceView).toList());
+                request.referenceAudioAssetIds().stream().map(this::referenceView).toList(),
+                VideoScenes.normalize(request.sceneKey()), request.planId());
     }
 
     private VideoDtos.Reference referenceView(Long id) {

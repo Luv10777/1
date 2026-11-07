@@ -5,6 +5,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { AudioLines, ChevronRight, Film, History, ImagePlus, Plus, Sparkles, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import VideoPlanPanel from '../components/VideoPlanPanel.vue'
+import VideoScenePicker from '../components/VideoScenePicker.vue'
 import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { get, post } from '../utils/request'
@@ -13,7 +14,9 @@ import { billing, dateTime, number, refreshBilling, requireAccount } from '../st
 import { getVideoQuote, submitVideoQuote, uploadVideoReference } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
 import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
+import { FREE_SCENE, fetchVideoScenes, findVideoScene, videoSceneFields, videoSceneName } from '../services/videoScenes'
 
+const defaultPlaceholder = '例如：为这份双人海鲜套餐制作一段诱人的展示视频，镜头从特写拉远，强调食材的新鲜与就餐的松弛感。'
 const prompt = ref('')
 const format = ref('auto')
 const duration = ref(10)
@@ -22,6 +25,11 @@ const selectedModel = ref('SEEDANCE_2_5')
 const referenceImages = ref([])
 const referenceVideos = ref([])
 const referenceAudios = ref([])
+const scenes = ref([])
+const sceneKey = ref(FREE_SCENE)
+// 提示词来自已采纳方案时记下那批方案，生成时服务端就不再附加场景参考。
+const planId = ref(null)
+const scenePicker = ref(null)
 const imageInput = ref(null)
 const videoInput = ref(null)
 const audioInput = ref(null)
@@ -73,8 +81,11 @@ const isGenerating = computed(() => Boolean(activeConversation.value?.submitting
 const notice = computed(() => activeConversation.value?.notice || '')
 const outputUrl = computed(() => workflow.value?.outputUrl || '')
 const stageLabel = computed(() => activeConversation.value?.submitting ? '正在提交创作' : ({ SUBMIT: '正在提交创作', POLL: '画面渲染中', IMPORT: '正在保存成片', QA: '正在检查成片' }[workflow.value?.stage] || '画面渲染中'))
-const readForm = () => snapshotVideoForm({ prompt: prompt.value, format: format.value, duration: duration.value, resolution: resolution.value, selectedModel: selectedModel.value, referenceImages: referenceImages.value, referenceVideos: referenceVideos.value, referenceAudios: referenceAudios.value })
+const currentScene = computed(() => findVideoScene(scenes.value, sceneKey.value))
+const readForm = () => snapshotVideoForm({ prompt: prompt.value, format: format.value, duration: duration.value, resolution: resolution.value, selectedModel: selectedModel.value, referenceImages: referenceImages.value, referenceVideos: referenceVideos.value, referenceAudios: referenceAudios.value, sceneKey: sceneKey.value, planId: planId.value })
 const applyForm = form => {
+  sceneKey.value = form.sceneKey || FREE_SCENE
+  planId.value = form.planId ?? null
   prompt.value = form.prompt
   format.value = form.format
   duration.value = form.duration
@@ -115,6 +126,8 @@ const createConversation = (form = null) => {
     referenceImages: [],
     referenceVideos: [],
     referenceAudios: [],
+    sceneKey: FREE_SCENE,
+    planId: null,
     workflow: null,
     submitting: false,
     notice: '',
@@ -197,6 +210,8 @@ const loadHistory = async (nextPage = 0) => {
 onMounted(() => { if (auth.isAuthenticated) loadHistory() })
 
 if (auth.isAuthenticated) get('/api/video/capabilities').then(data => { if (Array.isArray(data) && data.length) capabilities.value = data }).catch(() => {})
+// 场景列表取不到时场景一栏不显示，按自由创作提交。
+if (auth.isAuthenticated) fetchVideoScenes().then(data => { if (Array.isArray(data)) scenes.value = data }).catch(() => {})
 
 const clampSettings = () => {
   duration.value = Math.min(durationMax.value, Math.max(5, duration.value))
@@ -294,6 +309,7 @@ const generate = async () => {
       ratio: item.format,
       durationSeconds: item.duration,
       resolution: item.resolution,
+      ...videoSceneFields(item),
     }
     const signature = JSON.stringify(payload)
     if (item.payloadSignature !== signature) { item.requestKey = `video-${crypto.randomUUID()}`; item.payloadSignature = signature }
@@ -365,10 +381,11 @@ const openRightTab = async (tab) => {
   // 手机上预览区在表单下方，点了入口直接滚过去。
   if (window.matchMedia('(max-width: 760px)').matches) canvas.value?.$el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-const applyPlan = (form, letter, images) => {
+const applyPlan = (form, letter, images, batchId) => {
   // 从灵感记录复用时换回当时的参考图，提示词里的「图1、图2」才对得上。
   if (images) referenceImages.value = images
   prompt.value = form.prompt
+  planId.value = batchId ?? null
   format.value = form.format
   duration.value = form.duration
   saveActiveConversation()
@@ -392,6 +409,8 @@ onBeforeUnmount(() => {
   pollTimers.forEach(timer => window.clearTimeout(timer))
 })
 watch(selectedModel, () => { clampSettings(); enforceMaterialLimits() })
+// 描述框清空就不再算「来自方案」，之后写的内容会附加场景参考。
+watch(prompt, value => { if (!value.trim()) planId.value = null })
 watch(format, () => {
   isMorphing.value = true
   window.clearTimeout(morphTimer)
@@ -406,6 +425,19 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       <div class="video-editor-heading"><div><h1>视频创作</h1></div><button class="vp-entry" type="button" :aria-pressed="rightTab === 'plan'" @click="openRightTab('plan')"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />帮我出方案</button><button class="video-history-trigger" type="button" :aria-expanded="historyOpen" @click="historyOpen = !historyOpen"><span class="material-symbols-outlined">history</span>创作记录</button></div>
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
       <fieldset class="video-workbench-scroll vs-form flex-1 overflow-y-auto" :disabled="isGenerating || activeConversation?.loading">
+        <section v-if="currentScene" class="vs-group">
+          <span class="vs-label">创作场景<small>可不选</small></span>
+          <div class="vs-scene-field">
+            <button type="button" class="vs-scene-pick" aria-haspopup="dialog" @click="scenePicker?.open()">
+              <span class="vs-scene-cover is-small" :data-scene="currentScene.key"><span class="material-symbols-outlined" aria-hidden="true">{{ currentScene.icon }}</span></span>
+              <span class="vs-scene-text"><strong>{{ currentScene.name }}</strong><small>{{ currentScene.summary }}</small></span>
+              <span class="vs-scene-action">{{ sceneKey === FREE_SCENE ? '选择场景' : '更换' }}</span>
+            </button>
+            <button v-if="sceneKey !== FREE_SCENE" type="button" class="vs-scene-clear" aria-label="清除场景，回到自由创作" @click="sceneKey = FREE_SCENE"><X :size="14" :stroke-width="2.2" aria-hidden="true" /></button>
+          </div>
+          <small v-if="currentScene.materialHint" class="vs-scene-hint">{{ currentScene.materialHint }}</small>
+        </section>
+
         <section class="vs-group">
           <span class="vs-label">素材<small>均可选</small></span>
           <div class="vs-tiles">
@@ -425,7 +457,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
         <section class="vs-group">
           <label for="video-prompt" class="vs-label">描述你的成片需求</label>
-          <textarea id="video-prompt" v-model="prompt" class="vs-textarea" rows="5" placeholder="例如：为这份双人海鲜套餐制作一段诱人的展示视频，镜头从特写拉远，强调食材的新鲜与就餐的松弛感。" />
+          <textarea id="video-prompt" v-model="prompt" class="vs-textarea" rows="5" :placeholder="currentScene?.placeholder || defaultPlaceholder" />
         </section>
 
         <section class="vs-settings">
@@ -482,7 +514,10 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         :max-duration="durationMax"
         :ratios="ratioOptions.map(option => option.value)"
         :locked="isGenerating || Boolean(activeConversation?.loading)"
+        :scene="sceneKey"
+        :scenes="scenes"
         @apply="applyPlan"
+        @scene="key => { sceneKey = key }"
       />
       <div v-if="historyOpen" class="vs-drawer-backdrop" aria-hidden="true" @click="historyOpen = false" />
       <aside v-if="historyOpen" id="video-history" class="vs-drawer" aria-label="视频创作记录" @keydown.esc="historyOpen = false">
@@ -503,7 +538,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
             @click="selectConversation(item)"
           >
             <span class="vs-drawer-thumb"><video v-if="item.workflow?.outputUrl" :src="`${item.workflow.outputUrl}#t=0.1`" muted playsinline preload="metadata" aria-hidden="true" /><Film v-else :size="18" :stroke-width="1.6" aria-hidden="true" /></span>
-            <span class="vs-drawer-text"><strong>{{ item.title }}</strong><small><span :class="`is-${statusTone(item)}`">{{ conversationStatus(item) }}</span> · {{ item.duration }} 秒<template v-if="item.updatedAt"> · {{ videoHistoryTime(item.updatedAt) }}</template></small></span>
+            <span class="vs-drawer-text"><strong>{{ item.title }}</strong><small><span :class="`is-${statusTone(item)}`">{{ conversationStatus(item) }}</span><template v-if="videoSceneName(scenes, item.sceneKey)"> · {{ videoSceneName(scenes, item.sceneKey) }}</template> · {{ item.duration }} 秒<template v-if="item.updatedAt"> · {{ videoHistoryTime(item.updatedAt) }}</template></small></span>
           </button>
           <p v-if="!conversations.length" class="vs-drawer-empty">从一段新的商家故事开始。</p>
           <p v-if="historyLoading" class="vs-drawer-empty" role="status">正在读取创作记录…</p>
@@ -515,6 +550,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         </div>
       </aside>
     </VideoPreviewPanel>
+    <VideoScenePicker ref="scenePicker" v-model="sceneKey" :scenes="scenes" />
     <dialog ref="quoteDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="video-price-title" @cancel.prevent="closeQuote">
       <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="(billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
     </dialog>

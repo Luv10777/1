@@ -12,6 +12,7 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.common.web.PageResult;
+import com.wuyao.growth.video.VideoScenes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -41,12 +42,15 @@ public class VideoPlanService {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VIDEO_PLANNER)) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "出方案模型尚未配置");
         String style = trim(request.style()), idea = trim(request.idea());
+        // 「换一批」固定用上一批的场景，不跟工作台当前的选择走。
+        String scene = request.previousPlanId() == null ? VideoScenes.normalize(request.sceneKey())
+                : plans.findById(request.previousPlanId()).map(VideoPlan::getSceneKey).orElse(null);
         var images = List.copyOf(request.imageAssetIds());
         var existing = plans.findByRequestKey(request.requestKey());
         if (existing.isPresent()) {
             var prior = existing.get();
             if (!prior.getImageAssetIds().equals(images) || prior.isReferenceVideo() != request.referenceVideo()
-                    || !Objects.equals(prior.getStyle(), style)
+                    || !Objects.equals(prior.getStyle(), style) || !Objects.equals(prior.getSceneKey(), scene)
                     || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousPlanId(), request.previousPlanId())) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的方案，请重新提交");
             }
@@ -69,6 +73,7 @@ public class VideoPlanService {
         plan.setReferenceVideo(request.referenceVideo());
         plan.setStyle(style);
         plan.setIdea(idea);
+        plan.setSceneKey(scene);
         plan.setPreviousPlanId(request.previousPlanId());
         plan.setBillingReservationId(billing.reserve("video-plan:" + request.requestKey(), "VIDEO_PLAN",
                 BillingService.VIDEO_PLAN_CREDITS, (request.previousPlanId() == null ? "视频方案" : "视频方案换一批") + " · 预占 1 烟火"));
@@ -91,7 +96,7 @@ public class VideoPlanService {
                 p.getImageAssetIds().stream().map(id -> assets.imagePreview(id)
                         .map(image -> new VideoPlanDtos.Image(id, image.name(), image.url()))
                         .orElse(new VideoPlanDtos.Image(id, "参考图已不可用", null))).toList(),
-                p.getPlans(), p.getCreatedAt())).toList());
+                p.getPlans(), p.getCreatedAt(), p.getSceneKey())).toList());
     }
 
     @Transactional(readOnly = true)

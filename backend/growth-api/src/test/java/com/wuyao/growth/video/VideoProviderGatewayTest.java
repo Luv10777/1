@@ -28,6 +28,22 @@ import static org.mockito.Mockito.*;
 
 class VideoProviderGatewayTest {
     @Test
+    void bothProtocolsSendTheSceneReferenceAfterTheUserPrompt() {
+        var request = new VideoDtos.Create("scene-request", "展示商品", List.of(), null,
+                "SEEDANCE_2_5", "auto", 10, "720p", null, null, null, null, "ecommerce", null);
+        var volcengine = new ObjectMapper().valueToTree(volcengineGateway(mock(AssetService.class), mock(HttpClient.class)).buildSubmitRequest(request));
+        assertThat(volcengine.path("content").get(0).path("text").asText()).startsWith("展示商品\n\n【创作场景：电商带货】");
+        assertThat((String) gateway(mock(AssetService.class), mock(HttpClient.class)).buildSubmitRequest(request).get("prompt"))
+                .startsWith("展示商品\n\n【创作场景：电商带货】");
+    }
+
+    @Test
+    void requestsWithoutSceneSerializeExactlyAsBeforeSoStoredHashesStillMatch() throws Exception {
+        var request = new VideoDtos.Create("old-request", "展示商品", List.of(), null, "SEEDANCE_2_5", "auto", 10, "720p");
+        assertThat(new ObjectMapper().writeValueAsString(request)).doesNotContain("sceneKey", "planId");
+    }
+
+    @Test
     void everySelectedVideoAndAudioIsSignedAndSentInOrder() {
         var assets = mock(AssetService.class);
         when(assets.presignedReference(anyLong(), anyString())).thenAnswer(i -> "https://storage.example/" + i.getArgument(0));

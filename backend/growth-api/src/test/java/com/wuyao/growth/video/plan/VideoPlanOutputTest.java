@@ -47,7 +47,19 @@ class VideoPlanOutputTest {
     }
 
     @Test void promptMentionsPreviousBatchForAnotherRound() {
-        String text = VideoPlanOutput.prompt(2, true, "高级质感", "突出补水", List.of(Map.of("title", "晨光", "idea", "清晨桌面")));
-        assertThat(text).contains("2 张参考图", "运镜节奏", "高级质感", "突出补水", "换一批", "晨光：清晨桌面");
+        String text = VideoPlanOutput.prompt(2, true, "高级质感", "突出补水", List.of(Map.of("title", "晨光", "idea", "清晨桌面")), null);
+        assertThat(text).contains("2 张参考图", "运镜节奏", "高级质感", "突出补水", "换一批", "晨光：清晨桌面")
+                .doesNotContain("创作场景");
+    }
+
+    @Test void sceneIsAReferenceThatYieldsToTheMerchantAndStyleOnlySetsTone() {
+        String text = VideoPlanOutput.prompt(1, false, "温馨治愈", "新品锅底", List.of(), "local_life");
+        assertThat(text).contains("创作场景：本地生活探店", "门头", "商家的一句话需求和素材优先", "不必套同一个结构",
+                "风格只管语气、节奏和画面质感");
+    }
+
+    @Test void freeOrUnknownSceneAddsNothing() {
+        assertThat(VideoPlanOutput.prompt(1, false, null, "x", List.of(), "free")).doesNotContain("创作场景");
+        assertThat(VideoPlanOutput.prompt(1, false, null, "x", List.of(), "no_such_scene")).doesNotContain("创作场景");
     }
 }

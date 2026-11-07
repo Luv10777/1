@@ -5,6 +5,7 @@ import YanhuoIcon from './YanhuoIcon.vue'
 import { refreshBilling, requireAccount } from '../stores/billing'
 import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPlanRecordImages, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
+import { FREE_SCENE, videoSceneKey, videoSceneName } from '../services/videoScenes'
 import { auth } from '../stores/auth'
 
 // 视频工作台右侧「视频方案」：可选功能，出 3 个版本后「用这个」填进左侧表单，商家仍可自己写。
@@ -16,8 +17,11 @@ const props = defineProps({
   maxDuration: { type: Number, default: 30 },
   ratios: { type: Array, default: () => [] },
   locked: Boolean,
+  // 工作台「场景」一栏选的场景；出方案时参考它，「换一批」由服务端沿用上一批的场景。
+  scene: { type: String, default: FREE_SCENE },
+  scenes: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['apply'])
+const emit = defineEmits(['apply', 'scene'])
 
 const config = ref(null)
 const style = ref('')
@@ -47,6 +51,7 @@ const styleText = computed(() => (customOpen.value ? customStyle.value : style.v
 const unavailable = computed(() => config.value && !config.value.configured)
 const planImages = computed(() => props.images.slice(0, config.value?.maxImages ?? 30))
 const missingRecordImages = computed(() => record.value?.images.filter(image => !image.url).length || 0)
+const sceneName = computed(() => videoSceneName(props.scenes, props.scene))
 
 const fetchRecords = async page => {
   recordsLoading.value = true
@@ -105,7 +110,8 @@ const run = async (previousPlanId = null) => {
   working.value = true
   try {
     const imageAssetIds = await Promise.all(planImages.value.map(entry => props.upload(entry, 'IMAGE')))
-    const body = { imageAssetIds, referenceVideo: Boolean(props.video), style: styleText.value, idea: idea.value.trim(), previousPlanId }
+    const body = { imageAssetIds, referenceVideo: Boolean(props.video), style: styleText.value, idea: idea.value.trim(), previousPlanId,
+      ...(videoSceneKey(props.scene) !== FREE_SCENE && { sceneKey: props.scene }) }
     // 网络中断后重试同一份请求沿用原编号，不会重复预占烟火。
     if (JSON.stringify(body) !== signature) { requestKey = `video-plan-${crypto.randomUUID()}`; signature = JSON.stringify(body) }
     const images = planImages.value.map(entry => entry.url)
@@ -139,6 +145,8 @@ const openRecord = item => {
   style.value = customOpen.value ? '' : item.style || ''
   customStyle.value = customOpen.value ? item.style : ''
   idea.value = item.idea || ''
+  // 工作台的场景一起切回这批当时的场景，之后的生成和这批方案用同一个场景。
+  emit('scene', videoSceneKey(item.sceneKey))
   showResults.value = true
 }
 const resume = async id => {
@@ -172,7 +180,7 @@ const use = (plan, index) => {
   if (props.locked) return
   appliedIndex.value = index
   const images = record.value ? videoPlanRecordImages(record.value, props.images) : null
-  emit('apply', videoPlanForm(plan, { maxDuration: props.maxDuration, ratios: props.ratios }), videoPlanLetters[index], images)
+  emit('apply', videoPlanForm(plan, { maxDuration: props.maxDuration, ratios: props.ratios }), videoPlanLetters[index], images, result.value.id)
 }
 </script>
 
@@ -189,6 +197,7 @@ const use = (plan, index) => {
         <p v-else class="vp-muted">还没有参考图，也可以只按一句话出方案；在左侧添加商品图效果更好。</p>
         <p v-if="images.length > planImages.length" class="vp-muted">方案仅参考前 {{ planImages.length }} 张图片，生成视频时仍使用全部素材。</p>
       </section>
+      <p v-if="sceneName" class="vp-scene">按「{{ sceneName }}」场景出方案，可在左侧「创作场景」更换。</p>
       <section class="vp-section">
         <strong class="vp-heading">风格<small>可不选</small></strong>
         <div class="vp-chips">
@@ -210,7 +219,7 @@ const use = (plan, index) => {
         <strong class="vp-heading">灵感记录<small>出过的方案都会留在这里，可以再看或直接用</small></strong>
         <button v-for="item in records" :key="item.id" type="button" class="vp-record" :class="{ active: record?.id === item.id }" :disabled="working" @click="openRecord(item)">
           <span class="vp-record-thumbs"><img v-for="image in item.images.filter(image => image.url).slice(0, 3)" :key="image.assetId" :src="image.url" alt=""><Sparkles v-if="!item.images.some(image => image.url)" :size="16" :stroke-width="1.6" aria-hidden="true" /></span>
-          <span class="vp-record-text"><strong>{{ item.plans.map(plan => plan.title).join(' / ') }}</strong><small>{{ videoHistoryTime(item.createdAt) }}<template v-if="item.style"> · {{ item.style }}</template><template v-if="item.idea"> · {{ item.idea }}</template></small></span>
+          <span class="vp-record-text"><strong>{{ item.plans.map(plan => plan.title).join(' / ') }}</strong><small>{{ videoHistoryTime(item.createdAt) }}<template v-if="videoSceneName(scenes, item.sceneKey)"> · {{ videoSceneName(scenes, item.sceneKey) }}</template><template v-if="item.style"> · {{ item.style }}</template><template v-if="item.idea"> · {{ item.idea }}</template></small></span>
         </button>
         <p v-if="recordsLoading" class="vp-muted" role="status">正在读取灵感记录…</p>
         <template v-else-if="recordsError">
