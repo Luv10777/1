@@ -217,12 +217,12 @@ const use = (plan, index) => {
         <div v-if="currentScene" class="ip-styles">
           <span class="ip-context-label">场景</span>
           <button type="button" class="has-thumb" :class="{ active: videoSceneKey(scene) !== FREE_SCENE }" aria-haspopup="dialog" @click="emit('pick-scene')"><img v-if="videoSceneCover(currentScene.key)" :src="videoSceneCover(currentScene.key)" alt="">{{ currentScene.name }}</button>
-          <button type="button" class="ip-text-button" aria-haspopup="dialog" @click="emit('pick-scene')">{{ videoSceneKey(scene) === FREE_SCENE ? '选择场景' : '更换场景' }}</button>
+          <button type="button" class="is-green" aria-haspopup="dialog" @click="emit('pick-scene')">{{ videoSceneKey(scene) === FREE_SCENE ? '选择场景' : '更换场景' }}</button>
         </div>
         <div class="ip-styles" role="group" aria-label="风格，可不选">
           <span class="ip-context-label">风格</span>
           <button v-for="item in videoPlanStyles" :key="item" type="button" :aria-pressed="style === item" :class="{ active: style === item }" @click="pickStyle(item)">{{ item }}</button>
-          <button type="button" :aria-pressed="customOpen" :class="{ active: customOpen }" @click="openCustom">自己填</button>
+          <button type="button" class="is-green" :aria-pressed="customOpen" @click="openCustom">自己填</button>
           <input v-if="customOpen" v-model="customStyle" maxlength="40" aria-label="自己填写风格" placeholder="例如：复古港风、清冷极简">
         </div>
         <label for="vp-idea" class="sr-only">一句话说说想要什么</label>

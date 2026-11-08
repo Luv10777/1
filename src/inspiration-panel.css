@@ -29,6 +29,8 @@
 .ip-panel .ip-text-button:hover:not(:disabled) { text-decoration: underline; }
 .ip-styles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ip-panel .ip-styles button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: var(--ip-fill); color: var(--ip-ink); font-size: 12px; cursor: pointer; transition: background .18s, color .18s; }
+.ip-panel .ip-styles button.is-green { background: var(--ip-accent); color: var(--ip-on-accent); font-weight: 600; }
+.ip-panel .ip-styles button.is-green:hover:not(:disabled) { background: var(--ip-accent-hover); }
 .ip-panel .ip-styles button.has-thumb { display: inline-flex; align-items: center; gap: 6px; padding-left: 3px; }
 .ip-styles button img { width: 34px; height: 24px; border-radius: 12px 4px 4px 12px; object-fit: cover; }
 .ip-panel .ip-styles button.active { background: var(--ip-accent-wash); color: var(--ip-accent-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--ip-accent); }
