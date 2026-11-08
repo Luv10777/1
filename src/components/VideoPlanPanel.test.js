@@ -192,10 +192,13 @@ test('plans follow the workbench scene, and opening a record switches the workbe
   const scenes = [{ key: 'free', name: '自由创作' }, { key: 'ecommerce', name: '电商带货' }, { key: 'drama', name: '剧情短片' }]
   const record = { id: 5, style: '', idea: '', sceneKey: 'drama', createdAt: new Date().toISOString(), plans, images: [] }
   const picked = []
-  const panel = await mountPanel(undefined, { scene: 'ecommerce', scenes, onScene: key => picked.push(key) }, { history: [record] })
+  let pickerOpened = 0
+  const panel = await mountPanel(undefined, { scene: 'ecommerce', scenes, onScene: key => picked.push(key), onPickScene: () => { pickerOpened++ } }, { history: [record] })
   try {
-    assert.match(panel.text(panel.root), /场景电商带货/)
-    assert.match(panel.text(panel.root), /剧情短片/)
+    assert.match(panel.text(panel.root), /场景电商带货更换场景/)
+    assert.doesNotMatch(panel.text(panel.root), /自由创作/, 'scenes are not all laid out in the panel')
+    panel.button('更换场景').props.onClick(); await panel.settle()
+    assert.equal(pickerOpened, 1, 'the button opens the workbench scene picker')
     panel.button('晨光').props.onClick(); await panel.settle()
     assert.deepEqual(picked, ['drama'])
     assert.match(panel.text(panel.root), /剧情短片 · 今天/)

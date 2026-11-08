@@ -5,7 +5,7 @@ import YanhuoIcon from './YanhuoIcon.vue'
 import { refreshBilling, requireAccount } from '../stores/billing'
 import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPlanRecordImages, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
-import { FREE_SCENE, videoSceneKey, videoSceneName } from '../services/videoScenes'
+import { FREE_SCENE, findVideoScene, videoSceneCover, videoSceneKey, videoSceneName } from '../services/videoScenes'
 import { auth } from '../stores/auth'
 import '../inspiration-panel.css'
 
@@ -22,7 +22,8 @@ const props = defineProps({
   scene: { type: String, default: FREE_SCENE },
   scenes: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['apply', 'scene'])
+// pick-scene：打开工作台的「选择创作场景」弹窗，选中后由工作台把场景传回来。
+const emit = defineEmits(['apply', 'scene', 'pick-scene'])
 
 const config = ref(null)
 const style = ref('')
@@ -52,8 +53,8 @@ const styleText = computed(() => (customOpen.value ? customStyle.value : style.v
 const unavailable = computed(() => config.value && !config.value.configured)
 const planImages = computed(() => props.images.slice(0, config.value?.maxImages ?? 30))
 const missingRecordImages = computed(() => record.value?.images.filter(image => !image.url).length || 0)
-const sceneName = computed(() => videoSceneName(props.scenes, props.scene))
 // 这批方案实际用的场景（「换一批」沿用上一批的），以服务端记录为准。
+const currentScene = computed(() => findVideoScene(props.scenes, props.scene))
 const resultSceneName = computed(() => videoSceneName(props.scenes, result.value?.sceneKey))
 // 结果页标题用：这批方案当初的一句话、风格、参考图张数和时间。
 const resultInfo = ref(null)
@@ -204,10 +205,6 @@ const use = (plan, index) => {
 <template>
   <section class="vp-panel ip-panel" aria-label="视频方案">
     <template v-if="!showResults || !result">
-      <div class="ip-hero">
-        <h2>说一句想要的视频，一方志给你三种拍法。</h2>
-        <p>按你的素材、场景和想法出 3 个版本的提示词和分镜，选一个填进左侧描述框。不用也可以直接自己写。</p>
-      </div>
       <div class="ip-composer">
         <div class="ip-context">
           <span class="ip-context-label">素材</span>
@@ -215,13 +212,13 @@ const use = (plan, index) => {
           <span v-if="planImages.length > 6" class="ip-chip">+{{ planImages.length - 6 }} 张</span>
           <span v-if="video" class="ip-chip has-thumb"><span class="ip-chip-icon"><Film :size="15" :stroke-width="1.6" aria-hidden="true" /></span>参考视频 · 只参考运镜</span>
           <span v-if="!planImages.length && !video" class="ip-chip is-empty">还没有素材，在左侧添加商品图效果更好</span>
-          <template v-if="sceneName">
-            <span class="ip-context-divider" aria-hidden="true" />
-            <span class="ip-context-label">场景</span>
-            <span class="ip-chip is-accent" :title="'可在左侧「创作场景」更换'">{{ sceneName }}</span>
-          </template>
         </div>
         <p v-if="images.length > planImages.length" class="ip-muted">方案仅参考前 {{ planImages.length }} 张图片，生成视频时仍使用全部素材。</p>
+        <div v-if="currentScene" class="ip-styles">
+          <span class="ip-context-label">场景</span>
+          <button type="button" class="has-thumb" :class="{ active: videoSceneKey(scene) !== FREE_SCENE }" aria-haspopup="dialog" @click="emit('pick-scene')"><img v-if="videoSceneCover(currentScene.key)" :src="videoSceneCover(currentScene.key)" alt="">{{ currentScene.name }}</button>
+          <button type="button" class="ip-text-button" aria-haspopup="dialog" @click="emit('pick-scene')">{{ videoSceneKey(scene) === FREE_SCENE ? '选择场景' : '更换场景' }}</button>
+        </div>
         <div class="ip-styles" role="group" aria-label="风格，可不选">
           <span class="ip-context-label">风格</span>
           <button v-for="item in videoPlanStyles" :key="item" type="button" :aria-pressed="style === item" :class="{ active: style === item }" @click="pickStyle(item)">{{ item }}</button>

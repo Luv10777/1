@@ -426,7 +426,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       <p v-if="activeConversation?.loading" class="video-history-message" role="status">正在恢复提示词、参考素材与输出选项…</p>
       <fieldset class="video-workbench-scroll vs-form flex-1 overflow-y-auto" :disabled="isGenerating || activeConversation?.loading">
         <section v-if="currentScene" class="vs-group">
-          <span class="vs-label">创作场景<small>可不选</small></span>
+          <span class="vs-label">创作场景</span>
           <div class="vs-scene-field">
             <button type="button" class="vs-scene-pick" aria-haspopup="dialog" @click="scenePicker?.open()">
               <span class="vs-scene-cover is-small" :data-scene="currentScene.key"><img v-if="videoSceneCover(currentScene.key)" :src="videoSceneCover(currentScene.key)" alt=""><span v-else class="material-symbols-outlined" aria-hidden="true">{{ currentScene.icon }}</span></span>
@@ -439,7 +439,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         </section>
 
         <section class="vs-group">
-          <span class="vs-label">素材<small>均可选</small></span>
+          <span class="vs-label">素材</span>
           <div class="vs-tiles">
             <button class="vs-tile" type="button" @click="imageInput?.click()" @dragover.prevent @drop="handleMaterialDrop('image', $event)"><ImagePlus :size="18" :stroke-width="1.6" aria-hidden="true" /><span>参考图片</span><small>最多 {{ materialLimits.image }} 张</small></button>
             <button class="vs-tile" type="button" @click="videoInput?.click()" @dragover.prevent @drop="handleMaterialDrop('video', $event)"><Film :size="18" :stroke-width="1.6" aria-hidden="true" /><span>参考视频</span><small>最多 {{ materialLimits.video }} 个</small></button>
@@ -518,6 +518,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         :scenes="scenes"
         @apply="applyPlan"
         @scene="key => { sceneKey = key }"
+        @pick-scene="scenePicker?.open()"
       />
       <div v-if="historyOpen" class="vs-drawer-backdrop" aria-hidden="true" @click="historyOpen = false" />
       <aside v-if="historyOpen" id="video-history" class="vs-drawer" aria-label="视频创作记录" @keydown.esc="historyOpen = false">

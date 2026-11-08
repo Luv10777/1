@@ -13,9 +13,8 @@
 }
 .ip-panel { display: flex; flex-direction: column; gap: 24px; color: var(--ip-ink); font-size: 13px; line-height: 1.8; }
 .ip-panel :is(button, a) { font-family: inherit; }
-.ip-hero { display: flex; flex-direction: column; gap: 6px; max-width: 640px; }
-.ip-hero h2, .ip-results-title h2 { margin: 0; font: 600 26px/1.4 var(--ip-serif); letter-spacing: .02em; text-wrap: pretty; }
-.ip-hero p, .ip-muted { margin: 0; color: var(--ip-muted); }
+.ip-results-title h2 { margin: 0; font: 600 26px/1.4 var(--ip-serif); letter-spacing: .02em; text-wrap: pretty; }
+.ip-muted { margin: 0; color: var(--ip-muted); }
 .ip-composer { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; border-radius: 12px; background: var(--ip-surface); box-shadow: 0 0 0 1px var(--ip-line), 0 6px 20px rgba(44,62,80,.05); }
 .ip-context { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .ip-context-label { color: var(--ip-faint); font-size: 12px; }
@@ -30,6 +29,8 @@
 .ip-panel .ip-text-button:hover:not(:disabled) { text-decoration: underline; }
 .ip-styles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ip-panel .ip-styles button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 15px; background: var(--ip-fill); color: var(--ip-ink); font-size: 12px; cursor: pointer; transition: background .18s, color .18s; }
+.ip-panel .ip-styles button.has-thumb { display: inline-flex; align-items: center; gap: 6px; padding-left: 3px; }
+.ip-styles button img { width: 34px; height: 24px; border-radius: 12px 4px 4px 12px; object-fit: cover; }
 .ip-panel .ip-styles button.active { background: var(--ip-accent-wash); color: var(--ip-accent-text); font-weight: 600; box-shadow: inset 0 0 0 1px var(--ip-accent); }
 .ip-panel .ip-styles input { height: 30px; min-width: 180px; padding: 0 12px; border: 0; border-radius: 15px; outline: 0; background: var(--ip-fill); color: var(--ip-ink); font: 12px inherit; }
 .ip-panel .ip-idea { width: 100%; box-sizing: border-box; min-height: 56px; padding: 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ip-ink); font: 16px/1.7 var(--font-sans, inherit); }

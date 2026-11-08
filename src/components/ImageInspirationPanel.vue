@@ -185,10 +185,6 @@ const use = (plan, index) => {
 <template>
   <section class="poster-idea ip-panel" aria-label="灵感方案">
     <template v-if="!showResults || !result">
-      <div class="ip-hero">
-        <h2>说一句想要的画面，一方志给你三种画法。</h2>
-        <p>按左侧的参考图和绘图风格出 3 个画面描述，选一个填进「画面描述」。不用也可以直接自己写。</p>
-      </div>
       <div class="ip-composer">
         <div class="ip-context">
           <span class="ip-context-label">参考</span>
