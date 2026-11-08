@@ -52,3 +52,22 @@ test('drawing controls and style gallery describe general images without a purpo
     assert.match(html, /drawing-styles\/watercolor\.webp/)
   } finally { await vite.close() }
 })
+
+test('poster gallery shows a visible preview as saving and never prints the item role code', async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom' })
+  try {
+    const { default: Gallery } = await vite.ssrLoadModule('/src/components/PosterGalleryView.vue')
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:path(.*)*', component: { render: () => null } }] })
+    await router.push('/image/create/poster')
+    const turn = { id: 9, parentId: null, brief: '旅行包换到火车站台', status: 'GENERATING', question: '', quality: '2K', ratio: '3:4',
+      completed: 0, count: 1, createdAt: '2026-11-08T00:00:00Z',
+      items: [{ id: 1, ordinal: 0, role: 'SUBJECT', width: 1536, height: 2048, url: '/test-only.png', status: 'GENERATING' }] }
+    const studio = reactive({ workspaceTab: 'result', history: [], thread: [turn], current: turn, busy: false, pending: null,
+      configured: true, revision: '', error: '', optimistic: false, locked: false, style: '', dimensions: { width: 1536, height: 2048 },
+      canUseAsset: () => false })
+    const html = await renderToString(createSSRApp({ render: () => h(Gallery, { studio }) }).use(router))
+    assert.match(html, /图片已出，正在保存原图/)
+    assert.doesNotMatch(html, /正在生成或接收图片/)
+    assert.doesNotMatch(html, /SUBJECT/)
+  } finally { await vite.close() }
+})

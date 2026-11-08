@@ -168,8 +168,7 @@
 .poster-result-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: min(100%, calc(min(40vh, 420px) * var(--poster-image-ratio))); min-height: 0; padding: 20px; border: 0; border-radius: 8px; box-shadow: none; background: var(--poster-subtle); color: var(--poster-muted); text-align: center; font-size: 12px; }
 .poster-result-placeholder.poster-skeleton-card { position: relative; }
 .poster-result-placeholder small { font-size: 12px; }
-.poster-item-top { display: flex; align-items: center; gap: 2px; margin-top: 10px; }
-.poster-item-meta { flex: 1; min-width: 0; color: var(--poster-muted); font-size: 13px; }
+.poster-item-top { display: flex; align-items: center; justify-content: flex-end; gap: 2px; margin-top: 10px; }
 .poster-workbench .poster-item-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin: 0; }
 .poster-workbench .poster-item-actions button:not(.poster-icon-button) { min-height: 32px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--poster-red-text); font-size: 13px; }
 .poster-workbench .poster-item-actions button:not(.poster-icon-button):hover:not(:disabled) { background: var(--poster-subtle); }
@@ -251,7 +250,7 @@
 .poster-lightbox-stage { display: flex; align-items: center; justify-content: center; min-width: 100%; min-height: 100%; padding: 20px; box-sizing: border-box; }
 .poster-lightbox-stage img { display: block; flex: 0 0 auto; max-width: none; max-height: none; object-fit: contain; box-shadow: 0 10px 35px rgba(0,0,0,.25); }
 .poster-workbench :is(.poster-result-empty p, .poster-skeleton-copy p, .poster-result-summary, .poster-result-error, .poster-result-note, .poster-empty-history) { font-size: 13px; line-height: 1.7; }
-.poster-workbench :is(.poster-gallery-tabs small, .poster-item-meta span, .poster-result-placeholder small, .poster-library-card-copy small) { font-size: 12px; }
+.poster-workbench :is(.poster-gallery-tabs small, .poster-result-placeholder small, .poster-library-card-copy small) { font-size: 12px; }
 .poster-workbench :is(.poster-conversation-heading small, .poster-edit-form label, .poster-edit-form small) { font-size: 12px; line-height: 1.6; }
 .poster-workbench :is(.poster-library-head strong, .poster-library-head small, .poster-library-empty, .poster-library-count, .poster-library-card-copy strong, .poster-reference-preview span, .poster-reference-chip :is(select, .app-select-button)) { font-size: 12px; line-height: 1.5; }
 .poster-workbench :is(.poster-variation > strong) { font-size: 13px; font-weight: 600; }

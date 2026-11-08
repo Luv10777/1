@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 import {
   IMAGE_STATUS,
   imageDimensions,
+  imageStatusLabel,
   isImageActive,
 } from "../domain/imageCreation";
 import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from "../domain/posterStyles";
@@ -297,7 +298,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
               <div>
                 <h3>{{ turnPrompt(turn) }}</h3>
                 <p class="poster-result-head" role="status">
-                  <span class="poster-status"><i :class="{ live: isImageActive(turn.status) }" />{{ IMAGE_STATUS[turn.status] }}</span>
+                  <span class="poster-status"><i :class="{ live: isImageActive(turn.status) }" />{{ imageStatusLabel(turn) }}</span>
                   <span>· {{ turn.completed }}/{{ turn.count }} 张 · {{ index === 0 ? '初稿' : `第 ${index + 1} 版` }} · <time>{{ new Date(turn.createdAt).toLocaleString() }}</time></span>
                 </p>
               </div>
@@ -358,10 +359,10 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   type="button"
                   class="poster-image-button"
                   :style="{ aspectRatio: item.width + '/' + item.height }"
-                  :aria-label="`放大查看${item.role}`"
+                  aria-label="放大查看图片"
                   @click="showPreview(item)"
                 >
-                  <img :src="item.url" :alt="item.role" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
+                  <img :src="item.url" alt="生成的图片" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
                 </button>
                 <div
                   v-else
@@ -372,18 +373,16 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                     class="poster-placeholder-mark"
                     src="/images/brand/yifangzhi-mark.png"
                     alt=""
-                  /><strong>{{ item.role }}</strong
-                  ><small>{{ IMAGE_STATUS[item.status] }}</small>
+                  /><small>{{ IMAGE_STATUS[item.status] }}</small>
                 </div>
                 <div class="poster-item-details">
                   <div class="poster-item-top">
-                    <span class="poster-item-meta">{{ item.role }}</span>
                     <div class="poster-item-actions">
                       <button
                         v-if="item.url"
                         type="button"
                         class="poster-icon-button"
-                        :aria-label="`下载${item.role}`"
+                        aria-label="下载图片"
                         title="下载图片"
                         :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)"
                         @click="studio.download(item)"
@@ -435,7 +434,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
     >
       <template v-if="preview">
         <header>
-          <strong>{{ preview.role }}</strong>
+          <strong>查看大图</strong>
           <div class="poster-zoom-controls" role="group" aria-label="图片缩放">
             <button
               type="button"
@@ -487,7 +486,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             <img
               ref="previewImage"
               :src="preview.url"
-              :alt="preview.role"
+              alt="生成的图片"
               :style="imageSize"
               @load="fitPreview"
             />

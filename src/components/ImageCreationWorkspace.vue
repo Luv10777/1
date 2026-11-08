@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, toRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { IMAGE_STATUS, imageDimensions } from '../domain/imageCreation'
+import { IMAGE_STATUS, imageDimensions, imageStatusLabel } from '../domain/imageCreation'
 import { ArrowUp, Check, Download, Folder, History, Pencil, RefreshCw, RotateCw, Type, X } from 'lucide-vue-next'
 
 const props = defineProps({ studio: { type: Object, required: true } })
@@ -73,7 +73,7 @@ async function saveTitle(entry) {
       <div class="creation-output-head">
         <div>
           <p class="creation-original">{{ studio.current.brief || '根据商品照片自动创作' }}</p>
-          <div class="creation-progress" role="status" aria-live="polite"><span class="creation-pulse" :class="{ done: !studio.active }" /><strong>{{ IMAGE_STATUS[studio.current.status] }}</strong><small>· {{ studio.current.completed }}/{{ studio.current.count }} 张</small><button v-if="studio.active" type="button" class="creation-text-button" :disabled="studio.busy" @click="studio.cancel()">取消</button></div>
+          <div class="creation-progress" role="status" aria-live="polite"><span class="creation-pulse" :class="{ done: !studio.active }" /><strong>{{ imageStatusLabel(studio.current) }}</strong><small>· {{ studio.current.completed }}/{{ studio.current.count }} 张</small><button v-if="studio.active" type="button" class="creation-text-button" :disabled="studio.busy" @click="studio.cancel()">取消</button></div>
         </div>
         <button type="button" class="creation-icon-button" aria-label="刷新" title="刷新" :disabled="studio.busy" @click="studio.load(studio.current.id)"><RefreshCw :size="17" :stroke-width="1.6" aria-hidden="true" /></button>
       </div>
