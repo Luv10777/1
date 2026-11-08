@@ -1,7 +1,7 @@
 <script setup>
 import AppSelect from './AppSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { ChevronRight, Plus, RotateCcw, X } from 'lucide-vue-next'
+import { ChevronRight, Plus, RotateCcw, Sparkles, X } from 'lucide-vue-next'
 import { IMAGE_QUALITIES, IMAGE_RATIOS } from '../domain/imageCreation'
 import { POSTER_STYLES } from '../domain/posterStyles'
 
@@ -53,7 +53,7 @@ onBeforeUnmount(() => {
 
 <template>
   <form class="poster-control-panel" @submit.prevent="studio.generate">
-    <header class="poster-control-head"><h1>灵感绘图</h1></header>
+    <header class="poster-control-head"><h1>灵感绘图</h1><button type="button" class="poster-idea-entry" :aria-pressed="studio.workspaceTab === 'plan'" @click="studio.workspaceTab = 'plan'"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案</button></header>
     <div class="poster-control-scroll">
       <section class="poster-control-group">
         <div class="poster-group-heading"><label for="poster-brief">画面描述</label><button v-if="studio.lastPrompt" type="button" class="poster-recall" :disabled="studio.locked" title="填入上一条提示词" @click="studio.recallLastPrompt(); promptInput?.focus()"><RotateCcw :size="13" aria-hidden="true" />填入上一条</button></div>

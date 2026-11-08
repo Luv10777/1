@@ -168,7 +168,7 @@ public class VideoPlanService {
     }
 
     private static VideoPlanDtos.View view(VideoPlan p) {
-        return new VideoPlanDtos.View(p.getId(), p.getStatus(), p.getPlans(), p.getErrorMessage(), p.getPreviousPlanId(), p.getCreatedAt());
+        return new VideoPlanDtos.View(p.getId(), p.getStatus(), p.getPlans(), p.getErrorMessage(), p.getPreviousPlanId(), p.getCreatedAt(), p.getSceneKey());
     }
 
     private static String trim(String value) { return value == null || value.isBlank() ? null : value.strip(); }

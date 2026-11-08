@@ -32,7 +32,7 @@ public final class VideoPlanDtos {
     }
 
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
-                       Long previousPlanId, Instant createdAt) {}
+                       Long previousPlanId, Instant createdAt, String sceneKey) {}
 
     /** 灵感记录里的一批方案，带上当初的素材和要求，方便再看或换回这些参考图复用。图片已删除时 url 为空。 */
     public record History(Long id, String style, String idea, boolean referenceVideo, List<Image> images,

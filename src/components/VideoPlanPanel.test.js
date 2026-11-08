@@ -88,7 +88,7 @@ test('video plans validate inputs, poll, apply with model limits and preserve th
     assert.equal(panel.button('正在出方案').props.disabled, true)
     assert.equal(panel.requests[0].idea, '新品上新')
     panel.timers.shift()(); await generating; await panel.settle()
-    assert.match(panel.text(panel.root), /方案 A.*方案 B.*方案 C/)
+    assert.match(panel.text(panel.root), /A晨光.*B窗边.*C静物/)
     panel.button('用这个').props.onClick(); await panel.settle()
     assert.deepEqual(panel.applied[0], [{ prompt: '晨光中的商品展示\n避免：画面文字', format: '9:16', duration: 10, shortened: true }, 'A', null, 7])
     assert.equal('sceneKey' in panel.requests[0], false)
@@ -169,8 +169,8 @@ test('leaving the page while plans are generating picks the batch up again on re
     assert.match(panel.text(panel.root), /正在出方案/)
     panel.videoPlanApi.get = async () => ({ id: 7, status: 'SUCCEEDED', plans })
     panel.timers.shift()(); await panel.settle(); await panel.settle()
-    assert.match(panel.text(panel.root), /方案 A.*方案 B.*方案 C/)
-    assert.match(panel.text(panel.root), /今天 .* 的方案/)
+    assert.match(panel.text(panel.root), /A晨光.*B窗边.*C静物/)
+    assert.match(panel.text(panel.root), /高级质感 · 今天/)
     assert.equal(storage['video-plan-pending:1'], undefined)
   } finally { await panel.close() }
 })
@@ -180,7 +180,7 @@ test('reusing a record from the inspiration list brings back the reference image
     images: [{ assetId: 11, name: '瓶身.png', url: '/a.png' }, { assetId: 12, name: '已删除', url: null }] }
   const panel = await mountPanel(undefined, { images: [{ id: 'x', assetId: 99, name: '别的图', url: '/x.png' }] }, { history: [record] })
   try {
-    panel.button('晨光 / 窗边 / 静物').props.onClick(); await panel.settle()
+    panel.button('晨光').props.onClick(); await panel.settle()
     assert.match(panel.text(panel.root), /1 张参考图已删除/)
     panel.button('用这个').props.onClick(); await panel.settle()
     assert.deepEqual(panel.applied[0][2], [{ id: 'asset-11', assetId: 11, name: '瓶身.png', url: '/a.png', file: null }])
@@ -194,16 +194,18 @@ test('plans follow the workbench scene, and opening a record switches the workbe
   const picked = []
   const panel = await mountPanel(undefined, { scene: 'ecommerce', scenes, onScene: key => picked.push(key) }, { history: [record] })
   try {
-    assert.match(panel.text(panel.root), /按「电商带货」场景出方案/)
+    assert.match(panel.text(panel.root), /场景电商带货/)
     assert.match(panel.text(panel.root), /剧情短片/)
-    panel.button('晨光 / 窗边 / 静物').props.onClick(); await panel.settle()
+    panel.button('晨光').props.onClick(); await panel.settle()
     assert.deepEqual(picked, ['drama'])
-    panel.button('改设置').props.onClick(); await panel.settle()
+    assert.match(panel.text(panel.root), /剧情短片 · 今天/)
+    panel.button('重选').props.onClick(); await panel.settle()
     panel.idea('新品上新'); await panel.settle()
-    panel.videoPlanApi.get = async () => ({ id: 7, status: 'SUCCEEDED', plans })
+    panel.videoPlanApi.get = async () => ({ id: 7, status: 'SUCCEEDED', plans, sceneKey: 'ecommerce' })
     const generating = panel.button('生成提示词').props.onClick()
     await panel.settle()
     assert.equal(panel.requests[0].sceneKey, 'ecommerce')
     panel.timers.shift()(); await generating; await panel.settle()
+    assert.match(panel.text(panel.root), /重选.*电商带货|电商带货.*重选/)
   } finally { await panel.close() }
 })

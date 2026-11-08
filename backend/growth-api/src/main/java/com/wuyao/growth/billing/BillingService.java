@@ -20,6 +20,7 @@ public class BillingService {
     public static final int IMAGE_CREDITS = 3;
     public static final int VIDEO_ANALYSIS_CREDITS = 1;
     public static final int VIDEO_PLAN_CREDITS = 1;
+    public static final int IMAGE_INSPIRATION_CREDITS = 1;
     public static final int COPY_CREDITS = 1;
     /** Live sessions reserve one hour at a time and settle by the minute. */
     public static final int LIVE_CREDITS_PER_HOUR = 35;

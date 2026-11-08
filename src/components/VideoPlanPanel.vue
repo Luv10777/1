@@ -1,12 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Film, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { Check, ChevronLeft, Film, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import YanhuoIcon from './YanhuoIcon.vue'
 import { refreshBilling, requireAccount } from '../stores/billing'
 import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPlanRecordImages, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
 import { FREE_SCENE, videoSceneKey, videoSceneName } from '../services/videoScenes'
 import { auth } from '../stores/auth'
+import '../inspiration-panel.css'
 
 // 视频工作台右侧「视频方案」：可选功能，出 3 个版本后「用这个」填进左侧表单，商家仍可自己写。
 // 出过的方案存在服务端，「灵感记录」里可以再看、再用。
@@ -52,6 +53,13 @@ const unavailable = computed(() => config.value && !config.value.configured)
 const planImages = computed(() => props.images.slice(0, config.value?.maxImages ?? 30))
 const missingRecordImages = computed(() => record.value?.images.filter(image => !image.url).length || 0)
 const sceneName = computed(() => videoSceneName(props.scenes, props.scene))
+// 这批方案实际用的场景（「换一批」沿用上一批的），以服务端记录为准。
+const resultSceneName = computed(() => videoSceneName(props.scenes, result.value?.sceneKey))
+// 结果页标题用：这批方案当初的一句话、风格、参考图张数和时间。
+const resultInfo = ref(null)
+const resultMeta = computed(() => [resultSceneName.value, resultInfo.value?.style,
+  resultInfo.value?.imageCount ? `${resultInfo.value.imageCount} 张参考图` : '',
+  resultInfo.value?.createdAt ? videoHistoryTime(resultInfo.value.createdAt) : ''].filter(Boolean).join(' · '))
 
 const fetchRecords = async page => {
   recordsLoading.value = true
@@ -123,6 +131,7 @@ const run = async (previousPlanId = null) => {
     if (plan.status === 'FAILED') { error.value = plan.errorMessage || '出方案没有完成，烟火已退回，请重试。'; return }
     result.value = plan
     resultImages.value = images
+    resultInfo.value = { idea: body.idea, style: body.style, imageCount: images.length, createdAt: plan.createdAt }
     record.value = null
     appliedIndex.value = -1
     showResults.value = true
@@ -139,6 +148,7 @@ const openRecord = item => {
   if (working.value) return
   result.value = item
   resultImages.value = item.images.map(image => image.url)
+  resultInfo.value = { idea: item.idea, style: item.style, imageCount: item.images.length, createdAt: item.createdAt }
   record.value = item
   appliedIndex.value = -1
   customOpen.value = Boolean(item.style) && !videoPlanStyles.includes(item.style)
@@ -185,82 +195,92 @@ const use = (plan, index) => {
 </script>
 
 <template>
-  <section class="vp-panel" aria-label="视频方案">
+  <section class="vp-panel ip-panel" aria-label="视频方案">
     <template v-if="!showResults || !result">
-      <p class="vp-intro">按你的素材和想法出 3 个版本的提示词和分镜，选一个填进描述框。不用也可以直接在左侧自己写。</p>
-      <section class="vp-section">
-        <strong class="vp-heading">素材<small>AI 会判断每张图怎么用，写进提示词</small></strong>
-        <div v-if="images.length || video" class="vp-materials">
-          <figure v-for="(entry, index) in planImages" :key="entry.id"><img v-if="entry.url" :src="entry.url" :alt="entry.name"><figcaption>图{{ index + 1 }}</figcaption></figure>
-          <figure v-if="video" class="is-video"><Film :size="18" :stroke-width="1.6" aria-hidden="true" /><figcaption>参考视频 · 只参考运镜</figcaption></figure>
-        </div>
-        <p v-else class="vp-muted">还没有参考图，也可以只按一句话出方案；在左侧添加商品图效果更好。</p>
-        <p v-if="images.length > planImages.length" class="vp-muted">方案仅参考前 {{ planImages.length }} 张图片，生成视频时仍使用全部素材。</p>
-      </section>
-      <p v-if="sceneName" class="vp-scene">按「{{ sceneName }}」场景出方案，可在左侧「创作场景」更换。</p>
-      <section class="vp-section">
-        <strong class="vp-heading">风格<small>可不选</small></strong>
-        <div class="vp-chips">
-          <button v-for="item in videoPlanStyles" :key="item" type="button" :aria-pressed="style === item" :class="{ active: style === item }" @click="pickStyle(item)">{{ item }}</button>
-          <button type="button" class="is-custom" :aria-pressed="customOpen" :class="{ active: customOpen }" @click="openCustom">自己填</button>
-        </div>
-        <input v-if="customOpen" v-model="customStyle" class="vp-input" maxlength="40" aria-label="自己填写风格" placeholder="例如：复古港风、清冷极简">
-      </section>
-      <section class="vp-section">
-        <label for="vp-idea" class="vp-heading">一句话说说想要什么</label>
-        <input id="vp-idea" v-model="idea" class="vp-input" maxlength="500" placeholder="例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.prevent="run()">
-      </section>
-      <div class="vp-footer">
-        <button class="vp-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成提示词' }}<span class="vp-cost"><YanhuoIcon :size="13" />{{ credits }}</span></button>
-        <small>每次出 3 个版本 · 换一批同样 {{ credits }} 烟火 · 失败不扣</small>
+      <div class="ip-hero">
+        <h2>说一句想要的视频，一方志给你三种拍法。</h2>
+        <p>按你的素材、场景和想法出 3 个版本的提示词和分镜，选一个填进左侧描述框。不用也可以直接自己写。</p>
       </div>
-      <button v-if="result" type="button" class="vp-link" @click="showResults = true">回到上一批方案</button>
-      <section ref="recordsSection" class="vp-section" aria-label="灵感记录">
-        <strong class="vp-heading">灵感记录<small>出过的方案都会留在这里，可以再看或直接用</small></strong>
-        <button v-for="item in records" :key="item.id" type="button" class="vp-record" :class="{ active: record?.id === item.id }" :disabled="working" @click="openRecord(item)">
-          <span class="vp-record-thumbs"><img v-for="image in item.images.filter(image => image.url).slice(0, 3)" :key="image.assetId" :src="image.url" alt=""><Sparkles v-if="!item.images.some(image => image.url)" :size="16" :stroke-width="1.6" aria-hidden="true" /></span>
-          <span class="vp-record-text"><strong>{{ item.plans.map(plan => plan.title).join(' / ') }}</strong><small>{{ videoHistoryTime(item.createdAt) }}<template v-if="videoSceneName(scenes, item.sceneKey)"> · {{ videoSceneName(scenes, item.sceneKey) }}</template><template v-if="item.style"> · {{ item.style }}</template><template v-if="item.idea"> · {{ item.idea }}</template></small></span>
-        </button>
-        <p v-if="recordsLoading" class="vp-muted" role="status">正在读取灵感记录…</p>
+      <div class="ip-composer">
+        <div class="ip-context">
+          <span class="ip-context-label">素材</span>
+          <span v-for="(entry, index) in planImages.slice(0, 6)" :key="entry.id" class="ip-chip has-thumb"><img v-if="entry.url" :src="entry.url" alt="">图{{ index + 1 }}</span>
+          <span v-if="planImages.length > 6" class="ip-chip">+{{ planImages.length - 6 }} 张</span>
+          <span v-if="video" class="ip-chip has-thumb"><span class="ip-chip-icon"><Film :size="15" :stroke-width="1.6" aria-hidden="true" /></span>参考视频 · 只参考运镜</span>
+          <span v-if="!planImages.length && !video" class="ip-chip is-empty">还没有素材，在左侧添加商品图效果更好</span>
+          <template v-if="sceneName">
+            <span class="ip-context-divider" aria-hidden="true" />
+            <span class="ip-context-label">场景</span>
+            <span class="ip-chip is-accent" :title="'可在左侧「创作场景」更换'">{{ sceneName }}</span>
+          </template>
+        </div>
+        <p v-if="images.length > planImages.length" class="ip-muted">方案仅参考前 {{ planImages.length }} 张图片，生成视频时仍使用全部素材。</p>
+        <div class="ip-styles" role="group" aria-label="风格，可不选">
+          <span class="ip-context-label">风格</span>
+          <button v-for="item in videoPlanStyles" :key="item" type="button" :aria-pressed="style === item" :class="{ active: style === item }" @click="pickStyle(item)">{{ item }}</button>
+          <button type="button" :aria-pressed="customOpen" :class="{ active: customOpen }" @click="openCustom">自己填</button>
+          <input v-if="customOpen" v-model="customStyle" maxlength="40" aria-label="自己填写风格" placeholder="例如：复古港风、清冷极简">
+        </div>
+        <label for="vp-idea" class="sr-only">一句话说说想要什么</label>
+        <textarea id="vp-idea" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.exact.prevent="run()" />
+        <div class="ip-composer-foot">
+          <small>每次出 3 个版本 · 换一批同价 · 失败不扣烟火</small>
+          <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成提示词' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
+        </div>
+      </div>
+      <button v-if="result" type="button" class="ip-link" @click="showResults = true">回到上一批方案</button>
+      <section ref="recordsSection" class="ip-section" aria-label="灵感记录">
+        <div class="ip-section-head"><h3>灵感记录</h3><small>出过的方案都在这里，点开可以再看、再用</small></div>
+        <div v-if="records.length" class="ip-records">
+          <button v-for="item in records" :key="item.id" type="button" class="ip-record" :class="{ active: record?.id === item.id }" :disabled="working" @click="openRecord(item)">
+            <span class="ip-record-thumbs" aria-hidden="true"><img v-for="image in item.images.filter(image => image.url).slice(0, 3)" :key="image.assetId" :src="image.url" alt=""><span v-if="!item.images.some(image => image.url)">没有参考图</span></span>
+            <ol><li v-for="(plan, index) in item.plans" :key="index"><b>{{ videoPlanLetters[index] }}</b>{{ plan.title }}</li></ol>
+            <small>{{ videoHistoryTime(item.createdAt) }}<template v-if="videoSceneName(scenes, item.sceneKey)"> · {{ videoSceneName(scenes, item.sceneKey) }}</template><template v-if="item.style || item.idea"> · {{ item.style || item.idea }}</template></small>
+          </button>
+        </div>
+        <p v-if="recordsLoading" class="ip-muted" role="status">正在读取灵感记录…</p>
         <template v-else-if="recordsError">
-          <p class="vp-status is-error" role="status">{{ recordsError }}</p>
-          <button type="button" class="vp-link" @click="loadRecords(recordsPage)">重新加载</button>
+          <p class="ip-status is-error" role="status">{{ recordsError }}</p>
+          <button type="button" class="ip-link" @click="loadRecords(recordsPage)">重新加载</button>
         </template>
-        <button v-else-if="recordsHasMore" type="button" class="vp-link" @click="loadRecords(recordsPage + 1)">加载更早的记录</button>
-        <p v-else-if="!records.length && !working" class="vp-muted">还没有出过方案。</p>
+        <button v-else-if="recordsHasMore" type="button" class="ip-link" @click="loadRecords(recordsPage + 1)">加载更早的记录</button>
+        <p v-else-if="!records.length && !working" class="ip-muted">还没有出过方案。</p>
       </section>
     </template>
 
     <template v-else>
-      <div class="vp-results-head">
-        <p><template v-if="record">{{ videoHistoryTime(record.createdAt) }} 的方案。</template>选一个方案，会填进描述框，可以再改字。</p>
-        <button type="button" class="vp-link" :disabled="working" @click="showRecords">灵感记录</button>
-        <button type="button" class="vp-link" :disabled="working" @click="showResults = false">改设置</button>
-      </div>
-      <p v-if="missingRecordImages" class="vp-status">这批方案用过的 {{ missingRecordImages }} 张参考图已删除，提示词里的图号可能对不上，用之前请核对。</p>
-      <div class="vp-cards" :class="{ 'is-working': working }">
-        <article v-for="(plan, index) in result.plans" :key="index" class="vp-card">
-          <span class="vp-letter">方案 {{ videoPlanLetters[index] }}<small v-if="appliedIndex === index">已填入描述框</small></span>
-          <h3>{{ plan.title }}</h3>
-          <p class="vp-idea">{{ plan.idea }}</p>
-          <p class="vp-meta">{{ plan.ratio === 'auto' ? '自适应' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots.length }} 个镜头</p>
-          <ul v-if="plan.materials.length" class="vp-uses">
-            <li v-for="item in plan.materials" :key="item.index"><img v-if="resultImages[item.index - 1]" :src="resultImages[item.index - 1]" alt=""><span><b>图{{ item.index }}</b>{{ item.use }}</span></li>
+      <header class="ip-results-head">
+        <div class="ip-results-title">
+          <button type="button" class="ip-back" :disabled="working" @click="showRecords"><ChevronLeft :size="14" :stroke-width="1.8" aria-hidden="true" />灵感记录</button>
+          <h2>{{ resultInfo?.idea || '按素材出的视频方案' }}</h2>
+          <small v-if="resultMeta">{{ resultMeta }}</small>
+        </div>
+        <div class="ip-results-actions">
+          <button type="button" class="ip-outline" :disabled="working" @click="showResults = false"><SlidersHorizontal :size="15" :stroke-width="1.8" aria-hidden="true" />重选</button>
+          <button type="button" class="ip-primary" :disabled="working" @click="run(result.id)"><RefreshCw :size="15" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在换一批…' : '换一批' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
+        </div>
+      </header>
+      <p v-if="missingRecordImages" class="ip-status">这批方案用过的 {{ missingRecordImages }} 张参考图已删除，提示词里的图号可能对不上，用之前请核对。</p>
+      <div class="ip-cards" :class="{ 'is-working': working }">
+        <article v-for="(plan, index) in result.plans" :key="index" class="ip-card" :class="{ 'is-applied': appliedIndex === index }">
+          <div class="ip-card-title"><span class="ip-letter">{{ videoPlanLetters[index] }}</span><h3>{{ plan.title }}</h3></div>
+          <p v-if="plan.idea" class="ip-card-idea">{{ plan.idea }}</p>
+          <p class="ip-card-meta">{{ plan.ratio === 'auto' ? '自适应' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots.length }} 个镜头</p>
+          <ul v-if="plan.materials.length" class="ip-uses">
+            <li v-for="item in plan.materials" :key="item.index" :class="{ 'no-thumb': !resultImages[item.index - 1] }"><img v-if="resultImages[item.index - 1]" :src="resultImages[item.index - 1]" alt="">图{{ item.index }} {{ item.use }}</li>
           </ul>
-          <ol class="vp-shots">
+          <ol class="ip-shots">
             <li v-for="(shot, shotIndex) in plan.shots" :key="shotIndex"><time>{{ videoPlanSeconds(shot.start) }}–{{ videoPlanSeconds(shot.end) }}s</time><span>{{ shot.description }}</span></li>
           </ol>
-          <details class="vp-prompt"><summary>完整提示词</summary><p>{{ plan.prompt }}</p></details>
-          <button type="button" class="vp-use" :class="{ active: appliedIndex === index }" :disabled="locked" @click="use(plan, index)">{{ appliedIndex === index ? '已填入' : '用这个' }}</button>
+          <details class="ip-prompt"><summary>完整提示词</summary><p>{{ plan.prompt }}</p></details>
+          <button type="button" class="ip-use" :class="{ active: appliedIndex === index }" :disabled="locked" @click="use(plan, index)"><template v-if="appliedIndex === index"><Check :size="15" :stroke-width="2" aria-hidden="true" />已填入描述框</template><template v-else>用这个</template></button>
         </article>
       </div>
-      <div class="vp-footer is-center">
-        <button type="button" class="vp-secondary" :disabled="working" @click="run(result.id)"><RefreshCw :size="15" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在换一批…' : '换一批' }}<span class="vp-cost is-plain"><YanhuoIcon :size="13" />{{ credits }}</span></button>
-      </div>
+      <p class="ip-foot-note">选中的提示词会填进左侧描述框，可以再改字；左侧素材和当初不一样时，会一起换回当初那几张。</p>
     </template>
 
-    <p v-if="working" class="vp-status" role="status">正在看图出方案，通常 1 分钟左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
-    <p v-if="unavailable" class="vp-status" role="status">出方案暂未开放，可以直接在左侧写描述。</p>
-    <p v-if="error" class="vp-status is-error" role="alert">{{ error }}</p>
+    <p v-if="working" class="ip-status" role="status">正在看图出方案，通常 1 分钟左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
+    <p v-if="unavailable" class="ip-status" role="status">出方案暂未开放，可以直接在左侧写描述。</p>
+    <p v-if="error" class="ip-status is-error" role="alert">{{ error }}</p>
   </section>
 </template>

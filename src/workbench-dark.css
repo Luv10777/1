@@ -194,7 +194,8 @@
 :root.dark .poster-skeleton-glow { background: linear-gradient(105deg, transparent 30%, rgba(17,26,43,.72) 50%, transparent 70%) !important; }
 :root.dark .poster-skeleton-line { background: #1A2436 !important; }
 :root.dark .poster-workbench .poster-variation-options button { background: #111A2B !important; }
-:root.dark .poster-conversation-editor { background: #111A2B !important; }
+:root.dark .poster-dock-bar { background: #111A2B !important; }
+:root.dark .poster-idea { --ip-surface: #111A2B; }
 :root.dark .poster-edit-form input, :root.dark .poster-edit-form textarea { background: #111A2B !important; }
 :root.dark .poster-edit-form small { color: #CBD5E1 !important; }
 :root.dark .poster-history-status { background: rgba(17,26,43,.92) !important; }

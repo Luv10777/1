@@ -29,7 +29,7 @@ public class VideoPlanHttpAdapter implements ProviderAdapter {
 
     @Override public String code() { return "VIDEO_PLAN_HTTP"; }
     @Override public Set<ModelAlias> supports() {
-        return config.configured() ? EnumSet.of(ModelAlias.VIDEO_PLANNER) : EnumSet.noneOf(ModelAlias.class);
+        return config.configured() ? EnumSet.of(ModelAlias.VIDEO_PLANNER, ModelAlias.IMAGE_INSPIRATION_PLANNER) : EnumSet.noneOf(ModelAlias.class);
     }
 
     @Override

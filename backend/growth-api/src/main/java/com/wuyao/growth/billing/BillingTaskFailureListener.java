@@ -14,9 +14,11 @@ public class BillingTaskFailureListener {
     private final com.wuyao.growth.video.analysis.VideoAnalysisService analyses;
     private final com.wuyao.growth.video.plan.VideoPlanService plans;
     private final com.wuyao.growth.copywriting.CopyService copies;
+    private final com.wuyao.growth.creative.inspiration.ImageInspirationService inspirations;
     @TransactionalEventListener(fallbackExecution=true)
     public void failed(TaskTerminalFailure event) {
         try {
+        if(event.type().equals(com.wuyao.growth.creative.inspiration.ImageInspirationGenerateHandler.TYPE)) TenantContext.runAs(event.tenantId(),()->{ inspirations.taskFailed(event); return null; });
         if(event.type().startsWith("IMAGE_")) TenantContext.runAs(event.tenantId(),()->{ images.taskFailed(event); return null; });
         if(event.type().startsWith("VIDEO_") && event.payload().containsKey("workflowId")) TenantContext.runAs(event.tenantId(),()->{ videos.taskFailed(event); return null; });
         if(event.type().startsWith("VIDEO_ANALYSIS_") && event.payload().containsKey("analysisId")) TenantContext.runAs(event.tenantId(),()->{ analyses.taskFailed(event); return null; });

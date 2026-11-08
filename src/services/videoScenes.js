@@ -9,7 +9,11 @@ export const fetchVideoScenes = () => get('/api/video/scenes')
 /** 服务端对自由创作返回空，前端统一记成 free。 */
 export const videoSceneKey = key => key || FREE_SCENE
 
-export const findVideoScene = (scenes, key) => scenes.find(scene => scene.key === videoSceneKey(key)) || null
+// 场景封面图放在 public/images/video-scenes/，16:10；服务端新加的场景没有图时仍显示图标。
+const SCENE_COVERS = new Set([FREE_SCENE, 'ecommerce', 'local_life', 'event', 'brand', 'drama'])
+export const videoSceneCover = key => (SCENE_COVERS.has(key) ? `/images/video-scenes/${key}.webp` : '')
+
+export const findVideoScene =(scenes, key) => scenes.find(scene => scene.key === videoSceneKey(key)) || null
 
 /** 记录里显示的场景名；自由创作和已下线的场景不显示。 */
 export const videoSceneName = (scenes, key) => (videoSceneKey(key) === FREE_SCENE ? '' : findVideoScene(scenes, key)?.name || '')

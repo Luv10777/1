@@ -14,7 +14,7 @@ export const purchasedSources = { ORDER: '在线充值', REDEEM_CODE: '兑换码
 export const grantedSources = { ORDER: '会员赠送', ADMIN_MEMBERSHIP: '平台开通会员', ADMIN: '平台赠送', REDEEM_CODE: '兑换码赠送' }
 
 export const ledgerTypes = { CAPTURE: '扣除', RESERVE: '预占', RELEASE: '退回', PURCHASE: '充值', GRANT: '赠送' }
-export const ledgerCapabilities = { IMAGE: '图片创作', VIDEO: '视频创作', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', COPY: '文案创作', LIVE: '实景直播' }
+export const ledgerCapabilities = { IMAGE: '图片创作', VIDEO: '视频创作', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', IMAGE_INSPIRATION: '图片灵感方案', COPY: '文案创作', LIVE: '实景直播' }
 export const ledgerRanges = { 1: '今天', 7: '近 7 天', 30: '近 30 天', 90: '近 90 天' }
 
 /** 这一笔对可用烟火的影响：扣除取预占的减少量（可用余额在预占时已扣过），其余取可用烟火的变动。 */

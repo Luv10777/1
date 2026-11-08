@@ -101,8 +101,9 @@ class VideoPlanServiceTest {
         when(plans.saveAndFlush(any())).thenAnswer(call -> { VideoPlan p = call.getArgument(0); p.setId(8L); return p; });
         when(tasks.submit(anyString(), anyString(), any(), anyString(), anyLong())).thenReturn(new Task());
         var create = new VideoPlanDtos.Create("plan-key-2", List.of(5L), false, null, "x", 2L, "ecommerce");
-        TenantContext.runAs(3L, () -> service.create(create, 1L));
+        var view = TenantContext.runAs(3L, () -> service.create(create, 1L));
         verify(plans).saveAndFlush(argThat(p -> "drama".equals(p.getSceneKey())));
+        assertThat(view.sceneKey()).isEqualTo("drama");
     }
 
     @Test void changingTheSceneCannotReuseAnExistingRequestKey() {

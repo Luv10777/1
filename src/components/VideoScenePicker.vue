@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Check, X } from 'lucide-vue-next'
+import { videoSceneCover } from '../services/videoScenes'
 
 // 视频工作台「场景」一栏点开的面板：每个场景一张卡片，点一张即选中并关闭。
 defineProps({
@@ -27,7 +28,8 @@ defineExpose({ open })
       <div class="vs-scene-grid">
         <button v-for="scene in scenes" :key="scene.key" type="button" class="vs-scene-card" :class="{ active: modelValue === scene.key }" :aria-pressed="modelValue === scene.key" @click="pick(scene.key)">
           <span class="vs-scene-cover" :data-scene="scene.key">
-            <span class="material-symbols-outlined" aria-hidden="true">{{ scene.icon }}</span>
+            <img v-if="videoSceneCover(scene.key)" :src="videoSceneCover(scene.key)" alt="" loading="lazy">
+            <span v-else class="material-symbols-outlined" aria-hidden="true">{{ scene.icon }}</span>
             <Check v-if="modelValue === scene.key" class="vs-scene-check" :size="14" :stroke-width="2.6" aria-hidden="true" />
           </span>
           <strong>{{ scene.name }}</strong>

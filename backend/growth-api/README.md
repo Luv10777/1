@@ -15,6 +15,10 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 有场景且不是来自方案时，网关把分镜参考附在用户提示词之后，用户原文不改。两个字段为空时不写进请求 JSON，旧请求的幂等哈希不变。
 出方案请求也可带 `sceneKey`，「换一批」改用上一批的场景，迁移 V75 给 `video_plans` 加 `scene_key`。
 每次（含「换一批」）预占 1 烟火，结果校验通过才扣除，失败或校验不过退回。任务 `VIDEO_PLAN_GENERATE` 走 `DEFAULT` 队列。
+2026-11-09 视频工作台入口改名「灵感方案」，灵感绘图也加同名入口（`creative/inspiration` 模块，接口 `/api/image/inspirations`，迁移 V76）：
+看最多 6 张参考图，按左侧绘图风格和一句话出 3 个画面描述，「用这个」只填画面描述。模型别名 `IMAGE_INSPIRATION_PLANNER`，
+和视频方案共用 `growth.video-plan` 的看图模型配置，不需要新密钥。计费能力 `IMAGE_INSPIRATION`，每次（含「换一批」）预占 1 烟火，
+规则同视频方案；任务 `IMAGE_INSPIRATION_GENERATE` 走 `DEFAULT` 队列，终止失败和对账恢复都已在 billing 登记。
 接口：`GET /api/video/plans/config`、`POST /api/video/plans`（`requestKey` 幂等，`previousPlanId` 表示换一批）、`GET /api/video/plans/{id}`。
 服务端配置 `VIDEO_PLAN_API_KEY`（必填）、`VIDEO_PLAN_BASE_URL`、`VIDEO_PLAN_MODEL`、`VIDEO_PLAN_TIMEOUT_SECONDS`、`VIDEO_PLAN_MAX_TOKENS`；未配置密钥时入口显示未开放。
 
@@ -490,7 +494,9 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 
 | V74 | 烟火兑换码：`billing_redeem_codes`（平台级，不分商户；一码一用，兑换后记兑换商户；充值码记实收金额用于返利） | `claude/redeem-codes` |
 
-下一个可用编号：V75（V68–V73 已在主干）。
+| V76 | 灵感绘图「灵感方案」：`image_inspirations`（参考图、绘图风格、一句话、3 个画面描述、预占烟火） | `claude/image-inspiration` |
+
+下一个可用编号：V77（V68–V76 已在主干或已登记）。
 
 后端检查：
 

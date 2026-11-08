@@ -14,6 +14,7 @@ public enum ModelAlias {
     TEXT_REVIEWER,    // 内容审核、事实核对
     VISION_ANALYZER,  // 视频反推、图片理解
     VIDEO_PLANNER,    // 视频工作台看参考图出 3 个方案
+    IMAGE_INSPIRATION_PLANNER, // 灵感绘图看参考图出 3 个画面描述；和视频方案共用一套看图模型配置
     COPY_WRITER,      // 文案创作看图写配文；没单独配置时用 TEXT_WRITER
     AUDIO_ANALYZER,   // 视频口播、配乐、音效理解
     IMAGE_PRIMARY,    // 海报、产品套图

@@ -115,6 +115,18 @@ public class TaskUsageStore {
                         WHEN t.status IN ('FAILED','CANCELLED') THEN t.finished_at END, NULL::timestamptz
             FROM video_plans p LEFT JOIN tasks t ON t.id=p.task_id AND t.tenant_id=p.tenant_id WHERE p.tenant_id=:tenant
             UNION ALL
+            SELECT 'inspiration-'||p.id, p.id, 'IMAGE_INSPIRATION',
+                   CASE WHEN p.previous_id IS NULL THEN 'INITIAL' ELSE 'REGENERATE' END,
+                   COALESCE(NULLIF(p.idea,''),'灵感方案'), '一方志提示词', NULL::text,
+                   CASE WHEN p.status IN ('SUCCEEDED','FAILED') THEN p.status
+                        WHEN t.status IN ('FAILED','CANCELLED') THEN 'FAILED' ELSE 'RUNNING' END,
+                   p.created_at, 3, CASE WHEN p.status='SUCCEEDED' THEN 3 ELSE 0 END,
+                   CASE WHEN p.status='FAILED' OR (p.status<>'SUCCEEDED' AND t.status IN ('FAILED','CANCELLED'))
+                       THEN 3 ELSE 0 END, 0, '个方案', p.billing_reservation_id, NULL, NULL::int, p.error_message,
+                   CASE WHEN p.status IN ('SUCCEEDED','FAILED') THEN p.updated_at
+                        WHEN t.status IN ('FAILED','CANCELLED') THEN t.finished_at END, NULL::timestamptz
+            FROM image_inspirations p LEFT JOIN tasks t ON t.id=p.task_id AND t.tenant_id=p.tenant_id WHERE p.tenant_id=:tenant
+            UNION ALL
             SELECT 'copy-'||b.id, b.id, 'COPY',
                    CASE WHEN b.previous_batch_id IS NULL THEN 'INITIAL' ELSE 'REGENERATE' END,
                    COALESCE(NULLIF(b.note,''),'文案创作'), '一方志文案', NULL::text,

@@ -9,8 +9,9 @@ import {
 } from "../domain/imageCreation";
 import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from "../domain/posterStyles";
 import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
+import ImageInspirationPanel from "./ImageInspirationPanel.vue";
 import PosterStyleCard from "./PosterStyleCard.vue";
-import { ArrowUp, Check, Download, Folder, Pencil, RefreshCw, X } from "lucide-vue-next";
+import { ArrowUp, Check, Download, Folder, Maximize2, Pencil, RefreshCw, X } from "lucide-vue-next";
 
 const props = defineProps({ studio: { type: Object, required: true } });
 const emit = defineEmits(["choose"]);
@@ -35,6 +36,9 @@ const imageSize = computed(() => ({
   width: `${Math.round(fittedSize.value.width * zoom.value)}px`,
   height: `${Math.round(fittedSize.value.height * zoom.value)}px`,
 }));
+// 灵感方案第一次打开才挂上，之后切页签只是隐藏，出好的方案不会丢。
+const planOpened = ref(studio.value.workspaceTab === "plan");
+watch(() => studio.value.workspaceTab, tab => { if (tab === "plan") planOpened.value = true; });
 function showTab(tab) {
   studio.value.workspaceTab = tab;
   if (tab === 'history') studio.value.refreshHistory();
@@ -114,6 +118,33 @@ function turnPrompt(turn) {
   if (!turn.parentId) return turn.brief || "这次绘图创作";
   return turn.brief?.split("\n本次修改：").at(-1) || "继续修改图片";
 }
+// 图片是主角：描述只在图下占一行，点开才看全文和「一方志的理解」。
+const expandedPrompts = ref(new Set());
+function togglePrompt(id) {
+  expandedPrompts.value[expandedPrompts.value.has(id) ? "delete" : "add"](id);
+}
+function turnMeta(turn, index) {
+  return [
+    index > 0 && `第 ${index + 1} 版`,
+    (isImageActive(turn.status) || turn.completed > 0) && turn.completed !== turn.count && `${turn.completed}/${turn.count}`,
+    historyDate(turn.createdAt),
+  ].filter(Boolean).join(" · ");
+}
+const retryable = item => ["FAILED", "INTERRUPTED", "UPSTREAM_UNKNOWN"].includes(item.status);
+const REVISION_OPTIONS = [
+  { type: "TEXT", label: "修改文字" },
+  { type: "LAYOUT", label: "换构图" },
+  { type: "SCENE", label: "换场景" },
+  { type: "MESSAGE", label: "换表达角度" },
+];
+// 底部输入框只服务当前这一轮：规划时反问就补充信息，出完图就继续修改（修改作用于整轮）。
+const dockImage = computed(() => studio.value.current?.items?.find(item => item.url) || null);
+const dockMode = computed(() => {
+  const turn = studio.value.current;
+  if (studio.value.workspaceTab !== "result" || !turn) return null;
+  if (turn.status === "NEEDS_INPUT") return "answer";
+  return turn.status === "SUCCEEDED" && dockImage.value ? "revise" : null;
+});
 watch(() => studio.value.current?.id, () => { editorOptions.value = []; });
 watch(() => studio.value.thread, turns => {
   if (!preview.value) return;
@@ -142,6 +173,13 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           @click="showTab('inspiration')"
         >
           绘图风格</button
+        ><button
+          type="button"
+          :class="{ active: studio.workspaceTab === 'plan' }"
+          :aria-current="studio.workspaceTab === 'plan' ? 'page' : undefined"
+          @click="showTab('plan')"
+        >
+          灵感方案</button
         ><button
           type="button"
           :class="{ active: studio.workspaceTab === 'result' }"
@@ -174,6 +212,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
     </header>
 
     <div ref="galleryScroll" class="poster-gallery-scroll">
+      <ImageInspirationPanel v-if="planOpened" v-show="studio.workspaceTab === 'plan'" :studio="studio" />
       <div
         v-if="studio.workspaceTab === 'inspiration'"
         class="poster-inspiration-view"
@@ -233,7 +272,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         <button v-if="studio.historyMore" type="button" class="poster-load-more" @click="studio.refreshHistory(false)">加载更多</button>
       </div>
 
-      <div v-else class="poster-result-view">
+      <div v-else-if="studio.workspaceTab !== 'plan'" class="poster-result-view">
         <div
           v-if="studio.optimistic"
           class="poster-skeleton-card"
@@ -293,27 +332,42 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
             v-for="(turn, index) in studio.thread"
             :key="turn.id"
             class="poster-current"
+            :class="{ single: turn.count === 1 }"
+            :style="{ '--poster-image-ratio': imageDimensions(turn.quality, turn.ratio).width / imageDimensions(turn.quality, turn.ratio).height }"
           >
-            <div class="poster-turn-head">
-              <div>
-                <h3>{{ turnPrompt(turn) }}</h3>
-                <p class="poster-result-head" role="status">
-                  <span class="poster-status"><i :class="{ live: isImageActive(turn.status) }" />{{ imageStatusLabel(turn) }}</span>
-                  <span>· {{ turn.completed }}/{{ turn.count }} 张 · {{ index === 0 ? '初稿' : `第 ${index + 1} 版` }} · <time>{{ new Date(turn.createdAt).toLocaleString() }}</time></span>
+            <div class="poster-result-grid">
+              <template v-if="!turn.items.length && (isImageActive(turn.status) || turn.status === 'NEEDS_INPUT')">
+                <div v-for="n in turn.count" :key="n" class="poster-result-media poster-result-placeholder" :style="{ aspectRatio: imageDimensions(turn.quality, turn.ratio).width + '/' + imageDimensions(turn.quality, turn.ratio).height }">
+                  <template v-if="turn.status === 'NEEDS_INPUT'"><small>等你补充信息</small></template>
+                  <template v-else><span class="poster-skeleton-glow" /><small>生成中</small></template>
+                </div>
+              </template>
+              <figure v-for="item in turn.items" :key="item.id" class="poster-result-item">
+                <div class="poster-result-media" :style="{ aspectRatio: item.width + '/' + item.height }">
+                  <button v-if="item.url" type="button" class="poster-image-button" aria-label="放大查看图片" @click="showPreview(item)">
+                    <img :src="item.url" alt="生成的图片" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
+                  </button>
+                  <div v-else class="poster-result-placeholder"><small>{{ IMAGE_STATUS[item.status] }}</small></div>
+                  <div v-if="item.url" class="poster-image-actions">
+                    <button type="button" aria-label="放大查看" title="放大查看" @click="showPreview(item)"><Maximize2 :size="15" :stroke-width="1.8" aria-hidden="true" /></button>
+                    <button type="button" aria-label="下载图片" title="下载图片" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="15" :stroke-width="1.8" aria-hidden="true" /></button>
+                  </div>
+                </div>
+                <p v-if="item.similarityWarning" class="poster-result-note">这张与近期图片较相似，可换构图或场景。</p>
+                <p v-if="item.error || retryable(item)" class="poster-result-error">
+                  {{ item.error }}
+                  <button v-if="retryable(item)" type="button" :disabled="studio.busy || !!studio.pending" @click="studio.retry(item)">{{ item.status === "FAILED" ? "重新生成这张" : item.status === "UPSTREAM_UNKNOWN" ? "核对后重新生成" : "恢复这张" }}</button>
                 </p>
-              </div>
-              <button v-if="turn.id === studio.current?.id" type="button" class="poster-icon-button" aria-label="刷新进度" title="刷新进度" :disabled="studio.busy" @click="studio.load(turn.id)"><RefreshCw :size="17" :stroke-width="1.6" aria-hidden="true" /></button>
+              </figure>
             </div>
-            <p v-if="turn.summary" class="poster-result-summary">
-              {{ turn.summary }}
-            </p>
-            <p v-if="turn.question" class="poster-result-note">
-              {{ turn.question }}
-            </p>
-            <form v-if="turn.id === studio.current?.id && turn.status === 'NEEDS_INPUT'" class="poster-conversation-editor" @submit.prevent="studio.revise">
-              <textarea v-model="studio.revision" class="poster-conversation-input" maxlength="1000" aria-label="补充信息" placeholder="补充上面问到的信息，提交后继续规划这张图片" />
-              <button type="submit" class="poster-conversation-submit" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">补充并继续</button>
-            </form>
+            <div class="poster-turn-caption">
+              <span v-if="turn.status !== 'SUCCEEDED'" class="poster-status" role="status"><i :class="{ live: isImageActive(turn.status) }" />{{ imageStatusLabel(turn) }}</span>
+              <button type="button" class="poster-turn-prompt" :class="{ expanded: expandedPrompts.has(turn.id) }" :aria-expanded="expandedPrompts.has(turn.id)" :title="expandedPrompts.has(turn.id) ? '收起' : '查看完整描述'" @click="togglePrompt(turn.id)">{{ turnPrompt(turn) }}</button>
+              <span class="poster-turn-meta">{{ turnMeta(turn, index) }}</span>
+              <button v-if="turn.id === studio.current?.id && isImageActive(turn.status)" type="button" class="poster-icon-button" aria-label="刷新进度" title="刷新进度" :disabled="studio.busy" @click="studio.load(turn.id)"><RefreshCw :size="14" :stroke-width="1.6" aria-hidden="true" /></button>
+            </div>
+            <p v-if="turn.summary && expandedPrompts.has(turn.id)" class="poster-result-summary"><span>一方志的理解</span>{{ turn.summary }}</p>
+            <p v-if="turn.question && turn.id !== studio.current?.id" class="poster-result-note">{{ turn.question }}</p>
             <p v-if="turn.error" class="poster-result-error">
               {{ turn.error }}
               <button
@@ -325,107 +379,32 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                 恢复任务
               </button>
             </p>
-            <div
-              class="poster-result-grid"
-              :class="{ single: turn.count === 1 }"
-              :style="{ '--poster-image-ratio': imageDimensions(turn.quality, turn.ratio).width / imageDimensions(turn.quality, turn.ratio).height }"
-            >
-              <template v-if="!turn.items.length && isImageActive(turn.status)"
-                ><div
-                  v-for="n in turn.count"
-                  :key="n"
-                  class="poster-result-placeholder poster-skeleton-card"
-                  :style="{
-                     aspectRatio: imageDimensions(turn.quality, turn.ratio).width + '/' + imageDimensions(turn.quality, turn.ratio).height,
-                  }"
-                >
-                  <span class="poster-skeleton-glow" /><img
-                    class="poster-placeholder-mark"
-                    src="/images/brand/yifangzhi-mark.png"
-                    alt=""
-                  /><span
-                    >一方志正在编排画面…</span
-                  >
-                </div></template
-              >
-              <article
-                v-for="item in turn.items"
-                :key="item.id"
-                class="poster-result-item"
-                :style="{ '--poster-image-ratio': item.width / item.height }"
-              >
-                <button
-                  v-if="item.url"
-                  type="button"
-                  class="poster-image-button"
-                  :style="{ aspectRatio: item.width + '/' + item.height }"
-                  aria-label="放大查看图片"
-                  @click="showPreview(item)"
-                >
-                  <img :src="item.url" alt="生成的图片" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
-                </button>
-                <div
-                  v-else
-                  class="poster-result-placeholder"
-                  :style="{ aspectRatio: item.width + '/' + item.height }"
-                >
-                  <img
-                    class="poster-placeholder-mark"
-                    src="/images/brand/yifangzhi-mark.png"
-                    alt=""
-                  /><small>{{ IMAGE_STATUS[item.status] }}</small>
-                </div>
-                <div class="poster-item-details">
-                  <div class="poster-item-top">
-                    <div class="poster-item-actions">
-                      <button
-                        v-if="item.url"
-                        type="button"
-                        class="poster-icon-button"
-                        aria-label="下载图片"
-                        title="下载图片"
-                        :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)"
-                        @click="studio.download(item)"
-                      >
-                        <Download :size="16" :stroke-width="1.6" aria-hidden="true" /></button
-                      ><button
-                        v-if="['FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN'].includes(item.status)"
-                        type="button"
-                        :disabled="studio.busy || !!studio.pending"
-                        @click="studio.retry(item)"
-                      >
-                        {{ item.status === "FAILED" ? "重新生成这张" : item.status === "UPSTREAM_UNKNOWN" ? "核对后重新生成" : "恢复这张" }}
-                      </button>
-                    </div>
-                  </div>
-                <p v-if="item.similarityWarning" class="poster-result-note">
-                  这张与近期图片较相似，可换构图或场景。
-                </p>
-                <p v-if="item.error" class="poster-result-error">
-                  {{ item.error }}
-                </p>
-                <form v-if="item.url && turn.id === studio.current?.id && turn.status === 'SUCCEEDED'" class="poster-conversation-editor" @submit.prevent="submitEditor(item)">
-                  <div class="poster-conversation-heading"><strong>继续修改</strong></div>
-                  <div class="poster-conversation-options" role="group" aria-label="选择修改项">
-                    <label v-for="option in [{ type: 'TEXT', label: '修改文字' }, { type: 'LAYOUT', label: '换构图' }, { type: 'SCENE', label: '换场景' }, { type: 'MESSAGE', label: '换表达角度' }]" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" /><Check v-if="editorOptions.includes(option.type)" :size="12" :stroke-width="2.4" aria-hidden="true" />{{ option.label }}</label>
-                  </div>
-                  <div v-if="editorOptions.includes('TEXT')" class="poster-conversation-copy">
-                    <label><span>标题</span><input v-model="editorHeadline" maxlength="40" /></label>
-                    <label><span>说明文字</span><input v-model="editorCaption" maxlength="100" placeholder="可不填" /></label>
-                  </div>
-                  <div class="poster-conversation-bar">
-                    <input v-model="editorInstruction" class="poster-conversation-input" maxlength="1000" aria-label="补充修改说明" placeholder="还可以补充一句，例如：背景更清爽，主体保持不变" />
-                    <button type="submit" class="poster-conversation-submit" aria-label="生成这一版" title="生成这一版" :disabled="studio.busy || !!studio.pending || !studio.configured || (!editorOptions.length && !editorInstruction.trim())"><ArrowUp :size="18" :stroke-width="2" aria-hidden="true" /></button>
-                  </div>
-                  <small class="poster-conversation-note">{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</small>
-                </form>
-                </div>
-              </article>
-            </div>
           </div>
         </div>
       </div>
     </div>
+    <form v-if="dockMode" class="poster-dock" @submit.prevent="dockMode === 'answer' ? studio.revise() : submitEditor(dockImage)">
+      <p v-if="dockMode === 'answer'" class="poster-dock-question">{{ studio.current.question }}</p>
+      <div v-else class="poster-dock-options" role="group" aria-label="选择修改项">
+        <label v-for="option in REVISION_OPTIONS" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" />{{ option.label }}</label>
+        <small>{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</small>
+      </div>
+      <div v-if="dockMode === 'revise' && editorOptions.includes('TEXT')" class="poster-conversation-copy">
+        <label><span>标题</span><input v-model="editorHeadline" maxlength="40" /></label>
+        <label><span>说明文字</span><input v-model="editorCaption" maxlength="100" placeholder="可不填" /></label>
+      </div>
+      <div class="poster-dock-bar">
+        <template v-if="dockMode === 'answer'">
+          <input v-model="studio.revision" class="poster-dock-input" maxlength="1000" aria-label="补充信息" placeholder="补充上面问到的信息，提交后继续规划这张图片" />
+          <button type="submit" class="poster-conversation-submit" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">补充并继续</button>
+        </template>
+        <template v-else>
+          <img class="poster-dock-thumb" :src="dockImage.url" alt="" />
+          <input v-model="editorInstruction" class="poster-dock-input" maxlength="1000" aria-label="补充修改说明" placeholder="继续修改这一轮，例如：背景更清爽，主体不变" />
+          <button type="submit" class="poster-conversation-submit is-icon" aria-label="生成这一版" title="生成这一版" :disabled="studio.busy || !!studio.pending || !studio.configured || (!editorOptions.length && !editorInstruction.trim())"><ArrowUp :size="18" :stroke-width="2" aria-hidden="true" /></button>
+        </template>
+      </div>
+    </form>
     <dialog
       ref="previewDialog"
       class="poster-lightbox"
