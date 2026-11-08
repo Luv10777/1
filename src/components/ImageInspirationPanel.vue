@@ -125,6 +125,13 @@ const run = async (previousId = null) => {
   }
 }
 
+// 回车出方案（要扣烟火）；输入法还在选字时的回车只是确认候选，不能当成提交。
+const onIdeaEnter = event => {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  run()
+}
+
 const openRecord = item => {
   if (working.value) return
   result.value = item
@@ -193,7 +200,7 @@ const use = (plan, index) => {
           <button type="button" class="ip-text-button" @click="studio.workspaceTab = 'inspiration'">{{ styleName ? '更换' : '去挑选' }}</button>
         </div>
         <label for="poster-idea-input" class="sr-only">一句话说说想要什么</label>
-        <textarea id="poster-idea-input" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发小红书，安静高级一点" @keydown.enter.exact.prevent="run()" />
+        <textarea id="poster-idea-input" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发小红书，安静高级一点" @keydown.enter.exact="onIdeaEnter" />
         <div class="ip-composer-foot">
           <small>每次出 3 个画面 · 换一批同价 · 失败不扣烟火</small>
           <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成灵感方案' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>

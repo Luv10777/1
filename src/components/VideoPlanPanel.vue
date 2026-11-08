@@ -144,6 +144,13 @@ const run = async (previousPlanId = null) => {
 }
 
 // 打开一批记录时把当时的风格和想法也带回来，「换一批」「改设置」都接着这批的要求。
+// 回车出方案（要扣烟火）；输入法还在选字时的回车只是确认候选，不能当成提交。
+const onIdeaEnter = event => {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  run()
+}
+
 const openRecord = item => {
   if (working.value) return
   result.value = item
@@ -222,7 +229,7 @@ const use = (plan, index) => {
           <input v-if="customOpen" v-model="customStyle" maxlength="40" aria-label="自己填写风格" placeholder="例如：复古港风、清冷极简">
         </div>
         <label for="vp-idea" class="sr-only">一句话说说想要什么</label>
-        <textarea id="vp-idea" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.exact.prevent="run()" />
+        <textarea id="vp-idea" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.exact="onIdeaEnter" />
         <div class="ip-composer-foot">
           <small>每次出 3 个版本 · 换一批同价 · 失败不扣烟火</small>
           <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成提示词' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>

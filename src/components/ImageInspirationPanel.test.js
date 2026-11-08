@@ -54,7 +54,8 @@ async function mountPanel(studioState, { history = [], config = { configured: tr
   const find = predicate => [...nodes(root)].find(predicate)
   const button = label => find(node => node.tag === 'button' && text(node).includes(label))
   const idea = value => find(node => node.props?.id === 'poster-idea-input').props['onUpdate:modelValue'](value)
-  return { api: imageInspirationApi, studio, timers, requests, root, text, button, idea, settle,
+  const keydown = event => find(node => node.props?.id === 'poster-idea-input').props.onKeydown(event)
+  return { api: imageInspirationApi, studio, timers, requests, root, text, button, idea, keydown, settle,
     async close() {
       app.unmount(); auth.state.user = null; auth.state.token = null; await vite.close()
       for (const [key, descriptor] of Object.entries(saved)) {
@@ -101,6 +102,23 @@ test('without a chosen style the request leaves style empty, and an empty form a
     assert.equal(panel.requests[0].style, '')
     panel.timers.shift()(); await generating; await panel.settle()
     assert.match(panel.text(panel.root), /烟火已退回/)
+  } finally { await panel.close() }
+})
+
+test('enter generates plans, but not while an input method is still composing', async () => {
+  const panel = await mountPanel({})
+  try {
+    panel.idea('开业海报'); await panel.settle()
+    let prevented = 0
+    const enter = extra => ({ key: 'Enter', ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, preventDefault: () => { prevented++ }, ...extra })
+    panel.keydown(enter({ isComposing: true })); await panel.settle()
+    panel.keydown(enter({ keyCode: 229 })); await panel.settle()
+    assert.equal(panel.requests.length, 0)
+    assert.equal(prevented, 0, 'the input method keeps its own enter')
+    panel.api.get = async () => ({ id: 7, status: 'SUCCEEDED', plans })
+    panel.keydown(enter({})); await panel.settle()
+    assert.equal(panel.requests.length, 1)
+    assert.equal(prevented, 1)
   } finally { await panel.close() }
 })
 
