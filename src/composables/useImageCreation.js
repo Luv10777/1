@@ -1,7 +1,7 @@
 import { computed, reactive, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, downloadImage } from '../services/imageCreation'
-import { IMAGE_QUALITIES, imageDimensions, isImageActive, validateImageFile, supportsImageSize } from '../domain/imageCreation'
+import { IMAGE_QUALITIES, imageDimensions, isImageActive, isImageSaving, validateImageFile, supportsImageSize } from '../domain/imageCreation'
 import { readUser } from '../utils/tokenStore'
 import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -67,6 +67,7 @@ export function useImageCreation(workflow) {
     if (supported.length) quality.value = supported.at(-1)
   }
   const active = computed(() => isImageActive(current.value?.status))
+  const saving = computed(() => isImageSaving(current.value))
   const latestItem = item => thread.value.flatMap(turn => turn.items || []).find(latest => latest.id === item?.id) || item
   const canUseAsset = item => !latestItem(item)?.providerImageUrl || !!latestItem(item)?.persisted
   async function reportImageVisible(item) {
@@ -338,7 +339,7 @@ export function useImageCreation(workflow) {
   return reactive({
     product, brief, ratio, quality, count, platform, imageType, purpose, style, files, busy, error,
     capabilities, capabilityState, capabilityError, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
-    editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, locked, workspaceTab, supportsRatio,
+    editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, saving, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
     reportImageVisible, imageLoadFailed,

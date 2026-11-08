@@ -6,6 +6,9 @@ export const IMAGE_STATUS = {
   NEEDS_INPUT: '需要补充一句', FAILED: '生成失败', INTERRUPTED: '执行中断', UPSTREAM_UNKNOWN: '等待核对中转站结果', CANCELLED: '已取消',
 }
 export const isImageActive = status => ['QUEUED', 'PLANNING', 'GENERATING', 'SAVING'].includes(status)
+// 中转站的临时预览已经显示，只差后台把原图存进对象存储；任务仍未完成。
+export const isImageSaving = creation => isImageActive(creation?.status) && !!creation.items?.length && creation.items.every(item => item.url)
+export const imageStatusLabel = creation => isImageSaving(creation) ? '图片已出，正在保存原图' : IMAGE_STATUS[creation?.status]
 export function supportsImageSize(capabilities, quality, ratio) {
   try { imageDimensions(quality, ratio) } catch { return false }
   if (!capabilities) return true

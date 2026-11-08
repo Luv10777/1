@@ -1,6 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { imageDimensions, validateImageFile, isImageActive, supportsImageSize } from './imageCreation.js'
+import { imageDimensions, validateImageFile, isImageActive, isImageSaving, imageStatusLabel, supportsImageSize } from './imageCreation.js'
+
+test('a visible preview awaiting storage is labelled as saving, not generating', () => {
+  const ready = { id: 1, url: 'https://relay.example/preview.png' }
+  assert.equal(isImageSaving({ status: 'GENERATING', items: [ready] }), true)
+  assert.equal(imageStatusLabel({ status: 'GENERATING', items: [ready] }), '图片已出，正在保存原图')
+  assert.equal(isImageSaving({ status: 'GENERATING', items: [ready, { id: 2, url: null }] }), false, 'one image still rendering')
+  assert.equal(imageStatusLabel({ status: 'GENERATING', items: [] }), '正在生成或接收图片')
+  assert.equal(isImageSaving({ status: 'SUCCEEDED', items: [ready] }), false)
+  assert.equal(imageStatusLabel({ status: 'SUCCEEDED', items: [ready] }), '已完成')
+})
 
 test('quality resolves Flu standard 1K, 2K and 4K dimensions', () => {
   assert.deepEqual(imageDimensions('1K', '1:1'), { width: 1024, height: 1024 })

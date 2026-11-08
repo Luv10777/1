@@ -111,6 +111,10 @@ class ImagePlannerTest {
      .doesNotContain("complete ready-to-publish poster","Generate a complete ready-to-publish design with integrated text");
    assertThat(ImagePlanner.version("POSTER")).isNotEqualTo(ImagePlanner.version("PRODUCT_SET"));
  }
+ @Test void itemRoleIsAMerchantFacingNameNotAReferenceRole() {
+   for(String workflow:List.of("POSTER","PRODUCT_SET"))
+     assertThat(ImagePlanner.system(workflow)).contains("item.role 是展示给商家的这张图名称","不能填写参考图用途 SUBJECT");
+ }
  @Test void understandingRunsBeforeRefinementAndItsExplicitRemovalReachesTheImagePrompt() {
    var gateway=mock(com.wuyao.growth.common.gateway.AiGateway.class);
    var mapper=new ObjectMapper();
