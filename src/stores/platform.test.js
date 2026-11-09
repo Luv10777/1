@@ -71,7 +71,7 @@ test('admin permission outages block protected pages and return locations stay i
     assert.equal(router.currentRoute.value.name, 'admin-unavailable')
     assert.equal(router.currentRoute.value.query.redirect, '/identities?status=pending')
     for (const value of ['//evil.test', 'https://evil.test', '/image/create', '/login', '/api/auth/wechat/start', null]) {
-      assert.equal(adminDestination(value), '/information')
+      assert.equal(adminDestination(value), '/workbench')
     }
     assert.equal(adminDestination('/merchants?status=PENDING_REVIEW'), '/merchants?status=PENDING_REVIEW')
     await handleAdminAuthExpired()
