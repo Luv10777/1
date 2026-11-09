@@ -97,15 +97,19 @@ class BillingLedgerReportIntegrationTest {
 
     @Test void dailyGivesEveryDayInBeijingTimeWithTodaysCreditsOnToday() {
         var owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
-        owner.update("UPDATE billing_ledger SET created_at = now() - interval '1 day' WHERE type = 'RELEASE'");
+        // 账本只能追加，不能改时间：直接追加一条昨天的赠送。
+        owner.update("INSERT INTO billing_ledger(tenant_id,event_key,type,description,gift_delta,purchased_delta,held_delta,"
+                + "available_after,held_after,created_at) VALUES (?,'test-grant-yesterday','GRANT','昨天的赠送',50,0,0,1050,0,now() - interval '1 day')", shop);
         var days = report.daily(3);
         var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
         assertThat(days).extracting(BillingDtos.DailyCredits::date).containsExactly(today.minusDays(2), today.minusDays(1), today);
         assertThat(days.get(0).consumed()).isZero();
         assertThat(days.get(0).consumedByCapability()).isEmpty();
-        assertThat(days.get(1).refunded()).isEqualTo(3);
+        assertThat(days.get(1).granted()).isEqualTo(50);
+        assertThat(days.get(1).consumed()).isZero();
+        assertThat(days.get(2).granted()).isZero();
         assertThat(days.get(2).consumed()).isEqualTo(19);
-        assertThat(days.get(2).refunded()).isZero();
+        assertThat(days.get(2).refunded()).isEqualTo(3);
         assertThat(days.get(2).consumedByCapability()).isEqualTo(Map.of("IMAGE", 9L, "VIDEO", 10L));
     }
 
