@@ -16,6 +16,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,8 +33,16 @@ class PlatformUserServiceTest {
     private final PlatformManagementAuditRepository audits = mock(PlatformManagementAuditRepository.class);
     private final BillingService billing = mock(BillingService.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
-    private final PlatformUserService service = new PlatformUserService(management, config, directory, audits, billing, transactions);
+    private final RealNameApplicationRepository identities = mock(RealNameApplicationRepository.class);
+    private final PlatformUserService service = new PlatformUserService(management, config, directory, audits, billing, transactions, identities);
     private final Instant now = Instant.now();
+
+    private RealNameApplication identity(long id, long tenantId, long userId, String status) {
+        var application = new RealNameApplication();
+        application.setId(id); application.setTenantId(tenantId); application.setUserId(userId); application.setStatus(status);
+        application.setLegalNameMasked("林*夏"); application.setIdNumberMasked("1101**********002X"); application.setReviewedAt(now);
+        return application;
+    }
 
     private PlatformUser user(long id, long tenantId, String name, String status, Instant lastLogin) {
         return new PlatformUser(id, tenantId, name, "1380000" + (1000 + id), null, "OWNER", status, lastLogin, now.minus(Duration.ofDays(id)), null);
@@ -112,5 +121,31 @@ class PlatformUserServiceTest {
                 .isInstanceOfSatisfying(BizException.class, e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.BAD_REQUEST));
         verify(directory, never()).suspend(any());
         verifyNoInteractions(audits);
+    }
+
+    @Test
+    void listShowsOnlyVerifiedIdentitiesMaskedAndReadsThemOncePerTenantInItsScope() {
+        when(identities.findAllByTenantIdOrderBySubmittedAtDescIdDesc(2L)).thenAnswer(call -> {
+            assertThat(TenantContext.require()).isEqualTo(2L);
+            return List.of(identity(41, 2, 5, "VERIFIED"), identity(42, 2, 6, "REJECTED"));
+        });
+        when(identities.findAllByTenantIdOrderBySubmittedAtDescIdDesc(3L)).thenReturn(List.of());
+
+        var items = service.users(operator, 0, 20, null, null, null).items();
+        assertThat(items.get(0).identity()).isEqualTo(new PlatformDtos.UserIdentity(41L, "林*夏", "1101**********002X", now));
+        assertThat(items.get(1).identity()).as("a failed verification is shown as not verified").isNull();
+        assertThat(items.get(2).identity()).isNull();
+        verify(identities).findAllByTenantIdOrderBySubmittedAtDescIdDesc(2L);
+        verify(identities).findAllByTenantIdOrderBySubmittedAtDescIdDesc(3L);
+    }
+
+    @Test
+    void singleAccountChangesReturnTheAccountsVerifiedIdentity() {
+        when(directory.user(5L)).thenReturn(user(5, 2, "林知夏", "ACTIVE", null));
+        when(directory.suspend(5L)).thenReturn(user(5, 2, "林知夏", "SUSPENDED", null));
+        when(identities.findByTenantIdAndUserId(2L, 5L)).thenReturn(Optional.of(identity(41, 2, 5, "VERIFIED")));
+
+        var result = service.suspension(operator, 5L, new PlatformDtos.UserSuspensionRequest(true, "多次发布违规信息"));
+        assertThat(result.identity().id()).isEqualTo(41L);
     }
 }

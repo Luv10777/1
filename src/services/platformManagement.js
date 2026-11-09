@@ -8,7 +8,6 @@ export const platformManagementApi = {
   summary: () => get('/api/platform/summary'),
   information: values => get('/api/platform/information', params(values)),
   merchants: values => get('/api/platform/merchants', params(values)),
-  identities: values => get('/api/platform/identities', params(values)),
   informationStatus: (item, values) => post(`${target(item, 'information')}/status`, values),
   merchantReview: (item, values) => post(`${target(item, 'merchants')}/review`, values),
   revealIdentity: (item, note) => post(`${target(item, 'identities')}/reveal`, { note }),

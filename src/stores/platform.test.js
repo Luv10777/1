@@ -22,14 +22,14 @@ test('standalone admin routes require explicit operator access and do not exist 
     await publicRouter.push('/identity')
     assert.equal(publicRouter.currentRoute.value.name, 'login', 'personal identity submission remains in the merchant app')
     const { default: router } = await vite.ssrLoadModule('/admin/router.js')
-    for (const path of ['/information', '/merchants', '/identities']) {
+    for (const path of ['/information', '/merchants', '/users']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.name, 'admin-login')
       assert.equal(router.currentRoute.value.query.redirect, path)
     }
     auth.state.token = { accessToken: 'permission-test-only' }
     auth.state.user = { id: 7, tenantId: 2, roles: ['owner'] }
-    for (const path of ['/information', '/merchants', '/identities', '/admin/real-name']) {
+    for (const path of ['/information', '/merchants', '/users', '/identities', '/admin/real-name']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.name, 'admin-forbidden', 'merchant ownership grants no platform rights')
     }
@@ -41,7 +41,7 @@ test('standalone admin routes require explicit operator access and do not exist 
     await router.push('/admin/information')
     assert.equal(router.currentRoute.value.name, 'admin-information')
     await router.push('/admin/identities')
-    assert.equal(router.currentRoute.value.name, 'admin-identities')
+    assert.equal(router.currentRoute.value.name, 'admin-users', 'old real-name links open user management, which now shows identities')
     await router.push('/merchants')
     assert.equal(router.currentRoute.value.name, 'admin-merchants')
     operator = false
@@ -67,9 +67,9 @@ test('admin permission outages block protected pages and return locations stay i
     const { default: router, adminDestination, handleAdminAuthExpired } = await vite.ssrLoadModule('/admin/router.js')
     auth.state.token = { accessToken: 'permission-test-only' }
     auth.state.user = { id: 1, tenantId: 1 }
-    await router.push('/identities?status=pending')
+    await router.push('/users?status=SUSPENDED')
     assert.equal(router.currentRoute.value.name, 'admin-unavailable')
-    assert.equal(router.currentRoute.value.query.redirect, '/identities?status=pending')
+    assert.equal(router.currentRoute.value.query.redirect, '/users?status=SUSPENDED')
     for (const value of ['//evil.test', 'https://evil.test', '/image/create', '/login', '/api/auth/wechat/start', null]) {
       assert.equal(adminDestination(value), '/workbench')
     }
