@@ -1801,6 +1801,7 @@ class FoundationIntegrationTest {
         assertThat(owner.queryForObject("SELECT attempts FROM sms_codes", Integer.class)).isEqualTo(5);
         assertThat(code(() -> login("13800000001", "123456"))).isEqualTo(2003);
         assertThat(owner.queryForObject("SELECT count(*) FROM users WHERE id <> -1", Integer.class)).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM login_events", Integer.class)).as("failed logins are not recorded").isZero();
     }
 
     @Test
@@ -1809,6 +1810,8 @@ class FoundationIntegrationTest {
         var outcomes = concurrent(() -> code(() -> login("13800000001", "123456")));
         assertThat(outcomes).containsExactlyInAnyOrder(200, 2003);
         assertThat(owner.queryForObject("SELECT count(*) FROM refresh_tokens", Integer.class)).isEqualTo(1);
+        assertThat(owner.queryForObject("SELECT count(*) FROM login_events e JOIN users u ON u.id = e.user_id AND u.tenant_id = e.tenant_id",
+                Integer.class)).as("one record per successful login").isEqualTo(1);
     }
 
     @Test

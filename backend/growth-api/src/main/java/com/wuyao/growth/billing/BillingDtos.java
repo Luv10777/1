@@ -72,6 +72,10 @@ public final class BillingDtos {
     public record PlatformLedgerSummary(int days, long consumed, long consumedToday, long refunded, long purchased,
                                         long granted, java.util.Map<String, Long> consumedByCapability) {}
 
+    /** 某一天（北京时间）的全平台合计，口径同 PlatformLedgerSummary；没有流水的日子各项为 0。 */
+    public record DailyCredits(java.time.LocalDate date, long consumed, long refunded, long purchased, long granted,
+                               java.util.Map<String, Long> consumedByCapability) {}
+
     /**
      * 批量生成兑换码；kind 为 TOPUP（记充值烟火）或 GIFT（记赠送烟火），expiresAt 为空表示长期有效。
      * amountMinor 是每个充值码的实收金额（分），兑换后按它记邀请返利，0 表示不记；赠送码必须为 0。

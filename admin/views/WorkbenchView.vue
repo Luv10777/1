@@ -1,21 +1,20 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ArrowRight, Inbox, RefreshCw } from 'lucide-vue-next'
-import { isOverdue, OVERDUE_HOURS, reviewKindOrder, reviewKinds, waitedLabel } from '../../src/domain/adminReview.js'
 import { platformManagementApi } from '../../src/services/platformManagement.js'
 import { ledgerAdminApi, ledgerCapabilities } from '../../src/services/ledgerAdminApi.js'
-import { loadReviewQueue } from '../reviewQueue.js'
-import { pending } from '../pendingReviews.js'
+import { capabilityShares, creditMetrics, creditRanges, DAILY_DAYS, periodStats, windowRows } from '../../src/domain/creditStats.js'
+import { pendingTotal } from '../pendingReviews.js'
+import DeltaBadge from '../DeltaBadge.vue'
 
 const loading = ref(false)
-const queue = ref({ items: [], failed: [] })
-const queueError = ref('')
 const platformSummary = ref(null)
 const userSummary = ref(null)
 const summaryError = ref('')
-const today = ref(null)
-const week = ref(null)
+const daily = ref([])
 const ledgerError = ref('')
+const rangeKey = ref('7')
+const metricKey = ref('consumed')
 const now = ref(Date.now())
 let generation = 0
 
@@ -24,51 +23,42 @@ const greeting = computed(() => {
   return hour < 11 ? '早上好' : hour < 13 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
 })
 const dateLabel = computed(() => new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(now.value)))
-const rows = computed(() => {
-  const review = reviewKindOrder.map(kind => {
-    const list = queue.value.items.filter(item => item.kind === kind)
-    const oldest = list[0]
-    return { key: kind, label: reviewKinds[kind].title, count: list.length, failed: queue.value.failed.includes(kind), since: oldest?.since ?? null, late: oldest ? isOverdue(oldest, now.value) : false, to: { name: 'admin-review', query: { kind } } }
-  })
-  const elsewhere = [
-    { key: 'statements', label: '有异议的对账单', count: pending.statements, to: { name: 'admin-alliance' } },
-    { key: 'withdrawals', label: '待审核提现', count: pending.withdrawals, to: { name: 'admin-referral' } },
+const kpis = computed(() => {
+  const users = userSummary.value
+  return [
+    { label: '用户总数', value: users?.users, previous: users?.usersWeekAgo, compare: '比 7 天前' },
+    { label: '近 7 天登录', value: users?.activeLast7Days, previous: users?.activePrevious7Days, compare: '比上个 7 天', pending: users && users.activePrevious7Days == null ? '登录记录积累中，满 14 天后显示涨幅' : '' },
+    { label: '近 7 天新增', value: users?.newLast7Days, previous: users?.newPrevious7Days, compare: '比上个 7 天' },
+    { label: '已入驻商家', value: platformSummary.value?.approvedMerchants, helper: '入驻审核通过' },
+    { label: '在线信息', value: platformSummary.value?.publishedInformation, helper: '已发布且在有效期内' },
   ]
-  return [...review, ...elsewhere].filter(row => row.count || row.failed).sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity))
 })
-const total = computed(() => rows.value.reduce((sum, row) => sum + (row.count || 0), 0))
-const overdue = computed(() => queue.value.items.filter(item => isOverdue(item, now.value)).length)
-const kpis = computed(() => [
-  { label: '用户总数', value: userSummary.value?.users, helper: '不含已被商户移除的账号' },
-  { label: '近 7 天登录', value: userSummary.value?.activeLast7Days, helper: '最近一周登录过的账号' },
-  { label: '近 7 天新增', value: userSummary.value?.newLast7Days, helper: '注册或被商户添加' },
-  { label: '已入驻商家', value: platformSummary.value?.approvedMerchants, helper: '入驻审核通过' },
-  { label: '在线信息', value: platformSummary.value?.publishedInformation, helper: '已发布且在有效期内' },
-])
-const capabilities = computed(() => {
-  const entries = Object.entries(today.value?.consumedByCapability || {}).filter(([, amount]) => amount > 0).sort((a, b) => b[1] - a[1])
-  const max = entries[0]?.[1] || 1
-  const sum = entries.reduce((value, [, amount]) => value + amount, 0) || 1
-  return entries.map(([key, amount]) => ({ key, label: ledgerCapabilities[key] || key, amount, width: amount / max * 100, share: Math.round(amount / sum * 100) }))
-})
+const range = computed(() => creditRanges.find(item => item.key === rangeKey.value))
+const stats = computed(() => periodStats(daily.value, range.value.days))
+const metric = computed(() => creditMetrics.find(item => item.key === metricKey.value))
+const rows = computed(() => windowRows(daily.value, range.value.days))
+const firstCurrent = computed(() => rows.value.length - Math.min(range.value.days, rows.value.length))
+const chartMax = computed(() => Math.max(1, ...rows.value.map(row => Number(row[metricKey.value] || 0))))
+const tableRows = computed(() => rows.value.map((row, index) => ({ ...row, current: index >= firstCurrent.value })).reverse())
+const shares = computed(() => capabilityShares(stats.value.current, stats.value.previous))
+const shareTotal = computed(() => shares.value.reduce((sum, item) => sum + item.amount, 0))
 const number = value => value == null ? '—' : Number(value).toLocaleString('zh-CN')
+const shortDate = value => { const [, month, day] = String(value).split('-'); return `${Number(month)}/${Number(day)}` }
+const labelEvery = computed(() => rows.value.length > 45 ? 15 : rows.value.length > 14 ? 5 : 1)
 
 async function load() {
   const attempt = ++generation
   loading.value = true
   now.value = Date.now()
-  const [queueResult, platformResult, userResult, todayResult, weekResult] = await Promise.allSettled([
-    loadReviewQueue(), platformManagementApi.summary(), platformManagementApi.userSummary(), ledgerAdminApi.summary(1), ledgerAdminApi.summary(7),
+  const [platformResult, userResult, dailyResult] = await Promise.allSettled([
+    platformManagementApi.summary(), platformManagementApi.userSummary(), ledgerAdminApi.daily(DAILY_DAYS),
   ])
   if (attempt !== generation) return
-  queueError.value = queueResult.status === 'rejected' ? queueResult.reason?.message || '待处理事项读取失败。' : ''
-  if (queueResult.status === 'fulfilled') queue.value = queueResult.value
   platformSummary.value = platformResult.status === 'fulfilled' ? platformResult.value : null
   userSummary.value = userResult.status === 'fulfilled' ? userResult.value : null
   summaryError.value = platformResult.status === 'rejected' || userResult.status === 'rejected' ? '部分统计暂时读不到，显示为「—」。' : ''
-  today.value = todayResult.status === 'fulfilled' ? todayResult.value : null
-  week.value = weekResult.status === 'fulfilled' ? weekResult.value : null
-  ledgerError.value = todayResult.status === 'rejected' ? todayResult.reason?.message || '烟火数据暂时读不到。' : ''
+  daily.value = dailyResult.status === 'fulfilled' && Array.isArray(dailyResult.value) ? dailyResult.value : []
+  ledgerError.value = dailyResult.status === 'rejected' ? dailyResult.reason?.message || '烟火数据暂时读不到。' : ''
   loading.value = false
 }
 
@@ -80,8 +70,8 @@ onBeforeUnmount(() => { generation++ })
   <div class="management-page wb-page">
     <header class="ad-page-head">
       <div>
-        <h1>{{ greeting }}，{{ total ? `有 ${total} 件事等你处理` : '暂时没有待处理的事' }}</h1>
-        <p>{{ dateLabel }}<template v-if="overdue"> · <span class="wb-late">其中 {{ overdue }} 件已等超过 {{ OVERDUE_HOURS }} 小时</span></template></p>
+        <h1>{{ greeting }}</h1>
+        <p>{{ dateLabel }}<template v-if="pendingTotal"> · 有 <RouterLink class="wb-pending" :to="{ name: 'admin-review' }">{{ pendingTotal }} 件待处理</RouterLink></template></p>
       </div>
       <div class="wb-head-actions">
         <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
@@ -90,48 +80,69 @@ onBeforeUnmount(() => { generation++ })
     </header>
 
     <section class="wb-kpis" aria-label="平台概况">
-      <div v-for="item in kpis" :key="item.label"><span>{{ item.label }}</span><strong>{{ number(item.value) }}</strong><small>{{ item.helper }}</small></div>
+      <div v-for="item in kpis" :key="item.label">
+        <span>{{ item.label }}</span>
+        <strong>{{ number(item.value) }}</strong>
+        <small v-if="item.helper">{{ item.helper }}</small>
+        <DeltaBadge v-else :current="item.value ?? null" :previous="item.previous ?? null" :label="item.compare" :pending="item.pending" />
+      </div>
     </section>
     <p v-if="summaryError" class="ad-note">{{ summaryError }}</p>
 
     <div class="wb-grid">
-      <section class="ad-panel" aria-labelledby="wb-queue-title">
-        <header><h2 id="wb-queue-title">待你处理</h2><small>等得最久的排最前</small></header>
-        <p v-if="queueError" class="ad-alert wb-inset" role="alert">{{ queueError }}</p>
-        <div v-else-if="loading && !rows.length" class="mg-state" role="status"><RefreshCw :size="24" class="mg-spinning" /><p>正在读取…</p></div>
-        <p v-else-if="!rows.length" class="wb-empty">都处理完了。新的申请进来后，侧栏和铃铛会显示数字。</p>
-        <ul v-else class="wb-queue">
-          <li v-for="row in rows" :key="row.key">
-            <div>
-              <strong>{{ row.label }}</strong>
-              <small v-if="row.failed" class="wb-late">暂时读不到</small>
-              <small v-else-if="row.since != null" :class="{ 'wb-late': row.late }">最久一条已等 {{ waitedLabel(row.since, now) }}</small>
-              <small v-else>在原页面处理</small>
+      <section class="ad-panel" aria-labelledby="wb-stats-title">
+        <header>
+          <h2 id="wb-stats-title">烟火统计</h2>
+          <div class="wb-ranges" role="tablist" aria-label="时间段">
+            <button v-for="item in creditRanges" :key="item.key" type="button" role="tab" :aria-selected="rangeKey === item.key" :class="{ active: rangeKey === item.key }" @click="rangeKey = item.key">{{ item.label }}</button>
+          </div>
+        </header>
+        <p v-if="ledgerError" class="wb-empty">{{ ledgerError }}</p>
+        <div v-else-if="loading && !daily.length" class="mg-state" role="status"><RefreshCw :size="24" class="mg-spinning" /><p>正在读取…</p></div>
+        <template v-else>
+          <div class="wb-metrics" role="tablist" aria-label="烟火类型">
+            <button v-for="item in creditMetrics" :key="item.key" type="button" role="tab" :aria-selected="metricKey === item.key" :class="{ active: metricKey === item.key }" @click="metricKey = item.key">
+              <span>{{ range.label }}{{ item.label }}</span>
+              <strong>{{ number(stats.current[item.key]) }}</strong>
+              <DeltaBadge :current="stats.current[item.key]" :previous="stats.previous?.[item.key] ?? null" :label="range.compare" />
+            </button>
+          </div>
+
+          <div class="wb-chart-head"><h3>每日{{ metric.label }}</h3><small>{{ range.days === 1 ? '最近 14 天，深色为今天' : `${range.label}，共 ${rows.length} 天` }}</small></div>
+          <div class="wb-chart" role="img" :aria-label="`每日${metric.label}柱状图`">
+            <div v-for="(row, index) in rows" :key="row.date" class="wb-bar" :class="{ current: index >= firstCurrent }" :title="`${row.date} ${metric.label} ${number(row[metricKey])}`">
+              <i :style="{ height: `${Number(row[metricKey] || 0) / chartMax * 100}%` }" />
+              <small v-if="(rows.length - 1 - index) % labelEvery === 0">{{ shortDate(row.date) }}</small>
             </div>
-            <b :class="{ late: row.late }">{{ row.failed ? '—' : row.count }}</b>
-            <RouterLink class="mg-button" :to="row.to">去处理<ArrowRight :size="14" /></RouterLink>
-          </li>
-        </ul>
+          </div>
+
+          <div class="wb-table-wrap">
+            <table class="wb-table">
+              <thead><tr><th>日期</th><th v-for="item in creditMetrics" :key="item.key" :class="{ active: metricKey === item.key }">{{ item.label }}</th></tr></thead>
+              <tbody>
+                <tr v-for="row in tableRows" :key="row.date" :class="{ muted: !row.current }"><td>{{ row.date }}</td><td v-for="item in creditMetrics" :key="item.key" :class="{ active: metricKey === item.key }">{{ number(row[item.key]) }}</td></tr>
+              </tbody>
+              <tfoot>
+                <tr><th>{{ range.label }}合计</th><td v-for="item in creditMetrics" :key="item.key">{{ number(stats.current[item.key]) }}</td></tr>
+                <tr class="muted"><th>上期合计</th><td v-for="item in creditMetrics" :key="item.key">{{ stats.previous ? number(stats.previous[item.key]) : '—' }}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        </template>
       </section>
 
-      <section class="ad-panel" aria-labelledby="wb-credit-title">
-        <header><h2 id="wb-credit-title">烟火</h2><RouterLink class="mg-text-button" :to="{ name: 'admin-credits' }">看流水<ArrowRight :size="13" /></RouterLink></header>
+      <section class="ad-panel" aria-labelledby="wb-share-title">
+        <header><h2 id="wb-share-title">{{ range.label }}烟火花在哪</h2><RouterLink class="mg-text-button" :to="{ name: 'admin-credits' }">看流水<ArrowRight :size="13" /></RouterLink></header>
         <p v-if="ledgerError" class="wb-empty">{{ ledgerError }}</p>
+        <p v-else-if="!shares.length" class="wb-empty">{{ range.label }}还没有消耗。</p>
         <template v-else>
-          <dl class="wb-credit">
-            <div><dt>今日消耗</dt><dd>{{ number(today?.consumed) }}</dd></div>
-            <div><dt>今日购买</dt><dd>{{ number(today?.purchased) }}</dd></div>
-            <div><dt>今日赠送</dt><dd>{{ number(today?.granted) }}</dd></div>
-          </dl>
-          <dl class="wb-credit wb-credit-week">
-            <div><dt>近 7 天消耗</dt><dd>{{ number(week?.consumed) }}</dd></div>
-            <div><dt>近 7 天购买</dt><dd>{{ number(week?.purchased) }}</dd></div>
-            <div><dt>近 7 天退回</dt><dd>{{ number(week?.refunded) }}</dd></div>
-          </dl>
-          <h3 class="wb-sub">今天花在哪些功能上</h3>
-          <p v-if="!capabilities.length" class="wb-empty">今天还没有消耗。</p>
-          <ul v-else class="wb-bars">
-            <li v-for="item in capabilities" :key="item.key"><span>{{ item.label }}</span><span class="wb-track"><i :style="{ width: `${item.width}%` }" /></span><span class="mg-mono">{{ number(item.amount) }}<small>{{ item.share }}%</small></span></li>
+          <p class="wb-share-total">共消耗 <b>{{ number(shareTotal) }}</b> 烟火</p>
+          <ul class="wb-shares">
+            <li v-for="item in shares" :key="item.key">
+              <div class="wb-share-row"><span>{{ ledgerCapabilities[item.key] || item.key }}</span><strong>{{ item.share.toFixed(item.share > 0 && item.share < 1 ? 1 : 0) }}<small>%</small></strong></div>
+              <span class="wb-track"><i :style="{ width: `${item.share}%` }" /></span>
+              <div class="wb-share-meta"><span class="mg-mono">{{ number(item.amount) }} 烟火</span><DeltaBadge :current="item.amount" :previous="item.previous" :label="range.compare" /></div>
+            </li>
           </ul>
         </template>
       </section>

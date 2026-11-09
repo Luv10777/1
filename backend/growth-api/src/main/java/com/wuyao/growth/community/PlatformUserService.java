@@ -67,12 +67,19 @@ public class PlatformUserService {
 
     public PlatformDtos.UserSummary summary(AuthPrincipal me) {
         management.requireOperator(me);
-        Instant weekAgo = Instant.now().minus(Duration.ofDays(7));
+        Instant now = Instant.now();
+        Instant weekAgo = now.minus(Duration.ofDays(7));
+        Instant twoWeeksAgo = now.minus(Duration.ofDays(14));
         var current = directory.users().stream().filter(u -> !"REMOVED".equals(u.status())).toList();
+        long recent = current.stream().filter(u -> u.createdAt().isAfter(weekAgo)).count();
+        // 对比值按现有账号回推：之后被商户移除的账号不计入，与列表口径一致。
         return new PlatformDtos.UserSummary(current.size(),
                 current.stream().filter(u -> u.lastLoginAt() != null && u.lastLoginAt().isAfter(weekAgo)).count(),
-                current.stream().filter(u -> u.createdAt().isAfter(weekAgo)).count(),
-                current.stream().filter(u -> PlatformAccountDirectory.SUSPENDED.equals(u.status())).count());
+                recent,
+                current.stream().filter(u -> PlatformAccountDirectory.SUSPENDED.equals(u.status())).count(),
+                current.size() - recent,
+                current.stream().filter(u -> u.createdAt().isAfter(twoWeeksAgo) && !u.createdAt().isAfter(weekAgo)).count(),
+                directory.loginUsersBetween(twoWeeksAgo, weekAgo));
     }
 
     /** 停用立即让对方所有设备下线；不能停用自己和平台运营账号。 */

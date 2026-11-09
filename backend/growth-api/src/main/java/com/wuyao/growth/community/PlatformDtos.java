@@ -34,7 +34,12 @@ public final class PlatformDtos {
     /** 已通过的实名记录；id 是实名申请编号，按用途查看完整资料时使用。 */
     public record UserIdentity(Long id, String legalNameMasked, String idNumberMasked, Instant verifiedAt) {}
 
-    public record UserSummary(long users, long activeLast7Days, long newLast7Days, long suspended) {}
+    /**
+     * 用户概况，带上一个 7 天的对比值：usersWeekAgo 是 7 天前已注册的账号数，newPrevious7Days 是再往前 7 天的新增数，
+     * activePrevious7Days 是再往前 7 天登录过的账号数，登录记录还不满 14 天时为 null。
+     */
+    public record UserSummary(long users, long activeLast7Days, long newLast7Days, long suspended,
+                              long usersWeekAgo, long newPrevious7Days, Long activePrevious7Days) {}
 
     public record UserSuspensionRequest(
             @jakarta.validation.constraints.NotNull Boolean suspended,

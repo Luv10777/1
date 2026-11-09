@@ -6,6 +6,8 @@ const params = values => Object.fromEntries(Object.entries(values || {}).filter(
 export const ledgerAdminApi = {
   entries: values => get('/api/billing/operations/ledger', params(values)),
   summary: days => get('/api/billing/operations/ledger/summary', { days }),
+  /** 最近 days 天（含今天）每天的全平台合计，最多 180 天。 */
+  daily: days => get('/api/billing/operations/ledger/daily', { days }),
   overview: () => get('/api/billing/operations/overview'),
 }
 

@@ -32,6 +32,7 @@ public class BillingLedgerReport {
     static final Set<String> CAPABILITIES = Set.of("IMAGE", "IMAGE_INSPIRATION", "VIDEO", "VIDEO_ANALYSIS", "VIDEO_PLAN", "COPY", "LIVE");
     private static final int PER_TENANT_LIMIT = 2000;
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
+    static final int MAX_DAILY_DAYS = 180;
 
     private final EntityManager em;
     private final PlatformAccountDirectory directory;
@@ -87,6 +88,44 @@ public class BillingLedgerReport {
             }
         }
         return new BillingDtos.PlatformLedgerSummary(days, consumed, consumedToday, refunded, purchased, granted, byCapability);
+    }
+
+    /**
+     * 最近 days 天（含今天，按北京时间分日）每天的全平台合计，按日期从早到晚，没有流水的日子也给出。
+     * 后台用它算任意时段和上一个同长度时段的对比，所以上限是 90 天的两倍。
+     */
+    public List<BillingDtos.DailyCredits> daily(int days) {
+        if (days < 1 || days > MAX_DAILY_DAYS) throw BizException.of(ErrorCode.BAD_REQUEST, "时间范围为 1 至 " + MAX_DAILY_DAYS + " 天");
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate first = today.minusDays(days - 1L);
+        Instant since = first.atStartOfDay(ZONE).toInstant();
+        Map<LocalDate, long[]> totals = new TreeMap<>();
+        Map<LocalDate, Map<String, Long>> byCapability = new HashMap<>();
+        for (LocalDate date = first; !date.isAfter(today); date = date.plusDays(1)) {
+            totals.put(date, new long[4]);
+            byCapability.put(date, new TreeMap<>());
+        }
+        for (var tenant : directory.scopes()) {
+            for (Object[] row : inTenant(tenant.id(), () -> dailyTotals(tenant.id(), since))) {
+                LocalDate date = row[0] instanceof java.sql.Date sql ? sql.toLocalDate() : (LocalDate) row[0];
+                long[] day = totals.get(date);
+                if (day == null) continue;
+                String type = (String) row[1], capability = (String) row[2];
+                long amount = ((Number) row[3]).longValue();
+                switch (type) {
+                    case "CAPTURE" -> {
+                        day[0] += amount;
+                        if (capability != null) byCapability.get(date).merge(capability, amount, Long::sum);
+                    }
+                    case "RELEASE" -> day[1] += amount;
+                    case "PURCHASE" -> day[2] += amount;
+                    case "GRANT" -> day[3] += amount;
+                    default -> { }
+                }
+            }
+        }
+        return totals.entrySet().stream().map(e -> new BillingDtos.DailyCredits(e.getKey(), e.getValue()[0], e.getValue()[1],
+                e.getValue()[2], e.getValue()[3], byCapability.get(e.getKey()))).toList();
     }
 
     /** 烟火看板：每个商户的当前余额和累计数，再合计全平台。商户按当前可用烟火从多到少排。 */
@@ -177,6 +216,19 @@ public class BillingLedgerReport {
                 GROUP BY l.type, r.capability""")
                 .setParameter("tenant", tenantId).setParameter("since", Timestamp.from(since))
                 .setParameter("today", Timestamp.from(today)).getResultList();
+    }
+
+    /** 按北京时间日期、类型、功能分组的金额，口径同 totals。 */
+    @SuppressWarnings("unchecked")
+    private List<Object[]> dailyTotals(Long tenantId, Instant since) {
+        return em.createNativeQuery("""
+                SELECT (l.created_at AT TIME ZONE 'Asia/Shanghai')::date, l.type, r.capability,
+                       COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' THEN -l.held_delta ELSE l.gift_delta + l.purchased_delta END), 0)
+                FROM billing_ledger l
+                LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id
+                WHERE l.tenant_id = :tenant AND l.created_at >= :since AND l.type IN ('CAPTURE', 'RELEASE', 'PURCHASE', 'GRANT')
+                GROUP BY 1, 2, 3""")
+                .setParameter("tenant", tenantId).setParameter("since", Timestamp.from(since)).getResultList();
     }
 
     private <T> T inTenant(Long tenantId, Supplier<T> work) {
