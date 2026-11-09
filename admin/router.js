@@ -4,6 +4,9 @@ import { loadPlatformAccess, platform } from '../src/stores/platform.js'
 import LoginView from './views/LoginView.vue'
 import AccessView from './views/AccessView.vue'
 
+const WorkbenchView = () => import('./views/WorkbenchView.vue')
+const ReviewView = () => import('./views/ReviewView.vue')
+
 const ManagementView = () => import('../src/views/PlatformManagementView.vue')
 const AllianceView = () => import('../src/views/PlatformAllianceView.vue')
 const PlansView = () => import('../src/views/PlatformPlansView.vue')
@@ -14,17 +17,19 @@ const CreditOverviewView = () => import('../src/views/PlatformCreditOverviewView
 const RedeemCodesView = () => import('../src/views/PlatformRedeemCodesView.vue')
 
 export function adminDestination(raw) {
-  if (typeof raw !== 'string') return '/information'
+  if (typeof raw !== 'string') return '/workbench'
   const path = raw.split(/[?#]/)[0]
-  return ['/information', '/merchants', '/identities', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes'].includes(path) ? raw : '/information'
+  return ['/workbench', '/review', '/information', '/merchants', '/identities', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral'].includes(path) ? raw : '/workbench'
 }
 
 export function createAdminRouter(history = createWebHistory()) {
   const instance = createRouter({
     history,
     routes: [
-      { path: '/', redirect: '/information' },
+      { path: '/', redirect: '/workbench' },
       { path: '/login', name: 'admin-login', component: LoginView, meta: { title: '管理员登录' } },
+      { path: '/workbench', name: 'admin-home', component: WorkbenchView, meta: { title: '工作台', admin: true } },
+      { path: '/review', name: 'admin-review', component: ReviewView, meta: { title: '审核中心', admin: true } },
       { path: '/information', alias: '/admin/information', name: 'admin-information', component: ManagementView, meta: { title: '信息管理', admin: true } },
       { path: '/merchants', name: 'admin-merchants', component: ManagementView, meta: { title: '商家管理', admin: true } },
       { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], name: 'admin-identities', component: ManagementView, meta: { title: '用户实名', admin: true } },

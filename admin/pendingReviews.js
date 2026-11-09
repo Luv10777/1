@@ -9,12 +9,13 @@ import { referralApi } from '../src/services/referralApi.js'
  */
 export const pending = reactive({ information: null, merchants: null, offers: null, disputes: null, accounts: null, statements: null, withdrawals: null })
 
+// 前五类在审核中心处理（kind 对应审核中心的标签）；对账单和提现要录入打款信息，仍在原页面处理。
 export const pendingItems = computed(() => [
-  { key: 'information', label: '待审核信息', route: 'admin-information' },
-  { key: 'merchants', label: '待审核入驻', route: 'admin-merchants' },
-  { key: 'offers', label: '待审核供券', route: 'admin-alliance' },
-  { key: 'disputes', label: '待处理申诉', route: 'admin-alliance' },
-  { key: 'accounts', label: '待核对收款账号', route: 'admin-alliance' },
+  { key: 'information', label: '待审核信息', route: 'admin-review', kind: 'information' },
+  { key: 'merchants', label: '待审核入驻', route: 'admin-review', kind: 'merchant' },
+  { key: 'offers', label: '待审核供券', route: 'admin-review', kind: 'offer' },
+  { key: 'disputes', label: '待处理申诉', route: 'admin-review', kind: 'dispute' },
+  { key: 'accounts', label: '待核对收款账号', route: 'admin-review', kind: 'account' },
   { key: 'statements', label: '有异议的对账单', route: 'admin-alliance' },
   { key: 'withdrawals', label: '待审核提现', route: 'admin-referral' },
 ].map(item => ({ ...item, count: pending[item.key] || 0 })))
