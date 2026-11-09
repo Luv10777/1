@@ -150,7 +150,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
     <header class="works-header">
       <div class="works-heading">
         <div class="works-title-copy">
-          <h1>数字方志库</h1>
+          <h1>作品库</h1>
         </div>
         <button class="new-work-button" type="button" @click="router.push('/image/create')">
           <Plus :size="16" stroke-width="1.8" /> 新建创作
@@ -229,38 +229,41 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
       {{ worksLoading ? '正在读取…' : '加载更多' }}
     </button>
 
-    <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
-      <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
-        <header class="detail-header">
-          <div>
-            <p class="detail-eyebrow">{{ selectedWork.typeLabel }} / HISTORY</p>
-            <h2>{{ selectedWork.title }}</h2>
-            <p class="detail-date">生成于 {{ formatDate(selectedWork.createdAt) }} · 已完成</p>
+    <!-- .works-library 的 view-transition-name 会形成层叠上下文，弹窗留在里面会被顶栏和侧边栏压住。 -->
+    <Teleport to="body">
+      <div v-if="selectedWork" class="detail-scrim" @click.self="closeDetails">
+        <section class="detail-modal" role="dialog" aria-modal="true" :aria-label="`${selectedWork.title} 详情`">
+          <header class="detail-header">
+            <div>
+              <p class="detail-eyebrow">{{ selectedWork.typeLabel }} / HISTORY</p>
+              <h2>{{ selectedWork.title }}</h2>
+              <p class="detail-date">生成于 {{ formatDate(selectedWork.createdAt) }} · 已完成</p>
+            </div>
+            <button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button>
+          </header>
+          <div class="generation-detail">
+            <div class="detail-media">
+              <img v-if="selectedWork.type === 'image'" :src="selectedWork.url" :alt="selectedWork.title" />
+              <video v-else :src="selectedWork.url" controls playsinline preload="metadata" />
+            </div>
+            <p v-if="selectedWork.type === 'video' && selectedWork.prompt" class="detail-prompt">{{ selectedWork.prompt }}</p>
+            <div class="parameter-grid">
+              <div><span>类型</span><strong>{{ selectedWork.typeLabel }}</strong></div>
+              <div><span>{{ selectedWork.type === 'image' ? '画质' : '模型' }}</span><strong>{{ selectedWork.quality || selectedWork.model }}</strong></div>
+              <div><span>尺寸</span><strong>{{ selectedWork.dimensions }}</strong></div>
+              <div v-if="selectedWork.duration"><span>时长</span><strong>{{ selectedWork.duration }}</strong></div>
+            </div>
           </div>
-          <button class="close-modal" type="button" aria-label="关闭详情" @click="closeDetails"><X :size="18" /></button>
-        </header>
-        <div class="generation-detail">
-          <div class="detail-media">
-            <img v-if="selectedWork.type === 'image'" :src="selectedWork.url" :alt="selectedWork.title" />
-            <video v-else :src="selectedWork.url" controls playsinline preload="metadata" />
-          </div>
-          <p v-if="selectedWork.type === 'video' && selectedWork.prompt" class="detail-prompt">{{ selectedWork.prompt }}</p>
-          <div class="parameter-grid">
-            <div><span>类型</span><strong>{{ selectedWork.typeLabel }}</strong></div>
-            <div><span>{{ selectedWork.type === 'image' ? '画质' : '模型' }}</span><strong>{{ selectedWork.quality || selectedWork.model }}</strong></div>
-            <div><span>尺寸</span><strong>{{ selectedWork.dimensions }}</strong></div>
-            <div v-if="selectedWork.duration"><span>时长</span><strong>{{ selectedWork.duration }}</strong></div>
-          </div>
-        </div>
-        <footer class="detail-footer">
-          <span>作品 ID · {{ selectedWork.id }}</span>
-          <div>
-            <button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button>
-            <button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 继续创作</button>
-          </div>
-        </footer>
-      </section>
-    </div>
+          <footer class="detail-footer">
+            <span>作品 ID · {{ selectedWork.id }}</span>
+            <div>
+              <button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button>
+              <button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 继续创作</button>
+            </div>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -324,7 +327,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .works-error button { padding: 0; border: 0; color: inherit; background: transparent; text-decoration: underline; cursor: pointer; }
 .works-load-more { display: block; margin: 20px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
 .works-load-more:disabled { opacity: .55; cursor: default; }
-.detail-scrim { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; background: rgba(18, 18, 18, .42); backdrop-filter: blur(5px); }
+.detail-scrim { --surface: var(--color-bg-surface); --ink: var(--color-primary); --muted: var(--color-text-muted); --line: var(--color-border-subtle); position: fixed; inset: 0; z-index: 120;display: grid; place-items: center; padding: 20px; background: rgba(18, 18, 18, .42); backdrop-filter: blur(5px); }
 .detail-modal { width: min(760px, 100%); max-height: min(820px, calc(100vh - 40px)); overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
 .detail-eyebrow { margin: 0 0 7px; color: var(--muted); font: 600 12px var(--font-mono); }

@@ -89,7 +89,7 @@ const routes = [
   { path: '/assets/products', name: 'products', component: ProductsView, meta: { title: '商品库', navGroup: 'assets', description: '沉淀门店爆款、团购券与实物资产，为直播讲解与内容创作提供商品事实库。' } },
   { path: '/orders', name: 'merchant-orders', component: MerchantOrdersView, meta: { title: '订单管理', navGroup: 'alliance' } },
   { path: '/knowledge', name: 'knowledge', component: KnowledgeView, meta: { title: '知识库', icon: '≡', description: '把门店经验整理为模型可以调用的知识单元。' } },
-  { path: '/works', name: 'works', component: WorksView, meta: { title: '数字方志库', icon: '⌁', description: '查看当前账号实际生成的图片与视频作品。' } },
+  { path: '/works', name: 'works', component: WorksView, meta: { title: '作品库', icon: '⌁', description: '查看当前账号实际生成的图片与视频作品。' } },
   { path: '/reviews', name: 'reviews', component: ReviewsView, meta: { title: '评论 / 差评自动回复', icon: '◠', description: '聚合门店评论与差评，给出可审核的智能回复建议。' } },
   { path: '/publishing', name: 'publishing', component: PublishingView, meta: { title: '内容发布', icon: '↑', description: '管理多平台发布队列与内容审核状态。' } },
   { path: '/publishing/matrix', name: 'matrix-publishing', component: PlaceholderView, meta: { title: '矩阵发布', icon: '▦', description: '统一编排多个平台和账号的内容发布任务。' } },
