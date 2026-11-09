@@ -9,6 +9,8 @@ import com.wuyao.growth.iam.entity.RefreshToken;
 import com.wuyao.growth.iam.entity.SmsCode;
 import com.wuyao.growth.iam.entity.Tenant;
 import com.wuyao.growth.iam.entity.User;
+import com.wuyao.growth.iam.entity.LoginEvent;
+import com.wuyao.growth.iam.repository.LoginEventRepository;
 import com.wuyao.growth.iam.repository.RefreshTokenRepository;
 import com.wuyao.growth.iam.repository.SmsCodeRepository;
 import com.wuyao.growth.iam.repository.TenantRepository;
@@ -70,6 +72,7 @@ public class AuthService {
     private final StringRedisTemplate redis;
     private final AccountAvatarService avatars;
     private final ApplicationEventPublisher events;
+    private final LoginEventRepository loginEvents;
 
     @Value("${growth.sms.code-length:6}")
     private int codeLength;
@@ -156,7 +159,7 @@ public class AuthService {
                 throw BizException.of(ErrorCode.UNAUTHORIZED, PlatformAccountDirectory.SUSPENDED.equals(user.getStatus())
                         ? "账号已被平台停用，如有疑问请联系客服" : "账号已停用，请联系商户管理员");
             }
-            user.setLastLoginAt(Instant.now());
+            recordLogin(user);
             return issueTokens(user, ip, userAgent, deviceId);
         });
     }
@@ -168,7 +171,7 @@ public class AuthService {
             User user = userRepository.findForUpdate(userId)
                     .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                     .orElseThrow(() -> BizException.of(ErrorCode.PASSWORD_INVALID, "账号不可用"));
-            user.setLastLoginAt(Instant.now());
+            recordLogin(user);
             return issueTokens(user, ip, userAgent, deviceId);
         });
     }
@@ -309,9 +312,16 @@ public class AuthService {
             User user = userRepository.findForUpdate(userId)
                     .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                     .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
-            user.setLastLoginAt(Instant.now());
+            recordLogin(user);
             return issueTokens(user, ip, userAgent, deviceId);
         });
+    }
+
+    /** 记下最后登录时间，并留一条登录记录（后台按时段统计登录人数）。在登录事务里执行，登录失败不会留下记录。 */
+    private void recordLogin(User user) {
+        Instant now = Instant.now();
+        user.setLastLoginAt(now);
+        loginEvents.save(new LoginEvent(user.getId(), user.getTenantId(), now));
     }
 
     private AuthDtos.TokenPair issueTokens(User user, String ip, String userAgent, String deviceId) {

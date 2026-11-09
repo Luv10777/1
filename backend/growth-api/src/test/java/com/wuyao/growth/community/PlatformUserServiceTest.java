@@ -89,12 +89,19 @@ class PlatformUserServiceTest {
 
     @Test
     void summaryCountsCurrentAccountsOnly() {
+        when(directory.loginUsersBetween(any(), any())).thenReturn(2L);
         var summary = service.summary(operator);
         assertThat(summary.users()).isEqualTo(3);
         assertThat(summary.activeLast7Days()).isEqualTo(1);
         // 用户 N 注册于 N 天前：5、6 号在 7 天内，7 号刚满 7 天不算新增。
         assertThat(summary.newLast7Days()).isEqualTo(2);
         assertThat(summary.suspended()).isEqualTo(1);
+        // 对比上一个 7 天：7 天前已有 7 号；8–14 天前注册的只有 7 号（8 号已被移除不算）。
+        assertThat(summary.usersWeekAgo()).isEqualTo(1);
+        assertThat(summary.newPrevious7Days()).isEqualTo(1);
+        assertThat(summary.activePrevious7Days()).isEqualTo(2L);
+        verify(directory).loginUsersBetween(argThat(from -> Duration.between(from, Instant.now()).toDays() == 14),
+                argThat(to -> Duration.between(to, Instant.now()).toDays() == 7));
     }
 
     @Test

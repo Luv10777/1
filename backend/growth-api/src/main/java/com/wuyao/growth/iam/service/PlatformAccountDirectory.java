@@ -5,6 +5,7 @@ import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.iam.dto.AccountDtos;
 import com.wuyao.growth.iam.entity.User;
+import com.wuyao.growth.iam.repository.LoginEventRepository;
 import com.wuyao.growth.iam.repository.RefreshTokenRepository;
 import com.wuyao.growth.iam.repository.TenantRepository;
 import com.wuyao.growth.iam.repository.UserRepository;
@@ -24,6 +25,7 @@ public class PlatformAccountDirectory {
     private final TenantRepository tenants;
     private final UserRepository users;
     private final RefreshTokenRepository refreshTokens;
+    private final LoginEventRepository loginEvents;
 
     public record Scope(Long id, String name) {}
 
@@ -51,6 +53,17 @@ public class PlatformAccountDirectory {
     @Transactional(readOnly = true)
     public List<PlatformUser> users() {
         return users.findAll(Sort.by(Sort.Direction.DESC, "createdAt", "id")).stream().map(PlatformUser::of).toList();
+    }
+
+    /**
+     * [from, to) 内登录过的账号数（不含已被商户移除的）。登录记录从 V77 上线起才有，
+     * 最早一条记录晚于 from 时这段时间的数据不完整，返回 null。
+     */
+    @Transactional(readOnly = true)
+    public Long loginUsersBetween(Instant from, Instant to) {
+        Instant first = loginEvents.firstLoginAt();
+        if (first == null || first.isAfter(from)) return null;
+        return loginEvents.countUsersBetween(from, to);
     }
 
     @Transactional(readOnly = true)

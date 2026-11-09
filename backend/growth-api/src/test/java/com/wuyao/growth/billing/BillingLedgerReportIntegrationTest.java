@@ -95,6 +95,20 @@ class BillingLedgerReportIntegrationTest {
         assertThat(summary.consumedByCapability()).isEqualTo(Map.of("IMAGE", 9L, "VIDEO", 10L));
     }
 
+    @Test void dailyGivesEveryDayInBeijingTimeWithTodaysCreditsOnToday() {
+        var owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
+        owner.update("UPDATE billing_ledger SET created_at = now() - interval '1 day' WHERE type = 'RELEASE'");
+        var days = report.daily(3);
+        var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+        assertThat(days).extracting(BillingDtos.DailyCredits::date).containsExactly(today.minusDays(2), today.minusDays(1), today);
+        assertThat(days.get(0).consumed()).isZero();
+        assertThat(days.get(0).consumedByCapability()).isEmpty();
+        assertThat(days.get(1).refunded()).isEqualTo(3);
+        assertThat(days.get(2).consumed()).isEqualTo(19);
+        assertThat(days.get(2).refunded()).isZero();
+        assertThat(days.get(2).consumedByCapability()).isEqualTo(Map.of("IMAGE", 9L, "VIDEO", 10L));
+    }
+
     @Test void imageLedgerKeepsFirstPreviewDurationWhileDurableDeliveryContinues() {
         var owner=new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()));
         String reservation=TenantContext.runAs(shop,()->billing.reserve("preview:"+UUID.randomUUID(),"IMAGE",3,"Image preview"));
@@ -137,6 +151,12 @@ class BillingLedgerReportIntegrationTest {
         mvc.perform(get("/api/billing/operations/ledger/summary").header("Authorization", "Bearer " + jwt.issueAccessToken(operator, shop, null)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.consumed").value(19));
         mvc.perform(get("/api/billing/operations/ledger?days=91").header("Authorization", "Bearer " + jwt.issueAccessToken(operator, shop, null)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/billing/operations/ledger/daily?days=180").header("Authorization", "Bearer " + jwt.issueAccessToken(merchant, cafe, null)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/billing/operations/ledger/daily?days=180").header("Authorization", "Bearer " + jwt.issueAccessToken(operator, shop, null)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(180));
+        mvc.perform(get("/api/billing/operations/ledger/daily?days=181").header("Authorization", "Bearer " + jwt.issueAccessToken(operator, shop, null)))
                 .andExpect(status().isBadRequest());
     }
 }

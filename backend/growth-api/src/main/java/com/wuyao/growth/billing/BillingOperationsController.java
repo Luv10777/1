@@ -26,6 +26,11 @@ public class BillingOperationsController {
         @RequestParam(defaultValue="7") int days,@AuthenticationPrincipal AuthPrincipal me) {
         requireOperator(me); return ApiResponse.ok(ledger.summary(days));
     }
+    /** 烟火按天合计：最近 days 天（含今天，1 至 180），后台工作台用它做时段对比。 */
+    @GetMapping("/ledger/daily") public ApiResponse<java.util.List<BillingDtos.DailyCredits>> ledgerDaily(
+        @RequestParam(defaultValue="30") int days,@AuthenticationPrincipal AuthPrincipal me) {
+        requireOperator(me); return ApiResponse.ok(ledger.daily(days));
+    }
     /** 烟火看板：全平台累计充值、赠送、消耗，以及每个商户的余额。 */
     @GetMapping("/overview") public ApiResponse<BillingDtos.CreditOverview> overview(@AuthenticationPrincipal AuthPrincipal me) {
         requireOperator(me); return ApiResponse.ok(ledger.overview());
