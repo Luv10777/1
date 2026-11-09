@@ -19,9 +19,8 @@ const navigation = [
     { name: 'admin-review', label: '审核中心', description: '信息、入驻、供券、申诉、收款账号', icon: Inbox },
   ] },
   { label: '用户与商家', items: [
-    { name: 'admin-users', label: '用户管理', description: '账号状态、会员与烟火', icon: Users },
+    { name: 'admin-users', label: '用户管理', description: '账号状态、实名、会员与烟火', icon: Users },
     { name: 'admin-merchants', label: '商家管理', description: '商家档案与入驻', icon: Store },
-    { name: 'admin-identities', label: '用户实名', description: '实名核验记录', icon: ShieldCheck },
   ] },
   { label: '内容与联盟', items: [
     { name: 'admin-information', label: '信息管理', description: '平台发布内容与上下线', icon: FileText },

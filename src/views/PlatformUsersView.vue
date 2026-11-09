@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
-import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Crown, Flame, Gift, LockKeyhole, LogIn, RefreshCw, Search, UserCheck, UserPlus, Users, X } from 'lucide-vue-next'
+import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Crown, Eye, Flame, Gift, LockKeyhole, LogIn, RefreshCw, Search, ShieldCheck, UserCheck, UserPlus, Users, X } from 'lucide-vue-next'
 import { platformManagementApi as api } from '../services/platformManagement'
 import { planAdminApi } from '../services/planAdminApi'
 import { auth } from '../stores/auth'
@@ -38,8 +38,12 @@ const billingNote = ref('')
 const billingError = ref('')
 const billingDone = ref('')
 const confirming = ref(null)
+const identityNote = ref('')
+const identityError = ref('')
+const revealed = ref(null)
 let version = 0
 let detailVersion = 0
+let revealTimer
 
 const stats = [
   { key: 'users', label: '用户总数', helper: '不含已被商户移除的账号', icon: Users },
@@ -93,6 +97,26 @@ function closeDetail() {
   billingError.value = ''
   billingDone.value = ''
   confirming.value = null
+  clearTimeout(revealTimer)
+  revealed.value = null
+  identityNote.value = ''
+  identityError.value = ''
+}
+// 完整姓名和证件号按填写的用途查看，后端留存查阅记录；60 秒后自动遮蔽。
+async function revealIdentity() {
+  if (identityNote.value.trim().length < 5) { identityError.value = '请先填写至少5字的查阅用途，查阅将留存记录。'; return }
+  const item = selected.value
+  const attempt = detailVersion
+  busy.value = true
+  identityError.value = ''
+  try {
+    const result = await api.revealIdentity({ tenantId: item.tenantId, id: item.identity.id }, identityNote.value.trim())
+    if (attempt !== detailVersion) return
+    revealed.value = result
+    clearTimeout(revealTimer)
+    revealTimer = setTimeout(() => { revealed.value = null }, 60000)
+  } catch (failure) { if (attempt === detailVersion) identityError.value = failure.message || '完整资料暂时无法读取。' }
+  finally { if (attempt === detailVersion) busy.value = false }
 }
 async function loadTrail(item, attempt) {
   trailLoading.value = true
@@ -194,7 +218,7 @@ watch(() => [auth.user?.id, auth.tenantId], () => {
   records.value = []; summary.value = null; total.value = null; success.value = ''
   load()
 }, { immediate: true })
-onBeforeUnmount(() => { version++; detailVersion++ })
+onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); revealed.value = null })
 </script>
 
 <template>
@@ -209,7 +233,7 @@ onBeforeUnmount(() => { version++; detailVersion++ })
     <div v-if="success" class="mg-feedback success" role="status"><Check :size="16" />{{ success }}<button type="button" aria-label="关闭提示" @click="success = ''"><X :size="15" /></button></div>
 
     <section class="management-list" :aria-busy="loading" aria-label="用户列表">
-      <div class="mg-list-caption"><h2>全部用户</h2><span><LockKeyhole :size="13" />手机号默认脱敏</span></div>
+      <div class="mg-list-caption"><h2>全部用户</h2><span><LockKeyhole :size="13" />手机号、实名资料默认脱敏</span></div>
       <form class="management-filters" @submit.prevent="search">
         <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索姓名、手机号、登录账号、商户或用户编号" aria-label="搜索关键词" maxlength="100" /><button v-if="keyword" type="button" aria-label="清空搜索" @click="keyword = ''; search()"><X :size="14" /></button></label>
         <label class="mg-select"><span class="sr-only">角色</span><AppSelect v-model="role"><option value="">全部角色</option><option v-for="(label, value) in userRoles" :key="value" :value="value">{{ label }}</option></AppSelect></label>
@@ -221,10 +245,11 @@ onBeforeUnmount(() => { version++; detailVersion++ })
       <div v-else-if="!records.length" class="mg-state"><Users :size="32" /><h3>{{ keyword || status || role ? '没有匹配的用户' : '还没有用户' }}</h3><p>{{ keyword || status || role ? '调整关键词或筛选条件后重新查询。' : '商家注册或被添加后，账号会在这里显示。' }}</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
-          <thead><tr><th>用户</th><th>所属商户</th><th>会员与烟火</th><th>状态</th><th>最近登录</th><th class="mg-table-action">操作</th></tr></thead>
+          <thead><tr><th>用户</th><th>实名</th><th>所属商户</th><th>会员与烟火</th><th>状态</th><th>最近登录</th><th class="mg-table-action">操作</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.id">
               <td><button class="mg-record-title" type="button" @click="openDetail(item)"><span class="mg-avatar">{{ (item.name || '用').slice(0, 1) }}</span><span><strong>{{ item.name || '未填写姓名' }}</strong><small>用户 #{{ item.id }} · {{ item.phoneMasked }}</small></span></button></td>
+              <td><template v-if="item.identity"><span>{{ item.identity.legalNameMasked }}</span><small class="mg-mono">{{ item.identity.idNumberMasked }}</small></template><span v-else class="mg-status"><i />未实名</span></td>
               <td><span>{{ item.tenantName || '—' }}</span><small>{{ userRoles[item.role] || item.role }}{{ item.operator ? ' · 平台运营' : '' }}</small></td>
               <td><span>{{ membership(item) }}</span><small>烟火 {{ Number(item.creditsAvailable).toLocaleString('zh-CN') }}</small></td>
               <td><span class="mg-status" :class="`mg-${item.status.toLowerCase()}`"><i />{{ userStatuses[item.status] || item.status }}</span></td>
@@ -236,7 +261,7 @@ onBeforeUnmount(() => { version++; detailVersion++ })
       </div>
       <footer v-if="!error" class="management-pagination"><span>{{ total == null ? '正在读取记录' : `共 ${total.toLocaleString('zh-CN')} 个用户` }}</span><div><label><span class="sr-only">每页条数</span><AppSelect v-model.number="size" :disabled="loading" aria-label="每页条数" @change="search"><option :value="20">20 条 / 页</option><option :value="50">50 条 / 页</option></AppSelect></label><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ totalPages ? page + 1 : 0 }} / {{ totalPages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= totalPages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
-    <p class="management-footnote"><LockKeyhole :size="13" />平台停用会让对方所有设备立即下线，商户无法自行恢复；停用与解除都留存处理依据。</p>
+    <p class="management-footnote"><LockKeyhole :size="13" />平台停用会让对方所有设备立即下线，商户无法自行恢复；停用与解除都留存处理依据。实名由阿里云当场核验姓名与身份证号码，查看完整资料留存记录。</p>
 
     <Dialog :open="Boolean(selected)" class="management-dialog" @close="closeDetail">
       <div class="mg-backdrop" aria-hidden="true" /><div class="mg-drawer-position">
@@ -246,6 +271,20 @@ onBeforeUnmount(() => { version++; detailVersion++ })
             <DialogDescription class="mg-detail-description"><span class="mg-status" :class="`mg-${selected.status.toLowerCase()}`"><i />{{ userStatuses[selected.status] || selected.status }}</span><span>{{ selected.tenantName }} · 商户 #{{ selected.tenantId }}</span></DialogDescription>
             <div class="mg-drawer-body">
               <section class="mg-detail-section"><h3><Users :size="17" />账号资料</h3><dl class="mg-detail-grid"><div><dt>角色</dt><dd>{{ userRoles[selected.role] || selected.role }}{{ selected.operator ? ' · 平台运营' : '' }}</dd></div><div><dt>绑定手机</dt><dd>{{ selected.phoneMasked }}</dd></div><div><dt>登录账号</dt><dd>{{ selected.username || '未设置' }}</dd></div><div><dt>注册时间</dt><dd>{{ managementDate(selected.createdAt) }}</dd></div><div><dt>最近登录</dt><dd>{{ selected.lastLoginAt ? managementDate(selected.lastLoginAt) : '从未登录' }}</dd></div><div v-if="selected.suspendedAt"><dt>平台停用于</dt><dd>{{ managementDate(selected.suspendedAt) }}</dd></div></dl></section>
+              <section class="mg-detail-section" aria-labelledby="user-identity-title">
+                <h3 id="user-identity-title"><ShieldCheck :size="17" />实名信息</h3>
+                <template v-if="selected.identity">
+                  <dl class="mg-detail-grid"><div><dt>姓名</dt><dd>{{ revealed?.legalName || selected.identity.legalNameMasked }}</dd></div><div><dt>居民身份证号码</dt><dd class="mg-mono">{{ revealed?.idNumber || selected.identity.idNumberMasked }}</dd></div><div><dt>核验结果</dt><dd><span class="mg-status mg-verified"><i />阿里云核验一致</span></dd></div><div><dt>核验时间</dt><dd>{{ managementDate(selected.identity.verifiedAt) }}</dd></div></dl>
+                  <template v-if="!revealed">
+                    <label class="mg-note-label" for="user-identity-note">查阅用途<span>查看完整资料前必填 · 至少5字</span></label>
+                    <textarea id="user-identity-note" v-model="identityNote" class="mg-note" rows="2" maxlength="500" :disabled="busy" placeholder="填写查阅用途，例如核对重复注册。请勿填写证件号码。" />
+                    <p v-if="identityError" class="mg-inline-error" role="alert">{{ identityError }}</p>
+                    <button class="mg-button" type="button" :disabled="busy" @click="revealIdentity"><Eye :size="15" />按填写用途查看完整资料</button>
+                  </template>
+                  <button v-else class="mg-button" type="button" @click="revealed = null"><LockKeyhole :size="15" />立即遮蔽资料</button>
+                </template>
+                <p v-else class="mg-muted"><span class="mg-status"><i />未实名</span> 账号本人在设置页完成实名后，会显示在这里。</p>
+              </section>
               <section class="mg-detail-section"><h3><UserCheck :size="17" />所属商户的会员</h3><dl class="mg-detail-grid"><div><dt>会员套餐</dt><dd>{{ selected.memberActive ? selected.planName || '会员' : '未开通会员' }}</dd></div><div><dt>到期时间</dt><dd>{{ selected.memberActive ? managementDate(selected.memberUntil) : '—' }}</dd></div><div><dt>烟火余额</dt><dd>{{ Number(selected.creditsAvailable).toLocaleString('zh-CN') }}</dd></div></dl></section>
               <section class="mg-detail-section" aria-labelledby="user-billing-title">
                 <h3 id="user-billing-title"><Flame :size="17" />会员与烟火操作</h3>

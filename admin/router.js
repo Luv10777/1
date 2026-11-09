@@ -19,7 +19,7 @@ const RedeemCodesView = () => import('../src/views/PlatformRedeemCodesView.vue')
 export function adminDestination(raw) {
   if (typeof raw !== 'string') return '/workbench'
   const path = raw.split(/[?#]/)[0]
-  return ['/workbench', '/review', '/information', '/merchants', '/identities', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral'].includes(path) ? raw : '/workbench'
+  return ['/workbench', '/review', '/information', '/merchants', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral'].includes(path) ? raw : '/workbench'
 }
 
 export function createAdminRouter(history = createWebHistory()) {
@@ -32,7 +32,8 @@ export function createAdminRouter(history = createWebHistory()) {
       { path: '/review', name: 'admin-review', component: ReviewView, meta: { title: '审核中心', admin: true } },
       { path: '/information', alias: '/admin/information', name: 'admin-information', component: ManagementView, meta: { title: '信息管理', admin: true } },
       { path: '/merchants', name: 'admin-merchants', component: ManagementView, meta: { title: '商家管理', admin: true } },
-      { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], name: 'admin-identities', component: ManagementView, meta: { title: '用户实名', admin: true } },
+      // 实名已并入用户管理，旧地址跳过去。
+      { path: '/identities', alias: ['/admin/identities', '/admin/real-name'], redirect: '/users' },
       { path: '/credit-overview', name: 'admin-credit-overview', component: CreditOverviewView, meta: { title: '烟火看板', admin: true } },
       { path: '/credits', name: 'admin-credits', component: CreditsView, meta: { title: '烟火日志', admin: true } },
       { path: '/redeem-codes', name: 'admin-redeem-codes', component: RedeemCodesView, meta: { title: '兑换码', admin: true } },

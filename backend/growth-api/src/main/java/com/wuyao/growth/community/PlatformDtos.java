@@ -22,11 +22,17 @@ public final class PlatformDtos {
 
     public record MerchantDetailView(Long id, String creditCode, String contactPhone) {}
 
-    /** 平台用户列表的一行；手机号脱敏，会员与烟火取自用户所属商户。 */
+    /**
+     * 平台用户列表的一行；手机号脱敏，会员与烟火取自用户所属商户。
+     * identity 只在实名核验通过时给出（只含脱敏姓名与证件号），未实名为 null。
+     */
     public record UserView(Long id, Long tenantId, String tenantName, String name, String phoneMasked, String username,
                            String role, String status, Instant lastLoginAt, Instant createdAt, Instant suspendedAt,
                            boolean memberActive, Instant memberUntil, String planName, long creditsAvailable,
-                           boolean operator) {}
+                           boolean operator, UserIdentity identity) {}
+
+    /** 已通过的实名记录；id 是实名申请编号，按用途查看完整资料时使用。 */
+    public record UserIdentity(Long id, String legalNameMasked, String idNumberMasked, Instant verifiedAt) {}
 
     public record UserSummary(long users, long activeLast7Days, long newLast7Days, long suspended) {}
 

@@ -37,6 +37,7 @@ public class PlatformUserService {
     private final PlatformManagementAuditRepository audits;
     private final BillingService billing;
     private final PlatformTransactionManager transactionManager;
+    private final RealNameApplicationRepository identities;
 
     /** 默认不列出已被商户移除的账号；按状态筛选 REMOVED 时才显示。 */
     public PageResult<PlatformDtos.UserView> users(AuthPrincipal me, int page, int size, String status, String role, String keyword) {
@@ -54,10 +55,12 @@ public class PlatformUserService {
                 .toList();
         int start = (int) Math.min((long) page * size, matched.size());
         int end = Math.min(start + size, matched.size());
-        // 会员信息只为当前页涉及的商户读取，每个商户读一次。
+        // 会员信息和实名记录只为当前页涉及的商户读取，每个商户读一次。
         Map<Long, BillingDtos.Summary> memberships = new HashMap<>();
+        Map<Long, Map<Long, PlatformDtos.UserIdentity>> verified = new HashMap<>();
         var items = matched.subList(start, end).stream()
-                .map(u -> view(u, tenantNames.get(u.tenantId()), memberships.computeIfAbsent(u.tenantId(), this::membership)))
+                .map(u -> view(u, tenantNames.get(u.tenantId()), memberships.computeIfAbsent(u.tenantId(), this::membership),
+                        verified.computeIfAbsent(u.tenantId(), this::verifiedIdentities).get(u.id())))
                 .toList();
         return new PageResult<>(items, page, size, matched.size(), (int) Math.ceil((double) matched.size() / size));
     }
@@ -91,7 +94,7 @@ public class PlatformUserService {
             audits.saveAndFlush(event);
             return result;
         });
-        return view(updated, tenantNames().get(tenantId), membership(tenantId));
+        return view(updated, tenantNames().get(tenantId), membership(tenantId), identity(tenantId, userId));
     }
 
     /** 会员按商户计：给某个账号开通或关闭，就是给他所属的商户开通或关闭。 */
@@ -129,7 +132,7 @@ public class PlatformUserService {
             audits.saveAndFlush(event);
             return null;
         });
-        return view(directory.user(userId), tenantNames().get(tenantId), membership(tenantId));
+        return view(directory.user(userId), tenantNames().get(tenantId), membership(tenantId), identity(tenantId, userId));
     }
 
     private static String reason(String note) {
@@ -138,11 +141,33 @@ public class PlatformUserService {
         return value;
     }
 
-    private PlatformDtos.UserView view(PlatformAccountDirectory.PlatformUser u, String tenantName, BillingDtos.Summary member) {
+    private PlatformDtos.UserView view(PlatformAccountDirectory.PlatformUser u, String tenantName, BillingDtos.Summary member,
+                                       PlatformDtos.UserIdentity identity) {
         return new PlatformDtos.UserView(u.id(), u.tenantId(), tenantName, u.name(), PlatformManagementService.maskPhone(u.phone()),
                 u.username(), u.role(), u.status(), u.lastLoginAt(), u.createdAt(), u.suspendedAt(),
                 member.memberActive(), member.memberUntil(), member.plan() == null ? null : member.plan().name(),
-                member.available(), config.getOperatorUserIds().contains(u.id()));
+                member.available(), config.getOperatorUserIds().contains(u.id()), identity);
+    }
+
+    /** 商户里实名核验通过的账号，按用户编号取。核验不一致或未提交的不在其中，列表显示为未实名。 */
+    private Map<Long, PlatformDtos.UserIdentity> verifiedIdentities(Long tenantId) {
+        return inScope(tenantId, true, () -> identities.findAllByTenantIdOrderBySubmittedAtDescIdDesc(tenantId).stream()
+                .filter(PlatformUserService::verified)
+                .collect(Collectors.toMap(RealNameApplication::getUserId, PlatformUserService::brief, (first, ignored) -> first)));
+    }
+
+    private PlatformDtos.UserIdentity identity(Long tenantId, Long userId) {
+        return inScope(tenantId, true, () -> identities.findByTenantIdAndUserId(tenantId, userId)
+                .filter(PlatformUserService::verified).map(PlatformUserService::brief).orElse(null));
+    }
+
+    private static boolean verified(RealNameApplication application) {
+        return "VERIFIED".equals(application.getStatus());
+    }
+
+    private static PlatformDtos.UserIdentity brief(RealNameApplication application) {
+        return new PlatformDtos.UserIdentity(application.getId(), application.getLegalNameMasked(),
+                application.getIdNumberMasked(), application.getReviewedAt());
     }
 
     private BillingDtos.Summary membership(Long tenantId) {
