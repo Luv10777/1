@@ -50,13 +50,15 @@ const pageScroll = ref(null)
 // 门店的新建、编辑和关店在"门店库"页面；这里只留一个入口，给还没有任何门店的管理员建第一家店。
 const storeModalOpen = ref(false)
 const connectedRoute = computed(() => ['products', 'knowledge', 'digital-human'].includes(route.name))
-// 侧栏账号处显示当前套餐：没有生效中的会员即为免费版；账户读不到时不显示，避免误报。
+// 侧栏账号处显示当前套餐：没有生效中的会员即账号未激活；账户读不到时不显示，避免误报。
 const memberTier = computed(() => {
   const summary = billing.summary
   if (billing.error || !summary) return null
-  if (!summary.memberActive) return { label: '免费版', paid: false, until: '' }
+  if (!summary.memberActive) return { label: '未激活', paid: false, until: '' }
   return { label: summary.plan?.name || '会员', paid: true, until: summary.memberUntil ? new Date(summary.memberUntil).toLocaleDateString('zh-CN') : '' }
 })
+// AI 创作站上未激活的账号只能查看，页面顶部提示去激活；主域名不受影响，套餐页自己有说明。
+const showActivation = computed(() => auth.isAuthenticated && !aiCreationHidden && memberTier.value?.paid === false && route.name !== 'billing')
 const needsStore = computed(() => auth.isAuthenticated && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
 // 侧边栏和顶栏使用当前账号资料；未设置头像时回退到名字首字。
@@ -342,6 +344,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
         </div>
       </header>
       <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }">
+        <p v-if="showActivation" class="activation-banner" role="status">账号还未激活，现在只能查看。<RouterLink :to="{ name: 'billing', query: { membership: 'required', redirect: route.fullPath, module: route.meta.title } }">购买会员或输入激活码</RouterLink></p>
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
           <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>
@@ -372,6 +375,8 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
 .page-scroll.page-scroll-workspace > :first-child { flex: none; }
 .page-scroll.page-scroll-workspace > .site-footer { flex: none; height: auto; min-height: 0; margin: 0; padding: 12px 16px; }
 
+.activation-banner { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--night-panel); color: var(--ink); font-size: 13px; line-height: 1.6; }
+.activation-banner a { margin-left: 4px; color: var(--color-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .store-context-state { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px; text-align: center; }
 .store-context-state > span { font-size: 36px; color: var(--muted, #8d8478); }
 .store-context-state h2 { margin: 20px 0 8px; font-size: 22px; }

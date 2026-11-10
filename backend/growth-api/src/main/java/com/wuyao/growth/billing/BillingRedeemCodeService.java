@@ -16,7 +16,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 烟火兑换码：计费运营批量生成、查看、作废；商家管理员或店员按完整码兑换，一码一用。
+ * 烟火兑换码和激活码：计费运营批量生成、查看、作废；商家管理员或店员按完整码兑换，一码一用。
+ * 激活码（MEMBERSHIP）兑换后按生成时的套餐版本开通或顺延会员，不送烟火。
  * 码长 16 位，取自去掉 0/O/1/I 的 32 个字符，约 80 位随机，无法靠猜。
  */
 @Service
@@ -35,16 +36,24 @@ public class BillingRedeemCodeService {
     @Transactional
     public List<BillingDtos.RedeemCodeView> create(BillingDtos.NewRedeemCodes input, Long operator) {
         if (input.expiresAt() != null && !input.expiresAt().isAfter(Instant.now())) throw bad("失效时间须晚于现在");
-        if (!"TOPUP".equals(input.kind()) && input.amountMinor() != 0) throw bad("赠送兑换码没有实收金额");
+        if (!"TOPUP".equals(input.kind()) && input.amountMinor() != 0) throw bad("只有充值兑换码有实收金额");
+        boolean membership = "MEMBERSHIP".equals(input.kind());
+        if (membership ? input.credits() != 0 : input.credits() < 1) throw bad(membership ? "激活码不送烟火" : "兑换码烟火须为 1 至 100000");
+        if (membership != (input.planId() != null)) throw bad(membership ? "请选择激活码开通的套餐" : "只有激活码可以选择套餐");
         em.createNativeQuery("SELECT true FROM pg_advisory_xact_lock(hashtextextended(:key,0))")
                 .setParameter("key", "redeem-batch:" + input.requestKey()).getSingleResult();
         var existing = em.createQuery("from BillingRedeemCode c where c.batchKey = :key order by c.id", BillingRedeemCode.class)
                 .setParameter("key", input.requestKey()).getResultList();
         if (existing.isEmpty()) {
+            if (membership) {
+                var plan = billing.planForActivation(input.planId());
+                if (!plan.isPublished()) throw bad("该套餐未上架，不能生成激活码");
+            }
             String note = input.note() == null || input.note().isBlank() ? null : input.note().trim();
             for (int i = 0; i < input.quantity(); i++) {
                 var c = new BillingRedeemCode();
                 c.setCode(generate()); c.setBatchKey(input.requestKey()); c.setKind(input.kind()); c.setCredits(input.credits()); c.setAmountMinor(input.amountMinor());
+                c.setPlanId(input.planId());
                 c.setNote(note); c.setExpiresAt(input.expiresAt()); c.setCreatedBy(operator);
                 em.persist(c);
                 existing.add(c);
@@ -58,7 +67,7 @@ public class BillingRedeemCodeService {
     public PageResult<BillingDtos.RedeemCodeView> list(int page, int size, String status, String kind, String keyword) {
         if (page < 0 || size < 1 || size > 100) throw bad("分页参数无效");
         if (status != null && !status.isBlank() && !STATUSES.contains(status)) throw bad("筛选条件无效");
-        if (kind != null && !kind.isBlank() && !Set.of("TOPUP", "GIFT").contains(kind)) throw bad("筛选条件无效");
+        if (kind != null && !kind.isBlank() && !Set.of("TOPUP", "GIFT", "MEMBERSHIP").contains(kind)) throw bad("筛选条件无效");
         String where = " where (:kind = '' or c.kind = :kind) and (:key = '' or c.code like :code or lower(c.note) like :note)" + switch (status == null ? "" : status) {
             case "UNUSED" -> " and c.voidedAt is null and c.redeemedAt is null and (c.expiresAt is null or c.expiresAt > :now)";
             case "REDEEMED" -> " and c.redeemedAt is not null";
@@ -108,8 +117,9 @@ public class BillingRedeemCodeService {
             default -> { }
         }
         c.setRedeemedTenantId(tenantId); c.setRedeemedBy(userId); c.setRedeemedAt(Instant.now());
+        if ("MEMBERSHIP".equals(c.getKind())) return billing.activateRedeemCode(c.getId(), c.getPlanId());
         long available = billing.creditRedeemCode(c.getId(), c.getKind(), c.getCredits(), c.getAmountMinor());
-        return new BillingDtos.Redeemed(c.getKind(), c.getCredits(), available);
+        return new BillingDtos.Redeemed(c.getKind(), c.getCredits(), available, null, null);
     }
 
     /** 去掉空格、横线等分隔符并转大写，商家照抄 XXXX-XXXX-XXXX-XXXX 也能兑换。 */
@@ -127,10 +137,16 @@ public class BillingRedeemCodeService {
         Map<Long, String> tenants = codes.stream().anyMatch(c -> c.getRedeemedTenantId() != null)
                 ? directory.scopes().stream().collect(Collectors.toMap(PlatformAccountDirectory.Scope::id, s -> String.valueOf(s.name())))
                 : Map.of();
+        Map<Long, BillingPlan> plans = new HashMap<>();
+        for (var c : codes) if (c.getPlanId() != null) plans.computeIfAbsent(c.getPlanId(), billing::planForActivation);
         Instant now = Instant.now();
-        return codes.stream().map(c -> new BillingDtos.RedeemCodeView(c.getId(), c.getCode(), c.getKind(), c.getCredits(), c.getAmountMinor(),
-                c.status(now), c.getNote(), c.getExpiresAt(), c.getCreatedAt(), c.getRedeemedTenantId(),
-                c.getRedeemedTenantId() == null ? null : tenants.get(c.getRedeemedTenantId()), c.getRedeemedAt(), c.getVoidedAt())).toList();
+        return codes.stream().map(c -> {
+            var plan = c.getPlanId() == null ? null : plans.get(c.getPlanId());
+            return new BillingDtos.RedeemCodeView(c.getId(), c.getCode(), c.getKind(), c.getCredits(), c.getAmountMinor(),
+                    c.status(now), c.getNote(), c.getExpiresAt(), c.getCreatedAt(), c.getRedeemedTenantId(),
+                    c.getRedeemedTenantId() == null ? null : tenants.get(c.getRedeemedTenantId()), c.getRedeemedAt(), c.getVoidedAt(),
+                    c.getPlanId(), plan == null ? null : plan.getName(), plan == null ? null : plan.getDurationDays());
+        }).toList();
     }
 
     private static BizException bad(String message) { return BizException.of(ErrorCode.BAD_REQUEST, message); }

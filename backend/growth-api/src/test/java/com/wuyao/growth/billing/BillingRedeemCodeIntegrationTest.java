@@ -135,7 +135,51 @@ class BillingRedeemCodeIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    @Test void activationCodesOpenTheirPlanWithoutCreditsAndExtendAnActiveMembership() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        var month = billing.createPlan(new BillingDtos.NewPlan("MONTH-" + suffix, "月卡", "test-only", 50000, 30, 0, true, true, true, true));
+        var year = billing.createPlan(new BillingDtos.NewPlan("YEAR-" + suffix, "年卡", "test-only", 480000, 365, 0, true, true, true, true));
+        var monthCodes = codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 2, null, "线下", month.id()), operator);
+        assertThat(monthCodes).allSatisfy(c -> {
+            assertThat(c.kind()).isEqualTo("MEMBERSHIP");
+            assertThat(c.planName()).isEqualTo("月卡");
+            assertThat(c.durationDays()).isEqualTo(30);
+            assertThat(c.credits()).isZero();
+        });
+        String yearCode = codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 1, null, null, year.id()), operator)
+                .getFirst().code();
+
+        // 店员也能兑换激活码，开通的是全店共用的会员，不送烟火。
+        redeem(shopStaff, shop, monthCodes.getFirst().code()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.kind").value("MEMBERSHIP")).andExpect(jsonPath("$.data.credits").value(0))
+                .andExpect(jsonPath("$.data.available").value(0)).andExpect(jsonPath("$.data.planName").value("月卡"));
+        Instant monthEnd = memberUntil(shop);
+        assertThat(monthEnd).isCloseTo(Instant.now().plus(java.time.Duration.ofDays(30)), org.assertj.core.api.Assertions.within(1, java.time.temporal.ChronoUnit.MINUTES));
+        // 月卡有效期内兑换年卡：功能相同，从月卡到期日顺延 365 天，套餐换成年卡。
+        redeem(shopOwner, shop, yearCode).andExpect(status().isOk()).andExpect(jsonPath("$.data.planName").value("年卡"));
+        assertThat(memberUntil(shop)).isEqualTo(monthEnd.plus(java.time.Duration.ofDays(365)));
+        assertThat(owner.queryForMap("SELECT gift_available, purchased_available FROM billing_accounts WHERE tenant_id=?", shop))
+                .isEqualTo(Map.of("gift_available", 0L, "purchased_available", 0L));
+        assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE type='REFERRAL_COMMISSION'", Long.class)).isZero();
+        redeem(shopOwner, shop, yearCode).andExpect(jsonPath("$.message").value("你已兑换过这个兑换码"));
+
+        // 已生成的码按生成时的套餐版本开通，套餐下架后照样能用；但下架的套餐不能再生成。
+        billing.publish(month.id(), false);
+        redeem(cafeOwner, cafe, monthCodes.get(1).code()).andExpect(status().isOk()).andExpect(jsonPath("$.data.planName").value("月卡"));
+        assertThat(codes.list(0, 20, "REDEEMED", "MEMBERSHIP", null).total()).isEqualTo(3);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 1, null, null, month.id()), operator))
+                .hasMessage("该套餐未上架，不能生成激活码");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 10, 0, 1, null, null, year.id()), operator))
+                .hasMessage("激活码不送烟火");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 1, null, null, null), operator))
+                .hasMessage("请选择激活码开通的套餐");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "GIFT", 10, 0, 1, null, null, year.id()), operator))
+                .hasMessage("只有激活码可以选择套餐");
+    }
+
     @Test void overviewSplitsGrantedAndPurchasedCreditsBySourceAndListsEveryMerchant() throws Exception {
+        // 未激活的账号不能使用功能，先给一方小馆开通会员再预占。
+        BillingTestFixtures.activateMembership(owner, cafe);
         TenantContext.runAs(shop, () -> billing.grantCredits(30, "test-grant", operator));
         String gift = codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "GIFT", 20, 0, 1, null, null), operator).getFirst().code();
         String topUp = codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "TOPUP", 100, 0, 1, null, null), operator).getFirst().code();
@@ -168,6 +212,10 @@ class BillingRedeemCodeIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2));
         mvc.perform(get("/api/billing/operations/overview").header("Authorization", "Bearer " + jwt.issueAccessToken(operator, shop, null)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.granted").value(50));
+    }
+
+    private Instant memberUntil(long tenant) {
+        return owner.queryForObject("SELECT member_until FROM billing_accounts WHERE tenant_id=?", java.sql.Timestamp.class, tenant).toInstant();
     }
 
     private org.springframework.test.web.servlet.ResultActions redeem(long user, long tenant, String code) throws Exception {

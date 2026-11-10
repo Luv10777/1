@@ -210,7 +210,7 @@ class FoundationIntegrationTest {
     }
 
     @Test
-    void nonmembersCanUseEverythingButLiveStreaming() throws Exception {
+    void accountsWithoutAnActiveMembershipCanOnlyBrowse() throws Exception {
         String token = jwt.issueAccessToken(seedPasswordAccount(), tenantA, null);
         long store = apiData(post("/api/stores"), token, Map.of("name", "浏览测试门店")).path("id").asLong();
         owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute' WHERE tenant_id=?", tenantA);
@@ -221,17 +221,22 @@ class FoundationIntegrationTest {
             mvc.perform(get(path).header("Authorization", "Bearer " + token))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(200));
         }
-        // 只有 AI 实景直播要开会员；其他写请求不看会员（这里只因参数不全被拒）。
+        // 未激活只能查看：AI 创作站功能的写请求一律要求会员，参数还没校验就被拦下。
         for (String path : List.of("/api/image-creations", "/api/video/workflows", "/api/video/quote",
-                "/api/video/analyses", "/api/video/analyses/import-url", "/api/assets/upload-url", "/api/stores")) {
+                "/api/video/analyses", "/api/video/analyses/import-url", "/api/video/plans", "/api/image/inspirations",
+                "/api/copy/batches", "/api/stores/" + store + "/live-sessions", "/api/stores/" + store + "/knowledge-sets",
+                "/api/stores/" + store + "/voice/preview")) {
+            mvc.perform(post(path).header("Authorization", "Bearer " + token)
+                            .contentType("application/json").content("{}"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001))
+                    .andExpect(jsonPath("$.message").value(BillingService.MEMBERSHIP_REQUIRED_MESSAGE));
+        }
+        // 门店、素材上传主域名的商户联盟也在用，不看会员（这里只因参数不全被拒）。
+        for (String path : List.of("/api/assets/upload-url", "/api/stores", "/api/billing/redeem")) {
             mvc.perform(post(path).header("Authorization", "Bearer " + token)
                             .contentType("application/json").content("{}"))
                     .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.not(9001)));
         }
-        mvc.perform(post("/api/stores/" + store + "/live-sessions").header("Authorization", "Bearer " + token)
-                        .contentType("application/json").content("{}"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(9001))
-                .andExpect(jsonPath("$.message").value("您还未开通会员"));
         mvc.perform(get("/api/stores")).andExpect(status().isUnauthorized());
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks", Long.class)).isZero();
         mvc.perform(get("/api/billing/summary").header("Authorization", "Bearer " + token))
@@ -242,12 +247,14 @@ class FoundationIntegrationTest {
     }
 
     @Test
-    void videoAnalysisNeedsEnoughYanhuoNotMembershipBeforeAnyTaskIsSubmitted() {
+    void videoAnalysisNeedsMembershipAndEnoughYanhuoBeforeAnyTaskIsSubmitted() {
         Long asset = videoAnalysisAsset();
         var request = new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Create(asset, "analysis-denied", "ai", "");
-        // 视频反推不看会员，只看烟火：会员已过期、烟火为零时提示烟火不足，不登记任何任务。
-        owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute',gift_available=0,purchased_available=0 WHERE tenant_id=?", tenantA);
+        // 会员生效、烟火为零时提示烟火不足；会员过期时提示未激活。两种情况都不登记任何任务。
+        owner.update("UPDATE billing_accounts SET gift_available=0,purchased_available=0 WHERE tenant_id=?", tenantA);
         assertThat(code(() -> TenantContext.runAs(tenantA, () -> videoAnalyses.create(request, -1L)))).isEqualTo(9003);
+        owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute',purchased_available=20 WHERE tenant_id=?", tenantA);
+        assertThat(code(() -> TenantContext.runAs(tenantA, () -> videoAnalyses.create(request, -1L)))).isEqualTo(9001);
         assertThat(owner.queryForObject("SELECT count(*) FROM video_analyses", Long.class)).isZero();
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE type LIKE 'VIDEO_ANALYSIS_%'", Long.class)).isZero();
         assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isZero();
@@ -435,11 +442,11 @@ class FoundationIntegrationTest {
     }
 
     @Test
-    void onlyLiveNeedsMembershipEverythingElseOnlyNeedsCredits() {
+    void everyCapabilityNeedsMembershipAndOnlyLiveChecksThePlan() {
         owner.update("update billing_accounts set member_until=now()-interval '1 day', purchased_available=20 where tenant_id=?",tenantA);
-        TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-member-image","IMAGE",3,"test"));
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-member-image","IMAGE",3,"test")))).isEqualTo(9001);
         assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-member-live","LIVE",3,"test")))).isEqualTo(9001);
-        assertThat(owner.queryForObject("select count(*) from billing_reservations",Long.class)).isEqualTo(1);
+        assertThat(owner.queryForObject("select count(*) from billing_reservations",Long.class)).isZero();
         owner.update("update billing_accounts set member_until=now()+interval '1 day', plan_snapshot=jsonb_set(jsonb_set(plan_snapshot,'{videoEnabled}','false'),'{liveEnabled}','false') where tenant_id=?",tenantA);
         TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-video-plan","VIDEO",3,"test"));
         assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.reserve("billing-no-live-plan","LIVE",3,"test")))).isEqualTo(9002);

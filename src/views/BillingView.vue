@@ -49,7 +49,13 @@ let disposed = false
 let qrVersion = 0
 const keys = new Map()
 const labels = { PENDING_PAYMENT: '待支付', PAID: '已到账', CANCELLED: '已取消', EXPIRED: '已过期' }
-const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期' : '尚未开通会员')
+const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期，账号未激活' : '账号未激活')
+// 会员有效期内可以续订同一套餐，或换成功能相同、只是时长不同的套餐（月卡续年卡），规则同后端。
+const canSwitchTo = plan => {
+  const current = account.value?.plan
+  if (!account.value?.memberActive || !current || current.code === plan.code) return true
+  return current.imageEnabled === plan.imageEnabled && current.videoEnabled === plan.videoEnabled && current.liveEnabled === plan.liveEnabled
+}
 const canPay = computed(() => account.value?.canManage && account.value?.payment.available && !billing.error && !busy.value)
 const keyFor = (key) => {
   if (!keys.has(key)) keys.set(key, 'billing-' + crypto.randomUUID())
@@ -232,12 +238,12 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           </div>
           <h2>{{ account.plan?.name || '尚未订阅套餐' }}</h2>
           <p v-if="account.memberUntil" class="yanhuo-card-meta">有效期至 {{ dateTime(account.memberUntil) }}</p>
-          <p v-else class="yanhuo-card-meta">不开会员也能用图片、视频、文案等功能，按烟火计费；AI 实景直播需开通会员。</p>
+          <p v-else class="yanhuo-card-meta">未激活的账号只能查看。购买会员或输入激活码后即可使用全部功能，使用时按烟火计费。</p>
           <ul class="yanhuo-entitlements">
-            <li class="enabled"><Check :size="14" />图片、视频、文案（按烟火）</li>
+            <li :class="{ enabled: account.memberActive }"><Check :size="14" />图片、视频、文案（按烟火）</li>
             <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />AI 实景直播</li>
           </ul>
-          <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '选择套餐' }}</a>
+          <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '购买会员' }}</a>
         </article>
         <article class="yanhuo-card yanhuo-balance-card">
           <div class="yanhuo-card-head">
@@ -250,17 +256,18 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
 
       <section class="yanhuo-section" aria-labelledby="redeem-title">
-        <header class="yanhuo-section-head"><h2 id="redeem-title">兑换烟火</h2><p>输入平台发放的兑换码，烟火立即到账、全店共用；每个兑换码只能使用一次。</p></header>
+        <header class="yanhuo-section-head"><h2 id="redeem-title">激活码 / 兑换码</h2><p>输入激活码开通会员，输入兑换码烟火立即到账；都是全店共用，每个码只能使用一次。</p></header>
         <form class="yanhuo-redeem" @submit.prevent="redeem">
-          <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="兑换码">
+          <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="激活码或兑换码">
           <button class="yanhuo-primary" type="submit" :disabled="redeeming || !redeemCode.trim()">{{ redeeming ? '兑换中…' : '兑换' }}</button>
         </form>
-        <p v-if="redeemResult" class="yanhuo-redeem-done" role="status">已到账 {{ number(redeemResult.credits) }} {{ redeemResult.kind === 'TOPUP' ? '充值' : '赠送' }}烟火，当前可用 {{ number(redeemResult.available) }}。</p>
+        <p v-if="redeemResult?.kind === 'MEMBERSHIP'" class="yanhuo-redeem-done" role="status">已开通「{{ redeemResult.planName }}」，有效期至 {{ dateTime(redeemResult.memberUntil) }}。</p>
+        <p v-else-if="redeemResult" class="yanhuo-redeem-done" role="status">已到账 {{ number(redeemResult.credits) }} {{ redeemResult.kind === 'TOPUP' ? '充值' : '赠送' }}烟火，当前可用 {{ number(redeemResult.available) }}。</p>
         <div v-if="redeemError" class="yanhuo-alert" role="alert">{{ redeemError }}</div>
       </section>
 
       <section id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">
-        <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>开通会员即可使用 AI 实景直播，套餐赠送的烟火在开通时发放。</p></header>
+        <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>开通会员后即可使用全部功能，使用时按烟火计费；也可以在上方输入激活码开通。</p></header>
         <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
         <div v-else-if="!billing.plans.length" class="yanhuo-card yanhuo-empty"><img src="/images/brand/yifangzhi-mark.png" alt="" width="36" height="36"><h3>套餐尚未开放</h3><p>正式套餐公布后，可在这里订阅。</p></div>
         <div v-else class="yanhuo-plan-grid">
@@ -268,15 +275,15 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
             <div class="yanhuo-plan-top"><h3>{{ plan.name }}</h3><span v-if="account.plan?.code === plan.code && account.memberActive" class="yanhuo-current">当前套餐</span></div>
             <p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p>
             <p class="yanhuo-plan-description">{{ plan.description }}</p>
-            <ul><li><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li><li v-if="plan.allianceQuotaMinor"><Check :size="15" />联盟券额度 ¥{{ (plan.allianceQuotaMinor / 100).toFixed(2) }} / 期</li></ul>
-            <button class="yanhuo-primary" type="button" :disabled="!canPay || (account.memberActive && account.plan?.code !== plan.code)" @click="choosePlan(plan)">{{ account.memberActive && account.plan?.code === plan.code ? '续订套餐' : account.memberActive ? '到期后可订阅' : '订阅套餐' }}</button>
+            <ul><li v-if="plan.giftCredits"><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li><li v-if="plan.allianceQuotaMinor"><Check :size="15" />联盟券额度 ¥{{ (plan.allianceQuotaMinor / 100).toFixed(2) }} / 期</li></ul>
+            <button class="yanhuo-primary" type="button" :disabled="!canPay || !canSwitchTo(plan)" @click="choosePlan(plan)">{{ !account.memberActive ? '订阅套餐' : !canSwitchTo(plan) ? '到期后可订阅' : '续订套餐' }}</button>
           </article>
         </div>
       </section>
 
 
       <section class="yanhuo-section" aria-labelledby="rules-title">
-        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>优先使用赠送的烟火；只有直播需要有效会员。</p></header>
+        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>优先使用赠送的烟火；所有功能都要账号已激活（会员生效中）。</p></header>
         <dl class="yanhuo-rule-grid">
           <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong>生成中先预占，未交付的退回。</dd></div>
           <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
@@ -290,7 +297,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <template v-if="account">
         <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="topup-title">充值烟火</h2><button class="yanhuo-icon" type="button" aria-label="关闭充值窗口" title="关闭" @click="closeTopup"><X :size="20" /></button></header>
         <p class="yanhuo-topup-rate">1 元 = {{ account.creditsPerYuan }} 烟火，充值的烟火长期有效。</p>
-        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。图片、视频、文案等功能充值后就能用；使用 AI 实景直播前，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">订阅或续订套餐</a>。</p>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。账号激活后才能使用功能，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">购买会员</a>或输入激活码。</p>
         <form class="yanhuo-topup-form" @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }}</small></label></fieldset>
           <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额（{{ MIN_TOPUP_YUAN }} 元起）</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" :min="MIN_TOPUP_YUAN" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>

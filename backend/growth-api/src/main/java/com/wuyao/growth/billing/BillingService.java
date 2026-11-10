@@ -27,6 +27,8 @@ public class BillingService {
     public static final int CREDITS_PER_YUAN = 10;
     /** Online top-ups start at 500 yuan. Redeem codes and operator grants are not top-up orders. */
     public static final long MIN_TOPUP_MINOR = 50_000;
+    /** 账号未激活时，所有功能的写操作都返回这句话（错误码 MEMBERSHIP_REQUIRED）。 */
+    public static final String MEMBERSHIP_REQUIRED_MESSAGE = "账号还未激活，请在「套餐与权益」开通会员或输入激活码";
     /** One operator grant is capped at 10,000 yuan worth of credits. */
     public static final long MAX_GRANT_CREDITS = 100_000;
     private final BillingStore store;
@@ -242,6 +244,27 @@ public class BillingService {
         if(topUp&&amountMinor>0) events.publishEvent(new BillingDtos.OrderPaid(TenantContext.require(),"redeem-code-"+codeId,"TOPUP",amountMinor));
         return a.available();
     }
+    /**
+     * 激活码兑换：按码上的套餐版本开通或顺延会员。激活码不送烟火，也不发 OrderPaid（线下卖码的实收金额平台不知道）。
+     * 调用方已锁住账户和激活码。
+     */
+    @Transactional
+    public BillingDtos.Redeemed activateRedeemCode(Long codeId,Long planId) {
+        var a=store.lockAccount(); String key="redeem-code:"+codeId;
+        if(!store.eventExists(key)) {
+            var plan=planForActivation(planId).snapshot();
+            activate(a,plan,UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)).toString(),0);
+            ledger(a,key,"GRANT",plan.name()+" · 激活码开通",0,0,0,null,null);
+        }
+        return new BillingDtos.Redeemed("MEMBERSHIP",0,a.available(),a.getPlanSnapshot().name(),a.getMemberUntil());
+    }
+    /** 激活码引用的套餐版本，下架的也能查到：已生成的码按生成时的版本开通。 */
+    @Transactional(readOnly=true)
+    public BillingPlan planForActivation(Long planId) {
+        var p=planId==null?null:store.plan(planId);
+        if(p==null) throw bad("套餐不存在");
+        return p;
+    }
     private void requireBillingOperator(Long operator) {
         if(!config.getOperatorUserIds().contains(operator)) throw BizException.of(ErrorCode.FORBIDDEN,"没有会员与烟火管理权限");
     }
@@ -318,13 +341,15 @@ public class BillingService {
     @Transactional(readOnly=true)
     public void requirePlatformMembership() { requireActiveMembership(store.account()); }
     private void requireActiveMembership(BillingAccount a) {
-        if(a==null||!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,"您还未开通会员");
+        if(a==null||!a.active(Instant.now())) throw BizException.of(ErrorCode.MEMBERSHIP_REQUIRED,MEMBERSHIP_REQUIRED_MESSAGE);
     }
-    /** 只有 AI 实景直播要开会员且套餐含直播；图片、视频、文案等不看会员，烟火够就能用。 */
+    /**
+     * 所有计费功能都要账号已激活（会员生效中），使用时照常扣烟火；AI 实景直播还要求套餐含直播。
+     * 已受理的任务在会员到期后照常交付和结算，结算不经过这里。
+     */
     private void requireEntitlement(BillingAccount a,String capability) {
-        if(!"LIVE".equals(capability)) return;
         requireActiveMembership(a);
-        if(!a.getPlanSnapshot().liveEnabled()) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,"当前套餐不含直播功能，请订阅包含直播的套餐");
+        if("LIVE".equals(capability)&&!a.getPlanSnapshot().liveEnabled()) throw BizException.of(ErrorCode.ENTITLEMENT_REQUIRED,"当前套餐不含直播功能，请订阅包含直播的套餐");
     }
     private void hold(BillingAccount a,BillingReservation r,long amount,String eventKey,String description) {
         if(amount<=0) throw bad("预占烟火必须大于零");
@@ -345,8 +370,11 @@ public class BillingService {
         l.setAvailableAfter(a.available()); l.setHeldAfter(a.getHeld()); l.setOrderId(order); l.setReservationId(reservation);
         a.setUpdatedAt(Instant.now()); store.save(l);
     }
+    /** 有效期内可以续订同一套餐，或换成功能相同、只是时长不同的套餐（月卡续年卡）；功能不同的套餐要等到期。 */
     private void checkRenewal(BillingAccount a,BillingDtos.PlanSnapshot p) {
-        if(a.active(Instant.now())&&!a.getPlanSnapshot().code().equals(p.code()))
+        var current=a.getPlanSnapshot();
+        if(a.active(Instant.now())&&!current.code().equals(p.code())
+            &&(current.imageEnabled()!=p.imageEnabled()||current.videoEnabled()!=p.videoEnabled()||current.liveEnabled()!=p.liveEnabled()))
             throw bad("当前会员有效期内可续订同一套餐，其他套餐请在到期后订阅");
     }
     private void requirePayment() {

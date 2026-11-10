@@ -15,6 +15,8 @@ public class BillingRedeemCode {
     private long credits;
     /** 充值码的实收金额（分），按它记邀请返利；赠送码为 0。 */
     private long amountMinor;
+    /** 激活码（MEMBERSHIP）开通的套餐版本；充值码、赠送码为空。 */
+    private Long planId;
     @Column(length=200) private String note;
     private Instant expiresAt;
     private Long createdBy;

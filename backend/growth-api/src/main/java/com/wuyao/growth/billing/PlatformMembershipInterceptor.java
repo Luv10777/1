@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-/** 直播模块的写请求要求会员生效中；浏览不受限。挂在哪些路径见 WebConfig。 */
+/** 账号未激活只能查看：挂上的模块写请求要求会员生效中，浏览不受限。挂在哪些路径见 WebConfig。 */
 @Component
 @RequiredArgsConstructor
 public class PlatformMembershipInterceptor implements HandlerInterceptor {

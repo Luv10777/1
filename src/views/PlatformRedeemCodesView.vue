@@ -3,6 +3,7 @@ import AppSelect from '../components/AppSelect.vue'
 import { reactive, ref } from 'vue'
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, RefreshCw, Search, TicketCheck, X } from 'lucide-vue-next'
 import { formatRedeemCode, redeemCodeAdminApi as api, redeemCodeExpiry, redeemCodeKinds, redeemCodeStatuses } from '../services/redeemCodeAdminApi'
+import { planAdminApi } from '../services/planAdminApi'
 import { managementDate } from '../domain/platformManagement'
 import '../platform-management.css'
 
@@ -20,10 +21,18 @@ const success = ref('')
 const busy = ref(false)
 const formOpen = ref(false)
 const formError = ref('')
-const blank = () => ({ kind: 'GIFT', credits: '100', amount: '0', quantity: '10', expiresOn: '', note: '' })
+const blank = () => ({ kind: 'MEMBERSHIP', planId: '', credits: '100', amount: '0', quantity: '10', expiresOn: '', note: '' })
 const form = reactive(blank())
 let requestKey = ''
 const created = ref([])
+// 激活码按已上架的套餐生成，兑换后开通该套餐，不送烟火。
+const plans = ref([])
+const plansError = ref('')
+async function loadPlans() {
+  plansError.value = ''
+  try { plans.value = (await planAdminApi.plans()).filter(item => item.published).map(item => item.plan) }
+  catch (failure) { plans.value = []; plansError.value = failure.message || '套餐暂时无法读取。' }
+}
 
 const number = value => Number(value || 0).toLocaleString('zh-CN')
 const money = minor => `¥${(Number(minor || 0) / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -53,20 +62,26 @@ function openNew() {
   formError.value = ''
   requestKey = 'redeem-' + crypto.randomUUID()
   formOpen.value = true
+  loadPlans()
 }
 
 async function save() {
   if (busy.value) return
   formError.value = ''
-  const credits = Number(form.credits), quantity = Number(form.quantity)
-  if (!Number.isInteger(credits) || credits < 1 || credits > 100000) { formError.value = '每个码的烟火须为 1 至 100,000 的整数。'; return }
+  const membership = form.kind === 'MEMBERSHIP'
+  const credits = membership ? 0 : Number(form.credits), quantity = Number(form.quantity)
+  const plan = plans.value.find(item => String(item.id) === String(form.planId))
+  if (membership && !plan) { formError.value = '请选择激活码开通的套餐。'; return }
+  if (!membership && (!Number.isInteger(credits) || credits < 1 || credits > 100000)) { formError.value = '每个码的烟火须为 1 至 100,000 的整数。'; return }
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 200) { formError.value = '一次生成 1 至 200 个。'; return }
   const amountMinor = form.kind === 'TOPUP' ? Math.round(Number(form.amount || 0) * 100) : 0
   if (!Number.isInteger(amountMinor) || amountMinor < 0 || amountMinor > 10000000) { formError.value = '实收金额须为 0 至 100,000 元。'; return }
   busy.value = true
   try {
-    created.value = await api.create({ requestKey, kind: form.kind, credits, amountMinor, quantity, expiresAt: redeemCodeExpiry(form.expiresOn), note: form.note.trim() || null })
-    success.value = `已生成 ${created.value.length} 个${redeemCodeKinds[form.kind]}兑换码，每个 ${number(credits)} 烟火`
+    created.value = await api.create({ requestKey, kind: form.kind, credits, amountMinor, quantity, expiresAt: redeemCodeExpiry(form.expiresOn), note: form.note.trim() || null, planId: membership ? plan.id : null })
+    success.value = membership
+      ? `已生成 ${created.value.length} 个激活码，每个开通「${plan.name}」${plan.durationDays} 天`
+      : `已生成 ${created.value.length} 个${redeemCodeKinds[form.kind]}兑换码，每个 ${number(credits)} 烟火`
     formOpen.value = false
     search()
   } catch (failure) {
@@ -102,7 +117,7 @@ load()
 <template>
   <div class="management-page">
     <header class="management-heading">
-      <div><div class="management-breadcrumb"><span>平台管理</span><ChevronRight :size="13" /><span>兑换码</span></div><h1>兑换码</h1><p>批量生成烟火兑换码发给商家，商家（管理员或店员）在「套餐与权益」页输入即可到账。每个码只能兑换一次。</p></div>
+      <div><div class="management-breadcrumb"><span>平台管理</span><ChevronRight :size="13" /><span>兑换码</span></div><h1>兑换码</h1><p>批量生成激活码或烟火兑换码发给商家，商家（管理员或店员）在「套餐与权益」页输入：激活码开通会员，兑换码烟火到账。每个码只能兑换一次。</p></div>
       <div class="management-heading-actions">
         <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
         <button v-if="!forbidden" class="mg-button mg-primary" type="button" @click="openNew"><Plus :size="15" />生成兑换码</button>
@@ -115,10 +130,12 @@ load()
       <form class="code-form" @submit.prevent="save">
         <fieldset class="full code-kinds">
           <legend>类型</legend>
+          <label><input v-model="form.kind" type="radio" value="MEMBERSHIP" name="code-kind" /><span><strong>激活码</strong><small>开通所选套餐的会员，有效期内兑换会顺延；不送烟火，使用功能照常扣烟火</small></span></label>
           <label><input v-model="form.kind" type="radio" value="TOPUP" name="code-kind" /><span><strong>充值</strong><small>记入商家的充值余额，计入「购买的烟火」，按实收金额记邀请返利</small></span></label>
           <label><input v-model="form.kind" type="radio" value="GIFT" name="code-kind" /><span><strong>赠送</strong><small>记入商家的赠送烟火，计入「赠送的烟火」，消耗时优先使用</small></span></label>
         </fieldset>
-        <label>每个码的烟火<input v-model="form.credits" type="number" min="1" max="100000" step="1" required /></label>
+        <label v-if="form.kind === 'MEMBERSHIP'">开通的套餐<AppSelect v-model="form.planId" required><option value="" disabled>选择已上架的套餐</option><option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.name }} · {{ plan.durationDays }} 天 · {{ money(plan.priceMinor) }}</option></AppSelect><small v-if="plansError" class="mg-error">{{ plansError }}</small><small v-else-if="!plans.length">还没有上架的套餐，请先到「会员套餐」上架月卡、季卡、年卡。</small></label>
+        <label v-else>每个码的烟火<input v-model="form.credits" type="number" min="1" max="100000" step="1" required /></label>
         <label v-if="form.kind === 'TOPUP'">每个码的实收金额（元）<input v-model="form.amount" type="number" min="0" max="100000" step="0.01" required /><small>兑换后按这个金额给商家的邀请人记充值返利；填 0 不记返利。</small></label>
         <label>生成数量<input v-model="form.quantity" type="number" min="1" max="200" step="1" required /><small>一次最多 200 个，每个码各自只能用一次。</small></label>
         <label>失效日期（可选）<input v-model="form.expiresOn" type="date" :min="today()" /><small>当天 23:59 后失效；不填长期有效。</small></label>
@@ -146,12 +163,12 @@ load()
       <div v-else-if="!records.length" class="mg-state"><TicketCheck :size="32" /><h3>{{ keyword || status || kind ? '没有匹配的兑换码' : '还没有兑换码' }}</h3><p>{{ keyword || status || kind ? '调整关键词或筛选条件后重新查询。' : '点右上角「生成兑换码」，选择类型和烟火数量。' }}</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
-          <thead><tr><th>兑换码</th><th>类型</th><th class="code-number">烟火</th><th class="code-number">实收</th><th>状态</th><th>兑换商户</th><th>备注</th><th>失效时间</th><th>生成时间</th><th class="mg-table-action">操作</th></tr></thead>
+          <thead><tr><th>兑换码</th><th>类型</th><th class="code-number">烟火 / 套餐</th><th class="code-number">实收</th><th>状态</th><th>兑换商户</th><th>备注</th><th>失效时间</th><th>生成时间</th><th class="mg-table-action">操作</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.id">
               <td class="mg-mono code-value">{{ formatRedeemCode(item.code) }}</td>
               <td>{{ redeemCodeKinds[item.kind] || item.kind }}</td>
-              <td class="code-number mg-mono">{{ number(item.credits) }}</td>
+              <td class="code-number mg-mono">{{ item.kind === 'MEMBERSHIP' ? `${item.planName || '套餐'} · ${item.durationDays ?? '—'} 天` : number(item.credits) }}</td>
               <td class="code-number mg-mono">{{ item.kind === 'TOPUP' ? money(item.amountMinor) : '—' }}</td>
               <td><span class="mg-status" :class="`code-${item.status.toLowerCase()}`"><i />{{ redeemCodeStatuses[item.status] || item.status }}</span></td>
               <td><template v-if="item.redeemedTenantId"><span>{{ item.redeemedTenantName || '—' }}</span><small>商户 #{{ item.redeemedTenantId }} · {{ managementDate(item.redeemedAt) }}</small></template><template v-else>—</template></td>
@@ -178,7 +195,7 @@ load()
 .code-form input { width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid #dfe4e9; border-radius: 5px; background: #fff; color: var(--mg-ink); font-size: 13px; }
 .code-form small { color: var(--mg-muted); font-size: 12px; line-height: 1.6; }
 .code-form .full { grid-column: 1 / -1; }
-.code-kinds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0; margin: 0; border: 0; }
+.code-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; margin: 0; border: 0; }
 .code-kinds legend { margin-bottom: 6px; color: var(--mg-muted); font-size: 12px; }
 .code-kinds label { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--mg-line); border-radius: 6px; cursor: pointer; }
 .code-kinds label:has(input:checked) { border-color: var(--mg-accent); background: var(--mg-soft); }

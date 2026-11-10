@@ -43,11 +43,11 @@ function openMembership() {
     <div class="membership-backdrop" aria-hidden="true" />
     <div class="membership-position">
       <DialogPanel class="membership-panel">
-        <DialogTitle as="h2">您还未开通会员</DialogTitle>
-        <DialogDescription as="p">AI 实景直播需要开通会员。图片、视频、文案等其他功能不用开会员，充值烟火就能用。</DialogDescription>
+        <DialogTitle as="h2">账号还未激活</DialogTitle>
+        <DialogDescription as="p">未激活的账号只能查看。购买会员，或在「套餐与权益」输入激活码，激活后即可使用全部功能，使用时按烟火计费。</DialogDescription>
         <div class="membership-actions">
           <button type="button" class="secondary-button" @click="membershipOpen = false">稍后再说</button>
-          <button type="button" class="primary-button" @click="openMembership">去开通会员</button>
+          <button type="button" class="primary-button" @click="openMembership">去激活</button>
         </div>
       </DialogPanel>
     </div>

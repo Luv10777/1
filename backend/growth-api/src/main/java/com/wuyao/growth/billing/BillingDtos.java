@@ -77,20 +77,26 @@ public final class BillingDtos {
                                java.util.Map<String, Long> consumedByCapability) {}
 
     /**
-     * 批量生成兑换码；kind 为 TOPUP（记充值烟火）或 GIFT（记赠送烟火），expiresAt 为空表示长期有效。
-     * amountMinor 是每个充值码的实收金额（分），兑换后按它记邀请返利，0 表示不记；赠送码必须为 0。
+     * 批量生成兑换码；kind 为 TOPUP（记充值烟火）、GIFT（记赠送烟火）或 MEMBERSHIP（激活码，按 planId 开通会员），
+     * expiresAt 为空表示长期有效。amountMinor 是每个充值码的实收金额（分），兑换后按它记邀请返利，0 表示不记；
+     * 赠送码和激活码必须为 0。激活码的 credits 为 0，planId 必须是已上架的套餐；其他种类不带 planId。
      */
     public record NewRedeemCodes(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
-                                 @NotBlank @Pattern(regexp="TOPUP|GIFT") String kind,
-                                 @Min(1) @Max(100000) long credits, @Min(0) @Max(10000000) long amountMinor,
+                                 @NotBlank @Pattern(regexp="TOPUP|GIFT|MEMBERSHIP") String kind,
+                                 @Min(0) @Max(100000) long credits, @Min(0) @Max(10000000) long amountMinor,
                                  @Min(1) @Max(200) int quantity,
-                                 Instant expiresAt, @Size(max=200) String note) {}
-    /** status 为 UNUSED、REDEEMED、VOIDED 或 EXPIRED。 */
+                                 Instant expiresAt, @Size(max=200) String note, @Positive Long planId) {
+        public NewRedeemCodes(String requestKey, String kind, long credits, long amountMinor, int quantity, Instant expiresAt, String note) {
+            this(requestKey, kind, credits, amountMinor, quantity, expiresAt, note, null);
+        }
+    }
+    /** status 为 UNUSED、REDEEMED、VOIDED 或 EXPIRED；planName、durationDays 只有激活码才有。 */
     public record RedeemCodeView(Long id, String code, String kind, long credits, long amountMinor, String status, String note,
                                  Instant expiresAt, Instant createdAt, Long redeemedTenantId, String redeemedTenantName,
-                                 Instant redeemedAt, Instant voidedAt) {}
+                                 Instant redeemedAt, Instant voidedAt, Long planId, String planName, Integer durationDays) {}
     public record Redeem(@NotBlank @Size(max=40) String code) {}
-    public record Redeemed(String kind, long credits, long available) {}
+    /** 激活码兑换后 planName、memberUntil 为开通的套餐和新的到期时间，credits 为 0。 */
+    public record Redeemed(String kind, long credits, long available, String planName, Instant memberUntil) {}
 
     /**
      * 烟火看板，全部为累计数。purchasedBySource / grantedBySource 按来源拆分：
