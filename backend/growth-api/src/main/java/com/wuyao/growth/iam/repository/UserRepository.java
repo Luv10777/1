@@ -14,6 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<User> findByPhone(String phone);
 
+    Optional<User> findByUid(Long uid);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<User> findByUsername(String username);
 

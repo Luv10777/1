@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "dev:admin": "vite --config vite.admin.config.js",
     "build:admin": "vite build --config vite.admin.config.js",
+    "dev:partner": "vite --config vite.partner.config.js",
+    "build:partner": "vite build --config vite.partner.config.js",
     "preview:admin": "vite preview --config vite.admin.config.js",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint . --ext .js,.vue",

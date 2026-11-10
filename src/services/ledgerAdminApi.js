@@ -12,7 +12,7 @@ export const ledgerAdminApi = {
 }
 
 /** 烟火看板的来源拆分：同一个来源键在「购买」和「赠送」里含义不同。 */
-export const purchasedSources = { ORDER: '在线充值', REDEEM_CODE: '兑换码充值' }
+export const purchasedSources = { ORDER: '在线充值', REDEEM_CODE: '兑换码充值', PARTNER: '服务商分配' }
 export const grantedSources = { ORDER: '会员赠送', ADMIN_MEMBERSHIP: '平台开通会员', ADMIN: '平台赠送', REDEEM_CODE: '兑换码赠送' }
 
 export const ledgerTypes = { CAPTURE: '扣除', RESERVE: '预占', RELEASE: '退回', PURCHASE: '充值', GRANT: '赠送' }

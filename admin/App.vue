@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bell, ChevronRight, FileText, Flame, Inbox, LayoutDashboard, Store, ShieldCheck, LogOut, PanelLeftClose, PanelLeftOpen, Search, Ticket, Layers, Users, Percent, ChartColumn, TicketCheck } from 'lucide-vue-next'
+import { Bell, ChevronRight, FileText, Flame, Inbox, LayoutDashboard, Store, ShieldCheck, LogOut, PanelLeftClose, PanelLeftOpen, Search, Ticket, Layers, Users, Percent, ChartColumn, TicketCheck, Handshake } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
 import { platform } from '../src/stores/platform.js'
 import { pendingByRoute, pendingItems, pendingTotal, refreshPending, startPendingPolling, stopPendingPolling } from './pendingReviews.js'
@@ -29,11 +29,12 @@ const navigation = [
   { label: '烟火与计费', items: [
     { name: 'admin-credit-overview', label: '烟火看板', description: '购买、赠送与商家余额', icon: ChartColumn },
     { name: 'admin-credits', label: '烟火日志', description: '全平台消耗与退回', icon: Flame },
-    { name: 'admin-redeem-codes', label: '兑换码', description: '生成充值或赠送兑换码', icon: TicketCheck },
+    { name: 'admin-redeem-codes', label: '兑换码', description: '生成激活码、充值或赠送兑换码', icon: TicketCheck },
     { name: 'admin-plans', label: '会员套餐', description: '套餐版本与上架', icon: Layers },
   ] },
   { label: '增长', items: [
     { name: 'admin-referral', label: '邀请返利', description: '返利比例、提现与调整记录', icon: Percent },
+    { name: 'admin-partners', label: '服务商', description: '发烟火、分激活码额度、改商户归属', icon: Handshake },
   ] },
 ]
 const currentGroup = computed(() => navigation.find(group => group.items.some(item => item.name === route.name))?.label)

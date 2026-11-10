@@ -93,14 +93,17 @@ public final class BillingDtos {
     /** status 为 UNUSED、REDEEMED、VOIDED 或 EXPIRED；planName、durationDays 只有激活码才有。 */
     public record RedeemCodeView(Long id, String code, String kind, long credits, long amountMinor, String status, String note,
                                  Instant expiresAt, Instant createdAt, Long redeemedTenantId, String redeemedTenantName,
-                                 Instant redeemedAt, Instant voidedAt, Long planId, String planName, Integer durationDays) {}
+                                 Instant redeemedAt, Instant voidedAt, Long planId, String planName, Integer durationDays, Long partnerId) {}
     public record Redeem(@NotBlank @Size(max=40) String code) {}
+    /** 服务商生成的激活码被兑换后发出，与兑换同一事务；服务商模块据此把商户归到服务商名下（第一次归属为准）。 */
+    public record PartnerCodeRedeemed(Long tenantId, Long codeId, Long partnerId) {}
     /** 激活码兑换后 planName、memberUntil 为开通的套餐和新的到期时间，credits 为 0。 */
     public record Redeemed(String kind, long credits, long available, String planName, Instant memberUntil) {}
 
     /**
      * 烟火看板，全部为累计数。purchasedBySource / grantedBySource 按来源拆分：
-     * ORDER（在线付款：充值或会员赠送）、ADMIN（平台赠送）、ADMIN_MEMBERSHIP（平台开通会员）、REDEEM_CODE（兑换码）。
+     * ORDER（在线付款：充值或会员赠送）、ADMIN（平台赠送）、ADMIN_MEMBERSHIP（平台开通会员）、REDEEM_CODE（兑换码）、
+     * PARTNER（服务商分给商户的烟火）。
      */
     public record CreditOverview(long purchased, long granted, long consumed, long available, long held,
                                  java.util.Map<String, Long> purchasedBySource, java.util.Map<String, Long> grantedBySource,

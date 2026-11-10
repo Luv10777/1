@@ -31,10 +31,33 @@ public class BillingRedeemCodeService {
     private final EntityManager em;
     private final BillingService billing;
     private final PlatformAccountDirectory directory;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     /** 同一 requestKey 重复提交返回第一次生成的那批码。 */
     @Transactional
     public List<BillingDtos.RedeemCodeView> create(BillingDtos.NewRedeemCodes input, Long operator) {
+        return create(input, operator, null);
+    }
+
+    /**
+     * 服务商在额度内生成激活码，额度由服务商模块在同一事务里扣减。同一 requestKey 重复提交返回第一次那批，
+     * 返回的码都属于这家服务商，别家的批次标识不会被借用。
+     */
+    @Transactional
+    public List<BillingDtos.RedeemCodeView> createForPartner(Long partnerId, Long planId, int quantity, String requestKey, String note, Long actor) {
+        var codes = create(new BillingDtos.NewRedeemCodes(requestKey, "MEMBERSHIP", 0, 0, quantity, null, note, planId), actor, partnerId);
+        if (codes.isEmpty() || !partnerId.equals(codes.getFirst().partnerId())) throw bad("批次标识已被使用，请刷新后重新生成");
+        return codes;
+    }
+
+    /** 该批次是否已经生成过（服务商模块据此判断重复提交，不重复扣额度）。 */
+    @Transactional(readOnly = true)
+    public boolean batchExists(String requestKey) {
+        return !em.createQuery("select c.id from BillingRedeemCode c where c.batchKey = :key", Long.class)
+                .setParameter("key", requestKey).setMaxResults(1).getResultList().isEmpty();
+    }
+
+    private List<BillingDtos.RedeemCodeView> create(BillingDtos.NewRedeemCodes input, Long operator, Long partnerId) {
         if (input.expiresAt() != null && !input.expiresAt().isAfter(Instant.now())) throw bad("失效时间须晚于现在");
         if (!"TOPUP".equals(input.kind()) && input.amountMinor() != 0) throw bad("只有充值兑换码有实收金额");
         boolean membership = "MEMBERSHIP".equals(input.kind());
@@ -54,6 +77,7 @@ public class BillingRedeemCodeService {
                 var c = new BillingRedeemCode();
                 c.setCode(generate()); c.setBatchKey(input.requestKey()); c.setKind(input.kind()); c.setCredits(input.credits()); c.setAmountMinor(input.amountMinor());
                 c.setPlanId(input.planId());
+                c.setPartnerId(partnerId);
                 c.setNote(note); c.setExpiresAt(input.expiresAt()); c.setCreatedBy(operator);
                 em.persist(c);
                 existing.add(c);
@@ -65,10 +89,21 @@ public class BillingRedeemCodeService {
 
     @Transactional(readOnly = true)
     public PageResult<BillingDtos.RedeemCodeView> list(int page, int size, String status, String kind, String keyword) {
+        return list(page, size, status, kind, keyword, 0L);
+    }
+
+    /** 某家服务商生成的激活码。 */
+    @Transactional(readOnly = true)
+    public PageResult<BillingDtos.RedeemCodeView> listForPartner(Long partnerId, int page, int size, String status, String keyword) {
+        return list(page, size, status, "MEMBERSHIP", keyword, partnerId);
+    }
+
+    private PageResult<BillingDtos.RedeemCodeView> list(int page, int size, String status, String kind, String keyword, long partnerId) {
         if (page < 0 || size < 1 || size > 100) throw bad("分页参数无效");
         if (status != null && !status.isBlank() && !STATUSES.contains(status)) throw bad("筛选条件无效");
         if (kind != null && !kind.isBlank() && !Set.of("TOPUP", "GIFT", "MEMBERSHIP").contains(kind)) throw bad("筛选条件无效");
-        String where = " where (:kind = '' or c.kind = :kind) and (:key = '' or c.code like :code or lower(c.note) like :note)" + switch (status == null ? "" : status) {
+        String where = " where (:kind = '' or c.kind = :kind) and (:key = '' or c.code like :code or lower(c.note) like :note)"
+                + (partnerId > 0 ? " and c.partnerId = :partner" : "") + switch (status == null ? "" : status) {
             case "UNUSED" -> " and c.voidedAt is null and c.redeemedAt is null and (c.expiresAt is null or c.expiresAt > :now)";
             case "REDEEMED" -> " and c.redeemedAt is not null";
             case "VOIDED" -> " and c.voidedAt is not null";
@@ -80,6 +115,7 @@ public class BillingRedeemCodeService {
         Map<String, Object> params = new HashMap<>(Map.of("kind", kind == null ? "" : kind, "key", key,
                 "code", codePart.isEmpty() ? "" : "%" + codePart + "%", "note", "%" + key.toLowerCase(Locale.ROOT) + "%"));
         if (where.contains(":now")) params.put("now", Instant.now());
+        if (partnerId > 0) params.put("partner", partnerId);
         var count = em.createQuery("select count(c) from BillingRedeemCode c" + where, Long.class);
         var rows = em.createQuery("from BillingRedeemCode c" + where + " order by c.createdAt desc, c.id desc", BillingRedeemCode.class);
         params.forEach((name, value) -> { count.setParameter(name, value); rows.setParameter(name, value); });
@@ -117,7 +153,11 @@ public class BillingRedeemCodeService {
             default -> { }
         }
         c.setRedeemedTenantId(tenantId); c.setRedeemedBy(userId); c.setRedeemedAt(Instant.now());
-        if ("MEMBERSHIP".equals(c.getKind())) return billing.activateRedeemCode(c.getId(), c.getPlanId());
+        if ("MEMBERSHIP".equals(c.getKind())) {
+            var activated = billing.activateRedeemCode(c.getId(), c.getPlanId());
+            if (c.getPartnerId() != null) events.publishEvent(new BillingDtos.PartnerCodeRedeemed(tenantId, c.getId(), c.getPartnerId()));
+            return activated;
+        }
         long available = billing.creditRedeemCode(c.getId(), c.getKind(), c.getCredits(), c.getAmountMinor());
         return new BillingDtos.Redeemed(c.getKind(), c.getCredits(), available, null, null);
     }
@@ -145,7 +185,7 @@ public class BillingRedeemCodeService {
             return new BillingDtos.RedeemCodeView(c.getId(), c.getCode(), c.getKind(), c.getCredits(), c.getAmountMinor(),
                     c.status(now), c.getNote(), c.getExpiresAt(), c.getCreatedAt(), c.getRedeemedTenantId(),
                     c.getRedeemedTenantId() == null ? null : tenants.get(c.getRedeemedTenantId()), c.getRedeemedAt(), c.getVoidedAt(),
-                    c.getPlanId(), plan == null ? null : plan.getName(), plan == null ? null : plan.getDurationDays());
+                    c.getPlanId(), plan == null ? null : plan.getName(), plan == null ? null : plan.getDurationDays(), c.getPartnerId());
         }).toList();
     }
 

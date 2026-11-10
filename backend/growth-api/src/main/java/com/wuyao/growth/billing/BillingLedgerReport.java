@@ -176,6 +176,7 @@ public class BillingLedgerReport {
                        CASE WHEN l.event_key LIKE 'redeem-code:%' THEN 'REDEEM_CODE'
                             WHEN l.event_key LIKE 'admin-credits:%' THEN 'ADMIN'
                             WHEN l.event_key LIKE 'admin-membership:%' THEN 'ADMIN_MEMBERSHIP'
+                            WHEN l.event_key LIKE 'partner-credits:%' THEN 'PARTNER'
                             ELSE 'ORDER' END,
                        COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' THEN -l.held_delta ELSE l.gift_delta + l.purchased_delta END), 0)
                 FROM billing_ledger l

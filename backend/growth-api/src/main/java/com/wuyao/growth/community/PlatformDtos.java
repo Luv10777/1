@@ -29,7 +29,7 @@ public final class PlatformDtos {
     public record UserView(Long id, Long tenantId, String tenantName, String name, String phoneMasked, String username,
                            String role, String status, Instant lastLoginAt, Instant createdAt, Instant suspendedAt,
                            boolean memberActive, Instant memberUntil, String planName, long creditsAvailable,
-                           boolean operator, UserIdentity identity) {}
+                           boolean operator, UserIdentity identity, Long uid) {}
 
     /** 已通过的实名记录；id 是实名申请编号，按用途查看完整资料时使用。 */
     public record UserIdentity(Long id, String legalNameMasked, String idNumberMasked, Instant verifiedAt) {}

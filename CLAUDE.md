@@ -10,6 +10,7 @@
 | `docs/` | 设计文档。`adr/` 记录架构决策的来龙去脉 |
 | `deploy/` | 测试服务器部署（Docker Compose 全栈），步骤见 `deploy/README.md` |
 | `desktop/` | 桌面端（Electron），在商家电脑上读取直播间弹幕；试用阶段，说明见 `desktop/README.md` |
+| `partner/` | 服务商后台（partner.yifangzhi.com），单独构建 `npm run build:partner`，说明见 `docs/partners.md` |
 | `android/` | 安卓端：一台手机开播，抖音在前台、一方志在后台读弹幕；试用阶段，说明和发版步骤见 `android/README.md` |
 
 ## ⛔ legacy/ 目录

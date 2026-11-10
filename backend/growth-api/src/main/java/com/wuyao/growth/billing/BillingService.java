@@ -245,6 +245,20 @@ public class BillingService {
         return a.available();
     }
     /**
+     * 服务商把自己的烟火分给名下商户：记入商户的充值烟火（账本 PURCHASE），不发 OrderPaid（服务商线下打款，不按这笔记邀请返利）。
+     * 服务商那边的扣减由服务商模块先记账；调用方切到目标商户后新开事务调用。
+     * @return 是否入账；同一 requestKey 已处理过时为 false
+     */
+    @Transactional
+    public boolean creditFromPartner(long credits,String requestKey,String partnerName,Long actor) {
+        if(credits<1) throw bad("分配的烟火必须大于零");
+        var a=store.lockAccount(); String key="partner-credits:"+requestKey;
+        if(store.eventExists(key)) return false;
+        a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),credits));
+        ledger(a,key,"PURCHASE","服务商「"+partnerName+"」分配烟火",0,credits,0,null,null,actor);
+        return true;
+    }
+    /**
      * 激活码兑换：按码上的套餐版本开通或顺延会员。激活码不送烟火，也不发 OrderPaid（线下卖码的实收金额平台不知道）。
      * 调用方已锁住账户和激活码。
      */

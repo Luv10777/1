@@ -3,7 +3,8 @@
  * 避免两边各存一份、键名对不上。
  */
 
-export const SESSION_NAMESPACE = import.meta.env?.VITE_APP_CONTEXT === 'admin' ? 'wuyao-admin' : 'wuyao-ai'
+const APP_CONTEXT = import.meta.env?.VITE_APP_CONTEXT
+export const SESSION_NAMESPACE = APP_CONTEXT === 'admin' ? 'wuyao-admin' : APP_CONTEXT === 'partner' ? 'wuyao-partner' : 'wuyao-ai'
 const TOKEN_KEY = `${SESSION_NAMESPACE}-token`
 const USER_KEY = `${SESSION_NAMESPACE}-auth`
 

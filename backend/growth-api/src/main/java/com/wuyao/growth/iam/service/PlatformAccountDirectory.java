@@ -42,10 +42,10 @@ public class PlatformAccountDirectory {
 
     /** 平台账号管理看到的用户资料；不含密码、令牌等凭证。 */
     public record PlatformUser(Long id, Long tenantId, String name, String phone, String username, String role,
-                               String status, Instant lastLoginAt, Instant createdAt, Instant suspendedAt) {
+                               String status, Instant lastLoginAt, Instant createdAt, Instant suspendedAt, Long uid) {
         static PlatformUser of(User u) {
             return new PlatformUser(u.getId(), u.getTenantId(), u.getName(), u.getPhone(), u.getUsername(), u.getRole(),
-                    u.getStatus(), u.getLastLoginAt(), u.getCreatedAt(), u.getSuspendedAt());
+                    u.getStatus(), u.getLastLoginAt(), u.getCreatedAt(), u.getSuspendedAt(), u.getUid());
         }
     }
 
@@ -64,6 +64,12 @@ public class PlatformAccountDirectory {
         Instant first = loginEvents.firstLoginAt();
         if (first == null || first.isAfter(from)) return null;
         return loginEvents.countUsersBetween(from, to);
+    }
+
+    /** 按用户 ID（uid）找账号，找不到为空。调用方负责核对身份。 */
+    @Transactional(readOnly = true)
+    public java.util.Optional<PlatformUser> userByUid(Long uid) {
+        return users.findByUid(uid).map(PlatformUser::of);
     }
 
     @Transactional(readOnly = true)

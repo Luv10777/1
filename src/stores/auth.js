@@ -38,6 +38,7 @@ function persistSession(data) {
     roles: rolesOf(data.user.role),
     role: roleLabel(data.user.role),
     avatarUrl: data.user.avatarUrl || '',
+    uid: data.user.uid ?? null,
   }
   state.user = user
   writeUser(user)
@@ -138,7 +139,7 @@ export const auth = {
     if (!state.token?.accessToken) return false
     try {
       const me = await authService.getCurrentUser()
-      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role), avatarUrl: me.avatarUrl || '' }
+      state.user = { ...state.user, id: me.userId, tenantId: me.tenantId, phone: me.phone, name: me.name || state.user?.name, roles: rolesOf(me.role), role: roleLabel(me.role), avatarUrl: me.avatarUrl || '', uid: me.uid ?? null }
       writeUser(state.user)
       // 校验过程中 request.js 可能已经换过 token，内存里的那份要跟上。
       state.token = readTokens()

@@ -17,6 +17,8 @@ public class BillingRedeemCode {
     private long amountMinor;
     /** 激活码（MEMBERSHIP）开通的套餐版本；充值码、赠送码为空。 */
     private Long planId;
+    /** 服务商生成的激活码记下服务商，兑换后把商户归到它名下；平台生成的为空。 */
+    private Long partnerId;
     @Column(length=200) private String note;
     private Instant expiresAt;
     private Long createdBy;

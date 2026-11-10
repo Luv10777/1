@@ -45,7 +45,7 @@ class PlatformUserServiceTest {
     }
 
     private PlatformUser user(long id, long tenantId, String name, String status, Instant lastLogin) {
-        return new PlatformUser(id, tenantId, name, "1380000" + (1000 + id), null, "OWNER", status, lastLogin, now.minus(Duration.ofDays(id)), null);
+        return new PlatformUser(id, tenantId, name, "1380000" + (1000 + id), null, "OWNER", status, lastLogin, now.minus(Duration.ofDays(id)), null, 10000000 + id);
     }
 
     @BeforeEach

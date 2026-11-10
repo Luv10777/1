@@ -1,0 +1,20 @@
+/* 服务商后台沿用管理后台的外壳和表格样式，只改品牌色块的文字。 */
+@import '../admin/style.css';
+
+.partner-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px; }
+.partner-card { padding:18px 20px; border:1px solid var(--mg-line); border-radius:8px; background:var(--mg-surface); }
+.partner-card span { display:block; color:var(--mg-muted); font-size:12px; }
+.partner-card strong { display:block; margin-top:8px; font:600 26px/1.2 var(--font-mono); color:var(--mg-ink); }
+.partner-card small { display:block; margin-top:6px; color:var(--mg-muted); font-size:12px; }
+.partner-form { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; padding:16px 20px; }
+.partner-form label { display:grid; gap:6px; color:var(--mg-muted); font-size:12px; }
+.partner-form input, .partner-form .app-select-button { min-height:36px; padding:6px 10px; border:1px solid var(--mg-line); border-radius:5px; background:#fff; color:var(--mg-ink); }
+.partner-form input { min-width:180px; }
+.partner-inline { display:flex; align-items:center; gap:8px; }
+.partner-inline input { width:110px; min-height:30px; padding:4px 8px; border:1px solid var(--mg-line); border-radius:5px; }
+@media (max-width: 640px) { .partner-form { padding:14px; } .partner-form label, .partner-form input { width:100%; } }
+.code-created-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:6px 18px; margin:0; padding:14px 22px 18px 44px; font-size:13px; }
+.code-number { text-align:right; }
+.management-table td > small { display:block; margin-top:2px; color:var(--mg-muted); font-size:11px; }
+.admin-password input { flex:1; min-width:0; }
+.admin-password > button { flex-shrink:0; white-space:nowrap; }

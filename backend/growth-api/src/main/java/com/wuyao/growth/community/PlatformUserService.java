@@ -50,7 +50,7 @@ public class PlatformUserService {
         var matched = directory.users().stream()
                 .filter(u -> blank(status) ? !"REMOVED".equals(u.status()) : status.equals(u.status()))
                 .filter(u -> blank(role) || role.equals(u.role()))
-                .filter(u -> key.isEmpty() || Stream.of(u.name(), u.phone(), u.username(), tenantNames.get(u.tenantId()), String.valueOf(u.id()))
+                .filter(u -> key.isEmpty() || Stream.of(u.name(), u.phone(), u.username(), tenantNames.get(u.tenantId()), String.valueOf(u.id()), String.valueOf(u.uid()))
                         .filter(Objects::nonNull).anyMatch(v -> v.toLowerCase(Locale.ROOT).contains(key)))
                 .toList();
         int start = (int) Math.min((long) page * size, matched.size());
@@ -153,7 +153,7 @@ public class PlatformUserService {
         return new PlatformDtos.UserView(u.id(), u.tenantId(), tenantName, u.name(), PlatformManagementService.maskPhone(u.phone()),
                 u.username(), u.role(), u.status(), u.lastLoginAt(), u.createdAt(), u.suspendedAt(),
                 member.memberActive(), member.memberUntil(), member.plan() == null ? null : member.plan().name(),
-                member.available(), config.getOperatorUserIds().contains(u.id()), identity);
+                member.available(), config.getOperatorUserIds().contains(u.id()), identity, u.uid());
     }
 
     /** 商户里实名核验通过的账号，按用户编号取。核验不一致或未提交的不在其中，列表显示为未实名。 */

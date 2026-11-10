@@ -18,6 +18,11 @@ public class User {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
+    /** 用户 ID：8 位随机数字，注册时由数据库生成，永不重复；服务商按它添加名下商户。 */
+    @org.hibernate.annotations.Generated
+    @Column(insertable = false, updatable = false)
+    private Long uid;
+
     @Column(length = 20)
     private String phone;
 

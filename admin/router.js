@@ -15,11 +15,12 @@ const CreditsView = () => import('../src/views/PlatformCreditsView.vue')
 const ReferralView = () => import('../src/views/PlatformReferralView.vue')
 const CreditOverviewView = () => import('../src/views/PlatformCreditOverviewView.vue')
 const RedeemCodesView = () => import('../src/views/PlatformRedeemCodesView.vue')
+const PartnersView = () => import('../src/views/PlatformPartnersView.vue')
 
 export function adminDestination(raw) {
   if (typeof raw !== 'string') return '/workbench'
   const path = raw.split(/[?#]/)[0]
-  return ['/workbench', '/review', '/information', '/merchants', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral'].includes(path) ? raw : '/workbench'
+  return ['/workbench', '/review', '/information', '/merchants', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral', '/partners'].includes(path) ? raw : '/workbench'
 }
 
 export function createAdminRouter(history = createWebHistory()) {
@@ -38,6 +39,7 @@ export function createAdminRouter(history = createWebHistory()) {
       { path: '/credits', name: 'admin-credits', component: CreditsView, meta: { title: '烟火日志', admin: true } },
       { path: '/redeem-codes', name: 'admin-redeem-codes', component: RedeemCodesView, meta: { title: '兑换码', admin: true } },
       { path: '/referral', name: 'admin-referral', component: ReferralView, meta: { title: '邀请返利', admin: true } },
+      { path: '/partners', name: 'admin-partners', component: PartnersView, meta: { title: '服务商', admin: true } },
       { path: '/users', name: 'admin-users', component: UsersView, meta: { title: '用户管理', admin: true } },
       { path: '/plans', name: 'admin-plans', component: PlansView, meta: { title: '会员套餐', admin: true } },
       { path: '/alliance', name: 'admin-alliance', component: AllianceView, meta: { title: '联盟券', admin: true } },

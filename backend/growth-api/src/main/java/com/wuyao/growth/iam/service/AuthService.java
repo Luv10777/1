@@ -251,7 +251,7 @@ public class AuthService {
                 .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
                 .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "用户不存在"));
         return new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole(),
-                avatars.url(user.getAvatarKey()));
+                avatars.url(user.getAvatarKey()), user.getUid());
     }
 
     /** 刷新即轮换：老的立刻作废，防止 refresh token 被重复使用。 */
@@ -345,7 +345,7 @@ public class AuthService {
                 refresh,
                 jwtService.getAccessTtl().toSeconds(),
                 new AuthDtos.UserInfo(user.getId(), user.getTenantId(), user.getPhone(), user.getName(), user.getRole(),
-                        avatars.url(user.getAvatarKey())));
+                        avatars.url(user.getAvatarKey()), user.getUid()));
     }
 
     private String randomCode() {
