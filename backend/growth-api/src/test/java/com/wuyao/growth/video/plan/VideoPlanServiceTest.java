@@ -33,7 +33,7 @@ class VideoPlanServiceTest {
     @Test void createReservesOneCreditAndQueuesGeneration() {
         when(gateway.configured(ModelAlias.VIDEO_PLANNER)).thenReturn(true);
         when(plans.findByRequestKey("plan-key-1")).thenReturn(Optional.empty());
-        when(billing.reserve(eq("video-plan:plan-key-1"), eq("VIDEO_PLAN"), eq(1L), anyString())).thenReturn("r1");
+        when(billing.reserve(eq("video-plan:plan-key-1"), eq("VIDEO_PLAN"), eq((long) BillingService.VIDEO_PLAN_CREDITS), anyString())).thenReturn("r1");
         when(plans.saveAndFlush(any())).thenAnswer(call -> { VideoPlan p = call.getArgument(0); p.setId(7L); return p; });
         var task = new Task(); task.setId(70L);
         when(tasks.submit(eq(VideoPlanGenerateHandler.TYPE), eq("DEFAULT"), eq(Map.of("planId", 7L)), eq("video-plan-generate-7"), eq(1L))).thenReturn(task);

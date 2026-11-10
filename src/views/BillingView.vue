@@ -16,13 +16,14 @@ const account = computed(() => billing.summary)
 const returnTo = computed(() => typeof route.query.redirect === 'string'
   && route.query.redirect.startsWith('/') && !route.query.redirect.startsWith('//')
   ? route.query.redirect : '/dashboard')
-const amount = ref(50)
+const amount = ref(500)
 const purchaseConsent = ref(false)
 const planTerms = ref(null)
 const topupTerms = ref(null)
 watch(() => [auth.user?.id, auth.tenantId], () => { purchaseConsent.value = false }, { flush: 'sync' })
-const preset = [10, 50, 100, 300]
-const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= 1 && amount.value <= 100000)
+const MIN_TOPUP_YUAN = 500
+const preset = [500, 1000, 2000, 5000]
+const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= MIN_TOPUP_YUAN && amount.value <= 100000)
 const topupCredits = computed(() => validAmount.value ? amount.value * (account.value?.creditsPerYuan || 10) : 0)
 const busy = ref(false)
 const error = ref('')
@@ -292,7 +293,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。图片、视频、文案等功能充值后就能用；使用 AI 实景直播前，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">订阅或续订套餐</a>。</p>
         <form class="yanhuo-topup-form" @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }}</small></label></fieldset>
-          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" min="1" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>
+          <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额（{{ MIN_TOPUP_YUAN }} 元起）</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" :min="MIN_TOPUP_YUAN" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>
           <BillingCheckoutTerms ref="topupTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'topup' ? error : ''">
             <div class="yanhuo-checkout-pay"><span class="yanhuo-checkout-due">应付<strong>{{ validAmount ? yuan(amount * 100) : '—' }}</strong></span><button class="yanhuo-primary" type="submit" :disabled="!canPay || !validAmount"><Wallet :size="16" />{{ busy ? '正在创建订单...' : '确认支付' }}</button></div>
           </BillingCheckoutTerms>

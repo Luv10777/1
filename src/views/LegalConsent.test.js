@@ -182,7 +182,7 @@ test('top-ups and subscriptions require consent', async () => {
     await view.topUp()
     await view.subscribe({ id: 3 })
     assert.deepEqual(calls.map(([kind]) => kind), ['topup', 'subscribe'])
-    assert.equal(calls[0][1].amountMinor, 5000)
+    assert.equal(calls[0][1].amountMinor, 50000)
     assert.equal(calls[1][1].planId, 3)
     auth.state.user = { id: 2, tenantId: 9 }
     assert.equal(view.purchaseConsent, false, 'another account cannot inherit purchase consent')

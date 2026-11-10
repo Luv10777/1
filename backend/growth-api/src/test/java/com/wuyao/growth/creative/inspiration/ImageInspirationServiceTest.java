@@ -33,7 +33,7 @@ class ImageInspirationServiceTest {
     @Test void createReservesOneCreditUnderItsOwnCapabilityAndQueuesGeneration() {
         when(gateway.configured(ModelAlias.IMAGE_INSPIRATION_PLANNER)).thenReturn(true);
         when(inspirations.findByRequestKey("inspiration-key-1")).thenReturn(Optional.empty());
-        when(billing.reserve(eq("image-inspiration:inspiration-key-1"), eq("IMAGE_INSPIRATION"), eq(1L), anyString())).thenReturn("r1");
+        when(billing.reserve(eq("image-inspiration:inspiration-key-1"), eq("IMAGE_INSPIRATION"), eq((long) BillingService.IMAGE_INSPIRATION_CREDITS), anyString())).thenReturn("r1");
         when(inspirations.saveAndFlush(any())).thenAnswer(call -> { ImageInspiration p = call.getArgument(0); p.setId(7L); return p; });
         var task = new Task(); task.setId(70L);
         when(tasks.submit(eq(ImageInspirationGenerateHandler.TYPE), eq("DEFAULT"), eq(Map.of("inspirationId", 7L)),
@@ -94,7 +94,7 @@ class ImageInspirationServiceTest {
         when(inspirations.lock(7L)).thenReturn(Optional.of(inspiration));
         assertThat(service.completed(7L, task, List.of(Map.of("title", "晨光")))).isTrue();
         assertThat(inspiration.getStatus()).isEqualTo("SUCCEEDED");
-        verify(billing).capture(eq("r1"), eq(1L), eq("image-inspiration:7:capture"), anyString());
+        verify(billing).capture(eq("r1"), eq((long) BillingService.IMAGE_INSPIRATION_CREDITS), eq("image-inspiration:7:capture"), anyString());
     }
 
     @Test void terminalTaskFailureReleasesTheReservationOnce() {

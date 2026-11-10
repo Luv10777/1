@@ -17,7 +17,7 @@ public final class BillingDtos {
     public record PaymentInstructions(boolean available, String recipient, String account, String bank,
                                       String instructions, String qrCodeUrl) {}
     public record TopUp(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
-                        @Min(100) @Max(10000000) long amountMinor) {}
+                        @Min(50000) @Max(10000000) long amountMinor) {}
     public record Subscribe(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
                             @NotNull @Positive Long planId) {}
     public record NewPlan(@NotBlank @Pattern(regexp="[A-Z0-9_-]{2,60}") String code,

@@ -673,7 +673,7 @@ public class ImageCreationService {
        captureImage(c,i);
        return;
      }
-     billing.releaseAmount(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,key,"图片未交付 · 退回 3 烟火");
+     billing.releaseAmount(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,key,"图片未交付 · 退回 "+BillingService.IMAGE_CREDITS+" 烟火");
      i.setBillingHeld(false);
    }
  }

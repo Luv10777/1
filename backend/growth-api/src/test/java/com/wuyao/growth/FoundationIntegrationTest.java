@@ -264,14 +264,14 @@ class FoundationIntegrationTest {
             var first = submissions.getFirst().get(15, TimeUnit.SECONDS);
             for (var submission : submissions) assertThat(submission.get(15, TimeUnit.SECONDS).id()).isEqualTo(first.id());
             var reserved = TenantContext.runAs(tenantA, () -> billingService.summary(true, false));
-            assertThat(reserved.available()).isEqualTo(before - 1);
-            assertThat(reserved.held()).isEqualTo(1);
+            assertThat(reserved.available()).isEqualTo(before - BillingService.VIDEO_ANALYSIS_CREDITS);
+            assertThat(reserved.held()).isEqualTo(BillingService.VIDEO_ANALYSIS_CREDITS);
             var task = tasks.claim("MEDIA_CPU", 1).getFirst();
             // Accepted work can finish and settle even if the membership expires during processing.
             owner.update("UPDATE billing_accounts SET member_until=now()-interval '1 minute' WHERE tenant_id=?", tenantA);
             assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.completed(first.id(), task, Map.of("summary", "test report")))).isTrue();
             assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.completed(first.id(), task, Map.of()))).isFalse();
-            assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before - 1);
+            assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before - BillingService.VIDEO_ANALYSIS_CREDITS);
             assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isZero();
             assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='CAPTURE' AND tenant_id=?", Long.class, tenantA)).isEqualTo(1);
             assertThat(code(() -> TenantContext.runAs(tenantB, () -> videoAnalyses.get(first.id())))).isEqualTo(1404);
@@ -324,8 +324,8 @@ class FoundationIntegrationTest {
         var request = new com.wuyao.growth.video.analysis.VideoAnalysisDtos.Import("https://example.com/test.mp4", "analysis-url", "real", "");
         var first = TenantContext.runAs(tenantA, () -> videoAnalyses.importUrl(request, -1L));
         assertThat(TenantContext.runAs(tenantA, () -> videoAnalyses.importUrl(request, -1L)).id()).isEqualTo(first.id());
-        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before - 1);
-        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(1);
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before - BillingService.VIDEO_ANALYSIS_CREDITS);
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(BillingService.VIDEO_ANALYSIS_CREDITS);
         TenantContext.runAs(tenantA, () -> videoAnalyses.cancel(first.id()));
         assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).available())).isEqualTo(before);
     }
@@ -349,7 +349,7 @@ class FoundationIntegrationTest {
         var request = new com.wuyao.growth.video.plan.VideoPlanDtos.Create("plan-first", List.of(image), false, "高级质感", "突出补水", null);
         var first = TenantContext.runAs(tenantA, () -> videoPlans.create(request, -1L));
         assertThat(TenantContext.runAs(tenantA, () -> videoPlans.create(request, -1L)).id()).isEqualTo(first.id());
-        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(1);
+        assertThat(TenantContext.runAs(tenantA, () -> billingService.summary(true, false).held())).isEqualTo(BillingService.VIDEO_PLAN_CREDITS);
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> videoPlans.get(first.id())))).isEqualTo(1404);
         var task = tasks.claim("DEFAULT", 1).getFirst();
         assertThat(task.getType()).isEqualTo("VIDEO_PLAN_GENERATE");
@@ -383,7 +383,7 @@ class FoundationIntegrationTest {
         tasks.failPermanently(retry.getId(), retry.getAttempts(), "VIDEO_PLAN_OUTPUT", "test failure");
         assertThat(TenantContext.runAs(tenantA, () -> videoPlans.get(again.id()).status())).isEqualTo("FAILED");
         var balance = TenantContext.runAs(tenantA, () -> billingService.summary(true, false));
-        assertThat(balance.available()).isEqualTo(before - 1);
+        assertThat(balance.available()).isEqualTo(before - BillingService.VIDEO_PLAN_CREDITS);
         assertThat(balance.held()).isZero();
         assertThat(owner.queryForObject("select relrowsecurity and relforcerowsecurity from pg_class where oid='public.video_plans'::regclass", Boolean.class)).isTrue();
     }
@@ -483,18 +483,19 @@ class FoundationIntegrationTest {
     @Test
     void billingTopupRecordsListOnlyPaidTopupsWithTheirLedgerBalances() {
         long before=TenantContext.runAs(tenantA,()->billingService.summary(true,false).available());
-        var paid=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-record-1",1500)));
-        TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-record-2",200)));
-        TenantContext.runAs(tenantA,()->billingService.confirmPayment(paid.id(),new BillingDtos.Confirmation(1500,"topup-record-receipt"),-1L));
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-below-min",49900))))).isEqualTo(1400);
+        var paid=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-record-1",150000)));
+        TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-record-2",50000)));
+        TenantContext.runAs(tenantA,()->billingService.confirmPayment(paid.id(),new BillingDtos.Confirmation(150000,"topup-record-receipt"),-1L));
         var records=TenantContext.runAs(tenantA,()->billingService.topups(0,20));
         assertThat(records.items()).singleElement().satisfies(r->{
             assertThat(r.orderId()).isEqualTo(paid.id());
-            assertThat(r.amountMinor()).isEqualTo(1500);
-            assertThat(r.credits()).isEqualTo(150);
+            assertThat(r.amountMinor()).isEqualTo(150000);
+            assertThat(r.credits()).isEqualTo(15000);
             assertThat(r.paymentMethod()).isEqualTo("MANUAL");
             assertThat(r.paidAt()).isNotNull();
             assertThat(r.balanceBefore()).isEqualTo(before);
-            assertThat(r.balanceAfter()).isEqualTo(before+150);
+            assertThat(r.balanceAfter()).isEqualTo(before+15000);
         });
         assertThat(records.hasMore()).isFalse();
         assertThat(TenantContext.runAs(tenantB,()->billingService.topups(0,20)).items()).isEmpty();
@@ -502,16 +503,16 @@ class FoundationIntegrationTest {
 
     @Test
     void billingPaymentMustMatchReceiptAndFulfilOnlyOnceAcrossConcurrentConfirmations() throws Exception {
-        var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1200)));
-        assertThat(order.credits()).isEqualTo(120);
-        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(1300,"payment-test-receipt"),-1L)))).isEqualTo(1400);
-        concurrent(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(1200,"payment-test-receipt"),-1L)));
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).purchasedAvailable())).isEqualTo(120);
-        var same=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1200)));
+        var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",120000)));
+        assertThat(order.credits()).isEqualTo(12000);
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(130000,"payment-test-receipt"),-1L)))).isEqualTo(1400);
+        concurrent(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(120000,"payment-test-receipt"),-1L)));
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).purchasedAvailable())).isEqualTo(12000);
+        var same=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",120000)));
         assertThat(same.id()).isEqualTo(order.id());
-        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",1300))))).isEqualTo(1400);
-        var other=TenantContext.runAs(tenantB,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-002",1200)));
-        assertThatThrownBy(()->TenantContext.runAs(tenantB,()->billingService.confirmPayment(other.id(),new BillingDtos.Confirmation(1200,"payment-test-receipt"),-1L))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",130000))))).isEqualTo(1400);
+        var other=TenantContext.runAs(tenantB,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-002",120000)));
+        assertThatThrownBy(()->TenantContext.runAs(tenantB,()->billingService.confirmPayment(other.id(),new BillingDtos.Confirmation(120000,"payment-test-receipt"),-1L))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThat(TenantContext.runAs(tenantB,()->billingService.summary(true,false).purchasedAvailable())).isZero();
     }
 
@@ -524,7 +525,7 @@ class FoundationIntegrationTest {
         assertThat(after.memberUntil()).isEqualTo(before.memberUntil().plus(Duration.ofDays(30)));
         assertThat(after.giftAvailable()).isEqualTo(2000000);
         billingConfig.setPaymentMethod("WECHAT");
-        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-unconfigured",100))))).isEqualTo(9004);
+        assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-unconfigured",50000))))).isEqualTo(9004);
         assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).payment().available())).isFalse();
     }
 
@@ -541,7 +542,7 @@ class FoundationIntegrationTest {
 
     @Test
     void billingReconciliationAndRecoveryClaimsAreSharedAcrossConcurrentCallers() throws Exception {
-        var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-query-claim",100)));
+        var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-query-claim",50000)));
         owner.update("update billing_orders set payment_method='WECHAT' where id=?",order.id());
         var queries=concurrent(()->TenantContext.runAs(tenantA,()->billingService.claimReconciliation(order.id())));
         assertThat(queries.stream().filter(Boolean.TRUE::equals).count()).isEqualTo(1);
@@ -574,7 +575,7 @@ class FoundationIntegrationTest {
         security.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal,null,List.of()));
         String orderId,reservationId;
         try {
-            var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-audit-order",100)));
+            var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-audit-order",50000)));
             orderId=order.id();
             assertThat(order.createdBy()).isEqualTo(user);
             reservationId=TenantContext.runAs(tenantA,()->billingService.reserve("billing-audit-reserve","IMAGE",3,"test audit"));
@@ -583,7 +584,7 @@ class FoundationIntegrationTest {
         assertThat(owner.queryForObject("select actor_user_id from billing_ledger where event_key='reserve:billing-audit-reserve'",Long.class)).isEqualTo(user);
         TenantContext.runAs(tenantA,()->{
             billingService.capture(reservationId,3,"billing-audit-worker","delivered by worker");
-            billingService.confirmPayment(orderId,new BillingDtos.Confirmation(100,"billing-audit-receipt"),-1L);
+            billingService.confirmPayment(orderId,new BillingDtos.Confirmation(50000,"billing-audit-receipt"),-1L);
             return null;
         });
         assertThat(owner.queryForObject("select actor_user_id from billing_ledger where event_key='billing-audit-worker'",Long.class)).isNull();
@@ -595,14 +596,14 @@ class FoundationIntegrationTest {
     void billingRecoveryRefundsLostImageFailureEventsAndSubsequentFailedRetries() {
         enableImageModels();
         var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-lost-event","POSTER",1,List.of()),null));
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(BillingService.IMAGE_CREDITS);
         // Simulate a worker crashing after its task failure commits and before the event is delivered.
         owner.update("update tasks set status='FAILED' where id=?",created.taskId());
         billingRecovery.recover();
         billingRecovery.recover();
         assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
         var retry=TenantContext.runAs(tenantA,()->imageCreations.retry(created.id(),null,created.taskId(),null));
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(BillingService.IMAGE_CREDITS);
         owner.update("update tasks set status='FAILED' where id=?",retry.taskId());
         owner.update("update billing_accounts set recovery_after=now()-interval '1 second' where tenant_id=?",tenantA);
         billingRecovery.recover();
@@ -619,7 +620,7 @@ class FoundationIntegrationTest {
             assertThat(imageRateLimiter.getActiveCount(tenantA)).isEqualTo(1);
             status.setRollbackOnly();return null;
         }));
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(BillingService.IMAGE_CREDITS);
         assertThat(imageRateLimiter.getActiveCount(tenantA)).isEqualTo(1);
         TenantContext.runAs(tenantA,()->imageCreations.cancel(created.id()));
         assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isZero();
@@ -636,7 +637,7 @@ class FoundationIntegrationTest {
         var created=TenantContext.runAs(tenantA,()->imageCreations.create(imageRequest("billing-preview","POSTER",1,List.of()),null));
         runImageTask("DEFAULT",imagePlanHandler); runImageTask("IMAGE",imageRenderHandler);
         var item=TenantContext.runAs(tenantA,()->imageCreations.get(created.id()).items().getFirst());
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(BillingService.IMAGE_CREDITS);
         if(visible) {
             assertThat(concurrent(()->TenantContext.runAs(tenantA,()->imageCreations.recordPreviewLoaded(created.id(),item.id(),0))))
                     .allMatch(Boolean.TRUE::equals);
@@ -646,7 +647,7 @@ class FoundationIntegrationTest {
         assertThat(tasks.failPermanently(download.getId(),download.getAttempts(),"STORAGE_UNAVAILABLE","test storage failure")).isTrue();
         var balance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
         assertThat(balance.held()).isZero();
-        assertThat(balance.available()).isEqualTo(visible?999997:1000000);
+        assertThat(balance.available()).isEqualTo(visible?1000000-BillingService.IMAGE_CREDITS:1000000);
         assertThat(imageRateLimiter.getActiveCount(tenantA)).isZero();
         if(visible) {
             TenantContext.runAs(tenantA,()->imageCreations.retry(created.id(),item.id(),download.getId(),null));
@@ -658,7 +659,7 @@ class FoundationIntegrationTest {
                 imageCreations.markImagePersisted(item.id(),retry,storageKey,480,640,null);
                 return null;
             });
-            assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).available())).isEqualTo(999997);
+            assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).available())).isEqualTo(1000000-BillingService.IMAGE_CREDITS);
             assertThat(owner.queryForObject("select count(*) from billing_ledger where event_key=?",Long.class,
                     "image-delivered:"+item.id()+":0")).isEqualTo(1);
         }
@@ -678,7 +679,7 @@ class FoundationIntegrationTest {
             status.setRollbackOnly(); return null;
         }));
         assertThat(TenantContext.runAs(tenantA,()->imageCreations.itemSnapshot(item.id()).getPreviewedAt())).isNull();
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(BillingService.IMAGE_CREDITS);
         assertThat(owner.queryForObject("select count(*) from billing_ledger where event_key=?",Long.class,
                 "image-delivered:"+item.id()+":0")).isZero();
     }
@@ -2775,17 +2776,17 @@ class FoundationIntegrationTest {
         var partial = TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()));
         assertThat(partial.status()).isEqualTo("PARTIAL");assertThat(partial.completed()).isEqualTo(2);
         var partialBalance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
-        assertThat(partialBalance.held()).isZero();assertThat(partialBalance.available()).isEqualTo(999994);
+        assertThat(partialBalance.held()).isZero();assertThat(partialBalance.available()).isEqualTo(1000000-2*BillingService.IMAGE_CREDITS);
         var failed = partial.items().get(1);
         TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(), failed.id(), failed.taskId(), null));
         TenantContext.runAs(tenantA, () -> imageCreations.retry(created.id(), failed.id(), failed.taskId(), null));
         assertThat(owner.queryForObject("select count(*) from tasks where type='IMAGE_RENDER' and status='PENDING'", Integer.class)).isEqualTo(1);
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(3);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).held())).isEqualTo(BillingService.IMAGE_CREDITS);
         clearInvocations(imageGateway);
         runImageTask("IMAGE", imageRenderHandler);
         assertThat(TenantContext.runAs(tenantA, () -> imageCreations.get(created.id()).completed())).isEqualTo(3);
         var completedBalance=TenantContext.runAs(tenantA,()->billingService.summary(true,false));
-        assertThat(completedBalance.held()).isZero();assertThat(completedBalance.available()).isEqualTo(999991);
+        assertThat(completedBalance.held()).isZero();assertThat(completedBalance.available()).isEqualTo(1000000-3*BillingService.IMAGE_CREDITS);
         verify(imageGateway, times(1)).invokeReal(any());
     }
 

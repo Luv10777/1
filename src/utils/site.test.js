@@ -36,3 +36,28 @@ test('main domain sends AI creation routes to the mall and keeps the rest', asyn
     delete globalThis.location
   }
 })
+
+test('the AI creation site sends alliance and information routes to image creation', async () => {
+  globalThis.location = { hostname: 'wy.yifangzhi.com' }
+  const vite = await createServer({ server: { middlewareMode: true, hmr: false }, appType: 'custom',
+    plugins: [{ name: 'memory-router-test', enforce: 'pre', transform(code, id) {
+      if (id.replaceAll('\\', '/').endsWith('/src/router.js')) return code
+        .replace('createRouter, createWebHistory', 'createRouter, createMemoryHistory').replace('createWebHistory()', 'createMemoryHistory()')
+    } }],
+  })
+  try {
+    const { default: router } = await vite.ssrLoadModule('/src/router.js')
+    for (const path of ['/merchant-alliance', '/merchant-alliance/join', '/orders', '/alliance/pool', '/alliance/vouchers', '/alliance/offers', '/alliance/rules', '/alliance/redeem', '/information', '/information/3', '/information-publishing']) {
+      await router.push('/policies/terms')
+      await router.push(path)
+      assert.equal(router.currentRoute.value.path, '/image/create', path)
+    }
+    for (const path of ['/image/create', '/store/5', '/login', '/policies/terms']) {
+      await router.push(path)
+      assert.equal(router.currentRoute.value.path, path)
+    }
+  } finally {
+    await vite.close()
+    delete globalThis.location
+  }
+})

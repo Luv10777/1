@@ -17,11 +17,13 @@ test('business pages remain visible without membership while login and owner per
     return { ok: true, status: 200, json: async () => ({ code: 200, data: account }) }
   }
   const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
+  // 测试环境不是主域名，按 AI 创作站处理：商户联盟和信息发布被隐藏，另见 site.test.js。
+  const { isHiddenRoute } = await vite.ssrLoadModule('/src/utils/site.js')
   try {
     const { default: router } = await vite.ssrLoadModule('/src/router.js')
     auth.state.user = { id: 1, tenantId: 7 }
     auth.state.token = { accessToken: 'test-only' }
-    for (const route of router.getRoutes().filter(route => route.name && !route.redirect && !route.meta.public && !route.meta.ownerOnly && !route.meta.platformOnly)) {
+    for (const route of router.getRoutes().filter(route => route.name && !route.redirect && !route.meta.public && !route.meta.ownerOnly && !route.meta.platformOnly && !isHiddenRoute(route.name))) {
       await router.push(route.path)
       assert.equal(router.currentRoute.value.name, route.name, route.path)
     }
@@ -55,11 +57,11 @@ test('business pages remain visible without membership while login and owner per
       await router.push(path)
       assert.equal(router.currentRoute.value.name, 'not-found', 'unknown policies must not silently display a different agreement')
     }
-    for (const path of ['/', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio', '/merchant-alliance', '/information', '/information/7?category=supply']) {
+    for (const path of ['/', '/image/create', '/image/create/poster', '/image/create/product-set', '/video/create', '/video/workbench', '/video/analyze', '/digital-human', '/digital-human/studio']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.path, path === '/' ? '/image/create' : path.split('?')[0], 'guests can browse ' + path)
     }
-    for (const path of ['/information-publishing', '/works', '/assets/products', '/tasks', '/team', '/billing', '/settings']) {
+    for (const path of ['/works', '/assets/products', '/tasks', '/team', '/billing', '/settings']) {
       await router.push(path)
       assert.equal(router.currentRoute.value.name, 'login', path + ' requires login')
       assert.equal(router.currentRoute.value.query.redirect, path, 'login returns to the intended page')
@@ -100,7 +102,7 @@ test('expired sessions preserve guest browsing and require login only for privat
     assert.equal(router.currentRoute.value.name, 'image-create', 'a saved login link to the former home opens guest browsing')
     await router.push('/login?redirect=/dashboard')
     assert.equal(router.currentRoute.value.name, 'login', 'opening login from within the app preserves login intent')
-    for (const path of ['/image/create', '/image/create/poster', '/video/analyze', '/digital-human', '/merchant-alliance', '/merchant-alliance/join', '/information?category=supply', '/information/7', '/store/5', '/order/receipt', '/login']) {
+    for (const path of ['/image/create', '/image/create/poster', '/video/analyze', '/digital-human', '/store/5', '/order/receipt', '/login']) {
       signedIn()
       await router.push(path)
       const previous = router.currentRoute.value.fullPath
@@ -108,7 +110,7 @@ test('expired sessions preserve guest browsing and require login only for privat
       assert.equal(auth.isAuthenticated, false)
       assert.equal(router.currentRoute.value.fullPath, previous, 'session expiry must preserve guest access to ' + path)
     }
-    for (const path of ['/dashboard', '/works', '/information-publishing', '/tasks?status=running']) {
+    for (const path of ['/dashboard', '/works', '/tasks?status=running']) {
       signedIn()
       await router.push(path)
       await handleAuthExpired()

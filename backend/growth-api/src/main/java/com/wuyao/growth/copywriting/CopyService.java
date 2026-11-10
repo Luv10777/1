@@ -26,7 +26,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** 文案创作：每次写 3 条，预占 1 烟火，成功扣除，失败退回；改写不另收费，每批最多 5 次；定稿收进门店志。 */
+/** 文案创作：每次写 3 条，预占 3 烟火，成功扣除，失败退回；改写不另收费，每批最多 5 次；定稿收进门店志。 */
 @Service
 @RequiredArgsConstructor
 public class CopyService {

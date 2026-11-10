@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** 视频工作台「帮我出方案」：每次出 3 个版本，预占 1 烟火，成功扣除，失败或校验不过退回。 */
+/** 视频工作台「帮我出方案」：每次出 3 个版本，预占 3 烟火，成功扣除，失败或校验不过退回。 */
 @Service
 @RequiredArgsConstructor
 public class VideoPlanService {
@@ -76,7 +76,7 @@ public class VideoPlanService {
         plan.setSceneKey(scene);
         plan.setPreviousPlanId(request.previousPlanId());
         plan.setBillingReservationId(billing.reserve("video-plan:" + request.requestKey(), "VIDEO_PLAN",
-                BillingService.VIDEO_PLAN_CREDITS, (request.previousPlanId() == null ? "视频方案" : "视频方案换一批") + " · 预占 1 烟火"));
+                BillingService.VIDEO_PLAN_CREDITS, (request.previousPlanId() == null ? "视频方案" : "视频方案换一批") + " · 预占 " + BillingService.VIDEO_PLAN_CREDITS + " 烟火"));
         plans.saveAndFlush(plan);
         Task task = tasks.submit(VideoPlanGenerateHandler.TYPE, "DEFAULT", Map.of("planId", plan.getId()),
                 "video-plan-generate-" + plan.getId(), userId);

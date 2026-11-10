@@ -65,7 +65,7 @@ class CopyServiceTest {
         configured();
         when(products.get(4L, 1L)).thenReturn(new ProductDtos.View(4L, 9L, "招牌牛肉面", "PHYSICAL", "面", new BigDecimal("28.00"), "碗",
                 null, "第二碗半价", null, "ACTIVE", null, null, 0L, null, null, List.of(), List.of()));
-        when(billing.reserve(eq("copy-generate:copy-key-1"), eq("COPY"), eq(1L), anyString())).thenReturn("r1");
+        when(billing.reserve(eq("copy-generate:copy-key-1"), eq("COPY"), eq((long) BillingService.COPY_CREDITS), anyString())).thenReturn("r1");
         when(batches.saveAndFlush(any())).thenAnswer(call -> { CopyBatch b = call.getArgument(0); b.setId(7L); return b; });
         var task = new Task(); task.setId(70L);
         when(tasks.submit(eq(CopyGenerateHandler.TYPE), eq("DEFAULT"), eq(Map.of("batchId", 7L)), eq("copy-generate-7"), eq(1L))).thenReturn(task);
@@ -123,7 +123,7 @@ class CopyServiceTest {
         when(batches.lock(7L)).thenReturn(Optional.of(batch));
         assertThat(service.completed(7L, task, List.of(Map.of("body", "a"), Map.of("body", "b")))).isTrue();
         assertThat(batch.getStatus()).isEqualTo("SUCCEEDED");
-        verify(billing).capture(eq("r1"), eq(1L), eq("copy-generate:7:capture"), anyString());
+        verify(billing).capture(eq("r1"), eq((long) BillingService.COPY_CREDITS), eq("copy-generate:7:capture"), anyString());
     }
 
     @Test void rewriteMarksTheVersionAndCountsTowardsTheLimit() {

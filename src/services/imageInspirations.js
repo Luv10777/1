@@ -1,6 +1,6 @@
 import { get, post } from '../utils/request.js'
 
-/** 灵感绘图「灵感方案」：看参考图出 3 个画面描述，每次（含换一批）1 烟火，失败退回。 */
+/** 灵感绘图「灵感方案」：看参考图出 3 个画面描述，每次（含换一批）3 烟火，失败退回。 */
 export const imageInspirationApi = {
   config: () => get('/api/image/inspirations/config'),
   create: request => post('/api/image/inspirations', request),

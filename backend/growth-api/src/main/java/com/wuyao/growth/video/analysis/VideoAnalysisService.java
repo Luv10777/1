@@ -87,7 +87,7 @@ public class VideoAnalysisService {
         analysis.setReverseNeed(need);
         analysis.setAssetId(asset.getId());
         analysis.setBillingReservationId(billing.reserve("video-analysis:" + request.requestKey(), "VIDEO_ANALYSIS",
-                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 1 烟火"));
+                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 " + BillingService.VIDEO_ANALYSIS_CREDITS + " 烟火"));
         analyses.saveAndFlush(analysis);
         Task task = tasks.submit(VideoAnalysisPrepareHandler.TYPE, "MEDIA_CPU", Map.of("analysisId", analysis.getId()),
                 "video-analysis-prepare-" + analysis.getId(), userId);
@@ -117,7 +117,7 @@ public class VideoAnalysisService {
             return view(prior, true);
         }
         String reservation = billing.reserve("video-analysis:" + request.requestKey(), "VIDEO_ANALYSIS",
-                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 1 烟火");
+                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 " + BillingService.VIDEO_ANALYSIS_CREDITS + " 烟火");
         var asset = new Asset();
         asset.setTenantId(TenantContext.require()); asset.setCreatedBy(userId);
         asset.setName("链接视频.mp4"); asset.setType("VIDEO"); asset.setMimeType("video/mp4");

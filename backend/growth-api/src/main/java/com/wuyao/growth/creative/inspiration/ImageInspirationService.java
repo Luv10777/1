@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** 灵感绘图「灵感方案」：每次出 3 个画面描述，预占 1 烟火，成功扣除，失败或校验不过退回。 */
+/** 灵感绘图「灵感方案」：每次出 3 个画面描述，预占 3 烟火，成功扣除，失败或校验不过退回。 */
 @Service
 @RequiredArgsConstructor
 public class ImageInspirationService {
@@ -71,7 +71,7 @@ public class ImageInspirationService {
         inspiration.setIdea(idea);
         inspiration.setPreviousId(request.previousId());
         inspiration.setBillingReservationId(billing.reserve("image-inspiration:" + request.requestKey(), CAPABILITY,
-                BillingService.IMAGE_INSPIRATION_CREDITS, (request.previousId() == null ? "灵感方案" : "灵感方案换一批") + " · 预占 1 烟火"));
+                BillingService.IMAGE_INSPIRATION_CREDITS, (request.previousId() == null ? "灵感方案" : "灵感方案换一批") + " · 预占 " + BillingService.IMAGE_INSPIRATION_CREDITS + " 烟火"));
         inspirations.saveAndFlush(inspiration);
         Task task = tasks.submit(ImageInspirationGenerateHandler.TYPE, "DEFAULT", Map.of("inspirationId", inspiration.getId()),
                 "image-inspiration-generate-" + inspiration.getId(), userId);

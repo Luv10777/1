@@ -1,6 +1,6 @@
 import { get, post, put } from '../utils/request.js'
 
-/** 文案创作：看图或一句话，给朋友圈、抖音、小红书写 3 条配文。每次（含换一批）1 烟火，失败退回；改写不另收费。 */
+/** 文案创作：看图或一句话，给朋友圈、抖音、小红书写 3 条配文。每次（含换一批）3 烟火，失败退回；改写不另收费。 */
 export const copyApi = {
   config: () => get('/api/copy/config'),
   almanac: storeId => get('/api/copy/almanac/today', { storeId }),

@@ -1,6 +1,6 @@
 import { get, post } from '../utils/request.js'
 
-/** 视频工作台「帮我出方案」：看参考图出 3 个版本的提示词与分镜，每次（含换一批）1 烟火，失败退回。 */
+/** 视频工作台「帮我出方案」：看参考图出 3 个版本的提示词与分镜，每次（含换一批）3 烟火，失败退回。 */
 export const videoPlanApi = {
   config: () => get('/api/video/plans/config'),
   create: request => post('/api/video/plans', request),

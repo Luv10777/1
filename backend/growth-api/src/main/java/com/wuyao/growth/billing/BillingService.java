@@ -17,14 +17,16 @@ import java.util.UUID;
 
 @Service @RequiredArgsConstructor
 public class BillingService {
-    public static final int IMAGE_CREDITS = 3;
-    public static final int VIDEO_ANALYSIS_CREDITS = 1;
-    public static final int VIDEO_PLAN_CREDITS = 1;
-    public static final int IMAGE_INSPIRATION_CREDITS = 1;
-    public static final int COPY_CREDITS = 1;
+    public static final int IMAGE_CREDITS = 9;
+    public static final int VIDEO_ANALYSIS_CREDITS = 3;
+    public static final int VIDEO_PLAN_CREDITS = 3;
+    public static final int IMAGE_INSPIRATION_CREDITS = 3;
+    public static final int COPY_CREDITS = 3;
     /** Live sessions reserve one hour at a time and settle by the minute. */
-    public static final int LIVE_CREDITS_PER_HOUR = 35;
+    public static final int LIVE_CREDITS_PER_HOUR = 105;
     public static final int CREDITS_PER_YUAN = 10;
+    /** Online top-ups start at 500 yuan. Redeem codes and operator grants are not top-up orders. */
+    public static final long MIN_TOPUP_MINOR = 50_000;
     /** One operator grant is capped at 10,000 yuan worth of credits. */
     public static final long MAX_GRANT_CREDITS = 100_000;
     private final BillingStore store;
@@ -53,8 +55,8 @@ public class BillingService {
 
     @Transactional
     public BillingDtos.OrderView topUp(BillingDtos.TopUp input) {
-        if(input.amountMinor()<100 || input.amountMinor()>10000000 || input.amountMinor()%100!=0)
-            throw bad("充值金额须为 1 至 100,000 元的整数");
+        if(input.amountMinor()<MIN_TOPUP_MINOR || input.amountMinor()>10000000 || input.amountMinor()%100!=0)
+            throw bad("充值金额须为 500 至 100,000 元的整数");
         store.lockAccount();
         var old=store.orderByKey(input.requestKey());
         if(old.isPresent()) {

@@ -9,7 +9,7 @@ import java.time.Instant;
 
 /**
  * 直播按「直播中」的时长计费，暂停不计。开播先预占一小时烟火，快用完时再预占下一小时；
- * 结束时按分钟结算（每分钟 35/60 烟火，向上取整），没用完的退回。
+ * 结束时按分钟结算（每分钟 105/60 烟火，向上取整），没用完的退回。
  * 调用方都在同一事务里，并且先锁账户、再锁场次，和烟火模块的加锁顺序一致。
  */
 @Component
@@ -101,7 +101,7 @@ public class LiveBilling {
         return Math.ceilDiv(seconds, 60);
     }
 
-    /** 每分钟 35/60 烟火，整场向上取整。 */
+    /** 每分钟 105/60 烟火，整场向上取整。 */
     static long charge(long seconds) {
         return Math.ceilDiv(minutes(seconds) * BillingService.LIVE_CREDITS_PER_HOUR, 60);
     }

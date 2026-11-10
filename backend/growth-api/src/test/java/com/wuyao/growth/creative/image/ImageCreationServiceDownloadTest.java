@@ -42,7 +42,7 @@ class ImageCreationServiceDownloadTest {
         fixture.service.markImagePersisted(8L, fixture.task, fixture.storageKey, 2048, 2048, null);
 
         assertThat(fixture.item.getPreviewedAt()).isEqualTo(previewedAt);
-        verify(fixture.billing).capture("reservation", 3, "image-delivered:8:0", "图片成功交付 · 1 张");
+        verify(fixture.billing).capture("reservation", BillingService.IMAGE_CREDITS, "image-delivered:8:0", "图片成功交付 · 1 张");
         verify(fixture.billing, never()).releaseAmount(anyString(), anyLong(), anyString(), anyString());
     }
 
@@ -58,11 +58,11 @@ class ImageCreationServiceDownloadTest {
         assertThat(fixture.item.getStatus()).isEqualTo("INTERRUPTED");
         assertThat(fixture.item.isBillingHeld()).isFalse();
         if (visible) {
-            verify(fixture.billing).capture("reservation", 3, "image-delivered:8:0", "图片成功交付 · 1 张");
+            verify(fixture.billing).capture("reservation", BillingService.IMAGE_CREDITS, "image-delivered:8:0", "图片成功交付 · 1 张");
             verify(fixture.billing, never()).releaseAmount(anyString(), anyLong(), anyString(), anyString());
             assertThat(fixture.item.getError()).doesNotContain("退回");
         } else {
-            verify(fixture.billing).releaseAmount("reservation", 3, "image-task-failed:12", "图片未交付 · 退回 3 烟火");
+            verify(fixture.billing).releaseAmount("reservation", BillingService.IMAGE_CREDITS, "image-task-failed:12", "图片未交付 · 退回 " + BillingService.IMAGE_CREDITS + " 烟火");
             verify(fixture.billing, never()).capture(anyString(), anyLong(), anyString(), anyString());
         }
     }
@@ -75,7 +75,7 @@ class ImageCreationServiceDownloadTest {
         fixture.service.cancel(7L);
 
         var order = inOrder(fixture.billing);
-        order.verify(fixture.billing).capture("reservation", 3, "image-delivered:8:0", "图片成功交付 · 1 张");
+        order.verify(fixture.billing).capture("reservation", BillingService.IMAGE_CREDITS, "image-delivered:8:0", "图片成功交付 · 1 张");
         order.verify(fixture.billing).release("reservation", "image-terminal:7:0", "图片创作结束 · 退回未交付烟火");
         assertThat(fixture.item.isBillingHeld()).isFalse();
     }
@@ -87,7 +87,7 @@ class ImageCreationServiceDownloadTest {
 
         fixture.service.taskFailed(fixture.failure());
 
-        verify(fixture.billing).capture("reservation", 3, "image-delivered:8:0", "图片成功交付 · 1 张");
+        verify(fixture.billing).capture("reservation", BillingService.IMAGE_CREDITS, "image-delivered:8:0", "图片成功交付 · 1 张");
         verify(fixture.billing, never()).releaseAmount(anyString(), anyLong(), anyString(), anyString());
     }
 
@@ -106,7 +106,7 @@ class ImageCreationServiceDownloadTest {
         assertThat(fixture.item.getStatus()).isEqualTo("SUCCEEDED");
         assertThat(fixture.item.getGeneration()).isZero();
         verify(fixture.billing, never()).reserveMore(anyString(), anyLong(), anyString(), anyString());
-        verify(fixture.billing).capture("reservation", 3, "image-delivered:8:0", "图片成功交付 · 1 张");
+        verify(fixture.billing).capture("reservation", BillingService.IMAGE_CREDITS, "image-delivered:8:0", "图片成功交付 · 1 张");
     }
 
     @Test
