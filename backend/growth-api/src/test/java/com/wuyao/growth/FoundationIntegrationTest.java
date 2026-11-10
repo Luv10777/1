@@ -236,7 +236,7 @@ class FoundationIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks", Long.class)).isZero();
         mvc.perform(get("/api/billing/summary").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.memberActive").value(false))
-                .andExpect(jsonPath("$.data.videoAnalysisCredits").value(1));
+                .andExpect(jsonPath("$.data.videoAnalysisCredits").value(BillingService.VIDEO_ANALYSIS_CREDITS));
         mvc.perform(get("/api/billing/plans").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
     }
