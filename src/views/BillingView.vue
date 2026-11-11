@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, Copy, RefreshCw, Wallet, X } from 'lucide-vue-next'
+import { Check, Copy, KeyRound, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
 import BillingCheckoutTerms from '../components/BillingCheckoutTerms.vue'
@@ -200,13 +200,47 @@ const buyCode = async (plan) => {
   catch (e) { error.value = e.message || '激活码订单创建失败' }
   finally { busy.value = false }
 }
-// 买到的码直接用于本账号：填进输入框兑换，和手动输入一样。
-const useCode = async (code) => {
-  redeemCode.value = code
-  closePayment()
-  await redeem()
-  await loadPurchased()
+// 输入激活码单独一个弹窗，和下方的兑换烟火分开；接口是同一个，按返回的种类显示结果。
+const activateDialog = ref(null)
+const activateInput = ref(null)
+const activateCode = ref('')
+const activating = ref(false)
+const activateError = ref('')
+const activateResult = ref(null)
+// 边输边按 4 位加横线，和激活码的印刷格式一致；大小写和横线都不影响兑换。
+const onActivateInput = event => {
+  const raw = event.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 16)
+  activateCode.value = formatRedeemCode(raw)
 }
+const activateReady = computed(() => activateCode.value.replace(/-/g, '').length === 16)
+const openActivate = async (code = '') => {
+  closePayment()
+  activateCode.value = code ? formatRedeemCode(code) : ''
+  activateError.value = ''
+  activateResult.value = null
+  await nextTick()
+  activateDialog.value?.showModal()
+  activateInput.value?.focus()
+}
+const closeActivate = () => {
+  activateDialog.value?.close()
+  if (route.query.activate) router.replace({ query: { ...route.query, activate: undefined } })
+}
+const activate = async () => {
+  if (!activateReady.value || activating.value) return
+  activating.value = true; activateError.value = ''
+  try {
+    activateResult.value = await billingApi.redeem(activateCode.value)
+    activateCode.value = ''
+    await refreshBilling()
+    await loadPurchased()
+  }
+  catch (e) { activateError.value = e.message || '激活失败，请核对激活码后重试' }
+  finally { activating.value = false }
+}
+const buyFromActivate = () => { closeActivate(); openBuy() }
+// 买到的码用于本账号：打开激活弹窗并填好码，确认后激活。
+const useCode = code => openActivate(code)
 const cancelPayment = async () => {
   if (!payment.value || paymentLoading.value) return
   paymentLoading.value = true
@@ -224,6 +258,7 @@ onMounted(async () => {
   }
   if (disposed) return
   if (route.query.topup && account.value) openTopup()
+  else if (route.query.activate && account.value) openActivate()
   balanceTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBilling() }, 30000)
   globalThis.window?.addEventListener('focus', checkOnReturn)
   globalThis.document?.addEventListener?.('visibilitychange', checkOnReturn)
@@ -263,7 +298,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <p v-if="copied" class="yanhuo-card-meta yanhuo-copied" role="status">{{ copied }}</p>
           <div class="yanhuo-account-actions">
             <button v-if="billing.plans.length && account.canManage" type="button" class="yanhuo-primary" :disabled="!canPay" @click="openBuy">购买激活码</button>
-            <a href="#activation-code" class="yanhuo-secondary">{{ account.memberActive ? '输入激活码续期' : '输入激活码' }}</a>
+            <button type="button" class="yanhuo-secondary" @click="openActivate()">{{ account.memberActive ? '输入激活码续期' : '输入激活码' }}</button>
           </div>
         </article>
         <article class="yanhuo-card yanhuo-balance-card">
@@ -276,10 +311,10 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         </article>
       </section>
 
-      <section id="activation-code" class="yanhuo-section" aria-labelledby="redeem-title">
-        <header class="yanhuo-section-head"><h2 id="redeem-title">激活码 / 兑换码</h2><p>输入激活码激活账号，输入兑换码烟火立即到账；都是全店共用，每个码只能使用一次。</p></header>
+      <section class="yanhuo-section" aria-labelledby="redeem-title">
+        <header class="yanhuo-section-head"><h2 id="redeem-title">兑换烟火</h2><p>输入平台发放的兑换码，烟火立即到账、全店共用；每个兑换码只能使用一次。激活码请点上方「输入激活码」。</p></header>
         <form class="yanhuo-redeem" @submit.prevent="redeem">
-          <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="激活码或兑换码">
+          <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="兑换码">
           <button class="yanhuo-primary" type="submit" :disabled="redeeming || !redeemCode.trim()">{{ redeeming ? '兑换中…' : '兑换' }}</button>
         </form>
         <p v-if="redeemResult?.kind === 'MEMBERSHIP'" class="yanhuo-redeem-done" role="status">已激活（{{ redeemResult.planName }}），有效期至 {{ dateTime(redeemResult.memberUntil) }}。</p>
@@ -318,7 +353,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <template v-if="account">
         <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="topup-title">充值烟火</h2><button class="yanhuo-icon" type="button" aria-label="关闭充值窗口" title="关闭" @click="closeTopup"><X :size="20" /></button></header>
         <p class="yanhuo-topup-rate">1 元 = {{ account.creditsPerYuan }} 烟火，充值的烟火长期有效。</p>
-        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。账号激活后才能使用功能，请先<a href="#activation-code" class="yanhuo-link" @click="closeTopup">输入激活码</a>。</p>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。账号激活后才能使用功能，请先<button type="button" class="yanhuo-link" @click="closeTopup(); openActivate()">输入激活码</button>。</p>
         <form class="yanhuo-topup-form" @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }}</small></label></fieldset>
           <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额（{{ MIN_TOPUP_YUAN }} 元起）</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" :min="MIN_TOPUP_YUAN" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>
@@ -339,6 +374,41 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <div v-if="topupResult.now !== null" class="total"><dt>现在烟火</dt><dd><YanhuoIcon :size="18" />{{ number(topupResult.now) }}</dd></div>
         </dl>
         <button class="yanhuo-primary" type="button" @click="closeSuccess">完成</button>
+      </template>
+    </dialog>
+    <dialog ref="activateDialog" class="yanhuo-payment yanhuo-activate" aria-labelledby="activate-title" @cancel.prevent="closeActivate" @click="event => { if (event.target === activateDialog) closeActivate() }">
+      <template v-if="account">
+        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="activate-title">输入激活码</h2><button class="yanhuo-icon" type="button" aria-label="关闭" title="关闭" @click="closeActivate"><X :size="20" /></button></header>
+        <template v-if="activateResult?.kind === 'MEMBERSHIP'">
+          <div class="yanhuo-activate-done" role="status">
+            <span class="yanhuo-success-mark"><Check :size="26" /></span>
+            <strong>激活成功</strong>
+            <p>{{ activateResult.planName }} · 有效期至 {{ dateTime(activateResult.memberUntil) }}</p>
+            <small>全店的账号都可以使用了，使用功能按烟火扣费。</small>
+          </div>
+          <button class="yanhuo-primary yanhuo-activate-submit" type="button" @click="closeActivate">完成</button>
+        </template>
+        <template v-else-if="activateResult">
+          <div class="yanhuo-activate-done" role="status">
+            <span class="yanhuo-success-mark"><Check :size="26" /></span>
+            <strong>这是一个兑换码</strong>
+            <p>已到账 {{ number(activateResult.credits) }} 烟火，当前可用 {{ number(activateResult.available) }}。</p>
+            <small>账号激活需要激活码，可以购买或向服务商获取。</small>
+          </div>
+          <button class="yanhuo-primary yanhuo-activate-submit" type="button" @click="closeActivate">完成</button>
+        </template>
+        <form v-else class="yanhuo-activate-form" @submit.prevent="activate">
+          <div class="yanhuo-activate-state" :class="{ active: account.memberActive }">
+            <KeyRound :size="18" />
+            <span>{{ account.memberActive ? `已激活，有效期至 ${dateTime(account.memberUntil)}；再输入激活码会在此基础上顺延。` : '账号未激活，输入激活码后即可使用全部功能。' }}</span>
+          </div>
+          <label for="activate-code">激活码</label>
+          <input id="activate-code" ref="activateInput" :value="activateCode" class="yanhuo-activate-input" autocomplete="off" spellcheck="false" inputmode="text" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" aria-describedby="activate-hint" @input="onActivateInput">
+          <p id="activate-hint" class="yanhuo-activate-hint">16 位字母和数字，大小写和横线不影响。激活对全店账号生效，每个码只能用一次。</p>
+          <p v-if="activateError" class="yanhuo-alert" role="alert">{{ activateError }}</p>
+          <button class="yanhuo-primary yanhuo-activate-submit" type="submit" :disabled="!activateReady || activating">{{ activating ? '正在激活…' : '激活' }}</button>
+          <p v-if="billing.plans.length && account.canManage" class="yanhuo-activate-buy">还没有激活码？<button type="button" class="yanhuo-link" @click="buyFromActivate">购买激活码</button></p>
+        </form>
       </template>
     </dialog>
     <dialog ref="planDialog" class="yanhuo-payment" aria-labelledby="plan-confirm-title" @cancel.prevent="closePlan" @click="event => { if (event.target === planDialog) closePlan() }">

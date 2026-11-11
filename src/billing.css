@@ -114,6 +114,22 @@ button.yanhuo-secondary { background: transparent; font-family: inherit; cursor:
 .yanhuo-redeem-input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--color-bg-surface); color: var(--ink); font-size: 15px; letter-spacing: .06em; text-transform: uppercase; }
 .yanhuo-redeem-input::placeholder { letter-spacing: .06em; color: var(--ink-muted); }
 .yanhuo-redeem-done { margin: 12px 0 0; font-size: 13px; color: var(--color-accent-text); }
+.yanhuo-activate-form { display: grid; gap: 10px; margin-top: 20px; }
+.yanhuo-activate-state { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; padding: 12px 14px; border-radius: 6px; background: var(--color-bg-subtle); color: var(--ink-muted); font-size: 13px; line-height: 1.7; }
+.yanhuo-activate-state svg { flex-shrink: 0; margin-top: 2px; }
+.yanhuo-activate-state.active { color: var(--green); background: color-mix(in srgb, var(--green) 8%, transparent); }
+.yanhuo-activate-form > label { font-size: 13px; color: var(--ink-muted); }
+.yanhuo-activate-input { width: 100%; height: 52px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 6px; background: var(--color-bg-surface); color: var(--ink); font-family: var(--font-mono, monospace); font-size: 20px; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
+.yanhuo-activate-input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.yanhuo-activate-input::placeholder { color: var(--ink-muted); opacity: .5; }
+.yanhuo-activate-hint { margin: 0; font-size: 12px; line-height: 1.7; color: var(--ink-muted); }
+.yanhuo-activate-submit { width: 100%; min-height: 44px; margin-top: 6px; }
+.yanhuo-activate-buy { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--ink-muted); }
+.yanhuo-activate-buy .yanhuo-link { display: inline; }
+.yanhuo-activate-done { display: grid; justify-items: center; gap: 8px; margin: 24px 0 12px; text-align: center; }
+.yanhuo-activate-done strong { font-size: 18px; font-weight: 600; }
+.yanhuo-activate-done p { margin: 0; font-size: 14px; }
+.yanhuo-activate-done small { font-size: 12px; color: var(--ink-muted); line-height: 1.7; }
 .yanhuo-codes { display: grid; border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-surface); }
 .yanhuo-code-row { display: grid; grid-template-columns: minmax(190px, 1.4fr) 1fr 70px 1fr 150px; align-items: center; gap: 12px; padding: 12px 16px; font-size: 13px; }
 .yanhuo-code-row + .yanhuo-code-row { border-top: 1px solid var(--line); }

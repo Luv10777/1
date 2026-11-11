@@ -19,7 +19,7 @@ onMounted(() => window.addEventListener('membership-required', showMembership))
 onBeforeUnmount(() => window.removeEventListener('membership-required', showMembership))
 function openMembership() {
   membershipOpen.value = false
-  router.push({ name: 'billing', query: { membership: 'required', redirect: route.fullPath, module: route.meta.title } })
+  router.push({ name: 'billing', query: { membership: 'required', activate: '1', redirect: route.fullPath, module: route.meta.title } })
 }
 </script>
 
