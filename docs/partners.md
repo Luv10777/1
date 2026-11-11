@@ -70,7 +70,8 @@ V79 新增 `partners`、`partner_members`、`partner_code_quotas`、`partner_ten
 1. 后端随 V79 发布（V78 激活码需同时或先行上线）。
 2. 构建服务商后台：`npm run build:partner`，产物在 `dist-partner/`。部署方式同管理后台（静态文件 + `/api/` 反向代理到 API，
    页面加 `X-Robots-Tag: noindex`），参照 `deploy/nginx.admin.conf`。
-3. 在阿里云给 `partner.yifangzhi.com` 加解析，配好 HTTPS 证书。页面和 `/api/` 同域（nginx 反向代理），和管理后台一样不走跨域。
+3. 在阿里云给 `partner.yifangzhi.com` 加解析，配好 HTTPS 证书。页面和 `/api/` 同域（nginx 反向代理），
+   但和 wy 子域名一样，要把 `https://partner.yifangzhi.com` 加进 API 配置的 `growth.cors.allowed-origins` 并重启 API，否则请求会被跨域校验拒绝。
 4. 在管理后台「会员套餐」上架月卡、季卡、年卡后，才能给服务商分额度。
 
 ## 未做
