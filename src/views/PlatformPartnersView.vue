@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { Check, ChevronRight, Plus, RefreshCw, Store, X } from 'lucide-vue-next'
 import { partnerAdminApi as api, ledgerTypes, tenantSources, validUid } from '../services/partnerApi'
-import { planAdminApi } from '../services/planAdminApi'
+import { activationPlans, planAdminApi } from '../services/planAdminApi'
 import { managementDate } from '../domain/platformManagement'
 import '../platform-management.css'
 
@@ -33,7 +33,7 @@ async function load() {
   try {
     const [list, planList] = await Promise.all([api.list(), planAdminApi.plans()])
     partners.value = list
-    plans.value = planList.filter(item => item.published).map(item => item.plan)
+    plans.value = activationPlans(planList)
     if (selectedId.value && !selected.value) selectedId.value = null
   } catch (failure) {
     partners.value = []
@@ -213,7 +213,7 @@ load()
           </form>
           <form class="partner-admin-form" @submit.prevent="saveQuota">
             <h3>激活码额度</h3>
-            <label>套餐<select v-model="quotaForm.planCode"><option value="" disabled>选择已上架的套餐</option><option v-for="plan in plans" :key="plan.code" :value="plan.code">{{ plan.name }} · {{ plan.durationDays }} 天</option></select></label>
+            <label>套餐<select v-model="quotaForm.planCode"><option value="" disabled>选择套餐</option><option v-for="plan in plans" :key="plan.code" :value="plan.code">{{ plan.name }} · {{ plan.durationDays }} 天</option></select></label>
             <label>总额度（个）<input v-model="quotaForm.quota" type="number" min="0" max="1000000" step="1" /><small>设的是总数，不能低于已经生成的个数。</small></label>
             <p v-if="quotaForm.error" class="mg-error" role="alert">{{ quotaForm.error }}</p>
             <div><button class="mg-button mg-primary" type="submit" :disabled="busy">保存额度</button></div>

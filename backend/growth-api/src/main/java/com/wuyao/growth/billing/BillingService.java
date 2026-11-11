@@ -28,7 +28,7 @@ public class BillingService {
     /** Online top-ups start at 500 yuan. Redeem codes and operator grants are not top-up orders. */
     public static final long MIN_TOPUP_MINOR = 50_000;
     /** 账号未激活时，所有功能的写操作都返回这句话（错误码 MEMBERSHIP_REQUIRED）。 */
-    public static final String MEMBERSHIP_REQUIRED_MESSAGE = "账号还未激活，请在「套餐与权益」开通会员或输入激活码";
+    public static final String MEMBERSHIP_REQUIRED_MESSAGE = "账号还未激活，请在「套餐与权益」输入激活码";
     /** One operator grant is capped at 10,000 yuan worth of credits. */
     public static final long MAX_GRANT_CREDITS = 100_000;
     private final BillingStore store;
@@ -271,6 +271,16 @@ public class BillingService {
             ledger(a,key,"GRANT",plan.name()+" · 激活码开通",0,0,0,null,null);
         }
         return new BillingDtos.Redeemed("MEMBERSHIP",0,a.available(),a.getPlanSnapshot().name(),a.getMemberUntil());
+    }
+    /**
+     * 可以生成激活码的套餐：每个套餐标识取最新的版本，上没上架都算。2026-11-11 起站内不卖套餐，
+     * 月卡、季卡、年卡只作为激活码的模板，不上架。
+     */
+    @Transactional(readOnly=true)
+    public List<BillingDtos.PlanSnapshot> activationPlans() {
+        var latest=new java.util.LinkedHashMap<String,BillingPlan>();
+        for(var p:store.plans(true)) latest.merge(p.getCode(),p,(a,b)->a.getId()>b.getId()?a:b);
+        return latest.values().stream().map(BillingPlan::snapshot).toList();
     }
     /** 激活码引用的套餐版本，下架的也能查到：已生成的码按生成时的版本开通。 */
     @Transactional(readOnly=true)

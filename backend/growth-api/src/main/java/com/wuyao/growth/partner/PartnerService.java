@@ -78,13 +78,13 @@ public class PartnerService {
     }
 
     /**
-     * 在额度内生成激活码，按该套餐标识当前上架的版本开通。额度扣减和生成在同一事务；同一 requestKey 重复提交返回第一次那批，不再扣额度。
+     * 在额度内生成激活码，按该套餐标识最新的版本开通。额度扣减和生成在同一事务；同一 requestKey 重复提交返回第一次那批，不再扣额度。
      */
     @Transactional
     public List<BillingDtos.RedeemCodeView> createCodes(Long userId, PartnerDtos.NewCodes input) {
         var partner = requirePartner(userId);
-        var plan = billing.plans().stream().filter(p -> p.code().equals(input.planCode())).findFirst()
-                .orElseThrow(() -> bad("该套餐未上架，不能生成激活码"));
+        var plan = billing.activationPlans().stream().filter(p -> p.code().equals(input.planCode())).findFirst()
+                .orElseThrow(() -> bad("没有这个套餐，不能生成激活码"));
         var quota = store.lockQuota(partner.id(), input.planCode())
                 .orElseThrow(() -> bad("平台还没有给你分配「" + plan.name() + "」的激活码额度"));
         String batch = "partner-" + partner.id() + "-" + input.requestKey();
@@ -108,9 +108,9 @@ public class PartnerService {
         return partner;
     }
 
-    /** 额度按套餐标识列出，套餐名和天数取当前上架的版本。 */
+    /** 额度按套餐标识列出，套餐名和天数取最新的版本。 */
     List<PartnerDtos.Quota> quotas(Long partnerId) {
-        Map<String, BillingDtos.PlanSnapshot> plans = billing.plans().stream()
+        Map<String, BillingDtos.PlanSnapshot> plans = billing.activationPlans().stream()
                 .collect(Collectors.toMap(BillingDtos.PlanSnapshot::code, p -> p, (a, b) -> a));
         return store.quotas(partnerId).stream().map(q -> {
             var plan = plans.get(q.planCode());

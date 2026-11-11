@@ -239,12 +239,14 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           <h2>{{ account.plan?.name || '尚未订阅套餐' }}</h2>
           <p v-if="account.memberUntil" class="yanhuo-card-meta">有效期至 {{ dateTime(account.memberUntil) }}</p>
           <p v-if="auth.user?.uid" class="yanhuo-card-meta">我的用户 ID：<strong class="yanhuo-uid">{{ auth.user.uid }}</strong>（服务商添加你时使用）</p>
-          <p v-else class="yanhuo-card-meta">未激活的账号只能查看。购买会员或输入激活码后即可使用全部功能，使用时按烟火计费。</p>
+          <p v-else class="yanhuo-card-meta">未激活的账号只能查看。在下方输入激活码即可使用全部功能，使用时按烟火计费。</p>
           <ul class="yanhuo-entitlements">
             <li :class="{ enabled: account.memberActive }"><Check :size="14" />图片、视频、文案（按烟火）</li>
             <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />AI 实景直播</li>
           </ul>
-          <a href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '购买会员' }}</a>
+          <!-- 站内不卖套餐时（没有上架的套餐）只能用激活码开通和续期。 -->
+          <a v-if="billing.plans.length" href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '购买会员' }}</a>
+          <a v-else href="#activation-code" class="yanhuo-secondary">{{ account.memberActive ? '输入激活码续期' : '输入激活码' }}</a>
         </article>
         <article class="yanhuo-card yanhuo-balance-card">
           <div class="yanhuo-card-head">
@@ -256,7 +258,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         </article>
       </section>
 
-      <section class="yanhuo-section" aria-labelledby="redeem-title">
+      <section id="activation-code" class="yanhuo-section" aria-labelledby="redeem-title">
         <header class="yanhuo-section-head"><h2 id="redeem-title">激活码 / 兑换码</h2><p>输入激活码开通会员，输入兑换码烟火立即到账；都是全店共用，每个码只能使用一次。</p></header>
         <form class="yanhuo-redeem" @submit.prevent="redeem">
           <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="激活码或兑换码">
@@ -267,7 +269,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
         <div v-if="redeemError" class="yanhuo-alert" role="alert">{{ redeemError }}</div>
       </section>
 
-      <section id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">
+      <section v-if="billing.plans.length || plansError" id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">
         <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>开通会员后即可使用全部功能，使用时按烟火计费；也可以在上方输入激活码开通。</p></header>
         <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
         <div v-else-if="!billing.plans.length" class="yanhuo-card yanhuo-empty"><img src="/images/brand/yifangzhi-mark.png" alt="" width="36" height="36"><h3>套餐尚未开放</h3><p>正式套餐公布后，可在这里订阅。</p></div>
@@ -298,7 +300,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <template v-if="account">
         <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="topup-title">充值烟火</h2><button class="yanhuo-icon" type="button" aria-label="关闭充值窗口" title="关闭" @click="closeTopup"><X :size="20" /></button></header>
         <p class="yanhuo-topup-rate">1 元 = {{ account.creditsPerYuan }} 烟火，充值的烟火长期有效。</p>
-        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。账号激活后才能使用功能，请先<a href="#member-plans" class="yanhuo-link" @click="closeTopup">购买会员</a>或输入激活码。</p>
+        <p v-if="account.canManage && !account.memberActive" class="yanhuo-alert yanhuo-topup-warning" role="status">充值只增加烟火余额，不会开通会员。账号激活后才能使用功能，请先<a href="#activation-code" class="yanhuo-link" @click="closeTopup">输入激活码</a>。</p>
         <form class="yanhuo-topup-form" @submit.prevent="topUp">
           <fieldset class="yanhuo-amounts"><legend class="sr-only">充值金额</legend><label v-for="value in preset" :key="value" :class="{ selected: amount === value }"><input v-model="amount" type="radio" :value="value" name="topup-amount"><span>{{ yuan(value * 100) }}</span><small><YanhuoIcon :size="12" />{{ number(value * account.creditsPerYuan) }}</small></label></fieldset>
           <div class="yanhuo-topup-row"><label class="yanhuo-custom"><span>自定义金额（{{ MIN_TOPUP_YUAN }} 元起）</span><span class="yanhuo-money-input"><span>¥</span><input v-model.number="amount" inputmode="numeric" type="number" :min="MIN_TOPUP_YUAN" max="100000" step="1" required aria-label="充值金额，单位元"></span></label><div class="yanhuo-topup-total"><span>到账烟火</span><strong><YanhuoIcon :size="20" />{{ number(topupCredits) }}</strong></div></div>

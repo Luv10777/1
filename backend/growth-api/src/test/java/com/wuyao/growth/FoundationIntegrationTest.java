@@ -407,7 +407,7 @@ class FoundationIntegrationTest {
     }
 
     private void setUpPaidBillingFixtures() {
-        owner.execute("TRUNCATE billing_plans RESTART IDENTITY");
+        owner.execute("TRUNCATE billing_plans RESTART IDENTITY CASCADE");
         owner.update("INSERT INTO users(id,tenant_id,phone) VALUES (-1,?, '13999999999')", tenantA);
         billingConfig.setOperatorUserIds(List.of(-1L));
         billingConfig.setPaymentMethod("MANUAL");

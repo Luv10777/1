@@ -163,12 +163,12 @@ class BillingRedeemCodeIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM tasks WHERE type='REFERRAL_COMMISSION'", Long.class)).isZero();
         redeem(shopOwner, shop, yearCode).andExpect(jsonPath("$.message").value("你已兑换过这个兑换码"));
 
-        // 已生成的码按生成时的套餐版本开通，套餐下架后照样能用；但下架的套餐不能再生成。
+        // 站内不卖的套餐不上架，照样能生成和兑换激活码。
         billing.publish(month.id(), false);
         redeem(cafeOwner, cafe, monthCodes.get(1).code()).andExpect(status().isOk()).andExpect(jsonPath("$.data.planName").value("月卡"));
         assertThat(codes.list(0, 20, "REDEEMED", "MEMBERSHIP", null).total()).isEqualTo(3);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 1, null, null, month.id()), operator))
-                .hasMessage("该套餐未上架，不能生成激活码");
+        assertThat(codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 1, null, null, month.id()), operator))
+                .singleElement().satisfies(c -> assertThat(c.planName()).isEqualTo("月卡"));
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 10, 0, 1, null, null, year.id()), operator))
                 .hasMessage("激活码不送烟火");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "MEMBERSHIP", 0, 0, 1, null, null, null), operator))

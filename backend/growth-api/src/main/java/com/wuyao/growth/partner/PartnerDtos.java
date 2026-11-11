@@ -9,7 +9,7 @@ public final class PartnerDtos {
     private PartnerDtos() {}
 
     public record Partner(Long id, String name, String contact, String status, long creditsAvailable, Instant createdAt) {}
-    /** 一个套餐标识的激活码额度；planName、durationDays 取当前上架的版本，没有上架版本时为空，不能生成。 */
+    /** 一个套餐标识的激活码额度；planName、durationDays 取该标识最新的版本。 */
     public record Quota(String planCode, String planName, Integer durationDays, int quota, int used, int remaining) {}
     public record Overview(Partner partner, List<Quota> quotas, long tenantCount) {}
     public record Member(Long userId, Long uid, String name, String phone, Instant createdAt) {}

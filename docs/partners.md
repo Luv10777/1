@@ -40,7 +40,7 @@
 ### 激活码
 
 - 额度按套餐标识设（`partner_code_quotas`），平台设的是总数，不能低于已经生成的个数。
-- 服务商生成时选套餐和数量，按该标识**当前上架**的版本生成，额度扣减和生成在同一事务；同一请求重复提交返回同一批码，不重复扣额度。
+- 服务商生成时选套餐和数量，按该标识**最新**的版本生成（上没上架都行，站内不卖的套餐不上架），额度扣减和生成在同一事务；同一请求重复提交返回同一批码，不重复扣额度。
 - 服务商生成的码记在 `billing_redeem_codes.partner_id`，和平台生成的激活码一样一码一用；兑换后按上面的规则决定归属。
 
 ## 数据
@@ -72,7 +72,7 @@ V79 新增 `partners`、`partner_members`、`partner_code_quotas`、`partner_ten
    页面加 `X-Robots-Tag: noindex`），参照 `deploy/nginx.admin.conf`。
 3. 在阿里云给 `partner.yifangzhi.com` 加解析，配好 HTTPS 证书。页面和 `/api/` 同域（nginx 反向代理），
    但和 wy 子域名一样，要把 `https://partner.yifangzhi.com` 加进 API 配置的 `growth.cors.allowed-origins` 并重启 API，否则请求会被跨域校验拒绝。
-4. 在管理后台「会员套餐」上架月卡、季卡、年卡后，才能给服务商分额度。
+4. 在管理后台「会员套餐」新建月卡、季卡、年卡（不上架）后，才能给服务商分额度。
 
 ## 未做
 

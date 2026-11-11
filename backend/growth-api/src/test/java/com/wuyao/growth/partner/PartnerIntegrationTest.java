@@ -107,7 +107,9 @@ class PartnerIntegrationTest {
         String batch = "{\"requestKey\":\"codes-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":2}";
         String first = call(agentA, agency, post("/api/partner/codes"), batch).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2)).andReturn().getResponse().getContentAsString();
-        call(agentA, agency, post("/api/partner/codes"), batch).andExpect(content().string(first));
+        // 重复提交返回同一批码（只比码：第一次返回的时间带纳秒，再读出来是数据库的微秒）。
+        call(agentA, agency, post("/api/partner/codes"), batch).andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].code").value(codeAt(first, 0))).andExpect(jsonPath("$.data[1].code").value(codeAt(first, 1)));
         call(agentA, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-0002\",\"planCode\":\"" + planCode + "\",\"quantity\":1}")
                 .andExpect(status().isBadRequest());
         assertThat(owner.queryForObject("SELECT used FROM partner_code_quotas WHERE partner_id=?", Integer.class, a)).isEqualTo(2);
@@ -172,6 +174,12 @@ class PartnerIntegrationTest {
 
     private long user(long tenant, String username, String name) {
         return owner.queryForObject("INSERT INTO users(tenant_id,username,name) VALUES (?,?,?) RETURNING id", Long.class, tenant, username, name);
+    }
+
+    private static String codeAt(String json, int index) {
+        var m = java.util.regex.Pattern.compile("\"code\":\"([0-9A-Z]{16})\"").matcher(json);
+        for (int i = 0; i <= index; i++) assertThat(m.find()).isTrue();
+        return m.group(1);
     }
 
     private long uid(long user) { return owner.queryForObject("SELECT uid FROM users WHERE id=?", Long.class, user); }

@@ -80,7 +80,7 @@ public class PartnerPlatformService {
     public PartnerDtos.PlatformPartner setQuota(Long partnerId, PartnerDtos.SetQuota input, Long operator) {
         requireOperator(operator);
         var row = store.lockPartner(partnerId);
-        if (billing.plans().stream().noneMatch(p -> p.code().equals(input.planCode()))) throw PartnerService.bad("该套餐未上架，不能分配额度");
+        if (billing.activationPlans().stream().noneMatch(p -> p.code().equals(input.planCode()))) throw PartnerService.bad("没有这个套餐，不能分配额度");
         store.setQuota(partnerId, input.planCode(), input.quota());
         return view(row);
     }

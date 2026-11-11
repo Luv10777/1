@@ -44,10 +44,10 @@ function openMembership() {
     <div class="membership-position">
       <DialogPanel class="membership-panel">
         <DialogTitle as="h2">账号还未激活</DialogTitle>
-        <DialogDescription as="p">未激活的账号只能查看。购买会员，或在「套餐与权益」输入激活码，激活后即可使用全部功能，使用时按烟火计费。</DialogDescription>
+        <DialogDescription as="p">未激活的账号只能查看。在「套餐与权益」输入激活码，激活后即可使用全部功能，使用时按烟火计费。</DialogDescription>
         <div class="membership-actions">
           <button type="button" class="secondary-button" @click="membershipOpen = false">稍后再说</button>
-          <button type="button" class="primary-button" @click="openMembership">去激活</button>
+          <button type="button" class="primary-button" @click="openMembership">去输入激活码</button>
         </div>
       </DialogPanel>
     </div>

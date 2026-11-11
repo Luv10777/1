@@ -68,10 +68,8 @@ public class BillingRedeemCodeService {
         var existing = em.createQuery("from BillingRedeemCode c where c.batchKey = :key order by c.id", BillingRedeemCode.class)
                 .setParameter("key", input.requestKey()).getResultList();
         if (existing.isEmpty()) {
-            if (membership) {
-                var plan = billing.planForActivation(input.planId());
-                if (!plan.isPublished()) throw bad("该套餐未上架，不能生成激活码");
-            }
+            // 激活码按套餐定开通天数；站内不卖、只发激活码的套餐不上架，所以不要求已上架。
+            if (membership) billing.planForActivation(input.planId());
             String note = input.note() == null || input.note().isBlank() ? null : input.note().trim();
             for (int i = 0; i < input.quantity(); i++) {
                 var c = new BillingRedeemCode();

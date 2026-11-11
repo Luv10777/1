@@ -344,7 +344,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
         </div>
       </header>
       <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }">
-        <p v-if="showActivation" class="activation-banner" role="status">账号还未激活，现在只能查看。<RouterLink :to="{ name: 'billing', query: { membership: 'required', redirect: route.fullPath, module: route.meta.title } }">购买会员或输入激活码</RouterLink></p>
+        <p v-if="showActivation" class="activation-banner" role="status">账号还未激活，现在只能查看。<RouterLink :to="{ name: 'billing', query: { membership: 'required', redirect: route.fullPath, module: route.meta.title } }">去输入激活码</RouterLink></p>
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
           <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>

@@ -3,7 +3,7 @@ import AppSelect from '../components/AppSelect.vue'
 import { reactive, ref } from 'vue'
 import { Check, ChevronLeft, ChevronRight, Copy, Plus, RefreshCw, Search, TicketCheck, X } from 'lucide-vue-next'
 import { formatRedeemCode, redeemCodeAdminApi as api, redeemCodeExpiry, redeemCodeKinds, redeemCodeStatuses } from '../services/redeemCodeAdminApi'
-import { planAdminApi } from '../services/planAdminApi'
+import { activationPlans, planAdminApi } from '../services/planAdminApi'
 import { managementDate } from '../domain/platformManagement'
 import '../platform-management.css'
 
@@ -25,12 +25,12 @@ const blank = () => ({ kind: 'MEMBERSHIP', planId: '', credits: '100', amount: '
 const form = reactive(blank())
 let requestKey = ''
 const created = ref([])
-// 激活码按已上架的套餐生成，兑换后开通该套餐，不送烟火。
+// 激活码按套餐定开通天数（上没上架都行，站内不卖的套餐不上架），兑换后开通该套餐，不送烟火。
 const plans = ref([])
 const plansError = ref('')
 async function loadPlans() {
   plansError.value = ''
-  try { plans.value = (await planAdminApi.plans()).filter(item => item.published).map(item => item.plan) }
+  try { plans.value = activationPlans(await planAdminApi.plans()) }
   catch (failure) { plans.value = []; plansError.value = failure.message || '套餐暂时无法读取。' }
 }
 
@@ -134,7 +134,7 @@ load()
           <label><input v-model="form.kind" type="radio" value="TOPUP" name="code-kind" /><span><strong>充值</strong><small>记入商家的充值余额，计入「购买的烟火」，按实收金额记邀请返利</small></span></label>
           <label><input v-model="form.kind" type="radio" value="GIFT" name="code-kind" /><span><strong>赠送</strong><small>记入商家的赠送烟火，计入「赠送的烟火」，消耗时优先使用</small></span></label>
         </fieldset>
-        <label v-if="form.kind === 'MEMBERSHIP'">开通的套餐<AppSelect v-model="form.planId" required><option value="" disabled>选择已上架的套餐</option><option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.name }} · {{ plan.durationDays }} 天 · {{ money(plan.priceMinor) }}</option></AppSelect><small v-if="plansError" class="mg-error">{{ plansError }}</small><small v-else-if="!plans.length">还没有上架的套餐，请先到「会员套餐」上架月卡、季卡、年卡。</small></label>
+        <label v-if="form.kind === 'MEMBERSHIP'">开通的套餐<AppSelect v-model="form.planId" required><option value="" disabled>选择套餐</option><option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.name }} · {{ plan.durationDays }} 天 · {{ money(plan.priceMinor) }}</option></AppSelect><small v-if="plansError" class="mg-error">{{ plansError }}</small><small v-else-if="!plans.length">还没有套餐，请先到「会员套餐」新建月卡、季卡、年卡（不上架就不会在站内出售）。</small></label>
         <label v-else>每个码的烟火<input v-model="form.credits" type="number" min="1" max="100000" step="1" required /></label>
         <label v-if="form.kind === 'TOPUP'">每个码的实收金额（元）<input v-model="form.amount" type="number" min="0" max="100000" step="0.01" required /><small>兑换后按这个金额给商家的邀请人记充值返利；填 0 不记返利。</small></label>
         <label>生成数量<input v-model="form.quantity" type="number" min="1" max="200" step="1" required /><small>一次最多 200 个，每个码各自只能用一次。</small></label>
