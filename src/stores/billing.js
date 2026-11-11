@@ -56,6 +56,9 @@ export async function requireAccount() {
 export const billingApi = {
   topUp: data => post('/api/billing/orders/topup', data),
   subscribe: data => post('/api/billing/orders/subscription', data),
+  /** 站内购买激活码：付款成功后订单里带 activationCode。 */
+  buyActivationCode: data => post('/api/billing/orders/activation-code', data),
+  activationCodes: () => get('/api/billing/activation-codes'),
   order: id => get('/api/billing/orders/' + id),
   refresh: id => post('/api/billing/orders/' + id + '/refresh', {}),
   cancel: id => post('/api/billing/orders/' + id + '/cancel', {}),

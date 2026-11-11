@@ -31,6 +31,12 @@ public class BillingController {
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.topUp(input)); }
     @PostMapping("/orders/subscription") public ApiResponse<BillingDtos.OrderView> subscribe(@Valid @RequestBody BillingDtos.Subscribe input,
         @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.subscribe(input)); }
+    @PostMapping("/orders/activation-code") public ApiResponse<BillingDtos.OrderView> buyActivationCode(@Valid @RequestBody BillingDtos.Subscribe input,
+        @AuthenticationPrincipal AuthPrincipal me) { requireOwner(me); return ApiResponse.ok(checkout.buyActivationCode(input)); }
+    /** 本商户在站内买的激活码，只有商家管理员能看。 */
+    @GetMapping("/activation-codes") public ApiResponse<List<BillingDtos.PurchasedCode>> purchasedCodes(@AuthenticationPrincipal AuthPrincipal me) {
+        requireOwner(me); return ApiResponse.ok(redeemCodes.purchased(me.tenantId()));
+    }
     @PostMapping("/redeem") public ApiResponse<BillingDtos.Redeemed> redeem(@Valid @RequestBody BillingDtos.Redeem input,
         @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(redeemCodes.redeem(input.code(),me.userId(),me.tenantId()));

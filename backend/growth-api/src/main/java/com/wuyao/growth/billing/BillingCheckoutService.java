@@ -14,6 +14,7 @@ public class BillingCheckoutService {
     private final WechatPayGateway wechat;
     private final AlipayGateway alipay;
     public BillingDtos.OrderView topUp(BillingDtos.TopUp input) { return checkout(billing.topUp(input)); }
+    public BillingDtos.OrderView buyActivationCode(BillingDtos.Subscribe input) { return checkout(billing.buyActivationCode(input)); }
     public BillingDtos.OrderView subscribe(BillingDtos.Subscribe input) {
         if(reconciles()) for(String id:billing.reconciliationOrders()) refresh(id);
         return checkout(billing.subscribe(input));

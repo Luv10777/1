@@ -1,11 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, RefreshCw, Wallet, X } from 'lucide-vue-next'
+import { Check, Copy, RefreshCw, Wallet, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { billing, billingApi, dateTime, loadBillingPlans, number, refreshBilling, yuan } from '../stores/billing'
 import BillingCheckoutTerms from '../components/BillingCheckoutTerms.vue'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
+import UserAvatar from '../components/UserAvatar.vue'
+import { formatRedeemCode, redeemCodeStatuses } from '../services/redeemCodeAdminApi'
 import { auth } from '../stores/auth'
 import { isMobilePayment, openBillingCashier } from '../utils/billingPayment'
 
@@ -49,13 +51,11 @@ let disposed = false
 let qrVersion = 0
 const keys = new Map()
 const labels = { PENDING_PAYMENT: '待支付', PAID: '已到账', CANCELLED: '已取消', EXPIRED: '已过期' }
-const membershipLabel = computed(() => account.value?.memberActive ? '会员生效中' : account.value?.plan ? '会员已到期，账号未激活' : '账号未激活')
-// 会员有效期内可以续订同一套餐，或换成功能相同、只是时长不同的套餐（月卡续年卡），规则同后端。
-const canSwitchTo = plan => {
-  const current = account.value?.plan
-  if (!account.value?.memberActive || !current || current.code === plan.code) return true
-  return current.imageEnabled === plan.imageEnabled && current.videoEnabled === plan.videoEnabled && current.liveEnabled === plan.liveEnabled
-}
+// 一个激活码开通全部功能，页面上只分「已激活 / 未激活」，不再按套餐列功能。
+const activationLabel = computed(() => account.value?.memberActive ? '已激活' : '未激活')
+// 站内卖的激活码就是已上架的套餐（月卡、年卡）；付款后得到一串码，可以自己用，也可以转给别人。
+const purchased = ref([])
+const copied = ref('')
 const canPay = computed(() => account.value?.canManage && account.value?.payment.available && !billing.error && !busy.value)
 const keyFor = (key) => {
   if (!keys.has(key)) keys.set(key, 'billing-' + crypto.randomUUID())
@@ -65,7 +65,15 @@ const reloadPlans = async () => {
   try { await loadBillingPlans(); plansError.value = '' }
   catch (e) { plansError.value = e.message || '套餐暂时无法读取' }
 }
-const refresh = async () => { await refreshBilling(); await reloadPlans() }
+const loadPurchased = async () => {
+  if (!billing.summary?.canManage) { purchased.value = []; return }
+  try { purchased.value = await billingApi.activationCodes() } catch { purchased.value = [] }
+}
+const refresh = async () => { await refreshBilling(); await reloadPlans(); await loadPurchased() }
+const copy = async (text, label) => {
+  try { await navigator.clipboard.writeText(text); copied.value = `${label}已复制` }
+  catch { copied.value = `浏览器不允许自动复制，请手动选中${label}复制` }
+}
 // The top bar's balance chip lands here with ?topup=1; the query is dropped on close so the next click opens it again.
 const openTopup = async () => { await nextTick(); if (topupDialog.value && !topupDialog.value.open) topupDialog.value.showModal() }
 const closeTopup = () => {
@@ -73,7 +81,7 @@ const closeTopup = () => {
   if (route.query.topup) router.replace({ query: { ...route.query, topup: undefined } })
 }
 watch(() => route.query.topup, value => { if (value && account.value) openTopup() })
-const choosePlan = async (plan) => { pendingPlan.value = plan; await nextTick(); planDialog.value?.showModal() }
+const openBuy = async () => { pendingPlan.value = billing.plans[0] || null; await nextTick(); planDialog.value?.showModal() }
 const closePlan = () => { planDialog.value?.close(); pendingPlan.value = null }
 const closeSuccess = () => { successDialog.value?.close(); topupResult.value = null }
 const closePayment = () => {
@@ -83,11 +91,12 @@ const closePayment = () => {
 const applyPayment = async (order) => {
   if (disposed || !payment.value) return
   payment.value = order
-  if (['PAID', 'CANCELLED', 'EXPIRED'].includes(order.state)) keys.delete(order.kind === 'TOPUP' ? 'topup:' + order.amountMinor / 100 : 'plan:' + order.plan?.id)
+  if (['PAID', 'CANCELLED', 'EXPIRED'].includes(order.state)) keys.delete(order.kind === 'TOPUP' ? 'topup:' + order.amountMinor / 100 : 'code:' + order.plan?.id)
   if (order.state === 'PAID') {
     keys.clear()
     qr.value = ''
     await refreshBilling()
+    if (order.kind === 'ACTIVATION_CODE') await loadPurchased()
     if (order.kind === 'TOPUP' && !disposed) {
       topupResult.value = { before: balanceBefore, credits: order.credits, now: billing.summary?.available ?? null, paidAt: order.paidAt }
       closePayment()
@@ -179,17 +188,24 @@ const redeem = async () => {
   catch (e) { redeemError.value = e.message || '兑换失败，请稍后重试' }
   finally { redeeming.value = false }
 }
-const subscribe = async (plan) => {
-  if (!canPay.value) return
-  if (!checkPurchaseConsent('订阅前请阅读并同意用户协议、隐私协议和售后服务规则。', planTerms, 'plan')) return
+const buyCode = async (plan) => {
+  if (!canPay.value || !plan) return
+  if (!checkPurchaseConsent('购买前请阅读并同意用户协议、隐私协议和售后服务规则。', planTerms, 'plan')) return
   busy.value = true; error.value = ''; errorAt.value = 'plan'
   try {
-    const order = await billingApi.subscribe({ requestKey: keyFor('plan:' + plan.id), planId: plan.id })
+    const order = await billingApi.buyActivationCode({ requestKey: keyFor('code:' + plan.id), planId: plan.id })
     closePlan()
     await openPayment(order)
   }
-  catch (e) { error.value = e.message || '订阅订单创建失败' }
+  catch (e) { error.value = e.message || '激活码订单创建失败' }
   finally { busy.value = false }
+}
+// 买到的码直接用于本账号：填进输入框兑换，和手动输入一样。
+const useCode = async (code) => {
+  redeemCode.value = code
+  closePayment()
+  await redeem()
+  await loadPurchased()
 }
 const cancelPayment = async () => {
   if (!payment.value || paymentLoading.value) return
@@ -220,33 +236,35 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     <header class="yanhuo-heading">
       <div>
         <h1>套餐与权益</h1>
-        <p class="yanhuo-intro">输入激活码开通会员后才能使用各项功能，使用时按烟火扣费；激活码不送烟火，烟火需另外充值。</p>
+        <p class="yanhuo-intro">账号激活后才能使用各项功能，使用时按烟火扣费；激活码可以在这里购买，也可以向服务商购买。激活码不送烟火，烟火需另外充值。</p>
       </div>
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>
-    <div v-if="route.query.membership && !account?.memberActive" class="yanhuo-alert" role="status">{{ route.query.membership === 'unavailable' ? '暂时无法确认会员状态，请重新读取账户后继续。' : `使用${route.query.module || '平台功能'}需要先开通会员。充值烟火不会自动开通会员。` }}</div>
-    <RouterLink v-if="route.query.membership && account?.memberActive" :to="returnTo" class="generation-billing-link">会员已生效，继续使用{{ route.query.module || '平台功能' }}</RouterLink>
+    <div v-if="route.query.membership && !account?.memberActive" class="yanhuo-alert" role="status">{{ route.query.membership === 'unavailable' ? '暂时无法确认激活状态，请重新读取账户后继续。' : `使用${route.query.module || '平台功能'}需要先激活账号。充值烟火不会激活账号。` }}</div>
+    <RouterLink v-if="route.query.membership && account?.memberActive" :to="returnTo" class="generation-billing-link">账号已激活，继续使用{{ route.query.module || '平台功能' }}</RouterLink>
     <div v-if="billing.error" class="yanhuo-alert" role="alert">{{ billing.error }}<button type="button" @click="refresh">重新读取</button></div>
     <div v-else-if="!account" class="yanhuo-empty" role="status">正在读取烟火账户...</div>
     <div v-if="errorAt === 'payment' && error" class="yanhuo-alert" role="alert">{{ error }}</div>
     <template v-if="account">
-      <section class="yanhuo-overview" aria-label="会员与烟火">
-        <article class="yanhuo-card yanhuo-member-card">
+      <section class="yanhuo-overview" aria-label="账号与烟火">
+        <article class="yanhuo-card yanhuo-account-card">
           <div class="yanhuo-card-head">
-            <span class="yanhuo-card-label">会员</span>
-            <span class="yanhuo-status" :class="{ active: account.memberActive }"><span />{{ membershipLabel }}</span>
+            <span class="yanhuo-card-label">账号</span>
+            <span class="yanhuo-status" :class="{ active: account.memberActive }"><span />{{ activationLabel }}</span>
           </div>
-          <h2>{{ account.plan?.name || '尚未订阅套餐' }}</h2>
-          <p v-if="account.memberUntil" class="yanhuo-card-meta">有效期至 {{ dateTime(account.memberUntil) }}</p>
-          <p v-if="auth.user?.uid" class="yanhuo-card-meta">我的 UID：<strong class="yanhuo-uid">{{ auth.user.uid }}</strong>（服务商添加你时使用）</p>
-          <p v-else class="yanhuo-card-meta">未激活的账号只能查看。在下方输入激活码即可使用全部功能，使用时按烟火计费。</p>
-          <ul class="yanhuo-entitlements">
-            <li :class="{ enabled: account.memberActive }"><Check :size="14" />图片、视频、文案（按烟火）</li>
-            <li :class="{ enabled: account.memberActive && account.plan?.liveEnabled }"><Check :size="14" />AI 实景直播</li>
-          </ul>
-          <!-- 站内不卖套餐时（没有上架的套餐）只能用激活码开通和续期。 -->
-          <a v-if="billing.plans.length" href="#member-plans" class="yanhuo-secondary">{{ account.memberActive ? '续订套餐' : '购买会员' }}</a>
-          <a v-else href="#activation-code" class="yanhuo-secondary">{{ account.memberActive ? '输入激活码续期' : '输入激活码' }}</a>
+          <div class="yanhuo-account">
+            <UserAvatar class="yanhuo-avatar" :src="auth.user?.avatarUrl" :name="auth.user?.name || '用户'" />
+            <div class="yanhuo-account-copy">
+              <strong>{{ auth.user?.name || '未命名用户' }}</strong>
+              <span v-if="auth.user?.uid" class="yanhuo-uid-box"><span>UID：</span><b>{{ auth.user.uid }}</b><button type="button" aria-label="复制 UID" title="复制 UID" @click="copy(String(auth.user.uid), 'UID')"><Copy :size="14" /></button></span>
+            </div>
+          </div>
+          <p class="yanhuo-card-meta">{{ account.memberActive ? `已激活，有效期至 ${dateTime(account.memberUntil)}` : '未激活的账号只能查看。购买或输入激活码后即可使用全部功能，使用时按烟火扣费。' }}</p>
+          <p v-if="copied" class="yanhuo-card-meta yanhuo-copied" role="status">{{ copied }}</p>
+          <div class="yanhuo-account-actions">
+            <button v-if="billing.plans.length && account.canManage" type="button" class="yanhuo-primary" :disabled="!canPay" @click="openBuy">购买激活码</button>
+            <a href="#activation-code" class="yanhuo-secondary">{{ account.memberActive ? '输入激活码续期' : '输入激活码' }}</a>
+          </div>
         </article>
         <article class="yanhuo-card yanhuo-balance-card">
           <div class="yanhuo-card-head">
@@ -259,30 +277,30 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
 
       <section id="activation-code" class="yanhuo-section" aria-labelledby="redeem-title">
-        <header class="yanhuo-section-head"><h2 id="redeem-title">激活码 / 兑换码</h2><p>输入激活码开通会员，输入兑换码烟火立即到账；都是全店共用，每个码只能使用一次。</p></header>
+        <header class="yanhuo-section-head"><h2 id="redeem-title">激活码 / 兑换码</h2><p>输入激活码激活账号，输入兑换码烟火立即到账；都是全店共用，每个码只能使用一次。</p></header>
         <form class="yanhuo-redeem" @submit.prevent="redeem">
           <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="激活码或兑换码">
           <button class="yanhuo-primary" type="submit" :disabled="redeeming || !redeemCode.trim()">{{ redeeming ? '兑换中…' : '兑换' }}</button>
         </form>
-        <p v-if="redeemResult?.kind === 'MEMBERSHIP'" class="yanhuo-redeem-done" role="status">已开通「{{ redeemResult.planName }}」，有效期至 {{ dateTime(redeemResult.memberUntil) }}。</p>
+        <p v-if="redeemResult?.kind === 'MEMBERSHIP'" class="yanhuo-redeem-done" role="status">已激活（{{ redeemResult.planName }}），有效期至 {{ dateTime(redeemResult.memberUntil) }}。</p>
         <p v-else-if="redeemResult" class="yanhuo-redeem-done" role="status">已到账 {{ number(redeemResult.credits) }} {{ redeemResult.kind === 'TOPUP' ? '充值' : '赠送' }}烟火，当前可用 {{ number(redeemResult.available) }}。</p>
         <div v-if="redeemError" class="yanhuo-alert" role="alert">{{ redeemError }}</div>
       </section>
 
-      <section v-if="billing.plans.length || plansError" id="member-plans" class="yanhuo-section" aria-labelledby="plans-title">
-        <header class="yanhuo-section-head"><h2 id="plans-title">会员套餐</h2><p>开通会员后即可使用全部功能，使用时按烟火计费；也可以在上方输入激活码开通。</p></header>
-        <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
-        <div v-else-if="!billing.plans.length" class="yanhuo-card yanhuo-empty"><img src="/images/brand/yifangzhi-mark.png" alt="" width="36" height="36"><h3>套餐尚未开放</h3><p>正式套餐公布后，可在这里订阅。</p></div>
-        <div v-else class="yanhuo-plan-grid">
-          <article v-for="plan in billing.plans" :key="plan.id" class="yanhuo-card yanhuo-plan" :class="{ 'is-current': account.plan?.code === plan.code && account.memberActive }">
-            <div class="yanhuo-plan-top"><h3>{{ plan.name }}</h3><span v-if="account.plan?.code === plan.code && account.memberActive" class="yanhuo-current">当前套餐</span></div>
-            <p class="yanhuo-plan-price">{{ yuan(plan.priceMinor) }}<small>/ {{ plan.durationDays }} 天</small></p>
-            <p class="yanhuo-plan-description">{{ plan.description }}</p>
-            <ul><li v-if="plan.giftCredits"><Check :size="15" />赠送 {{ number(plan.giftCredits) }} 烟火</li><li v-if="plan.imageEnabled"><Check :size="15" />图片创作</li><li v-if="plan.videoEnabled"><Check :size="15" />视频创作</li><li v-if="plan.liveEnabled"><Check :size="15" />直播（{{ account.liveCreditsPerHour }} 烟火 / 小时）</li><li v-if="plan.allianceQuotaMinor"><Check :size="15" />联盟券额度 ¥{{ (plan.allianceQuotaMinor / 100).toFixed(2) }} / 期</li></ul>
-            <button class="yanhuo-primary" type="button" :disabled="!canPay || !canSwitchTo(plan)" @click="choosePlan(plan)">{{ !account.memberActive ? '订阅套餐' : !canSwitchTo(plan) ? '到期后可订阅' : '续订套餐' }}</button>
-          </article>
+      <section v-if="purchased.length" class="yanhuo-section" aria-labelledby="purchased-title">
+        <header class="yanhuo-section-head"><h2 id="purchased-title">我购买的激活码</h2><p>可以自己用，也可以复制给别人；每个码只能用一次。</p></header>
+        <div class="yanhuo-codes">
+          <div v-for="item in purchased" :key="item.code" class="yanhuo-code-row">
+            <span class="yanhuo-code-value">{{ formatRedeemCode(item.code) }}</span>
+            <span>{{ item.planName }} · {{ item.durationDays }} 天</span>
+            <span :class="{ positive: item.status === 'UNUSED' }">{{ redeemCodeStatuses[item.status] || item.status }}</span>
+            <span class="yanhuo-code-time">{{ dateTime(item.createdAt) }}</span>
+            <span class="yanhuo-code-actions"><template v-if="item.status === 'UNUSED'"><button class="yanhuo-link" type="button" @click="copy(formatRedeemCode(item.code), '激活码')"><Copy :size="13" />复制</button><button class="yanhuo-link" type="button" :disabled="redeeming" @click="useCode(item.code)">用于本账号</button></template></span>
+          </div>
         </div>
       </section>
+
+      <div v-if="plansError" class="yanhuo-alert" role="alert">{{ plansError }}<button type="button" @click="reloadPlans">重新读取</button></div>
 
 
       <section class="yanhuo-section" aria-labelledby="rules-title">
@@ -325,20 +343,29 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     </dialog>
     <dialog ref="planDialog" class="yanhuo-payment" aria-labelledby="plan-confirm-title" @cancel.prevent="closePlan" @click="event => { if (event.target === planDialog) closePlan() }">
       <template v-if="pendingPlan && account">
-        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="plan-confirm-title">{{ account.memberActive ? '续订套餐' : '订阅套餐' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭" title="关闭" @click="closePlan"><X :size="20" /></button></header>
-        <p class="yanhuo-payment-amount">{{ yuan(pendingPlan.priceMinor) }}</p>
-        <p class="yanhuo-payment-item">{{ pendingPlan.name }} · {{ pendingPlan.durationDays }} 天 · 赠送 {{ number(pendingPlan.giftCredits) }} 烟火</p>
+        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="plan-confirm-title">购买激活码</h2><button class="yanhuo-icon" type="button" aria-label="关闭" title="关闭" @click="closePlan"><X :size="20" /></button></header>
+        <fieldset class="yanhuo-code-options">
+          <legend class="sr-only">激活码类型</legend>
+          <label v-for="plan in billing.plans" :key="plan.id" :class="{ selected: pendingPlan.id === plan.id }"><input v-model="pendingPlan" type="radio" :value="plan" name="code-plan"><strong>{{ plan.name }}</strong><span>{{ yuan(plan.priceMinor) }}</span><small>开通 {{ plan.durationDays }} 天</small></label>
+        </fieldset>
+        <p class="yanhuo-note">付款后得到一串激活码，可以自己输入激活，也可以转给别人使用。激活码不送烟火，使用功能按烟火扣费。</p>
         <BillingCheckoutTerms ref="planTerms" v-model="purchaseConsent" :method="account.paymentMethod" :available="account.payment.available" :can-manage="account.canManage" :disabled="busy" :error="errorAt === 'plan' ? error : ''">
-          <button class="yanhuo-primary" type="button" :disabled="!canPay" @click="subscribe(pendingPlan)">{{ busy ? '正在创建订单...' : '确认支付' }}</button>
+          <button class="yanhuo-primary" type="button" :disabled="!canPay" @click="buyCode(pendingPlan)">{{ busy ? '正在创建订单...' : '确认支付 ' + yuan(pendingPlan.priceMinor) }}</button>
         </BillingCheckoutTerms>
       </template>
     </dialog>
     <dialog ref="paymentDialog" class="yanhuo-payment" aria-labelledby="payment-title" @cancel.prevent="closePayment" @click="event => { if (event.target === paymentDialog) closePayment() }">
       <template v-if="payment">
-        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="payment-title">{{ payment.state === 'PAID' ? '烟火已到账' : payment.kind === 'TOPUP' ? '充值烟火' : '订阅会员' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭支付窗口" title="关闭" @click="closePayment"><X :size="20" /></button></header>
+        <header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="payment-title">{{ payment.kind === 'ACTIVATION_CODE' ? (payment.state === 'PAID' ? '购买成功' : '购买激活码') : payment.state === 'PAID' ? '烟火已到账' : payment.kind === 'TOPUP' ? '充值烟火' : '订阅会员' }}</h2><button class="yanhuo-icon" type="button" aria-label="关闭支付窗口" title="关闭" @click="closePayment"><X :size="20" /></button></header>
         <p class="yanhuo-payment-amount">{{ yuan(payment.amountMinor) }}</p>
-        <p class="yanhuo-payment-item">{{ payment.kind === 'TOPUP' ? number(payment.credits) + ' 烟火' : payment.plan?.name + ' · 赠送 ' + number(payment.credits) + ' 烟火' }}</p>
-        <div v-if="payment.state === 'PAID'" class="yanhuo-payment-result positive"><Check :size="36" /><strong>支付成功</strong><span>{{ dateTime(payment.paidAt) }}</span></div>
+        <p class="yanhuo-payment-item">{{ payment.kind === 'TOPUP' ? number(payment.credits) + ' 烟火' : payment.kind === 'ACTIVATION_CODE' ? payment.plan?.name + '激活码 · 开通 ' + payment.plan?.durationDays + ' 天' : payment.plan?.name + ' · 赠送 ' + number(payment.credits) + ' 烟火' }}</p>
+        <div v-if="payment.state === 'PAID' && payment.kind === 'ACTIVATION_CODE' && payment.activationCode" class="yanhuo-code-result">
+          <span>你的激活码</span>
+          <strong>{{ formatRedeemCode(payment.activationCode) }}</strong>
+          <div><button class="yanhuo-secondary" type="button" @click="copy(formatRedeemCode(payment.activationCode), '激活码')"><Copy :size="14" />复制</button><button class="yanhuo-primary" type="button" :disabled="redeeming" @click="useCode(payment.activationCode)">用于本账号</button></div>
+          <small>也可以把激活码转给别人使用；之后在「我购买的激活码」里随时能查到。</small>
+        </div>
+        <div v-else-if="payment.state === 'PAID'" class="yanhuo-payment-result positive"><Check :size="36" /><strong>支付成功</strong><span>{{ dateTime(payment.paidAt) }}</span></div>
         <template v-else-if="payment.state === 'PENDING_PAYMENT'">
           <template v-if="payment.paymentMethod === 'WECHAT'">
             <div class="yanhuo-qr"><img v-if="qr" :src="qr" width="240" height="240" alt="微信支付二维码"><span v-else>正在读取收款码...</span></div><p class="yanhuo-payment-caption">微信扫码支付</p>

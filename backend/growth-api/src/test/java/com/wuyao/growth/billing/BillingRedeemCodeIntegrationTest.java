@@ -46,6 +46,7 @@ class BillingRedeemCodeIntegrationTest {
     @Autowired BillingRedeemCodeService codes;
     @Autowired BillingLedgerReport report;
     @Autowired BillingService billing;
+    @Autowired BillingProperties billingConfig;
     @Autowired JwtService jwt;
     @Autowired MockMvc mvc;
     JdbcTemplate owner;
@@ -175,6 +176,44 @@ class BillingRedeemCodeIntegrationTest {
                 .hasMessage("请选择激活码开通的套餐");
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> codes.create(new BillingDtos.NewRedeemCodes("batch-" + UUID.randomUUID(), "GIFT", 10, 0, 1, null, null, year.id()), operator))
                 .hasMessage("只有激活码可以选择套餐");
+    }
+
+    @Test void buyingAnActivationCodeGivesOneCodeAfterPaymentWithoutActivatingTheBuyer() throws Exception {
+        billingConfig.setPaymentMethod("MANUAL");
+        billingConfig.setPaymentRecipient("test receipt fixture");
+        billingConfig.setPaymentAccount("test-only");
+        String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        var month = billing.createPlan(new BillingDtos.NewPlan("MONTH-" + suffix, "月卡", "test-only", 50000, 30, 0, true, true, true, true));
+        String body = "{\"requestKey\":\"buy-code-" + suffix + "\",\"planId\":" + month.id() + "}";
+
+        // 只有商家管理员能买，店员不行。
+        mvc.perform(post("/api/billing/orders/activation-code").header("Authorization", "Bearer " + jwt.issueAccessToken(shopStaff, shop, null))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
+        String created = mvc.perform(post("/api/billing/orders/activation-code").header("Authorization", "Bearer " + jwt.issueAccessToken(shopOwner, shop, null))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.kind").value("ACTIVATION_CODE"))
+                .andExpect(jsonPath("$.data.amountMinor").value(50000)).andExpect(jsonPath("$.data.state").value("PENDING_PAYMENT"))
+                .andReturn().getResponse().getContentAsString();
+        String orderId = created.replaceAll(".*\"id\":\"([0-9a-f-]{36})\".*", "$1");
+
+        // 付款入账两次（重复通知），只生成一个码；买码不开通买方的会员，也不动余额。
+        for (int i = 0; i < 2; i++) TenantContext.runAs(shop, () -> billing.confirmPayment(orderId, new BillingDtos.Confirmation(50000, "test-receipt-" + suffix), operator));
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_redeem_codes WHERE order_id = ?", Long.class, orderId)).isEqualTo(1);
+        String code = owner.queryForObject("SELECT code FROM billing_redeem_codes WHERE order_id = ?", String.class, orderId);
+        mvc.perform(get("/api/billing/orders/" + orderId).header("Authorization", "Bearer " + jwt.issueAccessToken(shopOwner, shop, null)))
+                .andExpect(jsonPath("$.data.state").value("PAID")).andExpect(jsonPath("$.data.activationCode").value(code));
+        assertThat(owner.queryForMap("SELECT member_until, gift_available, purchased_available FROM billing_accounts WHERE tenant_id = ?", shop))
+                .containsEntry("member_until", null).containsEntry("gift_available", 0L).containsEntry("purchased_available", 0L);
+        mvc.perform(get("/api/billing/activation-codes").header("Authorization", "Bearer " + jwt.issueAccessToken(shopOwner, shop, null)))
+                .andExpect(jsonPath("$.data.length()").value(1)).andExpect(jsonPath("$.data[0].code").value(code))
+                .andExpect(jsonPath("$.data[0].planName").value("月卡")).andExpect(jsonPath("$.data[0].status").value("UNUSED"));
+
+        // 码可以转给别的商户用；买方列表里显示已兑换。
+        redeem(cafeOwner, cafe, code).andExpect(status().isOk()).andExpect(jsonPath("$.data.planName").value("月卡"));
+        mvc.perform(get("/api/billing/activation-codes").header("Authorization", "Bearer " + jwt.issueAccessToken(shopOwner, shop, null)))
+                .andExpect(jsonPath("$.data[0].status").value("REDEEMED"));
+        mvc.perform(get("/api/billing/activation-codes").header("Authorization", "Bearer " + jwt.issueAccessToken(cafeOwner, cafe, null)))
+                .andExpect(jsonPath("$.data.length()").value(0));
     }
 
     @Test void overviewSplitsGrantedAndPurchasedCreditsBySourceAndListsEveryMerchant() throws Exception {

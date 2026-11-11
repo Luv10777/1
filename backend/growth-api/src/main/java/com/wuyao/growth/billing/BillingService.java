@@ -95,6 +95,29 @@ public class BillingService {
         o.setExpiresAt(Instant.now().plus("MANUAL".equals(o.getPaymentMethod())?Duration.ofDays(7):Duration.ofMinutes(30))); store.save(o);
         return view(o);
     }
+    /**
+     * 站内购买激活码：按已上架的套餐（月卡、年卡）下单，付款成功后生成一个激活码，不直接开通，买的人可以自己兑换或转给别人。
+     * 有效期内也能买，不受换套餐规则限制（兑换时再按规则顺延）。
+     */
+    @Transactional
+    public BillingDtos.OrderView buyActivationCode(BillingDtos.Subscribe input) {
+        store.lockAccount();
+        var old=store.orderByKey(input.requestKey());
+        if(old.isPresent()) {
+            if(!"ACTIVATION_CODE".equals(old.get().getKind())||!Objects.equals(old.get().getPlanSnapshot().id(),input.planId()))
+                throw bad("同一订单标识不能用于不同的激活码");
+            return view(old.get());
+        }
+        requirePayment();
+        var p=store.plan(input.planId());
+        if(p==null||!p.isPublished()) throw bad("该激活码暂不出售");
+        var o=new BillingOrder(); o.setTenantId(TenantContext.require()); o.setRequestKey(input.requestKey());
+        o.setCreatedBy(currentUserId());
+        o.setKind("ACTIVATION_CODE"); o.setAmountMinor(p.getPriceMinor()); o.setCredits(0);
+        o.setPlanSnapshot(p.snapshot()); o.setPaymentMethod(config.getPaymentMethod());
+        o.setExpiresAt(Instant.now().plus("MANUAL".equals(o.getPaymentMethod())?Duration.ofDays(7):Duration.ofMinutes(30))); store.save(o);
+        return view(o);
+    }
     @Transactional
     public BillingDtos.OrderView order(String id) {
         var o=requireOrder(store.lockOrder(id));
@@ -170,6 +193,14 @@ public class BillingService {
         return view(o);
     }
     private BillingDtos.OrderView fulfil(BillingAccount a,BillingOrder o,String receipt,Long operator) {
+        if("ACTIVATION_CODE".equals(o.getKind())) {
+            // 只生成激活码，不动余额和会员，所以不记账本；邀请返利按开通会员的比例记（买码就是买会员）。
+            o.setReceiptReference(receipt); o.setConfirmedBy(operator); o.setPaidAt(Instant.now()); o.setState("PAID");
+            store.flush();
+            events.publishEvent(new BillingDtos.ActivationCodePurchased(o.getTenantId(),o.getId(),o.getPlanSnapshot().id(),o.getCreatedBy()));
+            events.publishEvent(new BillingDtos.OrderPaid(o.getTenantId(),o.getId(),"MEMBERSHIP",o.getAmountMinor()));
+            return view(o);
+        }
         if("MEMBERSHIP".equals(o.getKind())) activate(a,o.getPlanSnapshot(),o.getId(),o.getCredits());
         else a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),o.getCredits()));
         o.setReceiptReference(receipt); o.setConfirmedBy(operator); o.setPaidAt(Instant.now()); o.setState("PAID");
@@ -421,7 +452,8 @@ public class BillingService {
     private BillingDtos.OrderView view(BillingOrder o) {
         String state="PENDING_PAYMENT".equals(o.getState())&&!o.getExpiresAt().isAfter(Instant.now())?"EXPIRED":o.getState();
         return new BillingDtos.OrderView(o.getId(),o.getKind(),o.getAmountMinor(),o.getCredits(),state,o.getPlanSnapshot(),
-            o.getCreatedAt(),o.getExpiresAt(),o.getPaidAt(),payment(),o.getPaymentMethod(),o.getPaymentCodeUrl(),o.getCreatedBy(),o.getConfirmedBy());
+            o.getCreatedAt(),o.getExpiresAt(),o.getPaidAt(),payment(),o.getPaymentMethod(),o.getPaymentCodeUrl(),o.getCreatedBy(),o.getConfirmedBy(),
+            "ACTIVATION_CODE".equals(o.getKind())&&"PAID".equals(o.getState())?store.codeForOrder(o.getId()):null);
     }
     @Transactional(readOnly=true)
     public BillingDtos.History<BillingDtos.OrderView> orders(int page,int size) {

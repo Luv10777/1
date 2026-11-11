@@ -79,6 +79,11 @@ public class BillingStore {
     }
     public BillingReservation reservation(String id) { return em.find(BillingReservation.class,id,LockModeType.PESSIMISTIC_WRITE); }
     public BillingReservation reservationSnapshot(String id) { return em.find(BillingReservation.class,id); }
+    /** 激活码订单生成的码。兑换码表是平台级数据，不受租户 RLS 约束，按订单号直接查。 */
+    public String codeForOrder(String orderId) {
+        List<?> rows = em.createNativeQuery("SELECT code FROM billing_redeem_codes WHERE order_id = :id").setParameter("id", orderId).getResultList();
+        return rows.isEmpty() ? null : (String) rows.getFirst();
+    }
     public boolean eventExists(String key) {
         return em.createQuery("select count(l) from BillingLedger l where l.tenantId = :tenant and l.eventKey = :key",Long.class)
             .setParameter("tenant",TenantContext.require()).setParameter("key",key).getSingleResult()>0;

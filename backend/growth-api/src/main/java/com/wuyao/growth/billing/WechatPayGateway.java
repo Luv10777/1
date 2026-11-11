@@ -39,7 +39,7 @@ public class WechatPayGateway {
         requireConfigured();
         var body=new LinkedHashMap<String,Object>();
         body.put("appid",config.getAppId()); body.put("mchid",config.getMerchantId());
-        body.put("description",order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name());
+        body.put("description",order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name()+(order.kind().equals("ACTIVATION_CODE")?"激活码":""));
         body.put("out_trade_no",tradeNo(order.id())); body.put("notify_url",config.getNotifyUrl());
         body.put("attach",tenantId+":"+order.id());
         body.put("time_expire",DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(order.expiresAt().truncatedTo(ChronoUnit.SECONDS).atOffset(ZoneOffset.ofHours(8))));

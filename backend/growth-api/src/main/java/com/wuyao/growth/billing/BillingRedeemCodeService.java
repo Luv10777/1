@@ -160,6 +160,33 @@ public class BillingRedeemCodeService {
         return new BillingDtos.Redeemed(c.getKind(), c.getCredits(), available, null, null);
     }
 
+    /** 与激活码订单入账同一事务：按订单生成一个激活码，同一订单只生成一次。 */
+    @org.springframework.context.event.EventListener
+    public void onActivationCodePurchased(BillingDtos.ActivationCodePurchased event) {
+        if (!em.createQuery("select c.id from BillingRedeemCode c where c.orderId = :order", Long.class)
+                .setParameter("order", event.orderId()).getResultList().isEmpty()) return;
+        var c = new BillingRedeemCode();
+        c.setCode(generate()); c.setBatchKey("order-" + event.orderId()); c.setKind("MEMBERSHIP"); c.setCredits(0); c.setAmountMinor(0);
+        c.setPlanId(event.planId()); c.setNote("站内购买"); c.setCreatedBy(event.buyerUserId());
+        c.setOrderId(event.orderId()); c.setPurchasedTenantId(event.tenantId());
+        em.persist(c);
+        em.flush();
+    }
+
+    /** 本商户在站内买的激活码，新买的在前。 */
+    @Transactional(readOnly = true)
+    public List<BillingDtos.PurchasedCode> purchased(Long tenantId) {
+        var codes = em.createQuery("from BillingRedeemCode c where c.purchasedTenantId = :tenant order by c.createdAt desc, c.id desc", BillingRedeemCode.class)
+                .setParameter("tenant", tenantId).setMaxResults(200).getResultList();
+        Map<Long, BillingPlan> plans = new HashMap<>();
+        Instant now = Instant.now();
+        return codes.stream().map(c -> {
+            var plan = plans.computeIfAbsent(c.getPlanId(), billing::planForActivation);
+            return new BillingDtos.PurchasedCode(c.getCode(), plan.getName(), plan.getDurationDays(), c.status(now), c.getCreatedAt(),
+                    c.getRedeemedAt(), c.getOrderId());
+        }).toList();
+    }
+
     /** 去掉空格、横线等分隔符并转大写，商家照抄 XXXX-XXXX-XXXX-XXXX 也能兑换。 */
     static String normalize(String raw) {
         return raw == null ? "" : raw.toUpperCase(Locale.ROOT).replaceAll("[^0-9A-Z]", "");

@@ -41,7 +41,7 @@ public class AlipayGateway {
     /** Signed locally on every request: Alipay rejects stale request timestamps, so the URL is never stored. */
     public String pageUrl(BillingDtos.OrderView order,long tenantId) {
         return pageUrl(tradeNo(order.id()),BigDecimal.valueOf(order.amountMinor(),2),
-            order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name(),
+            order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name()+(order.kind().equals("ACTIVATION_CODE")?"激活码":""),
             order.expiresAt(),tenantId+"_"+order.id());
     }
     public String pageUrl(String tradeNo,BigDecimal amount,String subject,Instant expiresAt,String passback) {
@@ -62,7 +62,7 @@ public class AlipayGateway {
             :destination.toString();
         String returnUrl=base+"?paymentOrder="+order.id();
         return cashierUrl(tradeNo(order.id()),BigDecimal.valueOf(order.amountMinor(),2),
-            order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name(),
+            order.kind().equals("TOPUP")?"一方志 · 充值烟火":"一方志 · "+order.plan().name()+(order.kind().equals("ACTIVATION_CODE")?"激活码":""),
             order.expiresAt(),tenantId+"_"+order.id(),true,returnUrl);
     }
     private String cashierUrl(String tradeNo,BigDecimal amount,String subject,Instant expiresAt,String passback,

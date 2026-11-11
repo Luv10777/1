@@ -157,7 +157,7 @@ test('store checkout keeps recipient details and the cart when consent is missin
   } finally { await context.close() }
 })
 
-test('top-ups and subscriptions require consent', async () => {
+test('top-ups and activation code purchases require consent', async () => {
   const context = await fixture('BillingView', '/billing', [{ path: '/billing', name: 'billing' }])
   const originalFetch = globalThis.fetch
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ code: 200, data: [] }) })
@@ -167,7 +167,7 @@ test('top-ups and subscriptions require consent', async () => {
     billing.summary = { canManage: true, payment: { available: true } }
     const calls = []
     billingApi.topUp = async values => { calls.push(['topup', values]); return { state: 'CANCELLED' } }
-    billingApi.subscribe = async values => { calls.push(['subscribe', values]); return { state: 'CANCELLED' } }
+    billingApi.buyActivationCode = async values => { calls.push(['code', values]); return { state: 'CANCELLED' } }
     const view = context.mount()
     await settle()
     let focusCount = 0
@@ -175,13 +175,13 @@ test('top-ups and subscriptions require consent', async () => {
     view.planTerms = { focus() { focusCount++ } }
     assert.equal(view.purchaseConsent, false)
     await view.topUp()
-    await view.subscribe({ id: 3 })
+    await view.buyCode({ id: 3 })
     assert.deepEqual(calls, [])
     assert.ok(focusCount >= 2)
     view.purchaseConsent = true
     await view.topUp()
-    await view.subscribe({ id: 3 })
-    assert.deepEqual(calls.map(([kind]) => kind), ['topup', 'subscribe'])
+    await view.buyCode({ id: 3 })
+    assert.deepEqual(calls.map(([kind]) => kind), ['topup', 'code'])
     assert.equal(calls[0][1].amountMinor, 50000)
     assert.equal(calls[1][1].planId, 3)
     auth.state.user = { id: 2, tenantId: 9 }

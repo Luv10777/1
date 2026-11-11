@@ -53,10 +53,23 @@ public final class BillingDtos {
                                @NotBlank @Size(min=6,max=150) String receiptReference) {}
     public record LedgerView(Long id, String type, String description, long availableDelta, long heldDelta,
                              long availableAfter, long heldAfter, Instant createdAt, Long actorUserId) {}
+    /** kind 为 TOPUP、MEMBERSHIP 或 ACTIVATION_CODE；activationCode 只在激活码订单付款后才有。 */
     public record OrderView(String id, String kind, long amountMinor, long credits, String state,
                             PlanSnapshot plan, Instant createdAt, Instant expiresAt, Instant paidAt,
                             PaymentInstructions payment, String paymentMethod, String paymentCodeUrl,
-                            Long createdBy, Long confirmedBy) {}
+                            Long createdBy, Long confirmedBy, String activationCode) {
+        public OrderView(String id, String kind, long amountMinor, long credits, String state, PlanSnapshot plan, Instant createdAt,
+                         Instant expiresAt, Instant paidAt, PaymentInstructions payment, String paymentMethod, String paymentCodeUrl,
+                         Long createdBy, Long confirmedBy) {
+            this(id, kind, amountMinor, credits, state, plan, createdAt, expiresAt, paidAt, payment, paymentMethod, paymentCodeUrl,
+                    createdBy, confirmedBy, null);
+        }
+    }
+    /** 激活码订单付款入账后发出，与入账同一事务；兑换码模块据此生成这笔订单的激活码（一笔一个）。 */
+    public record ActivationCodePurchased(Long tenantId, String orderId, Long planId, Long buyerUserId) {}
+    /** 本商户在站内买的激活码；status 同兑换码。不显示兑换方是谁。 */
+    public record PurchasedCode(String code, String planName, Integer durationDays, String status, Instant createdAt,
+                                Instant redeemedAt, String orderId) {}
     /** A paid top-up with the balance read from its ledger entry, not recomputed from today's balance. */
     public record TopupRecord(String orderId, Instant paidAt, long amountMinor, long credits, String paymentMethod,
                               long balanceBefore, long balanceAfter) {}
