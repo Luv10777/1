@@ -20,7 +20,7 @@ async function switchAccount() {
     <Store :size="32" />
     <p class="admin-login-kicker">服务商后台</p>
     <h1>{{ forbidden ? '这个账号不能进入服务商后台' : '页面不存在' }}</h1>
-    <p>{{ forbidden ? (route.query.reason || '只有平台开通的服务商账号可以登录。') + ' 你的用户 ID：' + (auth.user?.uid || '—') + '，开通时请提供给平台。' : '请检查地址，或返回后台首页。' }}</p>
+    <p>{{ forbidden ? (route.query.reason || '只有平台开通的服务商账号可以登录。') + ' 你的 UID：' + (auth.user?.uid || '—') + '，开通时请提供给平台。' : '请检查地址，或返回后台首页。' }}</p>
     <div><button class="mg-button" type="button" :disabled="busy" @click="switchAccount"><ArrowLeft :size="15" />{{ auth.isAuthenticated ? '换一个账号登录' : '返回登录' }}</button></div>
   </main>
 </template>

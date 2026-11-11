@@ -39,7 +39,7 @@ function movePage(next) { page.value = next; load() }
 
 async function add() {
   if (busy.value) return
-  addError.value = validUid(uid.value) ? '' : '用户 ID 是 8 位数字，请让商户在「套餐与权益」页查看。'
+  addError.value = validUid(uid.value) ? '' : 'UID 是 8 位数字，请让商户在「套餐与权益」页查看。'
   if (addError.value) return
   busy.value = true
   try {
@@ -76,7 +76,7 @@ load()
 <template>
   <div class="management-page">
     <header class="management-heading">
-      <div><h1>名下商户</h1><p>输入商户的用户 ID 添加到名下（已归属其他服务商的不能添加），之后可以把烟火分给他们。可分配烟火：{{ number(partner.overview?.partner.creditsAvailable) }}</p></div>
+      <div><h1>名下商户</h1><p>输入商户的 UID 添加到名下（已归属其他服务商的不能添加），之后可以把烟火分给他们。可分配烟火：{{ number(partner.overview?.partner.creditsAvailable) }}</p></div>
       <div class="management-heading-actions"><button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button></div>
     </header>
     <div v-if="success" class="mg-feedback success" role="status"><Check :size="16" />{{ success }}<button type="button" aria-label="关闭提示" @click="success = ''"><X :size="15" /></button></div>
@@ -84,7 +84,7 @@ load()
     <section class="management-list" aria-labelledby="add-title">
       <div class="mg-list-caption"><h2 id="add-title">添加商户</h2></div>
       <form class="partner-form" @submit.prevent="add">
-        <label>商户的用户 ID<input v-model="uid" inputmode="numeric" maxlength="8" placeholder="8 位数字" /></label>
+        <label>商户的 UID<input v-model="uid" inputmode="numeric" maxlength="8" placeholder="8 位数字" /></label>
         <button class="mg-button mg-primary" type="submit" :disabled="busy"><Plus :size="15" />添加到名下</button>
         <p v-if="addError" class="mg-error" role="alert">{{ addError }}</p>
       </form>
@@ -92,18 +92,18 @@ load()
 
     <section class="management-list" :aria-busy="loading" aria-label="名下商户列表">
       <form class="management-filters" @submit.prevent="search">
-        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索商户名、联系人或用户 ID" aria-label="搜索商户" maxlength="60" /></label>
+        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索商户名、联系人或 UID" aria-label="搜索商户" maxlength="60" /></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
       </form>
       <div v-if="error" class="mg-state mg-error" role="alert"><p>{{ error }}</p><button class="mg-button" type="button" @click="load">重新读取</button></div>
-      <div v-else-if="!records.length && !loading" class="mg-state"><h3>{{ keyword ? '没有匹配的商户' : '还没有名下商户' }}</h3><p>在上方输入商户的用户 ID 添加；商户兑换了你生成的激活码也会自动归到你名下。</p></div>
+      <div v-else-if="!records.length && !loading" class="mg-state"><h3>{{ keyword ? '没有匹配的商户' : '还没有名下商户' }}</h3><p>在上方输入商户的 UID 添加；商户兑换了你生成的激活码也会自动归到你名下。</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
           <thead><tr><th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>归属方式</th><th class="mg-table-action">分配烟火</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.tenantId">
               <td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td>
-              <td><span>{{ item.ownerName || '—' }}</span><small>用户 ID {{ item.ownerUid || '—' }}</small></td>
+              <td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td>
               <td>{{ membership(item) }}</td>
               <td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td>
               <td><span>{{ tenantSources[item.source] || item.source }}</span><small>{{ managementDate(item.boundAt) }}</small></td>

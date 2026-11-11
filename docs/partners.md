@@ -1,14 +1,14 @@
-# 用户 ID 与服务商
+# 用户 UID 与服务商
 
 2026-11-11 新增。业务规则由业务方拍板，代码在 `backend/growth-api/.../partner/`、前端 `partner/`（服务商后台）和
 `src/views/PlatformPartnersView.vue`（管理后台「服务商」页），迁移 V79。
 
-## 用户 ID
+## UID
 
-- 每个账号有一个用户 ID（`users.uid`）：8 位随机数字，注册时由数据库默认值 `next_user_uid()` 生成，永不重复。
+- 每个账号有一个 UID（`users.uid`）：8 位随机数字，注册时由数据库默认值 `next_user_uid()` 生成，永不重复。
   V79 给已有账号逐个补号。
-- 用户在 wy 站「套餐与权益」页能看到自己的用户 ID，登录接口和 `/api/auth/me` 也返回 `uid`。
-- 管理后台「用户管理」能按用户 ID 搜索。
+- 用户在 wy 站「套餐与权益」页能看到自己的 UID，登录接口和 `/api/auth/me` 也返回 `uid`。
+- 管理后台「用户管理」能按 UID 搜索。
 
 ## 服务商
 
@@ -17,15 +17,15 @@
 
 | 谁 | 能做什么 |
 |---|---|
-| 平台（管理后台「服务商」页，限计费运营名单 `BILLING_OPERATOR_USER_IDS`） | 建服务商并指定登录账号（按用户 ID）；线下收款后给服务商发烟火；按套餐标识分别设激活码总额度（例如月卡 20 个）；停用 / 启用；看名下商户和烟火流水；按用户 ID 查商户归属并改归属或解除归属 |
-| 服务商（partner.yifangzhi.com） | 看可分配烟火、各套餐额度和流水；按用户 ID 把商户加到名下；把烟火分给名下商户；在额度内生成激活码 |
+| 平台（管理后台「服务商」页，限计费运营名单 `BILLING_OPERATOR_USER_IDS`） | 建服务商并指定登录账号（按 UID）；线下收款后给服务商发烟火；按套餐标识分别设激活码总额度（例如月卡 20 个）；停用 / 启用；看名下商户和烟火流水；按 UID 查商户归属并改归属或解除归属 |
+| 服务商（partner.yifangzhi.com） | 看可分配烟火、各套餐额度和流水；按 UID 把商户加到名下；把烟火分给名下商户；在额度内生成激活码 |
 
 ### 名下商户与归属
 
 - 归属按**商户**算（同一商户的管理员和店员一起），以第一次为准：
-  - 服务商按用户 ID 添加（来源 `UID`）；
+  - 服务商按 UID 添加（来源 `UID`）；
   - 商户兑换了某家服务商生成的激活码，且当时还没有归属（来源 `CODE`）。
-- 已经归属的商户，别家服务商不能再按用户 ID 添加；兑换别家的激活码照样开通会员，但不改归属。
+- 已经归属的商户，别家服务商不能再按 UID 添加；兑换别家的激活码照样开通会员，但不改归属。
 - 只有平台能改归属（来源 `PLATFORM`）或解除归属。
 
 ### 烟火
@@ -56,8 +56,8 @@ V79 新增 `partners`、`partner_members`、`partner_code_quotas`、`partner_ten
 | 接口 | 说明 |
 |---|---|
 | `GET /api/partner/me` | 服务商、可分配烟火、各套餐额度、名下商户数 |
-| `GET /api/partner/tenants` | 名下商户（含会员状态和烟火余额），`keyword` 按商户名、联系人、用户 ID 搜 |
-| `POST /api/partner/tenants` | `{uid}` 按用户 ID 添加 |
+| `GET /api/partner/tenants` | 名下商户（含会员状态和烟火余额），`keyword` 按商户名、联系人、UID 搜 |
+| `POST /api/partner/tenants` | `{uid}` 按 UID 添加 |
 | `POST /api/partner/tenants/{tenantId}/credits` | `{requestKey, credits, note}` 分烟火 |
 | `GET/POST /api/partner/codes` | 查看 / 生成激活码，生成参数 `{requestKey, planCode, quantity, note}` |
 | `GET /api/partner/ledger` | 烟火流水 |

@@ -211,12 +211,12 @@ async function grantPartner() {
   const item = selected.value
   partnerForm.error = ''
   partnerForm.done = ''
-  if (!item.uid) { partnerForm.error = '这个账号还没有用户 ID，请刷新后再试。'; return }
+  if (!item.uid) { partnerForm.error = '这个账号还没有 UID，请刷新后再试。'; return }
   const creating = partnerForm.target === 'new'
   const target = creating ? null : partners.value.find(entry => String(entry.partner.id) === partnerForm.target)
   const name = partnerForm.name.trim()
   if (creating && !name) { partnerForm.error = '请填写服务商名称。'; return }
-  const who = `${item.name || `用户 #${item.id}`}（用户 ID ${item.uid}）`
+  const who = `${item.name || `UID ${item.uid}`}（UID ${item.uid}）`
   if (!window.confirm(creating ? `新建服务商「${name}」，并把 ${who} 设为它的登录账号？` : `把 ${who} 加为「${target.partner.name}」的登录账号？`)) return
   const attempt = detailVersion
   busy.value = true
@@ -233,7 +233,7 @@ async function grantPartner() {
 async function revokePartner() {
   const item = selected.value
   const entry = partnerOf(item)
-  if (!entry || !window.confirm(`取消后 ${item.name || `用户 #${item.id}`} 不能再登录「${entry.partner.name}」的服务商后台；服务商本身、名下商户和烟火都保留。确定取消吗？`)) return
+  if (!entry || !window.confirm(`取消后 ${item.name || `UID ${item.uid}`} 不能再登录「${entry.partner.name}」的服务商后台；服务商本身、名下商户和烟火都保留。确定取消吗？`)) return
   const attempt = detailVersion
   busy.value = true
   partnerForm.error = ''
@@ -257,7 +257,7 @@ async function changeSuspension(suspended) {
   try {
     const result = await api.userSuspension(item, { suspended, note: note.value.trim() })
     if (attempt !== detailVersion) return
-    success.value = suspended ? `已停用 ${result.name || `用户 #${result.id}`}，对方所有设备已下线。` : `已解除 ${result.name || `用户 #${result.id}`} 的平台停用。`
+    success.value = suspended ? `已停用 ${result.name || `UID ${result.uid}`}，对方所有设备已下线。` : `已解除 ${result.name || `UID ${result.uid}`} 的平台停用。`
     busy.value = false
     closeDetail()
     await load()
@@ -293,7 +293,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
     <section class="management-list" :aria-busy="loading" aria-label="用户列表">
       <div class="mg-list-caption"><h2>全部用户</h2><span><LockKeyhole :size="13" />手机号、实名资料默认脱敏</span></div>
       <form class="management-filters" @submit.prevent="search">
-        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索姓名、手机号、登录账号、商户或用户编号" aria-label="搜索关键词" maxlength="100" /><button v-if="keyword" type="button" aria-label="清空搜索" @click="keyword = ''; search()"><X :size="14" /></button></label>
+        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索姓名、手机号、登录账号、商户或 UID" aria-label="搜索关键词" maxlength="100" /><button v-if="keyword" type="button" aria-label="清空搜索" @click="keyword = ''; search()"><X :size="14" /></button></label>
         <label class="mg-select"><span class="sr-only">角色</span><AppSelect v-model="role"><option value="">全部角色</option><option v-for="(label, value) in userRoles" :key="value" :value="value">{{ label }}</option></AppSelect></label>
         <label class="mg-select"><span class="sr-only">账号状态</span><AppSelect v-model="status"><option value="">当前账号</option><option v-for="(label, value) in userStatuses" :key="value" :value="value">{{ label }}</option></AppSelect></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
@@ -306,7 +306,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
           <thead><tr><th>用户</th><th>实名</th><th>所属商户</th><th>会员与烟火</th><th>状态</th><th>最近登录</th><th class="mg-table-action">操作</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.id">
-              <td><button class="mg-record-title" type="button" @click="openDetail(item)"><span class="mg-avatar">{{ (item.name || '用').slice(0, 1) }}</span><span><strong>{{ item.name || '未填写姓名' }}</strong><small>用户 #{{ item.id }} · {{ item.phoneMasked }}</small></span></button></td>
+              <td><button class="mg-record-title" type="button" @click="openDetail(item)"><span class="mg-avatar">{{ (item.name || '用').slice(0, 1) }}</span><span><strong>{{ item.name || '未填写姓名' }}</strong><small>UID {{ item.uid || '—' }} · {{ item.phoneMasked }}</small></span></button></td>
               <td><template v-if="item.identity"><span>{{ item.identity.legalNameMasked }}</span><small class="mg-mono">{{ item.identity.idNumberMasked }}</small></template><span v-else class="mg-status"><i />未实名</span></td>
               <td><span>{{ item.tenantName || '—' }}</span><small>{{ userRoles[item.role] || item.role }}{{ item.operator ? ' · 平台运营' : '' }}</small></td>
               <td><span>{{ membership(item) }}</span><small>烟火 {{ Number(item.creditsAvailable).toLocaleString('zh-CN') }}</small></td>
@@ -324,7 +324,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
     <Dialog :open="Boolean(selected)" class="management-dialog" @close="closeDetail">
       <div class="mg-backdrop" aria-hidden="true" /><div class="mg-drawer-position">
         <DialogPanel class="mg-drawer management-page">
-          <header class="mg-drawer-header"><div><span>用户 #{{ selected?.id }}</span><DialogTitle as="h2">{{ selected?.name || '未填写姓名' }}</DialogTitle></div><button class="mg-page-button" type="button" :disabled="busy" aria-label="关闭详情" @click="closeDetail"><X :size="20" /></button></header>
+          <header class="mg-drawer-header"><div><span>UID {{ selected?.uid || '—' }}</span><DialogTitle as="h2">{{ selected?.name || '未填写姓名' }}</DialogTitle></div><button class="mg-page-button" type="button" :disabled="busy" aria-label="关闭详情" @click="closeDetail"><X :size="20" /></button></header>
           <template v-if="selected">
             <DialogDescription class="mg-detail-description"><span class="mg-status" :class="`mg-${selected.status.toLowerCase()}`"><i />{{ userStatuses[selected.status] || selected.status }}</span><span>{{ selected.tenantName }} · 商户 #{{ selected.tenantId }}</span></DialogDescription>
             <div class="mg-drawer-body">
@@ -365,7 +365,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
               </section>
               <section class="mg-detail-section" aria-labelledby="user-partner-title">
                 <h3 id="user-partner-title"><Handshake :size="17" />服务商授权</h3>
-                <p class="mg-muted">授权后，这个账号可以登录 partner.yifangzhi.com，管理名下商户、分配烟火、生成激活码。用户 ID：<span class="mg-mono">{{ selected.uid || '—' }}</span></p>
+                <p class="mg-muted">授权后，这个账号可以登录 partner.yifangzhi.com，管理名下商户、分配烟火、生成激活码。UID：<span class="mg-mono">{{ selected.uid || '—' }}</span></p>
                 <p v-if="partnersError" class="mg-inline-error" role="alert">{{ partnersError }}</p>
                 <p v-else-if="!partners" class="mg-muted" role="status">正在读取服务商…</p>
                 <div v-else-if="partnerOf(selected)" class="mg-billing-row">

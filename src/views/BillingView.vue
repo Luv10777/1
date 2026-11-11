@@ -238,7 +238,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
           </div>
           <h2>{{ account.plan?.name || '尚未订阅套餐' }}</h2>
           <p v-if="account.memberUntil" class="yanhuo-card-meta">有效期至 {{ dateTime(account.memberUntil) }}</p>
-          <p v-if="auth.user?.uid" class="yanhuo-card-meta">我的用户 ID：<strong class="yanhuo-uid">{{ auth.user.uid }}</strong>（服务商添加你时使用）</p>
+          <p v-if="auth.user?.uid" class="yanhuo-card-meta">我的 UID：<strong class="yanhuo-uid">{{ auth.user.uid }}</strong>（服务商添加你时使用）</p>
           <p v-else class="yanhuo-card-meta">未激活的账号只能查看。在下方输入激活码即可使用全部功能，使用时按烟火计费。</p>
           <ul class="yanhuo-entitlements">
             <li :class="{ enabled: account.memberActive }"><Check :size="14" />图片、视频、文案（按烟火）</li>

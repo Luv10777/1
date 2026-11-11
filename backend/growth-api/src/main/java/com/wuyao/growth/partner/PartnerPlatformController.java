@@ -68,7 +68,7 @@ public class PartnerPlatformController {
         return ApiResponse.ok(service.ledger(id, page, size, me.userId()));
     }
 
-    /** 按用户 ID 查商户现在的归属。 */
+    /** 按 UID 查商户现在的归属。 */
     @GetMapping("/lookup")
     public ApiResponse<Map<String, Object>> lookup(@RequestParam Long uid, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(service.lookup(uid, me.userId()));

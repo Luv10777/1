@@ -96,7 +96,7 @@ public class PartnerPlatformService {
         return partners.ledgerOf(partnerId, page, size);
     }
 
-    /** 按用户 ID 查这个账号的商户现在归属哪家服务商，改归属前先查。 */
+    /** 按 UID 查这个账号的商户现在归属哪家服务商，改归属前先查。 */
     public Map<String, Object> lookup(Long uid, Long operator) {
         requireOperator(operator);
         var u = user(uid);
@@ -129,7 +129,7 @@ public class PartnerPlatformService {
 
     private PlatformAccountDirectory.PlatformUser user(Long uid) {
         return directory.userByUid(uid).filter(u -> !"REMOVED".equals(u.status()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个用户 ID，请核对后重新输入"));
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个 UID，请核对后重新输入"));
     }
 
     private PartnerDtos.PlatformPartner view(PartnerStore.Row row) {

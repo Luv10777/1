@@ -28,8 +28,8 @@ export const partnerAdminApi = {
   reassign: (tenantId, partnerId) => put(`/api/platform/partners/assignments/${encodeURIComponent(tenantId)}`, { partnerId: partnerId || null }),
 }
 
-export const tenantSources = { UID: '按用户 ID 添加', CODE: '兑换激活码', PLATFORM: '平台指定' }
+export const tenantSources = { UID: '按 UID 添加', CODE: '兑换激活码', PLATFORM: '平台指定' }
 export const ledgerTypes = { GRANT: '平台发放', TRANSFER: '分给商户' }
 
-/** 用户 ID 是 8 位数字。 */
+/** UID 是 8 位数字。 */
 export const validUid = value => /^[1-9]\d{7}$/.test(String(value || '').trim())

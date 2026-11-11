@@ -12,7 +12,7 @@ const signingOut = ref(false)
 const authorized = computed(() => route.meta.partner && auth.isAuthenticated && partner.overview)
 const navigation = [
   { name: 'partner-overview', label: '概览', description: '烟火余额、激活码额度与流水', icon: LayoutDashboard },
-  { name: 'partner-tenants', label: '名下商户', description: '按用户 ID 添加商户，分配烟火', icon: Store },
+  { name: 'partner-tenants', label: '名下商户', description: '按 UID 添加商户，分配烟火', icon: Store },
   { name: 'partner-codes', label: '激活码', description: '在额度内生成激活码', icon: TicketCheck },
 ]
 
@@ -39,7 +39,7 @@ async function logout() {
     <div class="admin-body">
       <header class="admin-topbar">
         <div class="admin-crumb"><button class="admin-menu-toggle" type="button" :aria-expanded="menuOpen" aria-label="切换导航" @click="menuOpen = !menuOpen"><component :is="menuOpen ? PanelLeftClose : PanelLeftOpen" :size="20" /></button><span>服务商后台</span><span class="admin-topbar-separator">/</span><strong>{{ route.meta.title }}</strong></div>
-        <div class="admin-topbar-actions" style="margin-left:auto"><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '服').slice(0, 1) }}</span><span>{{ auth.user?.name || '服务商账号' }}<small>用户 ID {{ auth.user?.uid || '—' }}</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div></div>
+        <div class="admin-topbar-actions" style="margin-left:auto"><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '服').slice(0, 1) }}</span><span>{{ auth.user?.name || '服务商账号' }}<small>UID {{ auth.user?.uid || '—' }}</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div></div>
       </header>
       <main id="partner-main" class="admin-main" tabindex="-1"><RouterView /></main>
     </div>

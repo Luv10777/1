@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 服务商后台（partner.yifangzhi.com）：服务商账号查看自己的烟火和激活码额度，按用户 ID 添加名下商户，
+ * 服务商后台（partner.yifangzhi.com）：服务商账号查看自己的烟火和激活码额度，按 UID 添加名下商户，
  * 把烟火分给名下商户，在额度内生成激活码。每个接口先确认当前账号属于一家启用中的服务商，只能动这一家的数据。
  */
 @Service
@@ -43,11 +43,11 @@ public class PartnerService {
         return tenantViews(store.tenants(partner.id()), page, size, keyword);
     }
 
-    /** 按用户 ID 把该账号所属的商户加到名下。第一次归属为准：已归属别家服务商的不能加。 */
+    /** 按 UID 把该账号所属的商户加到名下。第一次归属为准：已归属别家服务商的不能加。 */
     public PartnerDtos.TenantView addTenant(Long userId, Long uid) {
         var partner = requirePartner(userId);
         var user = directory.userByUid(uid).filter(u -> !"REMOVED".equals(u.status()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个用户 ID，请核对后重新输入"));
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个 UID，请核对后重新输入"));
         Long owner = store.bindIfAbsent(user.tenantId(), partner.id(), "UID", userId);
         if (!owner.equals(partner.id())) throw BizException.of(ErrorCode.CONFLICT, "该用户已归属其他服务商，不能添加");
         return tenantView(user.tenantId());

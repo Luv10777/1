@@ -74,7 +74,7 @@ async function run(work, done) {
 }
 
 async function create() {
-  createForm.error = !createForm.name.trim() ? '请填写服务商名称。' : !validUid(createForm.adminUid) ? '登录账号的用户 ID 是 8 位数字。' : ''
+  createForm.error = !createForm.name.trim() ? '请填写服务商名称。' : !validUid(createForm.adminUid) ? '登录账号的 UID 是 8 位数字。' : ''
   if (createForm.error) return
   try {
     await run(async () => {
@@ -113,7 +113,7 @@ async function saveQuota() {
 }
 
 async function addMember() {
-  memberForm.error = validUid(memberForm.uid) ? '' : '用户 ID 是 8 位数字。'
+  memberForm.error = validUid(memberForm.uid) ? '' : 'UID 是 8 位数字。'
   if (memberForm.error) return
   try {
     await run(async () => { replace(await api.addMember(selectedId.value, memberForm.uid.trim())); memberForm.uid = '' }, '登录账号已添加')
@@ -134,7 +134,7 @@ async function toggleStatus() {
 }
 
 async function lookup() {
-  assignForm.error = validUid(assignForm.uid) ? '' : '用户 ID 是 8 位数字。'
+  assignForm.error = validUid(assignForm.uid) ? '' : 'UID 是 8 位数字。'
   assignForm.found = null
   if (assignForm.error) return
   try { assignForm.found = await api.lookup(assignForm.uid.trim()); assignForm.partnerId = assignForm.found.partnerId ? String(assignForm.found.partnerId) : '' }
@@ -173,7 +173,7 @@ load()
       <form class="partner-admin-form" @submit.prevent="create">
         <label>服务商名称<input v-model="createForm.name" maxlength="80" required /></label>
         <label>联系方式（可选）<input v-model="createForm.contact" maxlength="120" placeholder="联系人、电话" /></label>
-        <label>登录账号的用户 ID<input v-model="createForm.adminUid" inputmode="numeric" maxlength="8" placeholder="8 位数字" required /><small>对方先注册一方志账号，在「套餐与权益」页能看到用户 ID。</small></label>
+        <label>登录账号的 UID<input v-model="createForm.adminUid" inputmode="numeric" maxlength="8" placeholder="8 位数字" required /><small>对方先注册一方志账号，在「套餐与权益」页能看到 UID。</small></label>
         <p v-if="createForm.error" class="mg-error" role="alert">{{ createForm.error }}</p>
         <div><button class="mg-button mg-primary" type="submit" :disabled="busy">创建</button></div>
       </form>
@@ -220,8 +220,8 @@ load()
           </form>
           <form class="partner-admin-form" @submit.prevent="addMember">
             <h3>登录账号</h3>
-            <ul class="partner-members"><li v-for="member in selected.members" :key="member.userId"><span>{{ member.name || '未命名' }} · 用户 ID {{ member.uid }}</span><button class="mg-text-button" type="button" :disabled="busy" @click="removeMember(member)">移除</button></li></ul>
-            <label>添加账号的用户 ID<input v-model="memberForm.uid" inputmode="numeric" maxlength="8" /></label>
+            <ul class="partner-members"><li v-for="member in selected.members" :key="member.userId"><span>{{ member.name || '未命名' }} · UID {{ member.uid }}</span><button class="mg-text-button" type="button" :disabled="busy" @click="removeMember(member)">移除</button></li></ul>
+            <label>添加账号的 UID<input v-model="memberForm.uid" inputmode="numeric" maxlength="8" /></label>
             <p v-if="memberForm.error" class="mg-error" role="alert">{{ memberForm.error }}</p>
             <div><button class="mg-button" type="submit" :disabled="busy">添加</button></div>
           </form>
@@ -235,7 +235,7 @@ load()
         <div v-else class="management-table-wrap">
           <table class="management-table">
             <thead><tr><th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>归属方式</th></tr></thead>
-            <tbody><tr v-for="item in tenants" :key="item.tenantId"><td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td><td><span>{{ item.ownerName || '—' }}</span><small>用户 ID {{ item.ownerUid || '—' }}</small></td><td>{{ membership(item) }}</td><td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td><td><span>{{ tenantSources[item.source] || item.source }}</span><small>{{ managementDate(item.boundAt) }}</small></td></tr></tbody>
+            <tbody><tr v-for="item in tenants" :key="item.tenantId"><td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td><td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td><td>{{ membership(item) }}</td><td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td><td><span>{{ tenantSources[item.source] || item.source }}</span><small>{{ managementDate(item.boundAt) }}</small></td></tr></tbody>
           </table>
         </div>
       </section>
@@ -255,7 +255,7 @@ load()
     <section v-if="!forbidden" class="management-list" aria-labelledby="assign-title">
       <div class="mg-list-caption"><h2 id="assign-title">改商户归属</h2></div>
       <form class="partner-admin-form partner-admin-inline" @submit.prevent="lookup">
-        <label>商户任一账号的用户 ID<input v-model="assignForm.uid" inputmode="numeric" maxlength="8" /></label>
+        <label>商户任一账号的 UID<input v-model="assignForm.uid" inputmode="numeric" maxlength="8" /></label>
         <div><button class="mg-button" type="submit" :disabled="busy">查询</button></div>
       </form>
       <div v-if="assignForm.found" class="partner-admin-form partner-admin-inline">

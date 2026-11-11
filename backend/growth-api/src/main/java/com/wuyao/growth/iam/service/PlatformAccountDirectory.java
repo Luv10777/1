@@ -66,7 +66,7 @@ public class PlatformAccountDirectory {
         return loginEvents.countUsersBetween(from, to);
     }
 
-    /** 按用户 ID（uid）找账号，找不到为空。调用方负责核对身份。 */
+    /** 按 UID（uid）找账号，找不到为空。调用方负责核对身份。 */
     @Transactional(readOnly = true)
     public java.util.Optional<PlatformUser> userByUid(Long uid) {
         return users.findByUid(uid).map(PlatformUser::of);

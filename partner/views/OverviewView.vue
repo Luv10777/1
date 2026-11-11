@@ -38,7 +38,7 @@ load()
     </header>
     <section v-if="overview" class="partner-cards" aria-label="服务商概况">
       <div class="partner-card"><span>可分配烟火</span><strong>{{ number(overview.partner.creditsAvailable) }}</strong><small>分给名下商户后记入商户的充值烟火</small></div>
-      <div class="partner-card"><span>名下商户</span><strong>{{ number(overview.tenantCount) }}</strong><small>按用户 ID 添加，或兑换了你的激活码</small></div>
+      <div class="partner-card"><span>名下商户</span><strong>{{ number(overview.tenantCount) }}</strong><small>按 UID 添加，或兑换了你的激活码</small></div>
     </section>
 
     <section class="management-list" aria-labelledby="quota-title">
