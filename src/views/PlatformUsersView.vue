@@ -1,10 +1,11 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
-import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Crown, Eye, Flame, Gift, LockKeyhole, LogIn, RefreshCw, Search, ShieldCheck, UserCheck, UserPlus, Users, X } from 'lucide-vue-next'
+import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Crown, Eye, Flame, Gift, LockKeyhole, LogIn, RefreshCw, Search, ShieldCheck, UserCheck, UserPlus, Users, X, Handshake } from 'lucide-vue-next'
 import { platformManagementApi as api } from '../services/platformManagement'
-import { planAdminApi } from '../services/planAdminApi'
+import { activationPlans, planAdminApi } from '../services/planAdminApi'
+import { partnerAdminApi } from '../services/partnerApi'
 import { auth } from '../stores/auth'
 import { loadPlatformAccess, platform } from '../stores/platform'
 import { auditActions, managementDate, userRoles, userStatuses } from '../domain/platformManagement'
@@ -41,6 +42,10 @@ const confirming = ref(null)
 const identityNote = ref('')
 const identityError = ref('')
 const revealed = ref(null)
+// 服务商授权：把这个账号设为某家服务商的登录账号（新建或加入已有的），对方即可登录 partner.yifangzhi.com。
+const partners = ref(null)
+const partnersError = ref('')
+const partnerForm = reactive({ target: 'new', name: '', error: '', done: '' })
 let version = 0
 let detailVersion = 0
 let revealTimer
@@ -101,6 +106,7 @@ function closeDetail() {
   revealed.value = null
   identityNote.value = ''
   identityError.value = ''
+  Object.assign(partnerForm, { target: 'new', name: '', error: '', done: '' })
 }
 // 完整姓名和证件号按填写的用途查看，后端留存查阅记录；60 秒后自动遮蔽。
 async function revealIdentity() {
@@ -132,13 +138,15 @@ function openDetail(item) {
   selected.value = item
   loadTrail(item, ++detailVersion)
   loadPlans()
+  partnerForm.name = item.tenantName || item.name || ''
+  loadPartners()
 }
-// 只列已上架的套餐；没有会员与烟火管理权限时，接口返回 403，提示原因并禁用操作。
+// 列每个套餐标识的最新版本，上没上架都算（站内不卖的月卡、季卡、年卡不上架）；没有会员与烟火管理权限时，接口返回 403，提示原因并禁用操作。
 async function loadPlans() {
   if (plans.value.length) return
   plansError.value = ''
   try {
-    plans.value = (await planAdminApi.plans()).filter(item => item.published).map(item => item.plan)
+    plans.value = activationPlans(await planAdminApi.plans())
     planId.value = plans.value[0] ? String(plans.value[0].id) : ''
   } catch (failure) { plansError.value = failure.message || '套餐读取失败，暂时不能开通会员。' }
 }
@@ -187,6 +195,56 @@ async function confirmBilling() {
     loadTrail(result, attempt)
   } catch (failure) {
     if (attempt === detailVersion) billingError.value = failure.message || '暂时无法确认处理结果，请刷新后核对。'
+  } finally { if (attempt === detailVersion) busy.value = false }
+}
+// 服务商涉及烟火和激活码，接口只开放给计费运营名单；没有权限时只提示，不显示操作。
+async function loadPartners() {
+  partnersError.value = ''
+  try { partners.value = await partnerAdminApi.list() }
+  catch (failure) {
+    partners.value = null
+    partnersError.value = failure.status === 403 ? '授权服务商需要计费运营权限（服务端配置 BILLING_OPERATOR_USER_IDS）。' : failure.message || '服务商暂时无法读取。'
+  }
+}
+const partnerOf = item => partners.value?.find(entry => entry.members.some(member => member.userId === item.id)) || null
+async function grantPartner() {
+  const item = selected.value
+  partnerForm.error = ''
+  partnerForm.done = ''
+  if (!item.uid) { partnerForm.error = '这个账号还没有用户 ID，请刷新后再试。'; return }
+  const creating = partnerForm.target === 'new'
+  const target = creating ? null : partners.value.find(entry => String(entry.partner.id) === partnerForm.target)
+  const name = partnerForm.name.trim()
+  if (creating && !name) { partnerForm.error = '请填写服务商名称。'; return }
+  const who = `${item.name || `用户 #${item.id}`}（用户 ID ${item.uid}）`
+  if (!window.confirm(creating ? `新建服务商「${name}」，并把 ${who} 设为它的登录账号？` : `把 ${who} 加为「${target.partner.name}」的登录账号？`)) return
+  const attempt = detailVersion
+  busy.value = true
+  try {
+    if (creating) await partnerAdminApi.create({ name, contact: null, adminUid: item.uid })
+    else await partnerAdminApi.addMember(target.partner.id, item.uid)
+    if (attempt !== detailVersion) return
+    await loadPartners()
+    partnerForm.done = '已授权，对方用这个账号登录 partner.yifangzhi.com。发烟火、设激活码额度请到「服务商」页。'
+  } catch (failure) {
+    if (attempt === detailVersion) partnerForm.error = failure.message || '授权失败，请稍后再试。'
+  } finally { if (attempt === detailVersion) busy.value = false }
+}
+async function revokePartner() {
+  const item = selected.value
+  const entry = partnerOf(item)
+  if (!entry || !window.confirm(`取消后 ${item.name || `用户 #${item.id}`} 不能再登录「${entry.partner.name}」的服务商后台；服务商本身、名下商户和烟火都保留。确定取消吗？`)) return
+  const attempt = detailVersion
+  busy.value = true
+  partnerForm.error = ''
+  partnerForm.done = ''
+  try {
+    await partnerAdminApi.removeMember(entry.partner.id, item.id)
+    if (attempt !== detailVersion) return
+    await loadPartners()
+    partnerForm.done = '已取消服务商授权。'
+  } catch (failure) {
+    if (attempt === detailVersion) partnerForm.error = failure.message || '取消失败，请稍后再试。'
   } finally { if (attempt === detailVersion) busy.value = false }
 }
 const canSuspend = item => item.status !== 'SUSPENDED' && item.status !== 'REMOVED' && !item.operator && item.id !== auth.user?.id
@@ -291,7 +349,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
                 <p class="mg-muted">会员和烟火按商户计算，操作作用于{{ tenantLabel(selected) }}下的所有账号。赠送的烟火不计入充值收入。</p>
                 <p v-if="plansError" class="mg-inline-error" role="alert">{{ plansError }}</p>
                 <div class="mg-billing-row">
-                  <label class="mg-select"><span class="sr-only">会员套餐</span><AppSelect v-model="planId" :disabled="busy || Boolean(confirming) || !plans.length" aria-label="会员套餐"><option v-if="!plans.length" value="">暂无上架套餐</option><option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.name }} · {{ plan.durationDays }} 天 · 送 {{ plan.giftCredits.toLocaleString('zh-CN') }} 烟火</option></AppSelect></label>
+                  <label class="mg-select"><span class="sr-only">会员套餐</span><AppSelect v-model="planId" :disabled="busy || Boolean(confirming) || !plans.length" aria-label="会员套餐"><option v-if="!plans.length" value="">暂无套餐</option><option v-for="plan in plans" :key="plan.id" :value="String(plan.id)">{{ plan.name }} · {{ plan.durationDays }} 天 · 送 {{ plan.giftCredits.toLocaleString('zh-CN') }} 烟火</option></AppSelect></label>
                   <button class="mg-button" type="button" :disabled="busy || Boolean(confirming) || !planId" @click="ask('grant')"><Crown :size="15" />{{ selected.memberActive ? '续期会员' : '开通会员' }}</button>
                   <button v-if="selected.memberActive" class="mg-button mg-danger" type="button" :disabled="busy || Boolean(confirming)" @click="ask('revoke')"><Ban :size="15" />关闭会员</button>
                 </div>
@@ -304,6 +362,25 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
                 <div v-if="confirming" class="mg-confirm" role="alert"><p>{{ confirming.text }}</p><div><button class="mg-button" type="button" :disabled="busy" @click="confirming = null">取消</button><button class="mg-button" :class="confirming.kind === 'revoke' ? 'mg-danger' : 'mg-primary'" type="button" :disabled="busy" @click="confirmBilling">{{ busy ? '正在保存…' : '确认' }}</button></div></div>
                 <p v-if="billingError" class="mg-inline-error" role="alert">{{ billingError }}</p>
                 <p v-if="billingDone" class="mg-billing-done" role="status"><Check :size="14" />{{ billingDone }}</p>
+              </section>
+              <section class="mg-detail-section" aria-labelledby="user-partner-title">
+                <h3 id="user-partner-title"><Handshake :size="17" />服务商授权</h3>
+                <p class="mg-muted">授权后，这个账号可以登录 partner.yifangzhi.com，管理名下商户、分配烟火、生成激活码。用户 ID：<span class="mg-mono">{{ selected.uid || '—' }}</span></p>
+                <p v-if="partnersError" class="mg-inline-error" role="alert">{{ partnersError }}</p>
+                <p v-else-if="!partners" class="mg-muted" role="status">正在读取服务商…</p>
+                <div v-else-if="partnerOf(selected)" class="mg-billing-row">
+                  <span>已是「{{ partnerOf(selected).partner.name }}」的登录账号{{ partnerOf(selected).partner.status === 'ACTIVE' ? '' : '（该服务商已停用）' }}</span>
+                  <RouterLink class="mg-button" to="/partners">去服务商页</RouterLink>
+                  <button class="mg-button mg-danger" type="button" :disabled="busy" @click="revokePartner"><Ban :size="15" />取消授权</button>
+                </div>
+                <p v-else-if="selected.status === 'REMOVED'" class="mg-muted">已被商户移除的账号不能授权为服务商。</p>
+                <div v-else class="mg-billing-row">
+                  <label class="mg-select"><span class="sr-only">授权方式</span><AppSelect v-model="partnerForm.target" :disabled="busy" aria-label="授权方式"><option value="new">新建服务商</option><option v-for="entry in partners" :key="entry.partner.id" :value="String(entry.partner.id)">加入「{{ entry.partner.name }}」</option></AppSelect></label>
+                  <label v-if="partnerForm.target === 'new'" class="mg-amount"><span class="sr-only">服务商名称</span><input v-model="partnerForm.name" maxlength="80" placeholder="服务商名称" :disabled="busy" /></label>
+                  <button class="mg-button mg-primary" type="button" :disabled="busy" @click="grantPartner"><Handshake :size="15" />授权为服务商</button>
+                </div>
+                <p v-if="partnerForm.error" class="mg-inline-error" role="alert">{{ partnerForm.error }}</p>
+                <p v-if="partnerForm.done" class="mg-billing-done" role="status"><Check :size="14" />{{ partnerForm.done }}</p>
               </section>
               <section v-if="selected.status === 'SUSPENDED' || canSuspend(selected)" class="mg-detail-section"><h3><ClipboardList :size="17" />处理依据</h3><label class="mg-note-label" for="user-suspension-note">{{ selected.status === 'SUSPENDED' ? '解除原因' : '停用原因' }}<span>必填 · 至少5字</span></label><textarea id="user-suspension-note" v-model="note" class="mg-note" rows="3" maxlength="500" :disabled="busy" :placeholder="selected.status === 'SUSPENDED' ? '说明核实情况与解除依据。' : '说明停用依据，例如违规内容、投诉编号。停用后对方所有设备立即下线。'" /><span class="mg-note-count">{{ note.length }}/500</span><p v-if="actionError" class="mg-inline-error" role="alert">{{ actionError }}</p></section>
               <p v-else class="mg-muted">{{ selected.operator ? '平台运营账号不能在这里停用，请先从运营名单中移除。' : selected.id === auth.user?.id ? '不能停用自己的账号。' : '该账号已被商户移除，无需处理。' }}</p>

@@ -200,7 +200,8 @@ public class BillingService {
         var a=store.lockAccount(); String key="admin-membership:"+requestKey;
         if(store.eventExists(key)) return null;
         var p=store.plan(planId);
-        if(p==null||!p.isPublished()) throw bad("该套餐未上架，不能开通");
+        // 站内不卖的套餐（月卡、季卡、年卡）不上架，平台照样可以按它开通，规则同激活码。
+        if(p==null) throw bad("套餐不存在");
         var plan=p.snapshot();
         activate(a,plan,UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)).toString(),plan.giftCredits());
         ledger(a,key,"GRANT",plan.name()+" · 平台开通会员赠送",plan.giftCredits(),0,0,null,null,operator);

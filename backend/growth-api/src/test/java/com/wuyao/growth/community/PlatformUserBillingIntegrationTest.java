@@ -133,11 +133,10 @@ class PlatformUserBillingIntegrationTest {
     }
 
     @Test
-    void grantNeedsAPublishedPlanAndRefusesAnotherPlanWhileMemberIsActive() throws Exception {
+    void grantWorksWithUnpublishedPlansAndRefusesAPlanWithOtherFeaturesWhileMemberIsActive() throws Exception {
+        // 站内不卖的套餐不上架，平台照样能按它开通。
         call(post("/api/billing/operations/plans/" + planId + "/publication"), operatorToken, Map.of("published", false), 200);
-        assertThat(call(post(membership()), operatorToken, grant("grant-key-0003"), 400).path("message").asText()).contains("未上架");
-        call(post("/api/billing/operations/plans/" + planId + "/publication"), operatorToken, Map.of("published", true), 200);
-        call(post(membership()), operatorToken, grant("grant-key-0004"), 200);
+        call(post(membership()), operatorToken, grant("grant-key-0003"), 200);
 
         var other = new HashMap<String, Object>(Map.of("code", "YIFANG", "name", "一方", "description", "进阶经营", "priceMinor", 59900,
                 "durationDays", 30, "giftCredits", 3000, "imageEnabled", true, "videoEnabled", true, "liveEnabled", true, "published", true));
