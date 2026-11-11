@@ -220,7 +220,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     <header class="yanhuo-heading">
       <div>
         <h1>套餐与权益</h1>
-        <p class="yanhuo-intro">图片、视频、文案等功能不用开会员，充值烟火就能用；AI 实景直播需要开通会员，开通时赠送烟火，赠送的烟火优先使用。</p>
+        <p class="yanhuo-intro">输入激活码开通会员后才能使用各项功能，使用时按烟火扣费；激活码不送烟火，烟火需另外充值。</p>
       </div>
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>

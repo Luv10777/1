@@ -45,7 +45,7 @@ export async function loadBillingPlans() {
   return data
 }
 
-/** 开始创作前确认已登录、账户读得到。只有 AI 实景直播要开会员（由直播页和后端把关），其他功能按烟火余额使用。 */
+/** 开始创作前确认已登录、账户读得到。账号是否已激活由后端把关：未激活时接口返回 9001，页面弹窗引导去输入激活码。 */
 export async function requireAccount() {
   if (!auth.requireLogin()) throw new Error('请先登录后开始创作')
   const account = await refreshBilling()
