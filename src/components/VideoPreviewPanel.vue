@@ -1,5 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { Download } from 'lucide-vue-next'
+import { downloadMedia } from '../services/mediaDownload'
 
 const props = defineProps({
   isGenerating: Boolean,
@@ -17,7 +19,22 @@ const props = defineProps({
   error: { type: String, default: '' },
 })
 const videoDimensions = ref(null)
-watch(() => props.outputUrl, () => { videoDimensions.value = null })
+const downloading = ref(false)
+const downloadError = ref('')
+watch(() => props.outputUrl, () => { videoDimensions.value = null; downloadError.value = '' })
+async function downloadVideo() {
+  if (!props.outputUrl || props.isGenerating || props.error || downloading.value) return
+  const url = props.outputUrl
+  downloading.value = true
+  downloadError.value = ''
+  try {
+    await downloadMedia(url, '一方志视频.mp4')
+  } catch (error) {
+    if (props.outputUrl === url) downloadError.value = error.message || '视频下载失败，请重试'
+  } finally {
+    downloading.value = false
+  }
+}
 const previewAspectRatio = computed(() => {
   const width = videoDimensions.value?.width || props.actualWidth
   const height = videoDimensions.value?.height || props.actualHeight
@@ -52,6 +69,12 @@ defineEmits(['switch-workspace'])
     </div>
     <div v-else-if="outputUrl && !error" class="video-result-stage">
       <video class="video-result-player" :src="outputUrl" :style="{ '--video-aspect-ratio': previewAspectRatio }" controls playsinline preload="metadata" aria-label="生成的视频" @loadedmetadata="readVideoDimensions" />
+      <div class="video-result-actions">
+        <p v-if="downloadError" class="video-download-error" role="alert">{{ downloadError }}</p>
+        <button class="video-download-button" type="button" :disabled="downloading" :aria-busy="downloading" @click="downloadVideo">
+          <Download :size="16" aria-hidden="true" />{{ downloading ? '正在下载…' : '下载视频' }}
+        </button>
+      </div>
     </div>
     <div v-else class="video-device-stage">
       <div class="video-player device-player relative z-10 overflow-hidden shadow-[0_0_120px_rgba(99,102,241,0.15)] transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]" :class="[['3:4', '9:16'].includes(format) ? 'is-portrait device-phone' : 'is-landscape device-browser', { 'is-morphing': isMorphing, 'is-generating': isGenerating }]">

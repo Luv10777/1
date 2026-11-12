@@ -17,19 +17,19 @@ import java.util.UUID;
 
 @Service @RequiredArgsConstructor
 public class BillingService {
-    public static final int IMAGE_CREDITS = 9;
-    public static final int VIDEO_ANALYSIS_CREDITS = 3;
-    public static final int VIDEO_PLAN_CREDITS = 3;
-    public static final int IMAGE_INSPIRATION_CREDITS = 3;
-    public static final int COPY_CREDITS = 3;
+    public static final int IMAGE_CREDITS = 3;
+    public static final int VIDEO_ANALYSIS_CREDITS = 1;
+    public static final int VIDEO_PLAN_CREDITS = 1;
+    public static final int IMAGE_INSPIRATION_CREDITS = 1;
+    public static final int COPY_CREDITS = 1;
     /** Live sessions reserve one hour at a time and settle by the minute. */
-    public static final int LIVE_CREDITS_PER_HOUR = 105;
-    public static final int CREDITS_PER_YUAN = 10;
+    public static final int LIVE_CREDITS_PER_HOUR = 35;
+    public static final int CREDITS_PER_YUAN = 5;
     /** Online top-ups start at 500 yuan. Redeem codes and operator grants are not top-up orders. */
     public static final long MIN_TOPUP_MINOR = 50_000;
     /** 账号未激活时，所有功能的写操作都返回这句话（错误码 MEMBERSHIP_REQUIRED）。 */
     public static final String MEMBERSHIP_REQUIRED_MESSAGE = "账号还未激活，请在「套餐与权益」输入激活码";
-    /** One operator grant is capped at 10,000 yuan worth of credits. */
+    /** One operator grant is capped at 100,000 credits. */
     public static final long MAX_GRANT_CREDITS = 100_000;
     private final BillingStore store;
     private final BillingProperties config;
@@ -69,7 +69,7 @@ public class BillingService {
         requirePayment();
         var o=new BillingOrder(); o.setTenantId(TenantContext.require()); o.setRequestKey(input.requestKey());
         o.setCreatedBy(currentUserId());
-        o.setKind("TOPUP"); o.setAmountMinor(input.amountMinor()); o.setCredits(input.amountMinor()/10);
+        o.setKind("TOPUP"); o.setAmountMinor(input.amountMinor()); o.setCredits(input.amountMinor()/100*CREDITS_PER_YUAN);
         o.setPaymentMethod(config.getPaymentMethod());
         o.setExpiresAt(Instant.now().plus("MANUAL".equals(o.getPaymentMethod())?Duration.ofDays(7):Duration.ofMinutes(30))); store.save(o);
         return view(o);
