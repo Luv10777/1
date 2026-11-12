@@ -2,8 +2,8 @@
 
 版本：1.3 · 更新：2026-11-12 · 适用：`growth-api` 与 Vue 控制台。
 
-2026-11-12 的消耗恢复与充值 1:5 已通过本地相关检查，尚未发布。线上视频费率恢复文件已核验，
-具体发布步骤见本文的 11 月 12 日记录。更早的日期章节保留当时决定，不作为现行规则。
+2026-11-12 的消耗恢复与充值 1:5 已通过 PR #154 合并到 main，并于北京时间 18:19 发布。
+线上全部 30 条视频费率倍率已恢复；发布与回滚记录见本文的 11 月 12 日章节。更早的日期章节保留当时决定，不作为现行规则。
 
 生产账务使用 PostgreSQL，会员、支付订单、预占及烟火流水均由服务端维护。正式套餐和视频商业费率没有默认值，新账户余额为零。微信商户配置尚待补齐；未配置时，页面明确显示收款尚未开放，服务端拒绝创建支付订单。
 
@@ -489,11 +489,13 @@ GROUP BY capability;
 下载含正在下载、重复点击拦截和失败重试；未完成视频不提供下载。
 下载依赖作品地址仍有效及对象存储允许跨域读取，旧地址失效时需要刷新作品记录。
 
-本地验证：49 项后端相关测试、14 项前端相关测试、相关 ESLint、vue-tsc 和生产前端构建通过。
+验证：GitHub 两项完整检查通过，1141 项后端测试零失败、零跳过；本地 81 项后端相关测试、364 项前端测试、
+全量 ESLint（0 错误、140 原有警告）、vue-tsc 和三个前端生产构建通过。
 Windows Chrome 已用本地跨域测试素材实测视频成片下载及作品详情图片下载，保存文件与原件哈希相同。
-没有 Mac 真机，也未执行线上实际支付或线上作品下载验收。本次不改迁移，代码尚未提交、发布。
+没有 Mac 真机，也未执行线上实际支付或线上作品下载验收；线上所查账户没有作品。
+本次不改迁移，代码已通过 [PR #154](https://github.com/Luv10777/1/pull/154) 合并发布。
 
-### 视频费率核对及发布步骤
+### 视频费率核对及实际发布记录
 
 只读 SSH 核对了线上 `/etc/wuyao/billing-rates.yml` 与
 `/etc/wuyao/backups/billing-rates.yml.bak-20261111T111203-triple`：30 条倍率均为备份的三倍，
@@ -503,35 +505,34 @@ Windows Chrome 已用本地跨域测试素材实测视频成片下载及作品�
 
 | 文件 | 已核验 SHA-256 |
 |---|---|
-| 当前线上三倍费率 | 48f13447bd27d1eea99150123d00ef35b52a7303850b73164cce0feea44a7f4a |
-| 调价前备份 / 恢复候选 | 3a7fb0ad0ac2f29f742713062e1944060291ed5875c8c28a5d7798d47a0ecd3f |
+| 发布前线上三倍费率 | 48f13447bd27d1eea99150123d00ef35b52a7303850b73164cce0feea44a7f4a |
+| 调价前备份 / 当前恢复后的线上费率 | 3a7fb0ad0ac2f29f742713062e1944060291ed5875c8c28a5d7798d47a0ecd3f |
 
-恢复候选已保存到本地 `deploy/billing-config/billing-rates-restored-20261112.yml`，该目录不入 Git。
-服务器两份文件的属主、组及权限均为 `root:ubuntu 640`。以下命令为待发布操作，尚未执行。
+恢复文件保存在本地 `deploy/billing-config/billing-rates-restored-20261112.yml`，该目录不入 Git。
+当前线上费率文件保持 `root:ubuntu 640`；应用环境文件哈希未变。
 
-发布先沿用既有流程确认非视频预占为空，并避免发布窗口再接新任务，保留数据库备份及旧 release。
-恢复费率前再次核对两份哈希；任何配置漂移都应先停止并重新核对，防止重复除以三：
+北京时间 2026-11-12 18:19 完成发布：源提交 `03dfbb27036a073504eb00bab5b35a7cda3d789f`，
+GitHub main 合并提交 `3081bd76a273fb993dbe54d59fcfad8d51f6f059`；四端 release 为 `20261112-pricing-download-03dfbb2`。
+发布脚本核对上传文件、全部 80 个迁移文件、当前软链接及配置哈希，完成数据库备份并校验备份目录；
+确认无非视频预占、停 API 及六个 worker 后恢复费率，切换后端并重启，再切换三个前端。
+启动时新目录权限导致 API 暂时无法启动，已将新后端目录修正为与旧 release 一致的 755、JAR 为 644；
+后续发布应在停服务前验证服务用户可进入目标目录并读取 JAR。
 
-```bash
-set -e
-sudo sha256sum --check <<'HASHES'
-48f13447bd27d1eea99150123d00ef35b52a7303850b73164cce0feea44a7f4a  /etc/wuyao/billing-rates.yml
-3a7fb0ad0ac2f29f742713062e1944060291ed5875c8c28a5d7798d47a0ecd3f  /etc/wuyao/backups/billing-rates.yml.bak-20261111T111203-triple
-HASHES
-sudo test ! -e /etc/wuyao/backups/billing-rates.yml.bak-20261112-before-restore
-sudo cp --preserve=all /etc/wuyao/billing-rates.yml /etc/wuyao/backups/billing-rates.yml.bak-20261112-before-restore
-sudo cp --preserve=all /etc/wuyao/backups/billing-rates.yml.bak-20261111T111203-triple /etc/wuyao/billing-rates.yml.restored-20261112
-sudo mv -T /etc/wuyao/billing-rates.yml.restored-20261112 /etc/wuyao/billing-rates.yml
-```
+七个进程及健康检查均通过，数据库仍为 V80。
+`wy.yifangzhi.com`、`yifangzhi.com`、`admin.yifangzhi.com`、`partner.yifangzhi.com` 的首页及入口 JS / CSS 哈希核验通过，
+保留旧哈希资源。公网计费 summary 为 5 / 3 / 1 / 35，15 个文生视频模型 / 分辨率组合按恢复倍率及取整公式核验通过。
+校验未创建充值订单或生成任务，不代表真实付款验收。
 
-随后切换同批后端 release，并重启 API 和全部 worker，使固定单价、充值比例与视频费率一致。
-前端切换后核对计费 summary 为 5 / 3 / 1 / 35、500 元预览 2500 烟火、
-各已开放视频模型的新报价与下载入口。若回滚，后端 release 与视频配置需一起恢复；
-已建立充值订单仍按各自快照入账，不用新比例重算旧订单。
+服务器备份与发布回执位于 `/home/ubuntu/deploy-staging/20261112-pricing-download-5a2f1db`：
+数据库 `production-before-20261112-pricing-download-03dfbb2.dump`、旧费率 `billing-rates-before.yml`、回执 `deployed.json`。
+本地回执保存于 `logs/pricing-download-release/deployed.json`，不入 Git。
+旧后端 release 为 `20261111-buy-codes-063c6a6`，三个旧前端为 `20261112-digits-font-81ac2b3`。
+若需回滚，应一起恢复四个旧软链接和旧视频费率，并重启 API 及全部 worker 后核验；
+已建立充值订单仍按各自快照入账，不用回滚后的比例重算订单。
 
 ## 变更记录
 
-- 2026-11-12：固定消耗恢复原值、充值改 1:5；补视频与作品下载。线上视频恢复候选已核验，本次仅本地实现及检查，尚未发布。
+- 2026-11-12 18:19：PR #154 合并发布，固定消耗恢复原值、充值改 1:5；补视频与作品下载。30 条视频倍率已恢复，七服务、四域名及 15 组报价核验通过。
 
 - 2026-11-11：站内购买激活码（月 500 / 年 3980，付款后得到激活码，迁移 V80）；套餐与权益页改为账号卡片（头像、UID、已激活 / 未激活）。
 - 2026-11-11：新增用户 ID 和服务商（平台发烟火、分激活码额度，服务商分烟火给名下商户、生成激活码），迁移 V79，见 [用户 ID 与服务商](partners.md)；烟火看板购买来源新增 `PARTNER`。
