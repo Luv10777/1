@@ -480,7 +480,7 @@ class LiveSessionServiceTest {
         selectProduct(30L);
         when(knowledge.context(2L, 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(
                 2L, null, List.of(), Instant.now()));
-        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(105L), anyString()))
+        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(35L), anyString()))
                 .thenThrow(BizException.of(ErrorCode.ENTITLEMENT_REQUIRED, "当前套餐不含直播功能"))
                 .thenReturn("reservation-1");
 
@@ -490,7 +490,7 @@ class LiveSessionServiceTest {
         LiveDtos.View started = service.start(20L, 4L);
         assertThat(started.status()).isEqualTo("LIVE");
         assertThat(started.billing()).extracting(LiveDtos.Billing::onAir, LiveDtos.Billing::reservedCredits,
-                LiveDtos.Billing::usedCredits).containsExactly(true, 105L, 0L);
+                LiveDtos.Billing::usedCredits).containsExactly(true, 35L, 0L);
         assertThat(session.getBillingReservationId()).isEqualTo("reservation-1");
         assertThat(session.getBilledHours()).isEqualTo(1);
         assertThat(session.getLiveSegmentStartedAt()).isNotNull();
@@ -512,15 +512,15 @@ class LiveSessionServiceTest {
         assertThat(paused.onAir()).isFalse();
         assertThat(paused.liveSeconds()).isBetween(1205L, 1207L);
         assertThat(paused).extracting(LiveDtos.Billing::creditsPerHour, LiveDtos.Billing::reservedCredits,
-                LiveDtos.Billing::usedCredits, LiveDtos.Billing::refundedCredits).containsExactly(105, 105L, 37L, 0L);
+                LiveDtos.Billing::usedCredits, LiveDtos.Billing::refundedCredits).containsExactly(35, 35L, 13L, 0L);
 
         LiveDtos.Billing ended = service.end(20L, 4L).billing();
-        // 21 started minutes at 105/60 credits each, rounded up once for the whole session.
-        verify(billingService).capture(eq("reservation-1"), eq(37L), eq("live-capture:20"), anyString());
+        // 21 started minutes at 35/60 credits each, rounded up once for the whole session.
+        verify(billingService).capture(eq("reservation-1"), eq(13L), eq("live-capture:20"), anyString());
         verify(billingService).release(eq("reservation-1"), eq("live-release:20"), anyString());
         assertThat(session.getLiveSeconds()).isBetween(1205L, 1207L);
         assertThat(ended).extracting(LiveDtos.Billing::usedCredits, LiveDtos.Billing::refundedCredits)
-                .containsExactly(37L, 68L);
+                .containsExactly(13L, 22L);
     }
 
     @Test
@@ -533,7 +533,7 @@ class LiveSessionServiceTest {
         assertThat(service.resume(20L, 4L).status()).isEqualTo("LIVE");
 
         verify(billingService).requireMembership("LIVE");
-        verify(billingService).reserveMore(eq("reservation-1"), eq(105L), eq("live-hour:20:2"), anyString());
+        verify(billingService).reserveMore(eq("reservation-1"), eq(35L), eq("live-hour:20:2"), anyString());
         assertThat(session.getBilledHours()).isEqualTo(2);
     }
 
@@ -543,13 +543,13 @@ class LiveSessionServiceTest {
         session.setBillingReservationId("reservation-1");
         session.setBilledHours(1);
         session.setLiveSegmentStartedAt(Instant.now().minusSeconds(56 * 60));
-        when(billingService.canReserve("LIVE", 105L)).thenReturn(true);
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(true);
 
         assertThat(service.meter(20L)).isTrue();
-        verify(billingService).reserveMore(eq("reservation-1"), eq(105L), eq("live-hour:20:2"), anyString());
+        verify(billingService).reserveMore(eq("reservation-1"), eq(35L), eq("live-hour:20:2"), anyString());
         assertThat(session.getBilledHours()).isEqualTo(2);
 
-        when(billingService.canReserve("LIVE", 105L)).thenReturn(false);
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(false);
         session.setLiveSegmentStartedAt(Instant.now().minusSeconds(116 * 60));
         assertThat(service.meter(20L)).isTrue();
         assertThat(session.getStatus()).isEqualTo("LIVE");
@@ -564,26 +564,26 @@ class LiveSessionServiceTest {
     @Test
     void aSessionOnAirBeforeBillingStartsPayingAtItsFirstCheckOrPauses() {
         session.setStatus("LIVE");
-        when(billingService.canReserve("LIVE", 105L)).thenReturn(false);
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(false);
         assertThat(service.meter(20L)).isFalse();
         assertThat(session.getStatus()).isEqualTo("PAUSED");
         assertThat(session.getLiveSeconds()).isZero();
 
         session.setStatus("LIVE");
-        when(billingService.canReserve("LIVE", 105L)).thenReturn(true);
-        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(105L), anyString())).thenReturn("reservation-2");
+        when(billingService.canReserve("LIVE", 35L)).thenReturn(true);
+        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(35L), anyString())).thenReturn("reservation-2");
         assertThat(service.meter(20L)).isTrue();
         assertThat(session.getBillingReservationId()).isEqualTo("reservation-2");
         assertThat(session.getLiveSegmentStartedAt()).isNotNull();
     }
 
     @Test
-    void liveChargeIsOneHundredFiveCreditsAnHourBilledPerStartedMinute() {
+    void liveChargeIsThirtyFiveCreditsAnHourBilledPerStartedMinute() {
         assertThat(LiveBilling.charge(0)).isZero();
-        assertThat(LiveBilling.charge(1)).isEqualTo(2);
-        assertThat(LiveBilling.charge(30 * 60)).isEqualTo(53);
-        assertThat(LiveBilling.charge(3600)).isEqualTo(105);
-        assertThat(LiveBilling.charge(3601)).isEqualTo(107);
+        assertThat(LiveBilling.charge(1)).isEqualTo(1);
+        assertThat(LiveBilling.charge(30 * 60)).isEqualTo(18);
+        assertThat(LiveBilling.charge(3600)).isEqualTo(35);
+        assertThat(LiveBilling.charge(3601)).isEqualTo(36);
     }
 
     private void selectProduct(Long id) {

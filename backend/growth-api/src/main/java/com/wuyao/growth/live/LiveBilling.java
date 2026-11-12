@@ -101,7 +101,7 @@ public class LiveBilling {
         return Math.ceilDiv(seconds, 60);
     }
 
-    /** 每分钟 105/60 烟火，整场向上取整。 */
+    /** 每分钟 35/60 烟火，整场向上取整。 */
     static long charge(long seconds) {
         return Math.ceilDiv(minutes(seconds) * BillingService.LIVE_CREDITS_PER_HOUR, 60);
     }

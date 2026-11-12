@@ -26,7 +26,7 @@ async function fixture(path) {
     removeEventListener: event => listeners.delete(event),
   } })
   globalThis.fetch = async url => ({ ok: true, status: 200, json: async () => ({ code: 200,
-    data: url.includes('/plans') ? [] : { available: 100, creditsPerYuan: 10, canManage: true, payment: { available: true } },
+    data: url.includes('/plans') ? [] : { available: 100, creditsPerYuan: 5, canManage: true, payment: { available: true } },
   }) })
   const filename = resolve('src/views/BillingView.vue')
   const moduleId = filename.replaceAll('\\', '/').replace('.vue', '.payment-test.js')
@@ -80,6 +80,11 @@ async function fixture(path) {
 test('mobile keeps the pending checkout on gateway failure and preserves its order before navigating', async () => {
   const context = await fixture('/billing')
   try {
+    assert.equal(context.view.topupCredits, 2500, '500 yuan top-up previews 2500 credits')
+    context.view.amount = 1000
+    assert.equal(context.view.topupCredits, 5000)
+    context.view.amount = 499
+    assert.equal(context.view.topupCredits, 0, 'minimum top-up remains 500 yuan')
     await context.view.openPayment({ ...pendingOrder })
     context.billingApi.alipay = async (value, mobile) => {
       assert.equal(value, id); assert.equal(mobile, true)

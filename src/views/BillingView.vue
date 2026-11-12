@@ -26,7 +26,7 @@ watch(() => [auth.user?.id, auth.tenantId], () => { purchaseConsent.value = fals
 const MIN_TOPUP_YUAN = 500
 const preset = [500, 1000, 2000, 5000]
 const validAmount = computed(() => Number.isInteger(amount.value) && amount.value >= MIN_TOPUP_YUAN && amount.value <= 100000)
-const topupCredits = computed(() => validAmount.value ? amount.value * (account.value?.creditsPerYuan || 10) : 0)
+const topupCredits = computed(() => validAmount.value ? amount.value * (account.value?.creditsPerYuan || 5) : 0)
 const busy = ref(false)
 const error = ref('')
 // The checkout block where the last purchase error happened, so the message shows beside that button.
@@ -271,7 +271,6 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
     <header class="yanhuo-heading">
       <div>
         <h1>套餐与权益</h1>
-        <p class="yanhuo-intro">账号激活后才能使用各项功能，使用时按烟火扣费；激活码可以在这里购买，也可以向服务商购买。激活码不送烟火，烟火需另外充值。</p>
       </div>
       <button ref="refreshButton" class="yanhuo-icon" type="button" title="刷新账户" aria-label="刷新账户" :disabled="billing.loading" @click="refresh"><RefreshCw :size="18" :class="{ spinning: billing.loading }" /></button>
     </header>
@@ -294,7 +293,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
               <span v-if="auth.user?.uid" class="yanhuo-uid-box"><span>UID：</span><b>{{ auth.user.uid }}</b><button type="button" aria-label="复制 UID" title="复制 UID" @click="copy(String(auth.user.uid), 'UID')"><Copy :size="14" /></button></span>
             </div>
           </div>
-          <p class="yanhuo-card-meta">{{ account.memberActive ? `已激活，有效期至 ${dateTime(account.memberUntil)}` : '未激活的账号只能查看。购买或输入激活码后即可使用全部功能，使用时按烟火扣费。' }}</p>
+          <p v-if="account.memberActive" class="yanhuo-card-meta">有效期至 {{ dateTime(account.memberUntil) }}</p>
           <p v-if="copied" class="yanhuo-card-meta yanhuo-copied" role="status">{{ copied }}</p>
           <div class="yanhuo-account-actions">
             <button v-if="billing.plans.length && account.canManage" type="button" class="yanhuo-primary" :disabled="!canPay" @click="openBuy">购买激活码</button>
@@ -312,7 +311,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
 
       <section class="yanhuo-section" aria-labelledby="redeem-title">
-        <header class="yanhuo-section-head"><h2 id="redeem-title">兑换烟火</h2><p>输入平台发放的兑换码，烟火立即到账、全店共用；每个兑换码只能使用一次。激活码请点上方「输入激活码」。</p></header>
+        <header class="yanhuo-section-head"><h2 id="redeem-title">兑换烟火</h2></header>
         <form class="yanhuo-redeem" @submit.prevent="redeem">
           <input v-model="redeemCode" class="yanhuo-redeem-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" aria-label="兑换码">
           <button class="yanhuo-primary" type="submit" :disabled="redeeming || !redeemCode.trim()">{{ redeeming ? '兑换中…' : '兑换' }}</button>
@@ -323,7 +322,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       </section>
 
       <section v-if="purchased.length" class="yanhuo-section" aria-labelledby="purchased-title">
-        <header class="yanhuo-section-head"><h2 id="purchased-title">我购买的激活码</h2><p>可以自己用，也可以复制给别人；每个码只能用一次。</p></header>
+        <header class="yanhuo-section-head"><h2 id="purchased-title">我购买的激活码</h2></header>
         <div class="yanhuo-codes">
           <div v-for="item in purchased" :key="item.code" class="yanhuo-code-row">
             <span class="yanhuo-code-value">{{ formatRedeemCode(item.code) }}</span>
@@ -339,14 +338,13 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
 
 
       <section class="yanhuo-section" aria-labelledby="rules-title">
-        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2><p>优先使用赠送的烟火；所有功能都要账号已激活（会员生效中）。</p></header>
+        <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2></header>
         <dl class="yanhuo-rule-grid">
           <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong>生成中先预占，未交付的退回。</dd></div>
           <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
           <div><dt>视频生成</dt><dd><strong>按确认的报价</strong>先预占烟火，交付后按实际用量结算。</dd></div>
           <div><dt>直播</dt><dd><strong><YanhuoIcon :size="14" />{{ account.liveCreditsPerHour }} / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>
         </dl>
-        <p class="yanhuo-note">其他模块按正式公布的规则计费。</p>
       </section>
     </template>
     <dialog ref="topupDialog" class="yanhuo-payment yanhuo-topup-dialog" aria-labelledby="topup-title" @cancel.prevent="closeTopup" @click="event => { if (event.target === topupDialog) closeTopup() }">

@@ -214,8 +214,14 @@
 .video-history-message{display:grid;gap:8px;margin:0;padding:14px 8px;color:var(--color-text-muted);font-size:12px;line-height:1.8}
 .video-workbench-page .video-workbench-canvas{background:var(--color-bg-canvas)}
 .video-workbench-canvas .device-screen{background:var(--color-bg-surface)}
-.video-result-stage{display:grid;place-items:center;flex:1 1 0;width:100%;min-height:0;padding:24px;container-type:size}
+.video-result-stage{display:grid;place-items:center;flex:1 1 0;width:100%;min-height:0;padding:24px 24px 96px;container-type:size}
 .video-result-player{display:block;width:min(640px,100cqw,calc(100cqh * var(--video-aspect-ratio)),calc(560px * var(--video-aspect-ratio)));height:auto;aspect-ratio:var(--video-aspect-ratio);border-radius:10px;object-fit:contain;background:transparent}
+.video-result-actions{position:absolute;right:24px;bottom:20px;left:24px;display:flex;align-items:center;justify-content:flex-end;gap:12px}
+.video-download-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex-shrink:0;min-height:36px;padding:0 14px;border:1px solid var(--line);border-radius:4px;color:var(--ink);background:var(--color-bg-surface);font-size:12px;cursor:pointer}
+.video-download-button:hover{border-color:var(--color-accent);color:var(--color-accent-text)}
+.video-download-button:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.video-download-button:disabled{opacity:.55;cursor:wait}
+.video-download-error{margin:0;color:var(--color-error);font-size:12px;line-height:1.6}
 .video-workbench-page .video-workbench-sidebar{flex-shrink:0}
 @media(max-width:1100px){
   .video-workbench-page{position:relative}

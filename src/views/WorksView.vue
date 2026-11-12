@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { imageApi, downloadImage } from '../services/imageCreation'
+import { imageApi } from '../services/imageCreation'
 import { videoApi } from '../services/videoWorkflow'
+import { downloadMedia } from '../services/mediaDownload'
 import { ArrowUpRight, Check, Clock3, Download, Edit3, Image as ImageIcon, LayoutGrid, List, Play, Plus, Search, X } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -21,6 +22,8 @@ const videoTotalPages = ref(0)
 const worksLoading = ref(false)
 const worksError = ref('')
 const selectedWork = ref(null)
+const downloadingWorks = ref(new Set())
+const downloadError = ref(null)
 
 const filteredWorks = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase()
@@ -107,11 +110,16 @@ async function loadWorks(page = 0) {
 }
 
 async function downloadWork(work) {
-  if (work.type !== 'image' || !work.url) return
+  if (!work.url || downloadingWorks.value.has(work.id)) return
+  downloadingWorks.value.add(work.id)
+  downloadError.value = null
   try {
-    await downloadImage(work.url, `一方志作品-${work.creationId}.png`)
+    const extension = work.type === 'video' ? 'mp4' : 'png'
+    await downloadMedia(work.url, `一方志作品-${work.id}.${extension}`)
   } catch (error) {
-    worksError.value = error.message || '下载失败'
+    downloadError.value = { workId: work.id, message: error.message || '作品下载失败，请重试' }
+  } finally {
+    downloadingWorks.value.delete(work.id)
   }
 }
 
@@ -188,6 +196,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
     <p v-if="worksError" class="works-error" role="alert">
       {{ worksError }} <button type="button" @click="loadWorks(worksPage)">重试</button>
     </p>
+    <p v-if="downloadError && !selectedWork" class="works-error" role="alert">{{ downloadError.message }}</p>
 
     <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
       <article
@@ -196,14 +205,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
         class="work-card"
         tabindex="0"
         @click="selectedWork = work"
-        @keydown.enter="selectedWork = work"
+        @keydown.enter.self="selectedWork = work"
       >
         <div class="work-thumb">
           <img v-if="work.type === 'image'" class="work-media" :src="work.url" :alt="work.title" loading="lazy" />
           <video v-else class="work-media" :src="work.url" :aria-label="work.title" muted playsinline preload="metadata" />
           <span v-if="work.type === 'video'" class="video-play-icon" aria-hidden="true"><Play :size="20" fill="currentColor" /></span>
           <div class="thumb-overlay">
-            <button v-if="work.type === 'image'" class="download-button" type="button" aria-label="下载图片" @click.stop="downloadWork(work)">
+            <button class="download-button" type="button" :aria-label="downloadingWorks.has(work.id) ? '正在下载' : `下载${work.typeLabel}`" :title="`下载${work.typeLabel}`" :disabled="downloadingWorks.has(work.id)" :aria-busy="downloadingWorks.has(work.id)" @click.stop="downloadWork(work)">
               <Download :size="17" stroke-width="1.8" />
             </button>
           </div>
@@ -258,9 +267,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
             <span>作品 ID · {{ selectedWork.id }}</span>
             <div>
               <button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button>
+              <button class="secondary-modal-button" type="button" :disabled="downloadingWorks.has(selectedWork.id)" :aria-busy="downloadingWorks.has(selectedWork.id)" @click="downloadWork(selectedWork)"><Download :size="14" aria-hidden="true" /> {{ downloadingWorks.has(selectedWork.id) ? '正在下载…' : `下载${selectedWork.typeLabel}` }}</button>
               <button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 继续创作</button>
             </div>
           </footer>
+          <p v-if="downloadError?.workId === selectedWork.id" class="works-error detail-download-error" role="alert">{{ downloadError.message }}</p>
         </section>
       </div>
     </Teleport>
@@ -308,6 +319,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .thumb-overlay { position: absolute; inset: 0; display: flex; justify-content: flex-end; padding: 10px; background: rgba(20, 20, 20, .12); opacity: 0; transition: opacity .16s ease; }
 .work-card:hover .thumb-overlay, .work-card:focus-within .thumb-overlay { opacity: 1; }
 .download-button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
+.download-button:disabled, .secondary-modal-button:disabled { opacity: .55; cursor: wait; }
+.download-button:focus-visible, .secondary-modal-button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.detail-download-error { padding: 0 22px; }
 .status-pill { position: absolute; left: 9px; bottom: 9px; display: inline-flex; align-items: center; gap: 5px; min-height: 23px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); font-size: 12px; }
 .work-body { padding: 11px 12px 12px; }
 .work-title-row { display: flex; align-items: flex-start; gap: 6px; }
