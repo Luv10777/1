@@ -8,8 +8,14 @@ export const partnerApi = {
   tenants: values => get('/api/partner/tenants', params(values)),
   addTenant: uid => post('/api/partner/tenants', { uid: Number(uid) }),
   transfer: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/credits`, values),
+  renew: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/renewals`, values),
+  assignBd: (tenantId, bdUserId) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/bd`, { bdUserId: bdUserId || null }),
+  team: () => get('/api/partner/team'),
+  addBd: uid => post('/api/partner/team', { uid: Number(uid) }),
+  removeBd: userId => del(`/api/partner/team/${encodeURIComponent(userId)}`),
   codes: values => get('/api/partner/codes', params(values)),
   createCodes: values => post('/api/partner/codes', values),
+  voidCode: id => post(`/api/partner/codes/${encodeURIComponent(id)}/void`, {}),
   ledger: values => get('/api/partner/ledger', params(values)),
 }
 

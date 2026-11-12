@@ -90,18 +90,22 @@ public class BillingRedeemCodeService {
         return list(page, size, status, kind, keyword, 0L);
     }
 
-    /** 某家服务商生成的激活码。 */
+    /** 某家服务商生成的激活码；creator 不为空时只列这个账号生成的（BD 只看自己生成的）。 */
     @Transactional(readOnly = true)
-    public PageResult<BillingDtos.RedeemCodeView> listForPartner(Long partnerId, int page, int size, String status, String keyword) {
-        return list(page, size, status, "MEMBERSHIP", keyword, partnerId);
+    public PageResult<BillingDtos.RedeemCodeView> listForPartner(Long partnerId, Long creator, int page, int size, String status, String keyword) {
+        return list(page, size, status, "MEMBERSHIP", keyword, partnerId, creator);
     }
 
     private PageResult<BillingDtos.RedeemCodeView> list(int page, int size, String status, String kind, String keyword, long partnerId) {
+        return list(page, size, status, kind, keyword, partnerId, null);
+    }
+
+    private PageResult<BillingDtos.RedeemCodeView> list(int page, int size, String status, String kind, String keyword, long partnerId, Long creator) {
         if (page < 0 || size < 1 || size > 100) throw bad("分页参数无效");
         if (status != null && !status.isBlank() && !STATUSES.contains(status)) throw bad("筛选条件无效");
         if (kind != null && !kind.isBlank() && !Set.of("TOPUP", "GIFT", "MEMBERSHIP").contains(kind)) throw bad("筛选条件无效");
         String where = " where (:kind = '' or c.kind = :kind) and (:key = '' or c.code like :code or lower(c.note) like :note)"
-                + (partnerId > 0 ? " and c.partnerId = :partner" : "") + switch (status == null ? "" : status) {
+                + (partnerId > 0 ? " and c.partnerId = :partner" : "") + (creator != null ? " and c.createdBy = :creator" : "") + switch (status == null ? "" : status) {
             case "UNUSED" -> " and c.voidedAt is null and c.redeemedAt is null and (c.expiresAt is null or c.expiresAt > :now)";
             case "REDEEMED" -> " and c.redeemedAt is not null";
             case "VOIDED" -> " and c.voidedAt is not null";
@@ -114,6 +118,7 @@ public class BillingRedeemCodeService {
                 "code", codePart.isEmpty() ? "" : "%" + codePart + "%", "note", "%" + key.toLowerCase(Locale.ROOT) + "%"));
         if (where.contains(":now")) params.put("now", Instant.now());
         if (partnerId > 0) params.put("partner", partnerId);
+        if (creator != null) params.put("creator", creator);
         var count = em.createQuery("select count(c) from BillingRedeemCode c" + where, Long.class);
         var rows = em.createQuery("from BillingRedeemCode c" + where + " order by c.createdAt desc, c.id desc", BillingRedeemCode.class);
         params.forEach((name, value) -> { count.setParameter(name, value); rows.setParameter(name, value); });
@@ -124,8 +129,21 @@ public class BillingRedeemCodeService {
 
     @Transactional
     public BillingDtos.RedeemCodeView voidCode(Long id, Long operator) {
+        return voidCode(id, operator, null, null);
+    }
+
+    /**
+     * 服务商作废自己生成、还没兑换的激活码，额度不退回。creator 不为空时只能作废这个账号生成的（BD 只能作废自己的）。
+     */
+    @Transactional
+    public BillingDtos.RedeemCodeView voidForPartner(Long id, Long partnerId, Long creator, Long operator) {
+        return voidCode(id, operator, partnerId, creator);
+    }
+
+    private BillingDtos.RedeemCodeView voidCode(Long id, Long operator, Long partnerId, Long creator) {
         var c = em.find(BillingRedeemCode.class, id, LockModeType.PESSIMISTIC_WRITE);
-        if (c == null) throw BizException.of(ErrorCode.NOT_FOUND, "兑换码不存在");
+        if (c == null || partnerId != null && !partnerId.equals(c.getPartnerId())
+                || creator != null && !creator.equals(c.getCreatedBy())) throw BizException.of(ErrorCode.NOT_FOUND, "兑换码不存在");
         switch (c.status(Instant.now())) {
             case "REDEEMED" -> throw BizException.of(ErrorCode.CONFLICT, "该兑换码已被兑换，不能作废");
             case "VOIDED" -> { return views(List.of(c)).getFirst(); }
@@ -210,7 +228,8 @@ public class BillingRedeemCodeService {
             return new BillingDtos.RedeemCodeView(c.getId(), c.getCode(), c.getKind(), c.getCredits(), c.getAmountMinor(),
                     c.status(now), c.getNote(), c.getExpiresAt(), c.getCreatedAt(), c.getRedeemedTenantId(),
                     c.getRedeemedTenantId() == null ? null : tenants.get(c.getRedeemedTenantId()), c.getRedeemedAt(), c.getVoidedAt(),
-                    c.getPlanId(), plan == null ? null : plan.getName(), plan == null ? null : plan.getDurationDays(), c.getPartnerId());
+                    c.getPlanId(), plan == null ? null : plan.getName(), plan == null ? null : plan.getDurationDays(), c.getPartnerId(),
+                    c.getCreatedBy());
         }).toList();
     }
 

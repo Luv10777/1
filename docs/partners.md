@@ -13,12 +13,13 @@
 ## 服务商
 
 服务商就是平台开通的合作方，用自己已有的一方志账号登录 **partner.yifangzhi.com**。一个账号最多属于一家服务商，
-一家服务商可以有几个登录账号。
+一家服务商可以有几个登录账号，分两种角色（2026-11-13 起，迁移 V81）：负责人（OWNER，平台开通的账号都是）和 BD。
 
 | 谁 | 能做什么 |
 |---|---|
-| 平台（管理后台「服务商」页，限计费运营名单 `BILLING_OPERATOR_USER_IDS`） | 建服务商并指定登录账号（按 UID）；线下收款后给服务商发烟火；按套餐标识分别设激活码总额度（例如月卡 20 个）；停用 / 启用；看名下商户和烟火流水；按 UID 查商户归属并改归属或解除归属 |
-| 服务商（partner.yifangzhi.com） | 看可分配烟火、各套餐额度和流水；按 UID 把商户加到名下；把烟火分给名下商户；在额度内生成激活码 |
+| 平台（管理后台「服务商」页，限计费运营名单 `BILLING_OPERATOR_USER_IDS`） | 建服务商并指定负责人账号（按 UID）；线下收款后给服务商发烟火；按套餐标识分别设激活码总额度（例如月卡 20 个）；停用 / 启用；分页看名下商户（含归属的 BD）和烟火流水，看到 BD 和各 BD 名下商户数；按 UID 查商户归属并改归属或解除归属 |
+| 服务商负责人 | 看可分配烟火、各套餐额度和流水；按 UID 添加 / 移除 BD（「团队」页）；按 UID 把商户加到名下；把商户调给某个 BD 或收回；一次给多个名下商户分烟火；在额度内生成、作废激活码，按码搜索、按生成人筛选、导出表格；按到期筛选商户并直接续期 |
+| BD | 只看自己名下的商户和自己生成的激活码；按 UID 加商户（归到自己）；在服务商的额度内生成、作废自己的激活码；给自己名下的商户续期。不能分烟火，看不到服务商的烟火余额和流水 |
 
 ### 名下商户与归属
 
@@ -26,7 +27,15 @@
   - 服务商按 UID 添加（来源 `UID`）；
   - 商户兑换了某家服务商生成的激活码，且当时还没有归属（来源 `CODE`）。
 - 已经归属的商户，别家服务商不能再按 UID 添加；兑换别家的激活码照样开通会员，但不改归属。
-- 只有平台能改归属（来源 `PLATFORM`）或解除归属。
+- 只有平台能改归属（来源 `PLATFORM`）或解除归属。平台改归属后商户回到新服务商的负责人直接管。
+
+### BD
+
+- 商户归在服务商下面的哪个 BD 记在 `partner_tenants.bd_user_id`，为空表示负责人直接管。
+- BD 按 UID 添加的商户、兑换了 BD 生成的激活码的商户（第一次归属时）归到这个 BD；负责人添加的归负责人直接管。
+  商户已在本服务商名下但不归这个 BD 时，BD 再按 UID 添加会被拒绝，要负责人调配。
+- 负责人可以把商户在 BD 之间调配；BD 被移除时，他名下的商户回到负责人直接管，他生成的激活码照常可用。
+- BD 生成的激活码按 `billing_redeem_codes.created_by` 认人，没有另加列。
 
 ### 烟火
 
@@ -35,6 +44,9 @@
   不按这笔记邀请返利。只能分给自己名下的商户，余额不足时拒绝。
 - 两边分两步记账：先扣服务商、再给商户入账，两步都按 `requestKey` 去重。商户入账那一步失败时，页面保留同一个
   `requestKey`，再点一次「分配」即可补上，不会重复扣服务商的烟火。
+- 批量分配：负责人在名下商户列表里给几个商户各填烟火数，一次确认。合计超过余额时页面先拦下；
+  每个商户单独一笔请求、单独一个 `requestKey`，某一笔失败只标在那个商户下面，其余照常到账，再点「分配」只重试没成功的。
+- 只有负责人能分烟火、看服务商的烟火流水。
 - 烟火看板的「累计购买」把这部分单列为来源 `PARTNER`。
 
 ### 激活码
@@ -42,12 +54,22 @@
 - 额度按套餐标识设（`partner_code_quotas`），平台设的是总数，不能低于已经生成的个数。
 - 服务商生成时选套餐和数量，按该标识**最新**的版本生成（上没上架都行，站内不卖的套餐不上架），额度扣减和生成在同一事务；同一请求重复提交返回同一批码，不重复扣额度。
 - 服务商生成的码记在 `billing_redeem_codes.partner_id`，和平台生成的激活码一样一码一用；兑换后按上面的规则决定归属。
+- 作废：负责人能作废本服务商没兑换的码，BD 只能作废自己生成的；作废后**额度不退回**。已兑换的码不能作废。
+- 导出：激活码页「导出表格」按当前筛选导出 CSV（Excel 直接打开）。
+
+### 到期与直接续期
+
+- 名下商户可按「7 天内到期 / 30 天内到期 / 已过期 / 从未开通」筛选，按到期时间从早到晚排。按到期筛选时要读全部名下商户的会员状态，商户很多时会慢一些。
+- 直接续期：在商户那一行点「续期」选套餐，扣 1 个该套餐的额度，直接给商户开通或顺延（还没到期的从原到期日往后加），
+  不用商户输入激活码。实现上是生成一个备注为「直接续期」的码并立即替商户兑换，激活码列表里能看到，便于对账。
+  同一请求重复提交不重复扣额度、不重复顺延。BD 只能给自己名下的商户续期。
 
 ## 数据
 
 V79 新增 `partners`、`partner_members`、`partner_code_quotas`、`partner_tenants`、`partner_credit_ledger`，
 并给 `billing_redeem_codes` 加 `partner_id`。这几张表和 `billing_redeem_codes`、`billing_plans` 一样是平台级数据，
 **不开行级隔离**：服务层先核对平台运营或服务商身份，服务商只能读写自己那一家。分给商户的烟火写进商户自己的账本，照旧受 RLS 约束。
+V81 给 `partner_members` 加 `role`（`OWNER`/`BD`，原有账号都是 `OWNER`），给 `partner_tenants` 加 `bd_user_id`。
 
 ## 接口
 
@@ -56,11 +78,16 @@ V79 新增 `partners`、`partner_members`、`partner_code_quotas`、`partner_ten
 | 接口 | 说明 |
 |---|---|
 | `GET /api/partner/me` | 服务商、可分配烟火、各套餐额度、名下商户数 |
-| `GET /api/partner/tenants` | 名下商户（含会员状态和烟火余额），`keyword` 按商户名、联系人、UID 搜 |
+| `GET /api/partner/me` 的 `role` | 当前账号的角色：`OWNER` 或 `BD`；BD 看不到 `creditsAvailable`，`tenantCount` 只算自己的 |
+| `GET /api/partner/tenants` | 名下商户（含会员状态、烟火余额、归属 BD），`keyword` 按商户名、联系人、UID 搜；`expiry` 取 `SOON7`/`SOON30`/`EXPIRED`/`NEVER`；负责人可传 `bdUserId`（0 表示负责人直接管的） |
 | `POST /api/partner/tenants` | `{uid}` 按 UID 添加 |
-| `POST /api/partner/tenants/{tenantId}/credits` | `{requestKey, credits, note}` 分烟火 |
-| `GET/POST /api/partner/codes` | 查看 / 生成激活码，生成参数 `{requestKey, planCode, quantity, note}` |
-| `GET /api/partner/ledger` | 烟火流水 |
+| `POST /api/partner/tenants/{tenantId}/credits` | `{requestKey, credits, note}` 分烟火（仅负责人） |
+| `POST /api/partner/tenants/{tenantId}/renewals` | `{requestKey, planCode}` 直接续期 |
+| `PUT /api/partner/tenants/{tenantId}/bd` | `{bdUserId}` 调给某个 BD，空表示收回（仅负责人） |
+| `GET/POST /api/partner/team`、`DELETE /api/partner/team/{userId}` | 团队列表 / 按 `{uid}` 添加 BD / 移除 BD（仅负责人） |
+| `GET/POST /api/partner/codes` | 查看 / 生成激活码，生成参数 `{requestKey, planCode, quantity, note}`；查看可传 `keyword`、`status`，负责人可传 `createdBy` |
+| `POST /api/partner/codes/{id}/void` | 作废没兑换的激活码，额度不退回 |
+| `GET /api/partner/ledger` | 烟火流水（仅负责人） |
 
 平台（计费运营名单）：`/api/platform/partners` 下的列表、新建、登录账号增删、启停、发烟火、设额度、名下商户、流水、
 `GET lookup?uid=` 查归属、`PUT assignments/{tenantId}` 改归属。
@@ -76,5 +103,5 @@ V79 新增 `partners`、`partner_members`、`partner_code_quotas`、`partner_ten
 
 ## 未做
 
-- 服务商不能作废自己生成的激活码；需要作废时由平台在「兑换码」页作废（额度不退回）。
 - 服务商分给商户的烟火不能撤回。
+- 运营看板（按时间段统计发放、分配、商户消耗、开通续期，按 BD / 商户排行）是下一期。

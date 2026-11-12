@@ -18,3 +18,11 @@
 .management-table td > small { display:block; margin-top:2px; color:var(--mg-muted); font-size:11px; }
 .admin-password input { flex:1; min-width:0; }
 .admin-password > button { flex-shrink:0; white-space:nowrap; }
+.partner-danger { color:var(--mg-alert); }
+.partner-member.warn { color:#b25e09; font-weight:600; }
+.partner-member.muted { color:var(--mg-muted); }
+.partner-credit-input { width:110px; min-height:30px; padding:4px 8px; border:1px solid var(--mg-line); border-radius:5px; }
+.app-select-button.partner-bd-select { min-height:30px; padding:4px 26px 4px 8px; border:1px solid var(--mg-line); border-radius:5px; background:#fff; font-size:12px; }
+.partner-batch-bar { position:sticky; bottom:0; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:12px; padding:12px 20px; border-top:1px solid var(--mg-line); background:var(--mg-surface); font-size:13px; }
+.partner-batch-bar .mg-error { flex-basis:100%; margin:0; text-align:right; }
+.partner-form-note { flex-basis:100%; margin:0; color:var(--mg-muted); font-size:12px; }
