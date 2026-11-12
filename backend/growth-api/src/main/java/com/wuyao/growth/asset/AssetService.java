@@ -206,9 +206,23 @@ public class AssetService {
             if (pixels > maxImagePixels) {
                 throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片像素过高，请压缩后重试");
             }
+            String mimeType = stored.contentType();
+            int orientation = ImageOrientation.read(bytes);
+            if (orientation != 1) {
+                // 竖拍原图的像素是横着存的，模型不认 EXIF 标记；转正后覆盖原文件，下游拿到的都是正的。
+                try {
+                    image = ImageOrientation.upright(image, orientation);
+                    bytes = ImageOrientation.encodeJpeg(image);
+                } catch (Exception e) {
+                    throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片方向处理失败，请重新上传");
+                }
+                mimeType = "image/jpeg";
+                storage.put(asset.getStorageKey(), bytes, mimeType);
+                asset.setSizeBytes((long) bytes.length);
+            }
             asset.setWidth(image.getWidth());
             asset.setHeight(image.getHeight());
-            asset.setMimeType(stored.contentType());
+            asset.setMimeType(mimeType);
             asset.setSha256(sha256(bytes));
         } else if ("VIDEO".equals(asset.getType())) {
             if (stored.sizeBytes() <= 0 || stored.sizeBytes() > maxVideoReferenceBytes) {
