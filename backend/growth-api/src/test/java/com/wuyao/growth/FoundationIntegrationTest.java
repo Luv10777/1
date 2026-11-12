@@ -498,11 +498,11 @@ class FoundationIntegrationTest {
         assertThat(records.items()).singleElement().satisfies(r->{
             assertThat(r.orderId()).isEqualTo(paid.id());
             assertThat(r.amountMinor()).isEqualTo(150000);
-            assertThat(r.credits()).isEqualTo(15000);
+            assertThat(r.credits()).isEqualTo(7500);
             assertThat(r.paymentMethod()).isEqualTo("MANUAL");
             assertThat(r.paidAt()).isNotNull();
             assertThat(r.balanceBefore()).isEqualTo(before);
-            assertThat(r.balanceAfter()).isEqualTo(before+15000);
+            assertThat(r.balanceAfter()).isEqualTo(before+7500);
         });
         assertThat(records.hasMore()).isFalse();
         assertThat(TenantContext.runAs(tenantB,()->billingService.topups(0,20)).items()).isEmpty();
@@ -511,10 +511,10 @@ class FoundationIntegrationTest {
     @Test
     void billingPaymentMustMatchReceiptAndFulfilOnlyOnceAcrossConcurrentConfirmations() throws Exception {
         var order=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",120000)));
-        assertThat(order.credits()).isEqualTo(12000);
+        assertThat(order.credits()).isEqualTo(6000);
         assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(130000,"payment-test-receipt"),-1L)))).isEqualTo(1400);
         concurrent(()->TenantContext.runAs(tenantA,()->billingService.confirmPayment(order.id(),new BillingDtos.Confirmation(120000,"payment-test-receipt"),-1L)));
-        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).purchasedAvailable())).isEqualTo(12000);
+        assertThat(TenantContext.runAs(tenantA,()->billingService.summary(true,false).purchasedAvailable())).isEqualTo(6000);
         var same=TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",120000)));
         assertThat(same.id()).isEqualTo(order.id());
         assertThat(code(()->TenantContext.runAs(tenantA,()->billingService.topUp(new BillingDtos.TopUp("billing-topup-001",130000))))).isEqualTo(1400);
