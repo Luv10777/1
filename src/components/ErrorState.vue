@@ -51,7 +51,7 @@ const emit = defineEmits(['retry'])
 }
 
 .error-code {
-  font-family: 'SF Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.3);
   margin-bottom: 24px !important;

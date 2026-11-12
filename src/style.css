@@ -6,10 +6,10 @@
   font-display: block;
 }
 @font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+  font-family: Inter;
+  src: url('/fonts/inter-latin-variable.woff2') format('woff2');
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
 }
 @font-face {
@@ -36,7 +36,8 @@
   --color-success:#047857;--color-warning:#b45309;--color-error:#b91c1c;--color-info:#4f46e5;
   --font-serif:'Yifangzhi Serif','Noto Serif SC','Source Han Serif SC','SimSun',serif;
   --font-sans:'Yifangzhi Sans','PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
-  --font-mono:'JetBrains Mono',monospace;
+  /* 数字、UID、激活码、订单号等用 Inter：0 是干净的椭圆，不带点也不带斜线（平台统一要求）。 */
+  --font-mono:Inter,'Yifangzhi Sans','PingFang SC','Microsoft YaHei',sans-serif;
   --shadow-paper:0 2px 12px -4px rgba(15,23,42,.06);
   --shadow-paper-elevated:0 16px 36px -8px rgba(15,23,42,.12);
   color-scheme:light;

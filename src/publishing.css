@@ -501,11 +501,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font:
-    500 12px/1.5 "SFMono-Regular",
-    Consolas,
-    "Liberation Mono",
-    monospace;
+  font: 500 12px/1.5 var(--font-mono);
   border: 1px solid #27354b;
   border-radius: 8px;
   padding: 4px 8px;
@@ -524,9 +520,7 @@
   line-height: 1.6;
 }
 :where(.publishing-page) .counter {
-  font:
-    12px "IBM Plex Mono",
-    monospace;
+  font: 12px var(--font-mono);
   color: var(--pub-muted);
   font-size: 12px;
   font-weight: 500;
@@ -1359,7 +1353,7 @@
   cursor: pointer;
   height: 66px;
   border-radius: 8px;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: 12px;
   padding: 5px;
@@ -1844,7 +1838,7 @@
   color: var(--pub-text);
   border-radius: 5px;
   font-size: 12px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono);
   font-weight: 500;
   line-height: 1.5;
   white-space: nowrap;
@@ -2113,7 +2107,7 @@
 :where(.publishing-page) .pub-upload-zone:hover { border-color: var(--color-accent); background: var(--pub-selected); }
 :where(.publishing-page) .pub-upload-zone > svg { color: var(--pub-accent-text); }
 :where(.publishing-page) .pub-upload-zone strong { color: var(--pub-heading); font-size: 14px; }
-:where(.publishing-page) .pub-upload-zone span { font: 12px/1.5 Consolas, monospace; }
+:where(.publishing-page) .pub-upload-zone span { font: 12px/1.5 var(--font-mono); }
 :where(.publishing-page) .pub-upload-zone small { font-size: 12px; }
 :where(.publishing-page) .pub-video-file { display: flex; align-items: center; gap: 12px; padding: 16px; border: 1px solid var(--pub-border); border-radius: 12px; background: var(--pub-muted-surface); }
 :where(.publishing-page) .pub-video-file > div { min-width: 0; flex: 1; }

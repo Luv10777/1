@@ -87,14 +87,14 @@
 .publishing-page .pub-music-track > svg { color: var(--pub-accent-text); flex-shrink: 0; }
 .publishing-page .pub-music-track > div { min-width: 0; flex: 1; }
 .publishing-page .pub-music-track b { display: block; font-size: 13px; color: var(--pub-heading); overflow-wrap: anywhere; }
-.publishing-page .pub-music-track small { display: block; margin-top: 4px; color: var(--pub-muted); font: 12px/1.5 Consolas, monospace; }
+.publishing-page .pub-music-track small { display: block; margin-top: 4px; color: var(--pub-muted); font: 12px/1.5 var(--font-mono); }
 .publishing-page .pub-music-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-top: 18px; }
 .publishing-page .pub-music-settings label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--pub-text); }
-.publishing-page .pub-music-settings output { color: var(--pub-muted); font-family: Consolas, monospace; }
+.publishing-page .pub-music-settings output { color: var(--pub-muted); font-family: var(--font-mono); }
 .publishing-page .pub-music-settings input { width: 100%; height: 18px; accent-color: #2563eb; padding: 0; cursor: pointer; }
 .publishing-page .pub-music-note { margin: 14px 0 0; font-size: 12px; line-height: 1.7; color: var(--pub-muted); }
 .publishing-page .pub-preview-picture { display: block; width: 100%; height: 100%; object-fit: contain; }
-.publishing-page .pub-image-pager { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 5px 12px; background: #18181b; color: #d4d4d8; flex-shrink: 0; font: 12px/1.5 Consolas, monospace; }
+.publishing-page .pub-image-pager { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 5px 12px; background: #18181b; color: #d4d4d8; flex-shrink: 0; font: 12px/1.5 var(--font-mono); }
 .publishing-page .pub-image-pager button { display: grid; place-items: center; border: 0; background: transparent; color: #f4f4f5; width: 28px; height: 28px; padding: 0; }
 .publishing-page .pub-phone-music { display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: #18181b; color: #d4d4d8; font-size: 10px; flex-shrink: 0; }
 .publishing-page .pub-phone-music > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

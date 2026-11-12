@@ -1,9 +1,12 @@
 @import '../src/platform-management.css';
 
+/* 数字和编码用 Inter：0 不带点也不带斜线。管理后台和服务商后台不带 public 目录，字体随构建打包。 */
+@font-face { font-family: Inter; src: url('../public/fonts/inter-latin-variable.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; }
+
 /* 配色：冷调白底；绿色是主色（选中、主按钮、主要数据），红色用来提示（待办数、超时、驳回与危险操作）。 */
 :root {
   color-scheme: light; font-family:'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif; font-size:14px; font-synthesis:none;
-  --font-mono:ui-monospace,'Cascadia Code',Consolas,monospace; --font-sans:'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
+  --font-mono:Inter,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif; --font-sans:'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif;
   --ad-canvas:#f5f7f9; --ad-surface:#fff; --ad-soft:#edf1f4; --ad-line:#e1e6eb; --ad-line-strong:#cdd5dc;
   --ad-ink:#1e2932; --ad-muted:#56636e; --ad-faint:#87939e;
   --ad-primary:#16825a; --ad-primary-hover:#116a49; --ad-primary-soft:#e3f2eb;

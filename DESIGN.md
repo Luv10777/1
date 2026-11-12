@@ -18,7 +18,7 @@
 
 品牌青灰 #7A8B8F / #6B7B80 仅作辅助装饰。小字号正文使用更高对比度的辅助文字色。暗色朱砂按钮使用深墨标签以满足 AA 对比要求。状态色采用松针绿、暖橙、朱砂红与霁蓝。
 
-标题与字标采用 Noto Serif SC / Source Han Serif SC，正文采用系统 sans，数字与代码采用 JetBrains Mono。4px 间距基准；印章 2px、按钮 4px、卡片 8px 圆角；阴影为轻纸张阴影。
+标题与字标采用 Noto Serif SC / Source Han Serif SC，正文采用系统 sans，数字与代码采用 Inter（0 不带点也不带斜线）。4px 间距基准；印章 2px、按钮 4px、卡片 8px 圆角；阴影为轻纸张阴影。
 
 ## 页面与交互
 

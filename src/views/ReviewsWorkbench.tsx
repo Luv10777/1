@@ -1351,7 +1351,7 @@ const workbenchCSS = `
   gap:2px;
   align-items:center;
   color:var(--rg);
-  font:10px ui-monospace}
+  font:10px var(--font-mono)}
 .reviews-page .metric-icon {
   display:grid;
   place-items:center;
@@ -1483,7 +1483,7 @@ const workbenchCSS = `
   flex-wrap:wrap}
 .reviews-page .step-index {
   color:#89a69e;
-  font:10px ui-monospace}
+  font:10px var(--font-mono)}
 .reviews-page .policy-step-head strong {
   font-size:12px}
 .reviews-page .policy-step-head em {
