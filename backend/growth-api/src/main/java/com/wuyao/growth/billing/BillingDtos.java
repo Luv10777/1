@@ -119,6 +119,10 @@ public final class BillingDtos {
                                  Long createdBy) {}
     public record Redeem(@NotBlank @Size(max=40) String code) {}
     /** 服务商生成的激活码被兑换后发出，与兑换同一事务；服务商模块据此把商户归到服务商名下（第一次归属为准）。 */
+    /** 服务商负责人从自己账号分出的烟火：赠送和充值各多少（先扣赠送）。 */
+    public record CreditSplit(long gift, long purchased) {
+        public long total() { return gift + purchased; }
+    }
     public record PartnerCodeRedeemed(Long tenantId, Long codeId, Long partnerId) {}
     /** 激活码兑换后 planName、memberUntil 为开通的套餐和新的到期时间，credits 为 0。 */
     public record Redeemed(String kind, long credits, long available, String planName, Instant memberUntil) {}

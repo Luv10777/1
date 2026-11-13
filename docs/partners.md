@@ -70,6 +70,8 @@
 - 批量分配：负责人在名下商户列表里给几个商户各填烟火数，一次确认。合计超过余额时页面先拦下；
   每个商户单独一笔请求、单独一个 `requestKey`，某一笔失败只标在那个商户下面，其余照常到账，再点「分配」只重试没成功的。
 - 只有负责人能分烟火、看服务商的烟火流水。
+- **负责人自己账号的烟火**（2026-11-13，迁移 V82）：负责人是服务商的最高权限，除了服务商的可分配烟火（平台发放），也能把自己一方志账号里的烟火分给名下商户或自己的 BD，充值和赠送都能分，先扣赠送；对方收到时赠送仍是赠送、充值仍是充值（可分配烟火分出去对方收到的是充值烟火）。负责人账号记一条 TRANSFER（转出）流水。分给 BD 的烟火进 BD 自己的一方志账号；BD 和负责人是同一个商户账号时不用分。
+- **分配记录**（`partner_distributions`，负责人在「分配记录」页看）：每一笔分给商户或 BD 的烟火，来源、赠送和充值各多少、备注、操作人、是否到账。先扣来源、再记录、再给对方入账，最后标记到账；中途失败的一笔显示「未到账」，点「补上」用原来的请求再走一遍，不会重复扣。V82 把之前从可分配烟火分给商户的每一笔补进了这张表。
 - 烟火看板的「累计购买」把这部分单列为来源 `PARTNER`。
 
 ### 激活码
@@ -101,6 +103,8 @@ V81 给 `partner_members` 加 `role`（`OWNER`/`BD`，原有账号都是 `OWNER`
 | 接口 | 说明 |
 |---|---|
 | `GET /api/partner/me` | 服务商、可分配烟火、各套餐额度、名下商户数 |
+| `POST /api/partner/tenants/{tenantId}/credits`、`POST /api/partner/team/{userId}/credits` | `{requestKey, credits, note, source}` 分给商户 / BD，`source` 为 `POOL`（默认）或 `ACCOUNT`（仅负责人） |
+| `GET /api/partner/distributions`、`POST /api/partner/distributions/{id}/retry` | 分配记录（可按 `recipientType`、`source` 筛）/ 补上未到账的一笔（仅负责人） |
 | `GET /api/partner/workbench` | 待办：`todos`（`type` 为 `EXPIRING`/`EXPIRED`/`LOW_BALANCE`/`NOT_STARTED`/`IDLE`，带商户）和各类数量 |
 | `GET /api/partner/dashboard?days=&bdUserId=` | 经营看板，`days` 取 1、7、30、90 |
 | `GET /api/partner/me` 的 `role` | 当前账号的角色：`OWNER` 或 `BD`；BD 看不到 `creditsAvailable`，`tenantCount` 只算自己的 |

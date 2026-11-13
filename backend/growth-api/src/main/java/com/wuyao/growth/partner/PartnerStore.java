@@ -32,6 +32,9 @@ class PartnerStore {
     }
     record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long bdUserId) {}
     record LedgerRow(Long id, String type, long delta, long availableAfter, Long tenantId, String note, Instant createdAt) {}
+    /** 一笔分配：source 为 POOL（可分配烟火）或 ACCOUNT（负责人自己的账号），recipientType 为 TENANT 或 BD。 */
+    record Distribution(Long id, String requestKey, String source, String recipientType, Long recipientTenantId, Long recipientUserId,
+                        long credits, long gift, long purchased, String note, Long actorUserId, String status, Instant createdAt) {}
     /** 服务商烟火流水按北京时间日期、类型、商户合计。 */
     record CreditDay(String date, String type, Long tenantId, long delta) {}
     /** 一个激活码在看板里要用到的时间点；renewal 表示直接续期生成的码。 */
@@ -286,15 +289,78 @@ class PartnerStore {
                 r[2] == null ? null : instant(r[2]), r[3] == null ? null : instant(r[3]), Boolean.TRUE.equals(r[4]))).toList();
     }
 
-    /** 这家服务商分给某个商户的烟火流水，新的在前。 */
+    private static final String DISTRIBUTION_COLUMNS = "id, request_key, source, recipient_type, recipient_tenant_id, recipient_user_id, "
+            + "credits, gift_credits, purchased_credits, note, actor_user_id, status, created_at";
+
+    private static Distribution distribution(Object[] r) {
+        return new Distribution(num(r[0]), (String) r[1], (String) r[2], (String) r[3], num(r[4]), r[5] == null ? null : num(r[5]),
+                num(r[6]), num(r[7]), num(r[8]), (String) r[9], num(r[10]), (String) r[11], instant(r[12]));
+    }
+
     @Transactional(readOnly = true)
-    public List<LedgerRow> tenantLedger(Long partnerId, Long tenantId, int limit) {
-        List<?> rows = em.createNativeQuery("""
-                SELECT id, type, delta, available_after, tenant_id, note, created_at FROM partner_credit_ledger
-                WHERE partner_id = :p AND tenant_id = :t ORDER BY id DESC LIMIT :limit""")
-                .setParameter("p", partnerId).setParameter("t", tenantId).setParameter("limit", limit).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new LedgerRow(num(r[0]), (String) r[1], num(r[2]), num(r[3]),
-                r[4] == null ? null : num(r[4]), (String) r[5], instant(r[6]))).toList();
+    public Optional<Distribution> distribution(Long partnerId, Long id) {
+        List<?> rows = em.createNativeQuery("SELECT " + DISTRIBUTION_COLUMNS + " FROM partner_distributions WHERE id = :id AND partner_id = :p")
+                .setParameter("id", id).setParameter("p", partnerId).getResultList();
+        return rows.stream().map(r -> distribution((Object[]) r)).findFirst();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Distribution> distributionByKey(String key) {
+        List<?> rows = em.createNativeQuery("SELECT " + DISTRIBUTION_COLUMNS + " FROM partner_distributions WHERE request_key = :k")
+                .setParameter("k", key).getResultList();
+        return rows.stream().map(r -> distribution((Object[]) r)).findFirst();
+    }
+
+    /** 记一笔分配（已扣过来源）；同一 request_key 已有时不动。 */
+    @Transactional
+    public void recordDistribution(Long partnerId, String key, String source, String recipientType, Long recipientTenantId, Long recipientUserId,
+                                   long gift, long purchased, String note, Long actor) {
+        var insert = em.createNativeQuery("""
+                INSERT INTO partner_distributions(partner_id, request_key, source, recipient_type, recipient_tenant_id, recipient_user_id,
+                    credits, gift_credits, purchased_credits, note, actor_user_id)
+                VALUES (:p, :k, :s, :rt, :t, :u, :c, :g, :pc, :note, :a) ON CONFLICT (request_key) DO NOTHING""")
+                .setParameter("p", partnerId).setParameter("k", key).setParameter("s", source).setParameter("rt", recipientType)
+                .setParameter("t", recipientTenantId).setParameter("c", gift + purchased).setParameter("g", gift)
+                .setParameter("pc", purchased).setParameter("a", actor);
+        typed(insert).setParameter("u", recipientUserId, Long.class).setParameter("note", note, String.class);
+        insert.executeUpdate();
+    }
+
+    @Transactional
+    public void completeDistribution(String key) {
+        em.createNativeQuery("UPDATE partner_distributions SET status = 'DONE', completed_at = now() WHERE request_key = :k AND status = 'PENDING'")
+                .setParameter("k", key).executeUpdate();
+    }
+
+    /** 分配记录，新的在前；各筛选为空时不限。 */
+    @Transactional(readOnly = true)
+    public List<Distribution> distributions(Long partnerId, String recipientType, String source, Long tenantId, Long userId,
+                                            Instant since, int page, int size) {
+        var query = em.createNativeQuery("SELECT " + DISTRIBUTION_COLUMNS + " FROM partner_distributions" + distributionWhere()
+                + " ORDER BY id DESC LIMIT :limit OFFSET :offset");
+        bindDistributionFilters(query, partnerId, recipientType, source, tenantId, userId, since);
+        List<?> rows = query.setParameter("limit", size).setParameter("offset", (long) page * size).getResultList();
+        return rows.stream().map(r -> distribution((Object[]) r)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public long distributionCount(Long partnerId, String recipientType, String source, Long tenantId, Long userId, Instant since) {
+        var query = em.createNativeQuery("SELECT count(*) FROM partner_distributions" + distributionWhere());
+        bindDistributionFilters(query, partnerId, recipientType, source, tenantId, userId, since);
+        return num(query.getSingleResult());
+    }
+
+    private static String distributionWhere() {
+        return """
+                 WHERE partner_id = :p AND (:rt = '' OR recipient_type = :rt) AND (:s = '' OR source = :s)
+                   AND (:t = 0 OR recipient_tenant_id = :t) AND (:u = 0 OR recipient_user_id = :u) AND created_at >= :since""";
+    }
+
+    private static void bindDistributionFilters(jakarta.persistence.Query query, Long partnerId, String recipientType, String source,
+                                                Long tenantId, Long userId, Instant since) {
+        query.setParameter("p", partnerId).setParameter("rt", recipientType == null ? "" : recipientType)
+                .setParameter("s", source == null ? "" : source).setParameter("t", tenantId == null ? 0L : tenantId)
+                .setParameter("u", userId == null ? 0L : userId).setParameter("since", Timestamp.from(since == null ? Instant.EPOCH : since));
     }
 
     @Transactional(readOnly = true)

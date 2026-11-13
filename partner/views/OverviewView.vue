@@ -108,10 +108,18 @@ load()
         <section class="pw-card" aria-labelledby="res-title">
           <header class="pw-card-head"><h2 id="res-title">我的资源</h2></header>
           <div class="pw-card-body">
-            <div v-if="owner" class="pw-balance">
-              <span>可分配烟火</span>
-              <strong class="mg-mono">{{ number(overview?.partner.creditsAvailable) }}</strong>
-              <small>平台发放，分给名下商户后记入商户的充值烟火</small>
+            <div v-if="owner" class="pw-balance-pair">
+              <div class="pw-balance">
+                <span>服务商可分配烟火</span>
+                <strong class="mg-mono">{{ number(overview?.partner.creditsAvailable) }}</strong>
+                <small>平台发放</small>
+              </div>
+              <div class="pw-balance">
+                <span>我的账号</span>
+                <strong class="mg-mono">{{ number(overview?.account?.available) }}</strong>
+                <small>赠送 {{ number(overview?.account?.gift) }} · 充值 {{ number(overview?.account?.purchased) }}</small>
+              </div>
+              <p class="pw-balance-hint">两边的烟火都能分给名下商户和 BD，在商户或成员详情里选择从哪里扣。<RouterLink :to="{ name: 'partner-distributions' }">分配记录</RouterLink></p>
             </div>
             <div class="pw-quotas">
               <p class="pw-label">激活码额度</p>
@@ -129,7 +137,8 @@ load()
             <RouterLink :to="{ name: 'partner-tenants' }"><Store :size="16" /><span>名下商户<small>{{ number(overview?.tenantCount) }} 个 · 添加、续期{{ owner ? '、分烟火' : '' }}</small></span><ArrowRight :size="14" /></RouterLink>
             <RouterLink :to="{ name: 'partner-codes' }"><TicketCheck :size="16" /><span>激活码<small>生成、作废、导出</small></span><ArrowRight :size="14" /></RouterLink>
             <RouterLink :to="{ name: 'partner-dashboard' }"><BarChart3 :size="16" /><span>经营看板<small>使用、烟火、激活码统计</small></span><ArrowRight :size="14" /></RouterLink>
-            <RouterLink v-if="owner" :to="{ name: 'partner-team' }"><Plus :size="16" /><span>团队<small>添加 BD、看业绩</small></span><ArrowRight :size="14" /></RouterLink>
+            <RouterLink v-if="owner" :to="{ name: 'partner-team' }"><Plus :size="16" /><span>团队<small>添加 BD、看业绩、分烟火给 BD</small></span><ArrowRight :size="14" /></RouterLink>
+            <RouterLink v-if="owner" :to="{ name: 'partner-distributions' }"><Coins :size="16" /><span>分配记录<small>分给商户和 BD 的每一笔</small></span><ArrowRight :size="14" /></RouterLink>
           </nav>
         </section>
       </aside>

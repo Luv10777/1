@@ -13,8 +13,17 @@ public final class PartnerDtos {
     public record Partner(Long id, String name, String contact, String status, Long creditsAvailable, Instant createdAt) {}
     /** 一个套餐标识的激活码额度；planName、durationDays 取该标识最新的版本。 */
     public record Quota(String planCode, String planName, Integer durationDays, int quota, int used, int remaining) {}
-    /** role 是当前登录账号在服务商里的角色：OWNER 负责人、BD。BD 的 tenantCount 只算自己名下的。 */
-    public record Overview(Partner partner, List<Quota> quotas, long tenantCount, String role) {}
+    /** role 是当前登录账号在服务商里的角色：OWNER 负责人、BD。BD 的 tenantCount 只算自己名下的。account 是负责人自己账号的烟火（BD 为空）。 */
+    public record Overview(Partner partner, List<Quota> quotas, long tenantCount, String role, Account account) {}
+    /** 负责人自己一方志账号里的烟火：可用 = 赠送 + 充值，都能分给商户和 BD。 */
+    public record Account(long available, long gift, long purchased) {}
+    /**
+     * 一笔分配记录。source：POOL（服务商可分配烟火）或 ACCOUNT（负责人自己的账号）；recipientType：TENANT（名下商户）或 BD；
+     * gift、purchased 是对方收到的赠送和充值烟火；status 为 DONE（已到账）或 PENDING（已扣来源，对方还没入账，用同一请求重试即可补上）。
+     */
+    public record Distribution(Long id, String source, String recipientType, Long recipientTenantId, String recipientName,
+                               Long recipientUserId, long credits, long gift, long purchased, String note, String actorName,
+                               String status, Instant createdAt) {}
     /** 激活码统计：unused = generated - redeemed - voided；renewals 是其中直接续期的个数。 */
     public record CodeStats(long generated, long redeemed, long unused, long voided, long renewals) {}
     /** 服务商的登录账号；role 为 OWNER 或 BD，tenantCount 是归到这个 BD 的商户数（负责人为空）。 */
@@ -29,7 +38,7 @@ public final class PartnerDtos {
      * 商户详情：transfers 是这家服务商分给他的烟火（只给负责人，BD 为空），codes 是他兑换过的本服务商激活码（含直接续期），
      * usage 是最近 30 天的使用情况，onboarding 是上手进度。
      */
-    public record TenantDetail(TenantView tenant, List<LedgerEntry> transfers, List<BillingDtos.RedeemCodeView> codes,
+    public record TenantDetail(TenantView tenant, List<Distribution> transfers, List<BillingDtos.RedeemCodeView> codes,
                                Usage usage, Onboarding onboarding) {}
     /**
      * 商户使用情况：只有烟火数和使用次数，不含作品内容。consumed、uses 和按功能的分组是最近 days 天；
@@ -55,7 +64,7 @@ public final class PartnerDtos {
      * activeTenants 是这段时间用过 AI 功能的商户，firstUses 是这段时间第一次使用的商户。
      * 会员状态按现在算：activeMembers（含 7 天内到期的 expiringSoon）、expiredMembers（开通过已过期）、neverActivated（从未开通）。
      */
-    public record Dashboard(int days, Long creditsAvailable, long tenants, long newTenants, long activeMembers, long expiringSoon,
+    public record Dashboard(int days, Long creditsAvailable, Long transferredToBds, long tenants, long newTenants, long activeMembers, long expiringSoon,
                             long expiredMembers, long neverActivated,
                             long activeTenants, long firstUses, long consumed, long uses, java.util.Map<String, Long> consumedByCapability,
                             Long granted, Long transferred, long codesGenerated, long codesRedeemed, long renewals, long codesVoided,
@@ -70,8 +79,10 @@ public final class PartnerDtos {
     public record Page<T>(List<T> items, int page, int size, long total) {}
 
     public record UidRequest(@NotNull @Min(10000000) @Max(99999999) Long uid) {}
+    /** source：POOL（默认，服务商可分配烟火）或 ACCOUNT（负责人自己的账号）。 */
     public record Transfer(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
-                           @Min(1) @Max(1000000) long credits, @Size(max=200) String note) {}
+                           @Min(1) @Max(1000000) long credits, @Size(max=200) String note,
+                           @Pattern(regexp="POOL|ACCOUNT") String source) {}
     public record NewCodes(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,60}") String requestKey,
                            @NotBlank @Pattern(regexp="[A-Z0-9_-]{2,60}") String planCode,
                            @Min(1) @Max(200) int quantity, @Size(max=200) String note) {}

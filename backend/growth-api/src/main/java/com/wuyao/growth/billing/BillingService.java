@@ -291,6 +291,44 @@ public class BillingService {
         return true;
     }
     /**
+     * 服务商负责人从自己的账号分出烟火（充值和赠送都能分，先扣赠送）：记一条 TRANSFER 流水。调用方切到负责人的商户后新开事务调用。
+     * 同一 requestKey 已处理过时返回第一次扣的拆分；数量不同则拒绝。
+     */
+    @Transactional
+    public BillingDtos.CreditSplit debitForPartner(long credits,String requestKey,String description,Long actor) {
+        if(credits<1) throw bad("分配的烟火必须大于零");
+        var a=store.lockAccount(); String key="partner-account-out:"+requestKey;
+        var existing=store.ledgerByKey(key);
+        if(existing.isPresent()) {
+            var split=new BillingDtos.CreditSplit(-existing.get().getGiftDelta(),-existing.get().getPurchasedDelta());
+            if(split.total()!=credits) throw bad("分配请求已用于不同的数量，请刷新后重试");
+            return split;
+        }
+        if(a.available()<credits) throw BizException.of(ErrorCode.INSUFFICIENT_YANHUO,"你的账号烟火不足，当前可用 "+a.available());
+        long gift=Math.min(a.getGiftAvailable(),credits),purchased=credits-gift;
+        a.setGiftAvailable(a.getGiftAvailable()-gift); a.setPurchasedAvailable(a.getPurchasedAvailable()-purchased);
+        ledger(a,key,"TRANSFER",description,-gift,-purchased,0,null,null,actor);
+        return new BillingDtos.CreditSplit(gift,purchased);
+    }
+    /**
+     * 收到服务商负责人从自己账号分来的烟火：赠送记入赠送烟火（GRANT），充值记入充值烟火（PURCHASE），性质不变。
+     * 调用方切到收款商户后新开事务调用；同一 requestKey 只入账一次。
+     */
+    @Transactional
+    public boolean creditFromPartnerAccount(BillingDtos.CreditSplit split,String requestKey,String description,Long actor) {
+        var a=store.lockAccount(); String key="partner-account:"+requestKey;
+        if(store.eventExists(key)||store.eventExists(key+":gift")) return false;
+        if(split.purchased()>0) {
+            a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),split.purchased()));
+            ledger(a,key,"PURCHASE",description,0,split.purchased(),0,null,null,actor);
+        }
+        if(split.gift()>0) {
+            a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),split.gift()));
+            ledger(a,key+":gift","GRANT",description,split.gift(),0,0,null,null,actor);
+        }
+        return true;
+    }
+    /**
      * 激活码兑换：按码上的套餐版本开通或顺延会员。激活码不送烟火，也不发 OrderPaid（线下卖码的实收金额平台不知道）。
      * 调用方已锁住账户和激活码。
      */

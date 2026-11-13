@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class BillingLedgerReport {
-    static final Set<String> TYPES = Set.of("RESERVE", "CAPTURE", "RELEASE", "PURCHASE", "GRANT");
+    static final Set<String> TYPES = Set.of("RESERVE", "CAPTURE", "RELEASE", "PURCHASE", "GRANT", "TRANSFER");
     static final Set<String> CAPABILITIES = Set.of("IMAGE", "IMAGE_INSPIRATION", "VIDEO", "VIDEO_ANALYSIS", "VIDEO_PLAN", "COPY", "LIVE");
     private static final int PER_TENANT_LIMIT = 2000;
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
@@ -214,6 +214,7 @@ public class BillingLedgerReport {
                             WHEN l.event_key LIKE 'admin-credits:%' THEN 'ADMIN'
                             WHEN l.event_key LIKE 'admin-membership:%' THEN 'ADMIN_MEMBERSHIP'
                             WHEN l.event_key LIKE 'partner-credits:%' THEN 'PARTNER'
+                            WHEN l.event_key LIKE 'partner-account:%' THEN 'PARTNER_ACCOUNT'
                             ELSE 'ORDER' END,
                        COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' THEN -l.held_delta ELSE l.gift_delta + l.purchased_delta END), 0)
                 FROM billing_ledger l

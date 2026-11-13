@@ -15,6 +15,9 @@ export const partnerApi = {
   renew: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/renewals`, values),
   assignBd: (tenantId, bdUserId) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/bd`, { bdUserId: bdUserId || null }),
   team: () => get('/api/partner/team'),
+  transferToBd: (userId, values) => post(`/api/partner/team/${encodeURIComponent(userId)}/credits`, values),
+  distributions: values => get('/api/partner/distributions', params(values)),
+  retryDistribution: id => post(`/api/partner/distributions/${encodeURIComponent(id)}/retry`, {}),
   addBd: uid => post('/api/partner/team', { uid: Number(uid) }),
   /** transferTo：他名下的商户转给哪个 BD，0 表示回到负责人直接管。 */
   removeBd: (userId, transferTo) => del(`/api/partner/team/${encodeURIComponent(userId)}?transferTo=${encodeURIComponent(transferTo || 0)}`),

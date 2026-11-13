@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { groupTodos, memberSegments, percent, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
+import { accountSplit, defaultSource, sourceBalance, groupTodos, memberSegments, percent, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
 
 const now = Date.parse('2026-11-13T00:00:00Z')
 
@@ -49,11 +49,11 @@ test('a failed transfer keeps going and reports per tenant with its own request 
 
 test('tenant timeline merges transfers, codes and renewals newest first', () => {
   const rows = tenantTimeline({
-    transfers: [{ id: 1, delta: -2000, note: '活动', createdAt: '2026-11-10T00:00:00Z' }],
+    transfers: [{ id: 1, credits: 2000, source: 'ACCOUNT', status: 'DONE', note: '活动', createdAt: '2026-11-10T00:00:00Z' }],
     codes: [{ id: 5, planName: '月卡', durationDays: 30, note: '直接续期', redeemedAt: '2026-11-12T00:00:00Z' },
       { id: 4, planName: '月卡', durationDays: 30, note: null, redeemedAt: '2026-11-01T00:00:00Z' }],
   })
-  assert.deepEqual(rows.map(r => [r.kind, r.title]), [['renew', '直接续期 · 月卡 30 天'], ['transfer', '分配 2,000 烟火'], ['code', '兑换激活码 · 月卡 30 天']])
+  assert.deepEqual(rows.map(r => [r.kind, r.title]), [['renew', '直接续期 · 月卡 30 天'], ['transfer', '分配 2,000 烟火 · 我的账号'], ['code', '兑换激活码 · 月卡 30 天']])
 })
 
 test('lookup verdicts never reveal another partner and only allow free tenants or accounts', () => {
@@ -94,4 +94,14 @@ test('member segments split active from expiring and percentages handle zero', (
   assert.equal(segs[0].ratio, 3 / 8)
   assert.equal(percent(1, 4), '25%')
   assert.equal(percent(1, 0), '—')
+})
+
+test('credit sources default to the partner pool and split account credits gift first', () => {
+  const overview = { partner: { creditsAvailable: 0 }, account: { available: 800, gift: 300, purchased: 500 } }
+  assert.equal(defaultSource(overview), 'ACCOUNT')
+  assert.equal(defaultSource({ ...overview, partner: { creditsAvailable: 10 } }), 'POOL')
+  assert.equal(sourceBalance(overview, 'ACCOUNT'), 800)
+  assert.equal(sourceBalance(overview, 'POOL'), 0)
+  assert.deepEqual(accountSplit(overview.account, 500), { gift: 300, purchased: 200 })
+  assert.deepEqual(accountSplit(overview.account, 100), { gift: 100, purchased: 0 })
 })

@@ -3,11 +3,12 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Activity, Check, Coins, History, ListChecks, RefreshCw, Store, UserRoundCog } from 'lucide-vue-next'
 import { partnerApi, tenantSources } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
-import { capabilityBars, dateText, membershipState, number, renewedUntil, sinceText, tenantTimeline, transferError, transferPresets } from '../../src/domain/partnerOps.js'
+import { accountSplit, capabilityBars, dateText, defaultSource, distributionSources, membershipState, number, renewedUntil, sinceText, sourceBalance, tenantTimeline, transferError, transferPresets } from '../../src/domain/partnerOps.js'
 import { bds, isOwner, loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 import OptionCards from './OptionCards.vue'
+import CreditSource from './CreditSource.vue'
 
 /**
  * 商户详情抽屉：会员续期、分配烟火（负责人）、调整归属 BD（负责人）、往来记录。
@@ -23,7 +24,8 @@ const error = ref('')
 const busy = ref(false)
 const notice = ref('')
 const tenant = computed(() => detail.value?.tenant || null)
-const available = computed(() => partner.overview?.partner.creditsAvailable || 0)
+const available = computed(() => sourceBalance(partner.overview, transfer.source))
+const split = computed(() => accountSplit(partner.overview?.account, Number(transfer.credits) || 0))
 const quotas = computed(() => (partner.overview?.quotas || []).filter(q => q.planName))
 const timeline = computed(() => tenantTimeline(detail.value))
 const state = computed(() => tenant.value ? membershipState(tenant.value) : null)
@@ -41,7 +43,7 @@ const steps = computed(() => {
 })
 
 const renewal = reactive({ planCode: '', requestKey: '', confirming: false, error: '' })
-const transfer = reactive({ credits: '', note: '', requestKey: '', confirming: false, error: '' })
+const transfer = reactive({ source: 'POOL', credits: '', note: '', requestKey: '', confirming: false, error: '' })
 const assign = reactive({ bdUserId: '', confirming: false, error: '' })
 const renewQuota = computed(() => quotas.value.find(q => q.planCode === renewal.planCode))
 const renewTo = computed(() => tenant.value && renewQuota.value ? renewedUntil(tenant.value, renewQuota.value.durationDays) : null)
@@ -57,7 +59,7 @@ const bdOptions = computed(() => [
 
 function reset() {
   Object.assign(renewal, { planCode: quotas.value.find(q => q.remaining > 0)?.planCode || '', requestKey: 'renew-' + crypto.randomUUID(), confirming: false, error: '' })
-  Object.assign(transfer, { credits: '', note: '', requestKey: 'transfer-' + crypto.randomUUID(), confirming: false, error: '' })
+  Object.assign(transfer, { source: defaultSource(partner.overview), credits: '', note: '', requestKey: 'transfer-' + crypto.randomUUID(), confirming: false, error: '' })
   Object.assign(assign, { bdUserId: currentBd.value, confirming: false, error: '' })
 }
 
@@ -106,7 +108,7 @@ async function sendCredits() {
   busy.value = true
   const credits = Number(transfer.credits)
   try {
-    await partnerApi.transfer(props.tenantId, { requestKey: transfer.requestKey, credits, note: transfer.note.trim() || null })
+    await partnerApi.transfer(props.tenantId, { requestKey: transfer.requestKey, credits, note: transfer.note.trim() || null, source: transfer.source })
     await refresh(`已分配 ${number(credits)} 烟火`)
   } catch (failure) {
     // 保留同一个 requestKey：再确认一次只会补上没到账的部分，不会重复扣。
@@ -195,13 +197,16 @@ async function saveAssign() {
 
       <section v-if="owner" class="mg-detail-section" aria-labelledby="transfer-title">
         <h3 id="transfer-title"><Coins :size="17" />分配烟火</h3>
-        <p class="mg-muted">分出的烟火记入商户的充值烟火，不能撤回。你现在可分配 {{ number(available) }} 烟火。</p>
+        <p class="mg-muted">分出后不能撤回，每一笔都记在「分配记录」里。</p>
+        <CreditSource v-model="transfer.source" :disabled="busy || transfer.confirming" />
         <label class="partner-field">烟火数<input v-model="transfer.credits" type="number" min="1" max="1000000" step="1" inputmode="numeric" placeholder="例如 2000" :disabled="busy || transfer.confirming" /></label>
         <div class="partner-presets"><button v-for="value in transferPresets" :key="value" type="button" :class="{ active: Number(transfer.credits) === value }" :disabled="busy || transfer.confirming" @click="transfer.credits = String(value)">{{ number(value) }}</button></div>
         <label class="partner-field">备注（可选）<input v-model="transfer.note" maxlength="200" placeholder="例如：11 月活动补贴" :disabled="busy || transfer.confirming" /></label>
         <ConfirmBox v-if="transfer.confirming" :busy="busy" confirm-text="确认分配" @confirm="sendCredits" @cancel="transfer.confirming = false">
           <p>把 <b>{{ number(transfer.credits) }}</b> 烟火分给「{{ tenant.tenantName }}」。</p>
-          <p>商户余额 {{ number(tenant.creditsAvailable) }} → <b>{{ number(Number(tenant.creditsAvailable || 0) + Number(transfer.credits)) }}</b>；你的可分配 {{ number(available) }} → <b>{{ number(available - Number(transfer.credits)) }}</b>。分出后不能撤回。</p>
+          <p>从「{{ distributionSources[transfer.source] }}」扣，{{ distributionSources[transfer.source] }} {{ number(available) }} → <b>{{ number(available - Number(transfer.credits)) }}</b>；商户余额 {{ number(tenant.creditsAvailable) }} → <b>{{ number(Number(tenant.creditsAvailable || 0) + Number(transfer.credits)) }}</b>。</p>
+          <p v-if="transfer.source === 'ACCOUNT'">其中赠送 {{ number(split.gift) }}、充值 {{ number(split.purchased) }}，商户收到的性质不变。分出后不能撤回。</p>
+          <p v-else>商户收到的是充值烟火。分出后不能撤回。</p>
         </ConfirmBox>
         <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy" @click="askTransfer">分配</button></div>
         <p v-if="transfer.error" class="mg-inline-error" role="alert">{{ transfer.error }}</p>

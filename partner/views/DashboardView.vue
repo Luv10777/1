@@ -140,7 +140,8 @@ load()
           <dl class="pw-flow">
             <div v-if="data.granted != null"><dt>平台发放</dt><dd class="mg-mono pw-plus">+{{ number(data.granted) }}</dd></div>
             <div><dt>分给商户</dt><dd class="mg-mono">−{{ number(data.transferred) }}</dd></div>
-            <div class="pw-flow-total"><dt>现在可分配</dt><dd class="mg-mono">{{ number(data.creditsAvailable) }}</dd></div>
+            <div v-if="data.transferredToBds != null"><dt>分给 BD</dt><dd class="mg-mono">−{{ number(data.transferredToBds) }}</dd></div>
+            <div class="pw-flow-total"><dt>服务商现在可分配</dt><dd class="mg-mono">{{ number(data.creditsAvailable) }}</dd></div>
           </dl>
         </section>
         <section class="pw-card" aria-labelledby="bd-title">

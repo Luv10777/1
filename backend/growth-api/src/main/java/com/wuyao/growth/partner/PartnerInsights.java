@@ -96,18 +96,20 @@ public class PartnerInsights {
             if (boundDay != null) boundDay[2]++;
         }
 
-        Long granted = null, transferred = null;
+        Long granted = null, transferred = null, toBds = null;
         if (owner) {
-            long g = 0, x = 0;
-            for (var c : store.creditDays(partnerId, since)) {
-                if ("GRANT".equals(c.type())) { g += c.delta(); continue; }
-                if (!tenantIds.contains(c.tenantId())) continue;
-                x += -c.delta();
-                var p = daily.get(c.date());
-                if (p != null) p[1] += -c.delta();
+            long g = 0, x = 0, b = 0;
+            for (var c : store.creditDays(partnerId, since)) if ("GRANT".equals(c.type())) g += c.delta();
+            for (var d : store.distributions(partnerId, null, null, null, null, since, 0, 100000)) {
+                if ("BD".equals(d.recipientType())) { b += d.credits(); continue; }
+                if (!tenantIds.contains(d.recipientTenantId())) continue;
+                x += d.credits();
+                var p = daily.get(LocalDate.ofInstant(d.createdAt(), ZONE).toString());
+                if (p != null) p[1] += d.credits();
             }
             granted = bdUserId == null ? g : null;
             transferred = x;
+            toBds = bdUserId == null ? b : null;
         }
 
         // 激活码按生成人认：BD 只算自己的；负责人按 BD 筛时只算那个 BD 的，「我直接管的」算负责人账号生成的。
@@ -135,7 +137,7 @@ public class PartnerInsights {
                 .limit(10).map(r -> new PartnerDtos.TenantRank(r.view().tenantId(), r.view().tenantName(), r.view().bdName(),
                         r.usage().consumed(), r.usage().uses(), r.usage().lastUsedAt())).toList();
         List<PartnerDtos.BdRank> bds = owner && bdUserId == null ? bdRanks(partnerId, rows, byCreator, since) : List.of();
-        return new PartnerDtos.Dashboard(days, owner ? access.partner().creditsAvailable() : null, rows.size(), newTenants, activeMembers,
+        return new PartnerDtos.Dashboard(days, owner ? access.partner().creditsAvailable() : null, toBds, rows.size(), newTenants, activeMembers,
                 expiring, expired, never, active, firstUses, consumed, uses, byCapability, granted, transferred, generated, redeemed, renewals, voided,
                 points, top, bds);
     }
