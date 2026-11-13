@@ -88,6 +88,10 @@ public class BillingStore {
         return em.createQuery("select count(l) from BillingLedger l where l.tenantId = :tenant and l.eventKey = :key",Long.class)
             .setParameter("tenant",TenantContext.require()).setParameter("key",key).getSingleResult()>0;
     }
+    public Optional<BillingLedger> ledgerByKey(String key) {
+        return em.createQuery("from BillingLedger l where l.tenantId = :tenant and l.eventKey = :key",BillingLedger.class)
+            .setParameter("tenant",TenantContext.require()).setParameter("key",key).getResultStream().findFirst();
+    }
     public List<BillingLedger> ledger(int page,int size) {
         return em.createQuery("from BillingLedger l where l.tenantId = :tenant order by l.id desc",BillingLedger.class)
             .setParameter("tenant",TenantContext.require()).setFirstResult(Math.multiplyExact(page,size)).setMaxResults(size+1).getResultList();

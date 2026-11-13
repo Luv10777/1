@@ -9,8 +9,9 @@ const TenantsView = () => import('./views/TenantsView.vue')
 const CodesView = () => import('./views/CodesView.vue')
 const TeamView = () => import('./views/TeamView.vue')
 const DashboardView = () => import('./views/DashboardView.vue')
+const DistributionsView = () => import('./views/DistributionsView.vue')
 
-const PAGES = ['/overview', '/dashboard', '/tenants', '/codes', '/team']
+const PAGES = ['/overview', '/dashboard', '/tenants', '/codes', '/team', '/distributions']
 export function partnerDestination(raw) {
   if (typeof raw !== 'string') return '/overview'
   return PAGES.includes(raw.split(/[?#]/)[0]) ? raw : '/overview'
@@ -27,6 +28,7 @@ export function createPartnerRouter(history = createWebHistory()) {
       { path: '/tenants', name: 'partner-tenants', component: TenantsView, meta: { title: '名下商户', partner: true } },
       { path: '/codes', name: 'partner-codes', component: CodesView, meta: { title: '激活码', partner: true } },
       { path: '/team', name: 'partner-team', component: TeamView, meta: { title: '团队', partner: true, owner: true } },
+      { path: '/distributions', name: 'partner-distributions', component: DistributionsView, meta: { title: '分配记录', partner: true, owner: true } },
       { path: '/403', name: 'partner-forbidden', component: AccessView, meta: { title: '不是服务商账号' } },
       { path: '/:pathMatch(.*)*', name: 'partner-not-found', component: AccessView, meta: { title: '页面不存在' } },
     ],
@@ -41,7 +43,7 @@ export function createPartnerRouter(history = createWebHistory()) {
     return { name: 'partner-forbidden', query: partner.error ? { reason: partner.error } : {} }
   })
   instance.afterEach(to => {
-    if (typeof document !== 'undefined') document.title = `服务商后台 · ${to.meta.title || '一方志'}`
+    if (typeof document !== 'undefined') document.title = `${partner.overview?.partner.name || '服务商后台'} · ${to.meta.title || '一方志'}`
   })
   return instance
 }

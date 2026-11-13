@@ -78,6 +78,26 @@ public class PartnerController {
         return ApiResponse.ok(service.assignBd(me.userId(), tenantId, input.bdUserId()));
     }
 
+    @PostMapping("/team/{userId}/credits")
+    public ApiResponse<PartnerDtos.Distribution> transferToBd(@PathVariable Long userId, @Valid @RequestBody PartnerDtos.Transfer input,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.transferToBd(me.userId(), userId, input));
+    }
+
+    /** 分配记录：recipientType 为 TENANT 或 BD，source 为 POOL 或 ACCOUNT。 */
+    @GetMapping("/distributions")
+    public ApiResponse<PartnerDtos.Page<PartnerDtos.Distribution>> distributions(@RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String recipientType,
+            @RequestParam(required = false) String source, @RequestParam(required = false) Long tenantId,
+            @RequestParam(required = false) Long bdUserId, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.distributions(me.userId(), page, size, recipientType, source, tenantId, bdUserId));
+    }
+
+    @PostMapping("/distributions/{id}/retry")
+    public ApiResponse<PartnerDtos.Distribution> retryDistribution(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.retryDistribution(me.userId(), id));
+    }
+
     @GetMapping("/team")
     public ApiResponse<List<PartnerDtos.Member>> team(@AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(service.team(me.userId()));

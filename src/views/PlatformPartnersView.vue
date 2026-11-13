@@ -29,6 +29,7 @@ const grantForm = reactive({ credits: '', note: '', requestKey: '', error: '' })
 const quotaForm = reactive({ planCode: '', quota: '', error: '' })
 const memberForm = reactive({ uid: '', error: '' })
 const assignForm = reactive({ uid: '', found: null, partnerId: '', error: '' })
+const renameForm = reactive({ open: false, name: '', contact: '', error: '' })
 
 async function load() {
   loading.value = true
@@ -137,6 +138,21 @@ async function removeMember(member) {
   catch (failure) { memberForm.error = failure.message || '移除失败，请稍后再试。' }
 }
 
+function startRename() {
+  Object.assign(renameForm, { open: true, name: selected.value.partner.name, contact: selected.value.partner.contact || '', error: '' })
+}
+
+async function rename() {
+  renameForm.error = renameForm.name.trim() ? '' : '请填写服务商名称。'
+  if (renameForm.error) return
+  try {
+    await run(async () => {
+      replace(await api.rename(selectedId.value, { name: renameForm.name.trim(), contact: renameForm.contact.trim() || null }))
+      renameForm.open = false
+    }, '名称已更新，服务商后台里同步显示')
+  } catch (failure) { renameForm.error = failure.message || '保存失败，请稍后再试。' }
+}
+
 async function toggleStatus() {
   const next = selected.value.partner.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
   if (next === 'DISABLED' && !window.confirm('停用后这家服务商不能登录后台、分配烟火和生成激活码；已生成的激活码照常可用。确定停用吗？')) return
@@ -213,7 +229,13 @@ load()
 
     <template v-if="selected">
       <section class="management-list" aria-labelledby="partner-detail-title">
-        <div class="mg-list-caption"><h2 id="partner-detail-title">{{ selected.partner.name }}</h2><span><button class="mg-text-button" type="button" :disabled="busy" @click="toggleStatus">{{ selected.partner.status === 'ACTIVE' ? '停用' : '启用' }}</button> · <button class="mg-text-button" type="button" @click="selectedId = null">收起</button></span></div>
+        <div class="mg-list-caption"><h2 id="partner-detail-title">{{ selected.partner.name }}</h2><span><button class="mg-text-button" type="button" :disabled="busy" @click="startRename">改名称</button> · <button class="mg-text-button" type="button" :disabled="busy" @click="toggleStatus">{{ selected.partner.status === 'ACTIVE' ? '停用' : '启用' }}</button> · <button class="mg-text-button" type="button" @click="selectedId = null">收起</button></span></div>
+        <form v-if="renameForm.open" class="partner-admin-form partner-admin-inline" @submit.prevent="rename">
+          <label>服务商名称<input v-model="renameForm.name" maxlength="80" required /><small>就是服务商在 partner.yifangzhi.com 里显示的名字。</small></label>
+          <label>联系方式（可选）<input v-model="renameForm.contact" maxlength="120" /></label>
+          <p v-if="renameForm.error" class="mg-error" role="alert">{{ renameForm.error }}</p>
+          <div><button class="mg-button mg-primary" type="submit" :disabled="busy">保存</button> <button class="mg-button" type="button" :disabled="busy" @click="renameForm.open = false">取消</button></div>
+        </form>
         <div class="partner-admin-grid">
           <form class="partner-admin-form" @submit.prevent="grant">
             <h3>发放烟火</h3>

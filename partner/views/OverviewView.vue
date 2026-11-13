@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ArrowRight, BarChart3, ChevronLeft, ChevronRight, Coins, Plus, RefreshCw, Store, TicketCheck } from 'lucide-vue-next'
 import { partnerApi, ledgerTypes } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
@@ -7,6 +8,7 @@ import { dateText, groupTodos, membershipState, number, sinceText, todoTypes } f
 import { auth } from '../../src/stores/auth.js'
 import { isOwner, loadPartner, partner } from '../partnerStore.js'
 import TenantDrawer from '../components/TenantDrawer.vue'
+import WelcomeDialog from '../components/WelcomeDialog.vue'
 
 /**
  * 工作台：左边是今天要跟进的商户（一个商户一行，原因用标签列出，按紧急程度排），点一行打开商户详情处理；
@@ -29,6 +31,17 @@ const tabs = computed(() => [{ type: '', label: '全部', count: allRows.value.l
   ...Object.entries(todoTypes).map(([type, meta]) => ({ type, label: meta.short, count: workbench.value?.counts?.[type] || 0 }))])
 const quotas = computed(() => (overview.value?.quotas || []).filter(q => q.planName))
 const today = computed(() => new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }))
+const router = useRouter()
+// 欢迎弹窗：每个账号每天进入工作台时弹一次。
+const welcomeKey = () => `partner-welcome-${auth.user?.id}-${new Date().toLocaleDateString('sv-SE')}`
+const welcome = ref(false)
+const expiringCount = computed(() => workbench.value?.counts?.EXPIRING || 0)
+const quotaLeft = computed(() => quotas.value.reduce((sum, q) => sum + q.remaining, 0))
+function closeWelcome() {
+  welcome.value = false
+  try { localStorage.setItem(welcomeKey(), '1') } catch { /* 本地存储不可用时这次照常关闭 */ }
+}
+function welcomeGo(name) { closeWelcome(); router.push({ name }) }
 
 async function load() {
   loading.value = true
@@ -36,6 +49,7 @@ async function load() {
   try {
     const [bench] = await Promise.all([partnerApi.workbench(), loadPartner(true)])
     workbench.value = bench
+    try { if (!localStorage.getItem(welcomeKey())) welcome.value = true } catch { welcome.value = true }
     if (owner.value) await loadLedger()
   } catch (failure) {
     error.value = failure.message || '工作台暂时无法读取。'
@@ -67,7 +81,7 @@ load()
     <header class="pw-head">
       <div>
         <p class="pw-date">{{ today }}</p>
-        <h1>{{ auth.user?.name ? `${auth.user.name}，` : '' }}{{ allRows.length ? `今天有 ${allRows.length} 个商户需要跟进` : '今天没有需要跟进的商户' }}</h1>
+        <h1>{{ overview?.partner.name ? `${overview.partner.name}，` : '' }}{{ allRows.length ? `今天有 ${allRows.length} 个商户需要跟进` : '今天没有需要跟进的商户' }}</h1>
       </div>
       <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
     </header>
@@ -108,10 +122,18 @@ load()
         <section class="pw-card" aria-labelledby="res-title">
           <header class="pw-card-head"><h2 id="res-title">我的资源</h2></header>
           <div class="pw-card-body">
-            <div v-if="owner" class="pw-balance">
-              <span>可分配烟火</span>
-              <strong class="mg-mono">{{ number(overview?.partner.creditsAvailable) }}</strong>
-              <small>平台发放，分给名下商户后记入商户的充值烟火</small>
+            <div v-if="owner" class="pw-balance-pair">
+              <div class="pw-balance">
+                <span>服务商可分配烟火</span>
+                <strong class="mg-mono">{{ number(overview?.partner.creditsAvailable) }}</strong>
+                <small>平台发放</small>
+              </div>
+              <div class="pw-balance">
+                <span>我的账号</span>
+                <strong class="mg-mono">{{ number(overview?.account?.available) }}</strong>
+                <small>赠送 {{ number(overview?.account?.gift) }} · 充值 {{ number(overview?.account?.purchased) }}</small>
+              </div>
+              <p class="pw-balance-hint">两边的烟火都能分给名下商户和 BD，在商户或成员详情里选择从哪里扣。<RouterLink :to="{ name: 'partner-distributions' }">分配记录</RouterLink></p>
             </div>
             <div class="pw-quotas">
               <p class="pw-label">激活码额度</p>
@@ -129,7 +151,8 @@ load()
             <RouterLink :to="{ name: 'partner-tenants' }"><Store :size="16" /><span>名下商户<small>{{ number(overview?.tenantCount) }} 个 · 添加、续期{{ owner ? '、分烟火' : '' }}</small></span><ArrowRight :size="14" /></RouterLink>
             <RouterLink :to="{ name: 'partner-codes' }"><TicketCheck :size="16" /><span>激活码<small>生成、作废、导出</small></span><ArrowRight :size="14" /></RouterLink>
             <RouterLink :to="{ name: 'partner-dashboard' }"><BarChart3 :size="16" /><span>经营看板<small>使用、烟火、激活码统计</small></span><ArrowRight :size="14" /></RouterLink>
-            <RouterLink v-if="owner" :to="{ name: 'partner-team' }"><Plus :size="16" /><span>团队<small>添加 BD、看业绩</small></span><ArrowRight :size="14" /></RouterLink>
+            <RouterLink v-if="owner" :to="{ name: 'partner-team' }"><Plus :size="16" /><span>团队<small>添加 BD、看业绩、分烟火给 BD</small></span><ArrowRight :size="14" /></RouterLink>
+            <RouterLink v-if="owner" :to="{ name: 'partner-distributions' }"><Coins :size="16" /><span>分配记录<small>分给商户和 BD 的每一笔</small></span><ArrowRight :size="14" /></RouterLink>
           </nav>
         </section>
       </aside>
@@ -157,5 +180,10 @@ load()
     </section>
 
     <TenantDrawer :tenant-id="openTenant" @close="openTenant = null" @updated="load" />
+    <WelcomeDialog
+      :open="welcome" :partner-name="overview?.partner.name || '服务商'" :person-name="auth.user?.name || ''" :owner="owner"
+      :todos="allRows.length" :expiring="expiringCount" :tenants="overview?.tenantCount || 0" :balance="overview?.account?.available || 0"
+      :pool="owner ? overview?.partner.creditsAvailable ?? 0 : null" :quota="quotaLeft" @close="closeWelcome" @go="welcomeGo"
+    />
   </div>
 </template>

@@ -5,6 +5,24 @@
 export const partnerRoles = { OWNER: '负责人', BD: 'BD' }
 export const expiryFilters = { SOON7: '7 天内到期', SOON30: '30 天内到期', EXPIRED: '已过期', NEVER: '从未开通' }
 export const transferPresets = [500, 1000, 2000, 5000]
+export const distributionSources = { POOL: '可分配烟火', ACCOUNT: '我的账号' }
+export const distributionRecipients = { TENANT: '商户', BD: 'BD' }
+
+/** 某个来源现在能分多少：POOL 是服务商可分配烟火，ACCOUNT 是负责人账号的可用烟火。 */
+export function sourceBalance(overview, source) {
+  return source === 'ACCOUNT' ? overview?.account?.available || 0 : overview?.partner?.creditsAvailable || 0
+}
+
+/** 默认来源：可分配烟火有余额就用它，否则用自己的账号。 */
+export function defaultSource(overview) {
+  return (overview?.partner?.creditsAvailable || 0) > 0 || !(overview?.account?.available > 0) ? 'POOL' : 'ACCOUNT'
+}
+
+/** 从负责人账号分出 credits 时，赠送和充值各扣多少（先扣赠送）。 */
+export function accountSplit(account, credits) {
+  const gift = Math.min(account?.gift || 0, credits)
+  return { gift, purchased: credits - gift }
+}
 
 /** 待办分类：标题、说明和对服务商的建议动作。顺序就是首页的展示顺序。 */
 export const todoTypes = {
@@ -148,7 +166,8 @@ export async function runBatchTransfers(entries, keys, transfer) {
 /** 商户详情里的记录：服务商分给他的烟火、他兑换的激活码和直接续期，按时间倒序。 */
 export function tenantTimeline(detail) {
   const rows = [
-    ...(detail?.transfers || []).map(t => ({ key: 'l' + t.id, at: t.createdAt, kind: 'transfer', title: `分配 ${number(-t.delta)} 烟火`, note: t.note })),
+    ...(detail?.transfers || []).map(t => ({ key: 'l' + t.id, at: t.createdAt, kind: 'transfer',
+      title: `分配 ${number(t.credits)} 烟火 · ${distributionSources[t.source] || ''}${t.status === 'PENDING' ? '（未到账）' : ''}`, note: t.note })),
     ...(detail?.codes || []).map(c => ({ key: 'c' + c.id, at: c.redeemedAt, kind: c.note === '直接续期' ? 'renew' : 'code',
       title: `${c.note === '直接续期' ? '直接续期' : '兑换激活码'} · ${c.planName || '套餐'} ${c.durationDays ?? ''} 天`.trim(), note: c.note === '直接续期' ? null : c.note })),
   ]

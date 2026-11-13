@@ -38,6 +38,12 @@ public class PartnerPlatformController {
         return ApiResponse.ok(service.removeMember(id, userId, me.userId()));
     }
 
+    @PutMapping("/{id}")
+    public ApiResponse<PartnerDtos.PlatformPartner> rename(@PathVariable Long id, @Valid @RequestBody PartnerDtos.Rename input,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.rename(id, input, me.userId()));
+    }
+
     @PostMapping("/{id}/status")
     public ApiResponse<PartnerDtos.PlatformPartner> status(@PathVariable Long id, @Valid @RequestBody PartnerDtos.SetStatus input,
             @AuthenticationPrincipal AuthPrincipal me) {

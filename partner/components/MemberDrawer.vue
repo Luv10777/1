@@ -1,13 +1,14 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { BarChart3, Store, UserMinus } from 'lucide-vue-next'
+import { BarChart3, Check, Coins, Store, UserMinus } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
-import { membershipState, number, partnerRoles } from '../../src/domain/partnerOps.js'
+import { defaultSource, distributionSources, membershipState, number, partnerRoles, sourceBalance, transferError, transferPresets } from '../../src/domain/partnerOps.js'
 import { bds, loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 import OptionCards from './OptionCards.vue'
+import CreditSource from './CreditSource.vue'
 
 /**
  * 团队成员详情（只给负责人）：业绩数字、名下商户（点开看商户详情），移除 BD 时先选名下商户转给谁。
@@ -28,6 +29,24 @@ const transferOptions = computed(() => [
   ...others.value.map(b => ({ value: String(b.userId), title: `BD · ${b.name || b.uid}`, detail: `UID ${b.uid || '—'} · 现有 ${b.tenantCount} 个商户` })),
 ])
 const codes = computed(() => props.member?.codes || { generated: 0, redeemed: 0, unused: 0, voided: 0, renewals: 0 })
+const gift = reactive({ source: 'POOL', credits: '', note: '', requestKey: '', confirming: false, error: '', done: '' })
+const giftBalance = computed(() => sourceBalance(partner.overview, gift.source))
+function resetGift() { Object.assign(gift, { source: defaultSource(partner.overview), credits: '', note: '', requestKey: 'bd-' + crypto.randomUUID(), confirming: false, error: '' }) }
+function askGift() { gift.error = transferError(gift.credits, giftBalance.value); gift.confirming = !gift.error }
+async function sendGift() {
+  busy.value = true
+  const credits = Number(gift.credits)
+  try {
+    await partnerApi.transferToBd(props.member.userId, { requestKey: gift.requestKey, credits, note: gift.note.trim() || null, source: gift.source })
+    await loadPartner(true)
+    const name = props.member.name || props.member.uid
+    resetGift()
+    gift.done = `已分给 ${name} ${number(credits)} 烟火`
+  } catch (failure) {
+    gift.error = `${failure.message || '分配失败'}，可以直接再确认一次，不会重复扣烟火。`
+    gift.confirming = false
+  } finally { busy.value = false }
+}
 
 async function load() {
   tenants.value = []
@@ -39,7 +58,7 @@ async function load() {
     tenantTotal.value = result.total
   } finally { loading.value = false }
 }
-watch(() => props.member?.userId, id => { Object.assign(removal, { transferTo: '0', confirming: false, error: '' }); if (id) load().catch(() => {}) }, { immediate: true })
+watch(() => props.member?.userId, id => { Object.assign(removal, { transferTo: '0', confirming: false, error: '' }); resetGift(); gift.done = ''; if (id) load().catch(() => {}) }, { immediate: true })
 
 async function remove() {
   busy.value = true
@@ -76,6 +95,21 @@ async function remove() {
           <div><span>已作废</span><strong>{{ number(codes.voided) }}</strong></div>
         </div>
         <p class="mg-muted">激活码数含直接续期自动生成的码。{{ isBd ? '' : '负责人管本服务商全部商户。' }}</p>
+      </section>
+
+      <section v-if="isBd" class="mg-detail-section" aria-labelledby="bd-gift-title">
+        <h3 id="bd-gift-title"><Coins :size="17" />分配烟火</h3>
+        <p class="mg-muted">分给 BD 的烟火进他自己的一方志账号，他可以自己用。分出后不能撤回，记在「分配记录」里。</p>
+        <div v-if="gift.done" class="mg-feedback success" role="status"><Check :size="16" />{{ gift.done }}</div>
+        <CreditSource v-model="gift.source" :disabled="busy || gift.confirming" />
+        <label class="partner-field">烟火数<input v-model="gift.credits" type="number" min="1" max="1000000" step="1" inputmode="numeric" placeholder="例如 1000" :disabled="busy || gift.confirming" /></label>
+        <div class="partner-presets"><button v-for="value in transferPresets" :key="value" type="button" :class="{ active: Number(gift.credits) === value }" :disabled="busy || gift.confirming" @click="gift.credits = String(value)">{{ number(value) }}</button></div>
+        <label class="partner-field">备注（可选）<input v-model="gift.note" maxlength="200" placeholder="例如：11 月提成" :disabled="busy || gift.confirming" /></label>
+        <ConfirmBox v-if="gift.confirming" :busy="busy" confirm-text="确认分配" @confirm="sendGift" @cancel="gift.confirming = false">
+          <p>从「{{ distributionSources[gift.source] }}」分 <b>{{ number(gift.credits) }}</b> 烟火给 BD「{{ member.name || member.uid }}」，{{ distributionSources[gift.source] }} {{ number(giftBalance) }} → <b>{{ number(giftBalance - Number(gift.credits)) }}</b>。</p>
+        </ConfirmBox>
+        <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy" @click="askGift">分配</button></div>
+        <p v-if="gift.error" class="mg-inline-error" role="alert">{{ gift.error }}</p>
       </section>
 
       <section v-if="isBd" class="mg-detail-section">

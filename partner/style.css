@@ -239,3 +239,42 @@
   .pw-todo-why { grid-column:1/-1; grid-row:2; }
   .pw-head h1 { font-size:18px; }
 }
+
+/* 工作台资源：服务商可分配烟火和负责人自己的账号并排 */
+.pw-balance-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--mg-line); }
+.pw-balance-pair .pw-balance { padding:0; margin:0; border:0; }
+.pw-balance-pair .pw-balance strong { font-size:22px; }
+.pw-balance-hint { grid-column:1/-1; margin:0; color:var(--mg-muted); font-size:12px; }
+.pw-balance-hint a { margin-left:6px; color:var(--mg-accent); }
+.pw-kpis-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+
+/* 右上角余额：与一方志站内同步的账号烟火 */
+.partner-balance { display:inline-flex; align-items:center; gap:5px; margin-right:14px; padding:5px 11px; border:1px solid var(--mg-line); border-radius:6px; background:#fff; color:var(--mg-ink); font-size:13px; font-weight:500; white-space:nowrap; }
+.partner-balance-label { margin-right:2px; color:var(--mg-muted); font-weight:400; }
+.partner-balance .yanhuo-coin { --color-accent:#0E766E; }
+@media (max-width:640px) { .partner-balance-label { display:none; } .partner-balance { margin-right:8px; padding:4px 8px; } }
+
+/* 欢迎弹窗 */
+.pwl-backdrop { background:rgb(12 24 20 / 46%); backdrop-filter:blur(3px); }
+.pwl { width:min(480px,100%); font-size:14px; border-radius:14px; background:#fff; box-shadow:0 30px 80px rgb(10 30 22 / 28%); overflow:hidden; animation:pwl-in .32s cubic-bezier(.2,.8,.2,1); }
+@keyframes pwl-in { from { opacity:0; transform:translateY(12px) scale(.98); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce) { .pwl { animation:none; } }
+.pwl-hero { position:relative; padding:28px 30px 24px; background:linear-gradient(135deg,#0f5e43 0%,#16825a 58%,#2a9a6f 100%); color:#fff; overflow:hidden; }
+.pwl-glow { position:absolute; right:-60px; top:-70px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgb(255 255 255 / 22%),transparent 70%); }
+.pwl-hero::after { content:''; position:absolute; inset:auto 0 0; height:1px; background:rgb(255 255 255 / 18%); }
+.pwl-badge { position:relative; display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border:1px solid rgb(255 255 255 / 35%); border-radius:20px; background:rgb(255 255 255 / 12%); font-size:12px; }
+.pwl-date { position:relative; margin:14px 0 4px; color:rgb(255 255 255 / 75%); font-size:12px; }
+.pwl-hero h2 { position:relative; margin:0; font:600 24px/1.35 var(--font-sans); letter-spacing:.5px; overflow-wrap:anywhere; }
+.pwl-person { position:relative; margin:6px 0 0; color:rgb(255 255 255 / 85%); font-size:13px; }
+.pwl-body { padding:22px 30px 6px; }
+.pwl-headline { margin:0; font:600 16px/1.5 var(--font-sans); color:var(--mg-ink); }
+.pwl-tip { margin:4px 0 16px; color:var(--mg-muted); font-size:13px; }
+.pwl-facts { list-style:none; margin:0; padding:0; border:1px solid var(--mg-line); border-radius:10px; }
+.pwl-facts li { display:grid; grid-template-columns:18px 1fr auto; align-items:center; gap:10px; padding:11px 14px; font-size:13px; color:var(--mg-ink); }
+.pwl-facts li + li { border-top:1px solid var(--mg-line); }
+.pwl .mg-button { min-height:38px; }
+.pwl-facts li > svg { color:var(--mg-accent); }
+.pwl-facts b { font-size:15px; }
+.pwl-facts b.warn { color:#b25e09; }
+.pwl-actions { display:flex; justify-content:flex-end; gap:10px; padding:18px 30px 24px; }
+.pwl-actions .mg-primary { padding-inline:18px; }

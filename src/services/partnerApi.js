@@ -15,6 +15,9 @@ export const partnerApi = {
   renew: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/renewals`, values),
   assignBd: (tenantId, bdUserId) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/bd`, { bdUserId: bdUserId || null }),
   team: () => get('/api/partner/team'),
+  transferToBd: (userId, values) => post(`/api/partner/team/${encodeURIComponent(userId)}/credits`, values),
+  distributions: values => get('/api/partner/distributions', params(values)),
+  retryDistribution: id => post(`/api/partner/distributions/${encodeURIComponent(id)}/retry`, {}),
   addBd: uid => post('/api/partner/team', { uid: Number(uid) }),
   /** transferTo：他名下的商户转给哪个 BD，0 表示回到负责人直接管。 */
   removeBd: (userId, transferTo) => del(`/api/partner/team/${encodeURIComponent(userId)}?transferTo=${encodeURIComponent(transferTo || 0)}`),
@@ -30,6 +33,7 @@ export const partnerAdminApi = {
   create: values => post('/api/platform/partners', values),
   addMember: (id, uid) => post(`/api/platform/partners/${encodeURIComponent(id)}/members`, { uid: Number(uid) }),
   removeMember: (id, userId) => del(`/api/platform/partners/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`),
+  rename: (id, values) => put(`/api/platform/partners/${encodeURIComponent(id)}`, values),
   setStatus: (id, status) => post(`/api/platform/partners/${encodeURIComponent(id)}/status`, { status }),
   grant: (id, values) => post(`/api/platform/partners/${encodeURIComponent(id)}/credits`, values),
   setQuota: (id, planCode, quota) => put(`/api/platform/partners/${encodeURIComponent(id)}/quotas`, { planCode, quota }),

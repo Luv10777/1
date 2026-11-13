@@ -12,10 +12,10 @@ export const ledgerAdminApi = {
 }
 
 /** 烟火看板的来源拆分：同一个来源键在「购买」和「赠送」里含义不同。 */
-export const purchasedSources = { ORDER: '在线充值', REDEEM_CODE: '兑换码充值', PARTNER: '服务商分配' }
-export const grantedSources = { ORDER: '会员赠送', ADMIN_MEMBERSHIP: '平台开通会员', ADMIN: '平台赠送', REDEEM_CODE: '兑换码赠送' }
+export const purchasedSources = { ORDER: '在线充值', REDEEM_CODE: '兑换码充值', PARTNER: '服务商分配', PARTNER_ACCOUNT: '服务商负责人转入' }
+export const grantedSources = { ORDER: '会员赠送', ADMIN_MEMBERSHIP: '平台开通会员', ADMIN: '平台赠送', REDEEM_CODE: '兑换码赠送', PARTNER_ACCOUNT: '服务商负责人转入' }
 
-export const ledgerTypes = { CAPTURE: '扣除', RESERVE: '预占', RELEASE: '退回', PURCHASE: '充值', GRANT: '赠送' }
+export const ledgerTypes = { CAPTURE: '扣除', RESERVE: '预占', RELEASE: '退回', PURCHASE: '充值', GRANT: '赠送', TRANSFER: '转出' }
 export const ledgerCapabilities = { IMAGE: '图片创作', VIDEO: '视频创作', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', IMAGE_INSPIRATION: '图片灵感方案', COPY: '文案创作', LIVE: '实景直播' }
 export const ledgerRanges = { 1: '今天', 7: '近 7 天', 30: '近 30 天', 90: '近 90 天' }
 
@@ -24,5 +24,6 @@ export function ledgerChange(entry) {
   const amount = entry.type === 'CAPTURE' ? -entry.heldDelta : entry.availableDelta
   if (entry.type === 'CAPTURE') return { text: `-${Math.abs(amount)}`, tone: 'out' }
   if (entry.type === 'RESERVE') return { text: `-${Math.abs(amount)}`, tone: 'hold' }
+  if (entry.type === 'TRANSFER') return { text: `-${Math.abs(amount)}`, tone: 'out' }
   return { text: `+${Math.abs(amount)}`, tone: 'in' }
 }

@@ -55,6 +55,15 @@ public class PartnerPlatformService {
         return view(row);
     }
 
+    /** 改服务商名称和联系方式；名称即服务商后台里显示的服务商名。 */
+    @Transactional
+    public PartnerDtos.PlatformPartner rename(Long partnerId, PartnerDtos.Rename input, Long operator) {
+        requireOperator(operator);
+        store.lockPartner(partnerId);
+        store.rename(partnerId, input.name().trim(), PartnerService.blank(input.contact()) ? null : input.contact().trim());
+        return view(store.partner(partnerId).orElseThrow());
+    }
+
     @Transactional
     public PartnerDtos.PlatformPartner setStatus(Long partnerId, String status, Long operator) {
         requireOperator(operator);
