@@ -1,8 +1,9 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BarChart3, Coins, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldCheck, Store, TicketCheck, Users } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
+import { useNavigationProgress } from '../admin/navigation.js'
 import { isOwner, partner } from './partnerStore.js'
 import YanhuoIcon from '../src/components/YanhuoIcon.vue'
 
@@ -10,7 +11,10 @@ const number = value => Number(value || 0).toLocaleString('zh-CN')
 
 const route = useRoute()
 const router = useRouter()
+const navigating = useNavigationProgress(router)
 const menuOpen = ref(false)
+// 窄屏上点了侧栏或页面里的链接，跳转后收起侧栏。
+watch(() => route.name, () => { menuOpen.value = false })
 const signingOut = ref(false)
 const authorized = computed(() => route.meta.partner && auth.isAuthenticated && partner.overview)
 const navigation = computed(() => [
@@ -44,10 +48,11 @@ async function logout() {
     </aside>
     <div class="admin-body">
       <header class="admin-topbar">
+        <div class="admin-progress" :class="{ active: navigating }" aria-hidden="true" />
         <div class="admin-crumb"><button class="admin-menu-toggle" type="button" :aria-expanded="menuOpen" aria-label="切换导航" @click="menuOpen = !menuOpen"><component :is="menuOpen ? PanelLeftClose : PanelLeftOpen" :size="20" /></button><span>{{ partner.overview.partner.name }}</span><span class="admin-topbar-separator">/</span><strong>{{ route.meta.title }}</strong></div>
         <div class="admin-topbar-actions" style="margin-left:auto"><span class="partner-balance" :title="`你的一方志账号烟火 ${number(partner.overview.account?.available)}，与一方志站内余额同步`" :aria-label="`烟火余额 ${number(partner.overview.account?.available)}`"><span class="partner-balance-label">余额</span><YanhuoIcon :size="16" /><span class="mg-mono">{{ number(partner.overview.account?.available) }}</span></span><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '服').slice(0, 1) }}</span><span>{{ auth.user?.name || '服务商账号' }}<small>{{ isOwner() ? '负责人' : 'BD' }} · UID {{ auth.user?.uid || '—' }}</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div></div>
       </header>
-      <main id="partner-main" class="admin-main" tabindex="-1"><RouterView /></main>
+      <main id="partner-main" class="admin-main" tabindex="-1"><RouterView v-slot="{ Component, route: page }"><Transition name="ad-page" mode="out-in"><component :is="Component" :key="page.name" /></Transition></RouterView></main>
     </div>
   </div>
   <RouterView v-else />

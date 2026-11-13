@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
+import com.wuyao.growth.iam.dto.AccountDtos;
 import com.wuyao.growth.iam.dto.AuthDtos;
 import com.wuyao.growth.iam.entity.User;
 import com.wuyao.growth.iam.entity.WechatAccount;
@@ -14,8 +15,10 @@ import com.wuyao.growth.iam.repository.WechatAccountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
@@ -42,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 public class WechatLoginService {
     public record Authorization(String url, String state) {}
 
+    public static final String STATE_COOKIE = "wechat_login_state";
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
     private static final Duration TICKET_TTL = Duration.ofMinutes(10);
     private static final Duration TICKET_LOCK_TTL = Duration.ofSeconds(30);
@@ -74,6 +78,10 @@ public class WechatLoginService {
     @Value("${growth.wechat.frontend-login-path:/login}")
     private String frontendLoginPath;
 
+    /** 已登录的人在设置页扫码绑定微信，完成后回到这里。 */
+    @Value("${growth.wechat.frontend-settings-path:/settings}")
+    private String frontendSettingsPath;
+
     /** 其他也在微信授权回调域里的站点域名：从这些域名发起的登录直接回到原域名，不先跳到 callback-url 的域名。 */
     @Value("${growth.wechat.callback-hosts:}")
     private List<String> callbackHosts;
@@ -90,6 +98,43 @@ public class WechatLoginService {
     }
 
     public Authorization start(String requestHost, String redirect) {
+        return authorize(requestHost, Map.of("redirect", safeRedirect(redirect)));
+    }
+
+    public boolean configured() {
+        try {
+            requireConfigured();
+            return true;
+        } catch (BizException e) {
+            return false;
+        }
+    }
+
+    /** 本人的微信绑定情况，设置页展示用。 */
+    public AccountDtos.WechatBinding binding(Long userId) {
+        return accounts.findFirstByUserIdOrderByIdDesc(userId)
+                .map(account -> new AccountDtos.WechatBinding(configured(), true, account.getNickname(), account.getCreatedAt()))
+                .orElseGet(() -> new AccountDtos.WechatBinding(configured(), false, null, null));
+    }
+
+    /**
+     * 已登录的人在设置页扫码绑定微信。和扫码登录共用回调地址，state 里记下是哪个账号在绑定，
+     * 回调时直接绑到这个账号上，不再走手机号验证。只能在回调域名下发起，否则浏览器带不回 state cookie。
+     */
+    public Authorization startBinding(String requestHost, Long userId) {
+        if (canonicalStartUrl(requestHost, null) != null) {
+            throw BizException.of(ErrorCode.BAD_REQUEST,
+                    "请在 " + URI.create(callbackUrl).getHost() + " 打开设置页再绑定微信");
+        }
+        users.findById(userId).filter(user -> "ACTIVE".equals(user.getStatus()))
+                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+        if (accounts.findFirstByUserIdOrderByIdDesc(userId).isPresent()) {
+            throw BizException.of(ErrorCode.CONFLICT, "这个账号已经绑定了微信");
+        }
+        return authorize(requestHost, Map.of("bindUserId", userId));
+    }
+
+    private Authorization authorize(String requestHost, Map<String, Object> stateData) {
         requireConfigured();
         URI callback = URI.create(callbackUrl);
         String redirectUri = isCallbackHost(requestHost)
@@ -97,7 +142,7 @@ public class WechatLoginService {
                         + callback.getRawPath() + (callback.getRawQuery() == null ? "" : "?" + callback.getRawQuery())
                 : callbackUrl;
         String state = randomToken();
-        redis.opsForValue().set(key("state", state), write(Map.of("redirect", safeRedirect(redirect))), STATE_TTL);
+        redis.opsForValue().set(key("state", state), write(stateData), STATE_TTL);
         String url = "https://open.weixin.qq.com/connect/qrconnect?appid=" + encode(appId)
                 + "&redirect_uri=" + encode(redirectUri)
                 + "&response_type=code&scope=snsapi_login&state=" + encode(state)
@@ -118,6 +163,7 @@ public class WechatLoginService {
             throw BizException.of(ErrorCode.WECHAT_TICKET_INVALID, "微信登录已过期，请重新扫码");
         }
         JsonNode stateNode = read(stateJson);
+        if (stateNode.hasNonNull("bindUserId")) return bindCallback(code, stateNode.get("bindUserId").asLong());
         String redirect = safeRedirect(stateNode.path("redirect").asText("/dashboard"));
 
         JsonNode token = requestToken(code);
@@ -136,6 +182,62 @@ public class WechatLoginService {
         ticketData.put("redirect", redirect);
         redis.opsForValue().set(key("ticket", ticket), write(ticketData), TICKET_TTL);
         return frontendLoginPath + "?redirect=" + encode(redirect) + "#wechat_ticket=" + encode(ticket);
+    }
+
+    /** 扫码绑定的回调：换到微信身份就绑到发起绑定的账号上，成功失败都回设置页说明。 */
+    private String bindCallback(String code, long userId) {
+        try {
+            JsonNode token = requestToken(code);
+            String openId = required(token, "openid");
+            JsonNode profile = requestProfile(required(token, "access_token"), openId);
+            String unionId = text(token, "unionid");
+            if (!StringUtils.hasText(unionId)) unionId = text(profile, "unionid");
+            bind(userId, openId, unionId, text(profile, "nickname"), text(profile, "headimgurl"));
+            return frontendSettingsPath + "?wechat_bound=1";
+        } catch (BizException e) {
+            return frontendSettingsPath + "?wechat_error=" + encode(e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("设置页绑定微信失败: userId={}", userId, e);
+            return frontendSettingsPath + "?wechat_error=" + encode("微信绑定暂时不可用，请稍后重试");
+        }
+    }
+
+    void bind(Long userId, String openId, String unionId, String nickname, String headimgUrl) {
+        try {
+            transactions.executeWithoutResult(status -> {
+                // 和扫码登录绑定同一把锁：同一个微信不能同时绑到两个账号上。
+                accounts.lockIdentity("auth:wechat:" + appId + ":" + openId);
+                WechatAccount current = accounts.findByAppIdAndOpenId(appId, openId).orElse(null);
+                if (current != null) {
+                    if (current.getUserId().equals(userId)) return;
+                    throw BizException.of(ErrorCode.CONFLICT, "这个微信已经绑定了其他账号，请换一个微信");
+                }
+                users.findForUpdate(userId).filter(user -> "ACTIVE".equals(user.getStatus()))
+                        .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+                if (accounts.findFirstByUserIdOrderByIdDesc(userId).isPresent()) {
+                    throw BizException.of(ErrorCode.CONFLICT, "这个账号已经绑定了另一个微信");
+                }
+                WechatAccount account = new WechatAccount();
+                account.setAppId(appId);
+                account.setOpenId(openId);
+                account.setUnionId(unionId);
+                account.setUserId(userId);
+                account.setNickname(nickname);
+                account.setHeadimgUrl(headimgUrl);
+                account.setUpdatedAt(Instant.now());
+                accounts.saveAndFlush(account);
+            });
+        } catch (DataIntegrityViolationException e) {
+            // union_id 唯一：同一个微信用户在这个应用下已经以另一个 openid 绑过账号。
+            throw BizException.of(ErrorCode.CONFLICT, "这个微信已经绑定了其他账号，请换一个微信");
+        }
+        log.info("设置页绑定微信: userId={}", userId);
+    }
+
+    /** 浏览器侧的 state cookie：回调时核对，防止别人把自己发起的授权链接塞给你扫。 */
+    public static String stateCookie(String value, long maxAgeSeconds) {
+        return ResponseCookie.from(STATE_COOKIE, value)
+                .httpOnly(true).secure(true).sameSite("Lax").path("/api/auth/wechat").maxAge(maxAgeSeconds).build().toString();
     }
 
     public String errorRedirect(String message) {

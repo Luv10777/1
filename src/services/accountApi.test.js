@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { closurePayload, createAccountApi, namePayload, passwordPayload, validateAvatar } from './accountApi.js'
+import { closurePayload, createAccountApi, namePayload, passwordPayload, phoneChangePayload, phoneProofPayload, validateAvatar, wechatQrFrameUrl } from './accountApi.js'
 
 test('avatars upload actual bytes directly, then save only the server-issued upload key to the current account', async () => {
   const file = new File(['image bytes'], 'portrait.png', { type: 'image/png' })
@@ -99,4 +99,26 @@ test('closing an account needs the box ticked and only the chosen proof is sent'
   assert.deepEqual(calls[1].body, { code: '123456', confirmed: true })
   assert.throws(() => api.close({ code: '123456', confirmed: false }, true), /勾选/)
   assert.equal(calls.length, 2)
+})
+
+test('changing the phone sends only the chosen proof, then the new number and its code', () => {
+  const proof = { code: ' 123456 ', currentPassword: 'old-secret' }
+  assert.deepEqual(phoneProofPayload(proof, true), { code: '123456' })
+  assert.deepEqual(phoneProofPayload(proof, false), { currentPassword: 'old-secret' })
+  assert.throws(() => phoneProofPayload({ code: '12' }, true), /6 位/)
+  assert.throws(() => phoneProofPayload({ currentPassword: '' }, false), /当前密码/)
+  assert.deepEqual(phoneChangePayload({ phone: ' 13900000022 ', code: '654321' }, '13900000021'), { phone: '13900000022', code: '654321' })
+  assert.throws(() => phoneChangePayload({ phone: '12345', code: '654321' }, null), /11 位/)
+  assert.throws(() => phoneChangePayload({ phone: '13900000021', code: '654321' }, '13900000021'), /一样/)
+  assert.throws(() => phoneChangePayload({ phone: '13900000022', code: '' }, null), /6 位/)
+})
+
+test('only the official WeChat authorize page is embedded, as the JS-SDK QR page', () => {
+  const frame = new URL(wechatQrFrameUrl('https://open.weixin.qq.com/connect/qrconnect?appid=wx1&state=s#wechat_redirect'))
+  assert.equal(frame.searchParams.get('login_type'), 'jssdk')
+  assert.equal(frame.searchParams.get('self_redirect'), 'false')
+  assert.equal(frame.searchParams.get('appid'), 'wx1')
+  assert.equal(frame.hash, '')
+  assert.equal(wechatQrFrameUrl('https://evil.example.com/connect/qrconnect?appid=wx1'), null)
+  assert.equal(wechatQrFrameUrl('not a url'), null)
 })

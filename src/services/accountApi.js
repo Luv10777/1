@@ -41,6 +41,42 @@ export function closurePayload(values, byCode) {
   return { currentPassword, confirmed: true }
 }
 
+/** 改绑或绑定手机号第一步：原手机号的验证码，或者当前密码，两者只发一样。 */
+export function phoneProofPayload(values, byCode) {
+  if (byCode) {
+    const code = String(values.code ?? '').trim()
+    if (!CODE.test(code)) throw new Error('请输入 6 位验证码')
+    return { code }
+  }
+  const currentPassword = String(values.currentPassword ?? '')
+  if (!currentPassword) throw new Error('请输入当前密码')
+  return { currentPassword }
+}
+
+/** 第二步：新手机号和发到新手机号的验证码。 */
+export function phoneChangePayload(values, currentPhone) {
+  const phone = String(values.phone ?? '').trim()
+  if (!/^1[3-9]\d{9}$/.test(phone)) throw new Error('请输入有效的 11 位手机号')
+  if (phone === currentPhone) throw new Error('新手机号和现在绑定的一样')
+  const code = String(values.code ?? '').trim()
+  if (!CODE.test(code)) throw new Error('请输入 6 位验证码')
+  return { phone, code }
+}
+
+/**
+ * 把服务端给的微信授权地址改成可以嵌进弹窗的二维码页（微信官方 JS 登录用的参数）。
+ * 扫码确认后由微信让整个页面跳到回调地址。不是微信的地址一律不嵌。
+ */
+export function wechatQrFrameUrl(url) {
+  let parsed
+  try { parsed = new URL(url) } catch { return null }
+  if (parsed.origin !== 'https://open.weixin.qq.com' || parsed.pathname !== '/connect/qrconnect') return null
+  parsed.hash = ''
+  parsed.searchParams.set('login_type', 'jssdk')
+  parsed.searchParams.set('self_redirect', 'false')
+  return parsed.href
+}
+
 export function validateAvatar(file) {
   if (!file || !['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 格式的头像')
   if (!file.size || file.size > 2 * 1024 * 1024) throw new Error('头像图片需大于 0 且不能超过 2 MB')
@@ -67,6 +103,14 @@ export function createAccountApi({ request = defaultRequest, fetch: uploadFetch 
     },
     /** 成功后返回新的一套令牌：其他设备的登录已失效，这台要换上新的才能继续用。 */
     changePassword: (values, byCode) => put('/api/auth/account/password', passwordPayload(values, byCode)),
+    /** 改绑手机号前确认是本人；通过后十分钟内可以提交新手机号。 */
+    verifyPhoneChange: (values, byCode) => request('/api/auth/account/phone/verify',
+      { method: 'POST', body: JSON.stringify(phoneProofPayload(values, byCode)) }),
+    /** 换成新手机号，返回更新后的资料。已登录的设备不受影响。 */
+    changePhone: (values, currentPhone) => put('/api/auth/account/phone', phoneChangePayload(values, currentPhone)),
+    wechat: () => request('/api/auth/account/wechat', { method: 'GET' }),
+    /** 返回微信授权地址；服务端同时写入一个只在回调时核对的 cookie。 */
+    bindWechat: () => request('/api/auth/account/wechat/bind', { method: 'POST' }),
     /** 注销前的说明：只注销自己还是连商户一起关闭、会作废什么、现在能不能注销。 */
     closurePreview: () => request('/api/auth/account/closure', { method: 'GET' }),
     /** 立即生效、不能恢复；成功后这台设备的令牌也已失效，调用方要清掉本地登录。 */

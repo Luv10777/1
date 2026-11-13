@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface WechatAccountRepository extends JpaRepository<WechatAccount, Long> {
     Optional<WechatAccount> findByAppIdAndOpenId(String appId, String openId);
 
+    Optional<WechatAccount> findFirstByUserIdOrderByIdDesc(Long userId);
+
     @Query(value = "SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:identity, 0))", nativeQuery = true)
     int lockIdentity(@Param("identity") String identity);
 
