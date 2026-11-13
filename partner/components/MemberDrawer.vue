@@ -1,5 +1,4 @@
 <script setup>
-import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { BarChart3, Store, UserMinus } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
@@ -8,6 +7,7 @@ import { membershipState, number, partnerRoles } from '../../src/domain/partnerO
 import { bds, loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
+import OptionCards from './OptionCards.vue'
 
 /**
  * 团队成员详情（只给负责人）：业绩数字、名下商户（点开看商户详情），移除 BD 时先选名下商户转给谁。
@@ -23,6 +23,10 @@ const removal = reactive({ transferTo: '0', confirming: false, error: '' })
 const isBd = computed(() => props.member?.role === 'BD')
 const others = computed(() => bds().filter(b => b.userId !== props.member?.userId))
 const target = computed(() => others.value.find(b => String(b.userId) === removal.transferTo))
+const transferOptions = computed(() => [
+  { value: '0', title: '我直接管', detail: '商户回到负责人名下' },
+  ...others.value.map(b => ({ value: String(b.userId), title: `BD · ${b.name || b.uid}`, detail: `UID ${b.uid || '—'} · 现有 ${b.tenantCount} 个商户` })),
+])
 const codes = computed(() => props.member?.codes || { generated: 0, redeemed: 0, unused: 0, voided: 0, renewals: 0 })
 
 async function load() {
@@ -87,7 +91,8 @@ async function remove() {
       <section v-if="isBd" class="mg-detail-section" aria-labelledby="remove-bd-title">
         <h3 id="remove-bd-title"><UserMinus :size="17" />移除 BD</h3>
         <p class="mg-muted">移除后他不能再登录服务商后台，他生成的激活码照常可用。名下商户需要先选一个去处。</p>
-        <label class="partner-field">名下 {{ member.tenantCount }} 个商户转给<AppSelect v-model="removal.transferTo" :disabled="busy || removal.confirming" aria-label="商户转给"><option value="0">我直接管</option><option v-for="b in others" :key="b.userId" :value="String(b.userId)">BD · {{ b.name || b.uid }}</option></AppSelect></label>
+        <p class="partner-field-label">名下 {{ member.tenantCount }} 个商户转给</p>
+        <OptionCards v-model="removal.transferTo" :options="transferOptions" label="商户转给" :disabled="busy || removal.confirming" />
         <ConfirmBox v-if="removal.confirming" danger :busy="busy" confirm-text="确认移除" @confirm="remove" @cancel="removal.confirming = false">
           <p>移除 BD「{{ member.name || member.uid }}」，他名下的 <b>{{ member.tenantCount }}</b> 个商户转给 <b>{{ target ? `BD ${target.name || target.uid}` : '你直接管' }}</b>。</p>
         </ConfirmBox>

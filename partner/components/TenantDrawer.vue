@@ -1,5 +1,4 @@
 <script setup>
-import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { Check, Coins, History, RefreshCw, Store, UserRoundCog } from 'lucide-vue-next'
 import { partnerApi, tenantSources } from '../../src/services/partnerApi.js'
@@ -8,6 +7,7 @@ import { dateText, membershipState, number, renewedUntil, tenantTimeline, transf
 import { bds, isOwner, loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
+import OptionCards from './OptionCards.vue'
 
 /**
  * 商户详情抽屉：会员续期、分配烟火（负责人）、调整归属 BD（负责人）、往来记录。
@@ -35,6 +35,13 @@ const renewQuota = computed(() => quotas.value.find(q => q.planCode === renewal.
 const renewTo = computed(() => tenant.value && renewQuota.value ? renewedUntil(tenant.value, renewQuota.value.durationDays) : null)
 const assignTarget = computed(() => bds().find(b => String(b.userId) === assign.bdUserId))
 const currentBd = computed(() => tenant.value?.bdUserId ? String(tenant.value.bdUserId) : '')
+const planOptions = computed(() => quotas.value.map(q => ({ value: q.planCode, title: `${q.planName} · ${q.durationDays} 天`,
+  detail: q.remaining < 1 ? '额度已用完' : `还剩 ${number(q.remaining)} 个额度`, disabled: q.remaining < 1 })))
+const bdOptions = computed(() => [
+  { value: '', title: '我直接管', detail: '只有负责人能看到和管理', badge: currentBd.value === '' ? '当前' : '' },
+  ...bds().map(b => ({ value: String(b.userId), title: `BD · ${b.name || b.uid}`, detail: `UID ${b.uid || '—'} · 名下 ${b.tenantCount} 个商户`,
+    badge: currentBd.value === String(b.userId) ? '当前' : '' })),
+])
 
 function reset() {
   Object.assign(renewal, { planCode: quotas.value.find(q => q.remaining > 0)?.planCode || '', requestKey: 'renew-' + crypto.randomUUID(), confirming: false, error: '' })
@@ -142,7 +149,8 @@ async function saveAssign() {
         <p class="mg-muted">扣 1 个激活码额度直接给商户开通，不用商户输入激活码。还没到期的从原到期日往后加。</p>
         <div v-if="!quotas.length" class="mg-muted">没有可用的激活码额度，请联系{{ owner ? '平台' : '负责人' }}。</div>
         <template v-else>
-          <label class="partner-field">套餐<AppSelect v-model="renewal.planCode" :disabled="busy || renewal.confirming" aria-label="续期套餐"><option value="" disabled>选择套餐</option><option v-for="q in quotas" :key="q.planCode" :value="q.planCode" :disabled="q.remaining < 1">{{ q.planName }} · {{ q.durationDays }} 天（剩 {{ number(q.remaining) }} 个额度）</option></AppSelect></label>
+          <p class="partner-field-label">选择套餐</p>
+          <OptionCards v-model="renewal.planCode" :options="planOptions" label="续期套餐" :disabled="busy || renewal.confirming" />
           <ConfirmBox v-if="renewal.confirming" :busy="busy" confirm-text="确认续期" @confirm="renew" @cancel="renewal.confirming = false">
             <p>用 1 个「{{ renewQuota.planName }}」额度给「{{ tenant.tenantName }}」续期 {{ renewQuota.durationDays }} 天。</p>
             <p>到期日：<b>{{ tenant.memberActive ? dateText(tenant.memberUntil) : '未生效' }}</b> → <b>{{ dateText(renewTo) }}</b>；「{{ renewQuota.planName }}」额度剩 {{ renewQuota.remaining - 1 }} 个。</p>
@@ -169,11 +177,12 @@ async function saveAssign() {
       <section v-if="owner" class="mg-detail-section" aria-labelledby="assign-title">
         <h3 id="assign-title"><UserRoundCog :size="17" />归属 BD</h3>
         <p class="mg-muted">BD 只看得到归自己的商户。转给 BD 后，他可以给这个商户续期；烟火仍由你分配。</p>
-        <label class="partner-field">归属给<AppSelect v-model="assign.bdUserId" :disabled="busy || assign.confirming" aria-label="归属 BD"><option value="">我直接管</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">BD · {{ b.name || b.uid }}（名下 {{ b.tenantCount }} 个）</option></AppSelect></label>
+        <p class="partner-field-label">归属给</p>
+        <OptionCards v-model="assign.bdUserId" :options="bdOptions" label="归属 BD" :disabled="busy || assign.confirming" />
         <ConfirmBox v-if="assign.confirming" :busy="busy" confirm-text="确认调整" @confirm="saveAssign" @cancel="assign.confirming = false">
           <p>「{{ tenant.tenantName }}」：<b>{{ tenant.bdUserId ? `BD「${tenant.bdName}」` : '我直接管' }}</b> → <b>{{ assignTarget ? `BD「${assignTarget.name || assignTarget.uid}」` : '我直接管' }}</b>。</p>
         </ConfirmBox>
-        <div v-else class="partner-section-actions"><button class="mg-button" type="button" :disabled="busy || !bds().length && !tenant.bdUserId" @click="askAssign">调整归属</button><span v-if="!bds().length && !tenant.bdUserId" class="mg-muted">还没有 BD，可在「团队」页添加。</span></div>
+        <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy || assign.bdUserId === currentBd" @click="askAssign">保存归属</button><span v-if="!bds().length && !tenant.bdUserId" class="mg-muted">还没有 BD，可在「团队」页添加。</span></div>
         <p v-if="assign.error" class="mg-inline-error" role="alert">{{ assign.error }}</p>
       </section>
 
