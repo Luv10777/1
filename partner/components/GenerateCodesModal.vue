@@ -1,5 +1,4 @@
 <script setup>
-import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { Copy, Download } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
@@ -8,6 +7,7 @@ import { codesCsv, downloadCsv, number } from '../../src/domain/partnerOps.js'
 import { loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
+import OptionCards from './OptionCards.vue'
 
 /** 生成激活码弹窗：选套餐和数量，确认后生成；生成的码在弹窗里直接复制或导出。 */
 const props = defineProps({ open: { type: Boolean, default: false } })
@@ -19,6 +19,8 @@ const busy = ref(false)
 const created = ref([])
 const copied = ref('')
 const quota = computed(() => quotas.value.find(q => q.planCode === form.planCode))
+const planOptions = computed(() => quotas.value.map(q => ({ value: q.planCode, title: `${q.planName} · ${q.durationDays} 天`,
+  detail: q.remaining < 1 ? '额度已用完' : `还能生成 ${number(q.remaining)} 个`, disabled: q.remaining < 1 })))
 const quantity = computed(() => Number(form.quantity))
 
 watch(() => props.open, open => {
@@ -68,7 +70,8 @@ function exportCreated() {
     <template v-else>
       <div v-if="!quotas.length" class="mg-state"><p>没有可用的激活码额度，请联系平台或负责人分配。</p></div>
       <template v-else>
-        <label class="partner-field">套餐<AppSelect v-model="form.planCode" :disabled="busy || form.confirming" aria-label="套餐"><option value="" disabled>选择套餐</option><option v-for="q in quotas" :key="q.planCode" :value="q.planCode" :disabled="q.remaining < 1">{{ q.planName }} · {{ q.durationDays }} 天（还能生成 {{ number(q.remaining) }} 个）</option></AppSelect></label>
+        <p class="partner-field-label">选择套餐</p>
+        <OptionCards v-model="form.planCode" :options="planOptions" label="套餐" :disabled="busy || form.confirming" />
         <label class="partner-field">数量<input v-model="form.quantity" type="number" min="1" max="200" step="1" inputmode="numeric" :disabled="busy || form.confirming" /><small>一次最多 200 个。</small></label>
         <label class="partner-field">备注（可选）<input v-model="form.note" maxlength="200" placeholder="例如：某某商户、某次活动" :disabled="busy || form.confirming" /></label>
         <ConfirmBox v-if="form.confirming" :busy="busy" confirm-text="确认生成" @confirm="generate" @cancel="form.confirming = false">
