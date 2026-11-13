@@ -1,13 +1,17 @@
 <script setup>
+import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, ref } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
-import { capabilityBars, dashboardRanges, number, sinceText } from '../../src/domain/partnerOps.js'
+import { capabilityBars, dashboardRanges, memberSegments, number, percent, sinceText } from '../../src/domain/partnerOps.js'
 import { bds, isOwner, loadTeam } from '../partnerStore.js'
 import TenantDrawer from '../components/TenantDrawer.vue'
 import DailyBars from '../components/DailyBars.vue'
 
-// 经营看板：选时间段（和 BD），看商户、使用、烟火和激活码的数字、每天的趋势和排行。只有使用量，不含作品内容。
+/**
+ * 经营看板，从上到下：四个核心指标 → 每天趋势和会员状态 → 按功能消耗和商户排行 → （负责人）烟火去向和 BD 业绩。
+ * 只有烟火数和使用次数，不含作品内容。
+ */
 const owner = computed(() => isOwner())
 const days = ref(30)
 const bdFilter = ref('')
@@ -17,13 +21,17 @@ const error = ref('')
 const metric = ref('consumed')
 const openTenant = ref(null)
 const metrics = computed(() => [
-  { key: 'consumed', label: '商户消耗烟火' },
-  ...(owner.value ? [{ key: 'transferred', label: '分给商户烟火' }] : []),
-  { key: 'newTenants', label: '新增商户' },
+  { key: 'consumed', label: '消耗烟火' },
+  ...(owner.value ? [{ key: 'transferred', label: '分给商户' }] : []),
   { key: 'redeemed', label: '激活码兑换' },
+  { key: 'newTenants', label: '新增商户' },
 ])
 const bars = computed(() => capabilityBars(data.value?.consumedByCapability))
-const rangeLabel = computed(() => dashboardRanges.find(r => r.value === days.value)?.label || '')
+const segments = computed(() => memberSegments(data.value))
+const segmentTotal = computed(() => segments.value.reduce((sum, s) => sum + s.value, 0))
+const range = computed(() => dashboardRanges.find(r => r.value === days.value)?.label || '')
+const scope = computed(() => !owner.value ? '我名下' : bdFilter.value === '' ? '全部' : bdFilter.value === '0' ? '我直接管的'
+  : `BD ${bds().find(b => String(b.userId) === bdFilter.value)?.name || ''}`)
 
 async function load() {
   loading.value = true
@@ -38,106 +46,125 @@ async function load() {
   } finally { loading.value = false }
 }
 function pickRange(value) { days.value = value; load() }
-function pickBd(value) { bdFilter.value = value; load() }
 if (owner.value) loadTeam().catch(() => {})
 load()
 </script>
 
 <template>
-  <div class="management-page">
-    <header class="management-heading">
-      <div><h1>经营看板</h1><p>{{ owner ? '名下商户的使用、你分出的烟火和激活码情况。' : '你名下商户的使用和你生成的激活码。' }}只统计烟火数和使用次数，不含商户的作品内容。</p></div>
-      <div class="management-heading-actions"><button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button></div>
+  <div class="management-page pw-page">
+    <header class="pw-head">
+      <div><p class="pw-date">{{ scope }}商户 · {{ range }}</p><h1>经营看板</h1></div>
+      <div class="pw-head-tools">
+        <label v-if="owner && bds().length" class="mg-select"><span class="sr-only">范围</span><AppSelect v-model="bdFilter" aria-label="按 BD 查看" @change="load"><option value="">全部商户</option><option value="0">我直接管的</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">BD · {{ b.name || b.uid }}</option></AppSelect></label>
+        <div class="partner-segment" role="group" aria-label="时间范围">
+          <button v-for="r in dashboardRanges" :key="r.value" type="button" :class="{ active: days === r.value }" :aria-pressed="days === r.value" :disabled="loading" @click="pickRange(r.value)">{{ r.label }}</button>
+        </div>
+        <button class="mg-page-button" type="button" :disabled="loading" aria-label="刷新" @click="load"><RefreshCw :size="16" :class="{ 'mg-spinning': loading }" /></button>
+      </div>
     </header>
 
-    <div class="partner-dash-filters">
-      <div class="partner-segment" role="group" aria-label="时间范围">
-        <button v-for="r in dashboardRanges" :key="r.value" type="button" :class="{ active: days === r.value }" :aria-pressed="days === r.value" :disabled="loading" @click="pickRange(r.value)">{{ r.label }}</button>
-      </div>
-      <div v-if="owner && bds().length" class="partner-segment" role="group" aria-label="按 BD 查看">
-        <button type="button" :class="{ active: bdFilter === '' }" :disabled="loading" @click="pickBd('')">全部</button>
-        <button type="button" :class="{ active: bdFilter === '0' }" :disabled="loading" @click="pickBd('0')">我直接管的</button>
-        <button v-for="b in bds()" :key="b.userId" type="button" :class="{ active: bdFilter === String(b.userId) }" :disabled="loading" @click="pickBd(String(b.userId))">{{ b.name || b.uid }}</button>
-      </div>
-    </div>
-
     <div v-if="error" class="mg-state mg-error" role="alert"><p>{{ error }}</p><button class="mg-button" type="button" @click="load">重新读取</button></div>
-    <template v-else-if="data">
-      <section class="partner-kpis" aria-label="商户">
-        <h2>商户</h2>
-        <div><span>名下商户</span><strong>{{ number(data.tenants) }}</strong><small>{{ rangeLabel }}新增 {{ number(data.newTenants) }}</small></div>
-        <div><span>会员有效</span><strong>{{ number(data.activeMembers) }}</strong><small>7 天内到期 {{ number(data.expiringSoon) }}</small></div>
-        <div><span>活跃商户</span><strong>{{ number(data.activeTenants) }}</strong><small>{{ rangeLabel }}用过 AI 功能</small></div>
-        <div><span>首次使用</span><strong>{{ number(data.firstUses) }}</strong><small>{{ rangeLabel }}第一次用的商户</small></div>
-      </section>
-      <section class="partner-kpis" aria-label="使用与烟火">
-        <h2>使用与烟火</h2>
-        <div><span>商户消耗</span><strong>{{ number(data.consumed) }}</strong><small>烟火 · {{ number(data.uses) }} 次使用</small></div>
-        <div v-if="owner"><span>分给商户</span><strong>{{ number(data.transferred) }}</strong><small>烟火</small></div>
-        <div v-if="owner && data.granted != null"><span>平台发放</span><strong>{{ number(data.granted) }}</strong><small>烟火</small></div>
-        <div v-if="owner && data.creditsAvailable != null"><span>可分配</span><strong>{{ number(data.creditsAvailable) }}</strong><small>烟火 · 当前</small></div>
-      </section>
-      <section class="partner-kpis" aria-label="激活码">
-        <h2>激活码{{ owner ? '' : '（我生成的）' }}</h2>
-        <div><span>生成</span><strong>{{ number(data.codesGenerated) }}</strong><small>含直接续期</small></div>
-        <div><span>兑换</span><strong>{{ number(data.codesRedeemed) }}</strong><small>开通或续期成功</small></div>
-        <div><span>直接续期</span><strong>{{ number(data.renewals) }}</strong><small>用额度替商户续的</small></div>
-        <div><span>作废</span><strong>{{ number(data.codesVoided) }}</strong><small>额度不退回</small></div>
-      </section>
-
-      <section class="management-list" aria-labelledby="trend-title">
-        <div class="mg-list-caption">
-          <h2 id="trend-title">每天趋势</h2>
-          <div class="partner-segment small" role="group" aria-label="趋势指标"><button v-for="m in metrics" :key="m.key" type="button" :class="{ active: metric === m.key }" @click="metric = m.key">{{ m.label }}</button></div>
-        </div>
-        <DailyBars :points="data.daily" :field="metric" :label="metrics.find(m => m.key === metric)?.label || ''" />
+    <div v-else-if="!data" class="mg-state"><p>正在统计…</p></div>
+    <template v-else>
+      <section class="pw-kpis" aria-label="核心指标">
+        <article>
+          <span>商户消耗烟火</span>
+          <strong class="mg-mono">{{ number(data.consumed) }}</strong>
+          <small>{{ number(data.uses) }} 次使用</small>
+        </article>
+        <article>
+          <span>活跃商户</span>
+          <strong class="mg-mono">{{ number(data.activeTenants) }}<em> / {{ number(data.tenants) }}</em></strong>
+          <small>活跃率 {{ percent(data.activeTenants, data.tenants) }} · 首次使用 {{ number(data.firstUses) }}</small>
+        </article>
+        <article>
+          <span>激活码兑换</span>
+          <strong class="mg-mono">{{ number(data.codesRedeemed) }}</strong>
+          <small>其中直接续期 {{ number(data.renewals) }} · 新生成 {{ number(data.codesGenerated) }}</small>
+        </article>
+        <article>
+          <span>新增商户</span>
+          <strong class="mg-mono">{{ number(data.newTenants) }}</strong>
+          <small>名下共 {{ number(data.tenants) }} 个</small>
+        </article>
       </section>
 
-      <div class="partner-dash-grid">
-        <section class="management-list" aria-labelledby="capability-title">
-          <div class="mg-list-caption"><h2 id="capability-title">按功能的消耗</h2></div>
-          <p v-if="!bars.length" class="mg-state">{{ rangeLabel }}没有消耗。</p>
+      <div class="pw-grid pw-grid-2-1">
+        <section class="pw-card" aria-labelledby="trend-title">
+          <header class="pw-card-head">
+            <h2 id="trend-title">每天趋势</h2>
+            <div class="partner-segment small" role="group" aria-label="趋势指标"><button v-for="m in metrics" :key="m.key" type="button" :class="{ active: metric === m.key }" :aria-pressed="metric === m.key" @click="metric = m.key">{{ m.label }}</button></div>
+          </header>
+          <DailyBars :points="data.daily" :field="metric" :label="metrics.find(m => m.key === metric)?.label || ''" />
+        </section>
+        <section class="pw-card" aria-labelledby="member-title">
+          <header class="pw-card-head"><h2 id="member-title">会员状态</h2><span class="mg-muted">按现在</span></header>
+          <div class="pw-card-body">
+            <p class="pw-big mg-mono">{{ number(data.activeMembers) }}<small> 个会员有效</small></p>
+            <div class="pw-stack" role="img" :aria-label="segments.map(s => `${s.label} ${s.value}`).join('，')">
+              <b v-for="s in segments.filter(x => x.value)" :key="s.key" :class="`pw-seg-${s.key}`" :style="{ flexGrow: s.value }" />
+            </div>
+            <ul class="pw-legend">
+              <li v-for="s in segments" :key="s.key"><i :class="`pw-seg-${s.key}`" /><span>{{ s.label }}</span><b class="mg-mono">{{ number(s.value) }}</b><small>{{ percent(s.value, segmentTotal) }}</small></li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <div class="pw-grid pw-grid-1-1">
+        <section class="pw-card" aria-labelledby="capability-title">
+          <header class="pw-card-head"><h2 id="capability-title">按功能的消耗</h2><span class="mg-muted">烟火</span></header>
+          <p v-if="!bars.length" class="pw-empty">{{ range }}没有消耗。</p>
           <ul v-else class="partner-hbars">
             <li v-for="b in bars" :key="b.key"><span>{{ b.label }}</span><i><b :style="{ width: Math.max(2, b.ratio * 100) + '%' }" /></i><strong class="mg-mono">{{ number(b.value) }}</strong></li>
           </ul>
         </section>
-        <section class="management-list" aria-labelledby="top-title">
-          <div class="mg-list-caption"><h2 id="top-title">消耗最多的商户</h2></div>
-          <p v-if="!data.topTenants.length" class="mg-state">{{ rangeLabel }}没有商户使用。</p>
-          <table v-else class="management-table">
-            <thead><tr><th>商户</th><th class="code-number">消耗</th><th class="code-number">次数</th><th>最近使用</th></tr></thead>
-            <tbody>
-              <tr v-for="t in data.topTenants" :key="t.tenantId" class="partner-row" tabindex="0" @click="openTenant = t.tenantId" @keydown.enter="openTenant = t.tenantId">
-                <td><span>{{ t.tenantName || '商户' }}</span><small v-if="owner && t.bdName">BD {{ t.bdName }}</small></td>
-                <td class="code-number mg-mono">{{ number(t.consumed) }}</td>
-                <td class="code-number mg-mono">{{ number(t.uses) }}</td>
-                <td>{{ sinceText(t.lastUsedAt) }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <section class="pw-card" aria-labelledby="top-title">
+          <header class="pw-card-head"><h2 id="top-title">消耗最多的商户</h2><span class="mg-muted">前 10</span></header>
+          <p v-if="!data.topTenants.length" class="pw-empty">{{ range }}没有商户使用。</p>
+          <ol v-else class="pw-rank">
+            <li v-for="(t, i) in data.topTenants" :key="t.tenantId">
+              <button type="button" @click="openTenant = t.tenantId">
+                <em class="mg-mono">{{ i + 1 }}</em>
+                <span><b>{{ t.tenantName || '商户' }}</b><small>{{ number(t.uses) }} 次 · 最近 {{ sinceText(t.lastUsedAt) }}{{ owner && t.bdName ? ` · BD ${t.bdName}` : '' }}</small></span>
+                <strong class="mg-mono">{{ number(t.consumed) }}</strong>
+              </button>
+            </li>
+          </ol>
         </section>
       </div>
 
-      <section v-if="owner && data.bds.length" class="management-list" aria-labelledby="bd-title">
-        <div class="mg-list-caption"><h2 id="bd-title">BD 业绩（{{ rangeLabel }}）</h2></div>
-        <div class="management-table-wrap">
-          <table class="management-table">
-            <thead><tr><th>BD</th><th class="code-number">名下商户</th><th class="code-number">活跃商户</th><th class="code-number">商户消耗</th><th class="code-number">激活码兑换</th><th class="code-number">直接续期</th></tr></thead>
-            <tbody>
-              <tr v-for="b in data.bds" :key="b.userId">
-                <td>{{ b.name || '—' }}</td>
-                <td class="code-number mg-mono">{{ number(b.tenants) }}</td>
-                <td class="code-number mg-mono">{{ number(b.activeTenants) }}</td>
-                <td class="code-number mg-mono">{{ number(b.consumed) }}</td>
-                <td class="code-number mg-mono">{{ number(b.codesRedeemed) }}</td>
-                <td class="code-number mg-mono">{{ number(b.renewals) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div v-if="owner" class="pw-grid pw-grid-1-2">
+        <section class="pw-card" aria-labelledby="flow-title">
+          <header class="pw-card-head"><h2 id="flow-title">烟火去向</h2><span class="mg-muted">{{ range }}</span></header>
+          <dl class="pw-flow">
+            <div v-if="data.granted != null"><dt>平台发放</dt><dd class="mg-mono pw-plus">+{{ number(data.granted) }}</dd></div>
+            <div><dt>分给商户</dt><dd class="mg-mono">−{{ number(data.transferred) }}</dd></div>
+            <div class="pw-flow-total"><dt>现在可分配</dt><dd class="mg-mono">{{ number(data.creditsAvailable) }}</dd></div>
+          </dl>
+        </section>
+        <section class="pw-card" aria-labelledby="bd-title">
+          <header class="pw-card-head"><h2 id="bd-title">BD 业绩</h2><span class="mg-muted">{{ range }}</span></header>
+          <p v-if="!data.bds.length" class="pw-empty">{{ bdFilter ? '按 BD 查看时不显示业绩对比。' : '还没有 BD，可在「团队」页添加。' }}</p>
+          <div v-else class="management-table-wrap">
+            <table class="management-table">
+              <thead><tr><th>BD</th><th class="code-number">商户</th><th class="code-number">活跃</th><th class="code-number">消耗</th><th class="code-number">兑换</th><th class="code-number">续期</th></tr></thead>
+              <tbody>
+                <tr v-for="b in data.bds" :key="b.userId">
+                  <td>{{ b.name || '—' }}</td>
+                  <td class="code-number mg-mono">{{ number(b.tenants) }}</td>
+                  <td class="code-number mg-mono">{{ number(b.activeTenants) }}</td>
+                  <td class="code-number mg-mono">{{ number(b.consumed) }}</td>
+                  <td class="code-number mg-mono">{{ number(b.codesRedeemed) }}</td>
+                  <td class="code-number mg-mono">{{ number(b.renewals) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <p class="pw-note">只统计烟火数和使用次数，不含商户的作品内容。作废的激活码 {{ number(data.codesVoided) }} 个，额度不退回。</p>
     </template>
-    <div v-else-if="loading" class="mg-state"><p>正在统计…</p></div>
 
     <TenantDrawer :tenant-id="openTenant" @close="openTenant = null" @updated="load" />
   </div>

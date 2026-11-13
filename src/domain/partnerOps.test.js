@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
+import { groupTodos, memberSegments, percent, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
 
 const now = Date.parse('2026-11-13T00:00:00Z')
 
@@ -79,4 +79,19 @@ test('dashboard helpers rank capabilities, pick a round axis maximum and describ
   assert.equal(sinceText(null, now), '从未')
   assert.equal(sinceText('2026-11-12T10:00:00Z', now), '今天')
   assert.equal(sinceText('2026-11-03T00:00:00Z', now), '10 天前')
+})
+
+test('to-dos merge per tenant, most urgent first, and filter by reason', () => {
+  const t1 = { tenantId: 1, memberUntil: '2026-11-20T00:00:00Z' }, t2 = { tenantId: 2, memberUntil: '2026-11-15T00:00:00Z' }, t3 = { tenantId: 3 }
+  const rows = groupTodos([{ type: 'LOW_BALANCE', tenant: t1 }, { type: 'IDLE', tenant: t3 }, { type: 'EXPIRING', tenant: t1 }, { type: 'EXPIRING', tenant: t2 }])
+  assert.deepEqual(rows.map(r => [r.tenant.tenantId, r.reasons.map(x => x.type)]), [[2, ['EXPIRING']], [1, ['EXPIRING', 'LOW_BALANCE']], [3, ['IDLE']]])
+  assert.deepEqual(groupTodos([{ type: 'LOW_BALANCE', tenant: t1 }, { type: 'IDLE', tenant: t3 }], 'IDLE').map(r => r.tenant.tenantId), [3])
+})
+
+test('member segments split active from expiring and percentages handle zero', () => {
+  const segs = memberSegments({ activeMembers: 5, expiringSoon: 2, expiredMembers: 1, neverActivated: 2 })
+  assert.deepEqual(segs.map(s => [s.key, s.value]), [['active', 3], ['expiring', 2], ['expired', 1], ['never', 2]])
+  assert.equal(segs[0].ratio, 3 / 8)
+  assert.equal(percent(1, 4), '25%')
+  assert.equal(percent(1, 0), '—')
 })

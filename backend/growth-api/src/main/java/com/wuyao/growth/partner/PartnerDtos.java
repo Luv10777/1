@@ -53,8 +53,10 @@ public final class PartnerDtos {
     /**
      * 经营看板（最近 days 天，days=1 是今天）。granted、transferred、creditsAvailable 和 bds 只给负责人，BD 为空。
      * activeTenants 是这段时间用过 AI 功能的商户，firstUses 是这段时间第一次使用的商户。
+     * 会员状态按现在算：activeMembers（含 7 天内到期的 expiringSoon）、expiredMembers（开通过已过期）、neverActivated（从未开通）。
      */
     public record Dashboard(int days, Long creditsAvailable, long tenants, long newTenants, long activeMembers, long expiringSoon,
+                            long expiredMembers, long neverActivated,
                             long activeTenants, long firstUses, long consumed, long uses, java.util.Map<String, Long> consumedByCapability,
                             Long granted, Long transferred, long codesGenerated, long codesRedeemed, long renewals, long codesVoided,
                             List<DailyPoint> daily, List<TenantRank> topTenants, List<BdRank> bds) {}

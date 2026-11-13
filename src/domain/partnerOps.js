@@ -8,12 +8,46 @@ export const transferPresets = [500, 1000, 2000, 5000]
 
 /** 待办分类：标题、说明和对服务商的建议动作。顺序就是首页的展示顺序。 */
 export const todoTypes = {
-  EXPIRING: { title: '7 天内到期', hint: '提醒续费，或直接用额度续期' },
-  EXPIRED: { title: '30 天内刚过期', hint: '会员已停，尽快联系续费' },
-  LOW_BALANCE: { title: '烟火余额不足', hint: '余额不到最近一次充值的 10%' },
-  NOT_STARTED: { title: '开通了还没用过', hint: '帮商户完成第一次创作' },
-  IDLE: { title: '7 天没有使用', hint: '回访了解原因，防止流失' },
+  EXPIRING: { title: '7 天内到期', short: '即将到期', hint: '提醒续费，或直接用额度续期', tone: 'warn' },
+  EXPIRED: { title: '30 天内刚过期', short: '已过期', hint: '会员已停，尽快联系续费', tone: 'alert' },
+  LOW_BALANCE: { title: '烟火余额不足', short: '余额不足', hint: '余额不到最近一次充值的 10%', tone: 'warn' },
+  NOT_STARTED: { title: '开通了还没用过', short: '未开始使用', hint: '帮商户完成第一次创作', tone: 'info' },
+  IDLE: { title: '7 天没有使用', short: '7 天未用', hint: '回访了解原因，防止流失', tone: 'muted' },
 }
+
+/**
+ * 待办按商户合并：一个商户一行，reasons 按优先级排（todoTypes 的顺序），整体按最紧急的原因、再按到期时间排。
+ * 筛选某一类时只留有这一类原因的商户。
+ */
+export function groupTodos(todos, type = '') {
+  const order = Object.keys(todoTypes)
+  const byTenant = new Map()
+  for (const todo of todos || []) {
+    const row = byTenant.get(todo.tenant.tenantId) || { tenant: todo.tenant, reasons: [] }
+    row.reasons.push(todo)
+    byTenant.set(todo.tenant.tenantId, row)
+  }
+  return [...byTenant.values()]
+    .map(row => ({ ...row, reasons: row.reasons.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type)) }))
+    .filter(row => !type || row.reasons.some(r => r.type === type))
+    .sort((a, b) => order.indexOf(a.reasons[0].type) - order.indexOf(b.reasons[0].type)
+      || (a.tenant.memberUntil ? Date.parse(a.tenant.memberUntil) : Infinity) - (b.tenant.memberUntil ? Date.parse(b.tenant.memberUntil) : Infinity))
+}
+
+/** 会员状态分布：有效（不含即将到期）、7 天内到期、已过期、从未开通；每段带占比，画横向堆叠条用。 */
+export function memberSegments(d) {
+  const rows = [
+    { key: 'active', label: '有效（7 天后到期）', value: Math.max(0, (d?.activeMembers || 0) - (d?.expiringSoon || 0)) },
+    { key: 'expiring', label: '7 天内到期', value: d?.expiringSoon || 0 },
+    { key: 'expired', label: '已过期', value: d?.expiredMembers || 0 },
+    { key: 'never', label: '从未开通', value: d?.neverActivated || 0 },
+  ]
+  const total = rows.reduce((sum, r) => sum + r.value, 0)
+  return rows.map(r => ({ ...r, ratio: total ? r.value / total : 0 }))
+}
+
+/** 百分比文字，分母为 0 时给「—」。 */
+export const percent = (part, whole) => whole ? `${Math.round(part / whole * 100)}%` : '—'
 export const capabilityNames = { IMAGE: '图片创作', IMAGE_INSPIRATION: '图片灵感', VIDEO: '视频创作', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', COPY: '文案创作', LIVE: '实景直播', OTHER: '其他' }
 export const dashboardRanges = [{ value: 1, label: '今天' }, { value: 7, label: '7 天' }, { value: 30, label: '30 天' }, { value: 90, label: '90 天' }]
 
