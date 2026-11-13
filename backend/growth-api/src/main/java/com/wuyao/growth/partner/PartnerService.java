@@ -124,15 +124,51 @@ public class PartnerService {
         return members(partnerId);
     }
 
-    /** 负责人移除 BD，BD 名下的商户回到负责人直接管。负责人账号只能由平台移除。 */
+    /**
+     * 负责人移除 BD。他名下的商户先整体转给 transferTo 指定的 BD，transferTo 为 0 时回到负责人直接管。
+     * 负责人账号只能由平台移除。
+     */
     @Transactional
-    public List<PartnerDtos.Member> removeBd(Long userId, Long bdUserId) {
+    public List<PartnerDtos.Member> removeBd(Long userId, Long bdUserId, long transferTo) {
         var access = requireOwner(userId);
         Long partnerId = access.partner().id();
         store.lockPartner(partnerId);
         if (store.role(partnerId, bdUserId).filter("BD"::equals).isEmpty()) throw BizException.of(ErrorCode.NOT_FOUND, "该账号不是你的 BD");
+        if (transferTo != 0) {
+            if (transferTo == bdUserId || store.role(partnerId, transferTo).filter("BD"::equals).isEmpty())
+                throw BizException.of(ErrorCode.NOT_FOUND, "接手的账号不是你的 BD");
+            store.moveBdTenants(partnerId, bdUserId, transferTo);
+        }
         store.removeMember(partnerId, bdUserId);
         return members(partnerId);
+    }
+
+    /** 按 UID 预查询：添加商户或 BD 前，先确认对方是谁、现在归属在哪。 */
+    public PartnerDtos.Lookup lookup(Long userId, Long uid) {
+        var access = requirePartner(userId);
+        Long partnerId = access.partner().id();
+        var user = directory.userByUid(uid).filter(u -> !"REMOVED".equals(u.status()))
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个 UID，请核对后重新输入"));
+        var binding = store.binding(user.tenantId());
+        boolean ours = binding.filter(b -> b.partnerId().equals(partnerId)).isPresent();
+        String state = binding.isEmpty() ? "NONE" : !ours ? "OTHER"
+                : access.owner() || userId.equals(binding.get().bdUserId()) ? "MINE" : "TEAM";
+        String bdName = ours && binding.get().bdUserId() != null ? userName(binding.get().bdUserId()) : null;
+        String member = access.owner() ? store.role(partnerId, user.id())
+                .orElseGet(() -> store.accessOfUser(user.id()).isPresent() ? "OTHER" : "NONE") : null;
+        return new PartnerDtos.Lookup(user.uid(), mask(user.name()), tenantNames().get(user.tenantId()), state,
+                "MINE".equals(state) ? user.tenantId() : null, bdName, member);
+    }
+
+    /** 商户详情：会员、余额、归属，以及这家服务商给他的分配（负责人可见）和他兑换过的本服务商激活码。 */
+    public PartnerDtos.TenantDetail tenantDetail(Long userId, Long tenantId) {
+        var access = requirePartner(userId);
+        Long partnerId = access.partner().id();
+        owned(access, tenantId);
+        var view = tenantView(tenantId);
+        var transfers = access.owner() ? store.tenantLedger(partnerId, tenantId, 50).stream().map(l -> new PartnerDtos.LedgerEntry(l.id(),
+                l.type(), l.delta(), l.availableAfter(), l.tenantId(), view.tenantName(), l.note(), l.createdAt())).toList() : null;
+        return new PartnerDtos.TenantDetail(view, transfers, codes.redeemedForPartner(partnerId, tenantId));
     }
 
     /** 激活码列表。BD 只看自己生成的；负责人可以按生成人筛。 */
@@ -164,9 +200,7 @@ public class PartnerService {
      */
     public PartnerDtos.TenantView renew(Long userId, Long tenantId, PartnerDtos.Renew input) {
         var access = requirePartner(userId);
-        var binding = store.binding(tenantId).filter(b -> b.partnerId().equals(access.partner().id()))
-                .filter(b -> access.owner() || userId.equals(b.bdUserId()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该商户不在你名下"));
+        var binding = owned(access, tenantId);
         String batch = "partner-renew-" + access.partner().id() + "-" + input.requestKey();
         inScope(binding.tenantId(), false, () -> {
             var code = generate(access, input.planCode(), 1, batch, "直接续期", userId).getFirst();
@@ -179,6 +213,26 @@ public class PartnerService {
 
     public PartnerDtos.Page<PartnerDtos.LedgerEntry> ledger(Long userId, int page, int size) {
         return ledgerOf(requireOwner(userId).partner().id(), page, size);
+    }
+
+    /** 当前账号管得到的商户：负责人管本服务商全部，BD 只管归到自己的。 */
+    private PartnerStore.Binding owned(PartnerStore.Access access, Long tenantId) {
+        return store.binding(tenantId).filter(b -> b.partnerId().equals(access.partner().id()))
+                .filter(b -> access.owner() || access.userId().equals(b.bdUserId()))
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该商户不在你名下"));
+    }
+
+    private String userName(Long id) {
+        var u = directory.user(id);
+        return u == null || u.name() == null ? "" : u.name();
+    }
+
+    /** 姓名只留第一个字，其余打星号；空名返回空。 */
+    static String mask(String name) {
+        if (name == null || name.isBlank()) return null;
+        String trimmed = name.trim();
+        int first = trimmed.offsetByCodePoints(0, 1);
+        return trimmed.substring(0, first) + "*".repeat(Math.max(1, trimmed.codePointCount(first, trimmed.length())));
     }
 
     private List<BillingDtos.RedeemCodeView> generate(PartnerStore.Access access, String planCode, int quantity, String batch, String note, Long userId) {
@@ -214,14 +268,17 @@ public class PartnerService {
         return access.owner() ? all : all.stream().filter(b -> access.userId().equals(b.bdUserId())).toList();
     }
 
-    /** 服务商的登录账号，负责人在前；BD 带名下商户数。 */
+    /** 服务商的登录账号，负责人在前；BD 带名下商户数，每个账号带自己生成的激活码统计。 */
     List<PartnerDtos.Member> members(Long partnerId) {
         Map<Long, Long> counts = store.tenants(partnerId).stream().filter(b -> b.bdUserId() != null)
                 .collect(Collectors.groupingBy(PartnerStore.Binding::bdUserId, Collectors.counting()));
+        Map<Long, PartnerStore.CodeStats> stats = store.codeStats(partnerId);
         return store.members(partnerId).stream().map(m -> {
             var u = directory.user(m.userId());
+            var s = stats.getOrDefault(m.userId(), new PartnerStore.CodeStats(0, 0, 0, 0));
+            var codeStats = new PartnerDtos.CodeStats(s.generated(), s.redeemed(), s.generated() - s.redeemed() - s.voided(), s.voided(), s.renewals());
             return new PartnerDtos.Member(m.userId(), u == null ? null : u.uid(), u == null ? null : u.name(), u == null ? null : u.phone(),
-                    m.role(), "BD".equals(m.role()) ? counts.getOrDefault(m.userId(), 0L) : null, m.createdAt());
+                    m.role(), "BD".equals(m.role()) ? counts.getOrDefault(m.userId(), 0L) : null, codeStats, m.createdAt());
         }).toList();
     }
 

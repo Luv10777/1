@@ -6,13 +6,16 @@ const params = values => Object.fromEntries(Object.entries(values || {}).filter(
 export const partnerApi = {
   me: () => get('/api/partner/me'),
   tenants: values => get('/api/partner/tenants', params(values)),
+  tenant: tenantId => get(`/api/partner/tenants/${encodeURIComponent(tenantId)}`),
+  lookup: uid => get('/api/partner/lookup', { uid: Number(uid) }),
   addTenant: uid => post('/api/partner/tenants', { uid: Number(uid) }),
   transfer: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/credits`, values),
   renew: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/renewals`, values),
   assignBd: (tenantId, bdUserId) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/bd`, { bdUserId: bdUserId || null }),
   team: () => get('/api/partner/team'),
   addBd: uid => post('/api/partner/team', { uid: Number(uid) }),
-  removeBd: userId => del(`/api/partner/team/${encodeURIComponent(userId)}`),
+  /** transferTo：他名下的商户转给哪个 BD，0 表示回到负责人直接管。 */
+  removeBd: (userId, transferTo) => del(`/api/partner/team/${encodeURIComponent(userId)}?transferTo=${encodeURIComponent(transferTo || 0)}`),
   codes: values => get('/api/partner/codes', params(values)),
   createCodes: values => post('/api/partner/codes', values),
   voidCode: id => post(`/api/partner/codes/${encodeURIComponent(id)}/void`, {}),

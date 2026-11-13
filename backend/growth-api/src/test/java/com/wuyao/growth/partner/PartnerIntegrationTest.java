@@ -224,15 +224,39 @@ class PartnerIntegrationTest {
                 .andExpect(jsonPath("$.data.items[0].tenantName").value("冰雪时光"));
         call(agentA, agency, get("/api/partner/tenants?expiry=BAD"), null).andExpect(status().isBadRequest());
 
-        // 负责人调配商户；移除 BD 后它名下的商户回到负责人直接管。
+        // 按 UID 预查询：负责人看得到归属和账号身份，BD 只看商户这边；姓名打码。
+        call(agentA, agency, get("/api/partner/lookup?uid=" + uid(shopOwner)), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantState").value("MINE")).andExpect(jsonPath("$.data.tenantId").value(shop))
+                .andExpect(jsonPath("$.data.userName").value("李**")).andExpect(jsonPath("$.data.bdName").value("BD 小周"))
+                .andExpect(jsonPath("$.data.memberState").value("NONE"));
+        call(bd, agency, get("/api/partner/lookup?uid=" + uid(cafeOwner)), null)
+                .andExpect(jsonPath("$.data.tenantState").value("TEAM")).andExpect(jsonPath("$.data.tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.memberState").doesNotExist());
+        call(agentA, agency, get("/api/partner/lookup?uid=" + uid(bd)), null).andExpect(jsonPath("$.data.memberState").value("BD"));
+        call(agentA, agency, get("/api/partner/lookup?uid=99999999"), null).andExpect(status().isNotFound());
+
+        // 商户详情：负责人看得到分给他的烟火，BD 看不到；兑换记录含直接续期；不归自己管的看不到。
+        call(agentA, agency, get("/api/partner/tenants/" + shop), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenant.tenantName").value("冰雪时光")).andExpect(jsonPath("$.data.transfers[0].delta").value(-2000));
+        call(bd, agency, get("/api/partner/tenants/" + bakery), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.transfers").doesNotExist()).andExpect(jsonPath("$.data.codes.length()").value(2))
+                .andExpect(jsonPath("$.data.codes[0].note").value("直接续期"));
+        call(bd, agency, get("/api/partner/tenants/" + cafe), null).andExpect(status().isNotFound());
+        call(agentA, agency, get("/api/partner/team"), null).andExpect(jsonPath("$.data[1].codes.generated").value(3))
+                .andExpect(jsonPath("$.data[1].codes.redeemed").value(2)).andExpect(jsonPath("$.data[1].codes.voided").value(1))
+                .andExpect(jsonPath("$.data[1].codes.unused").value(0)).andExpect(jsonPath("$.data[1].codes.renewals").value(1));
+
+        // 负责人调配商户；移除 BD 时指定商户转给谁（0 表示回到负责人直接管）。
         call(bd, agency, put("/api/partner/tenants/" + cafe + "/bd"), "{\"bdUserId\":" + bd + "}").andExpect(status().isForbidden());
         call(agentA, agency, put("/api/partner/tenants/" + cafe + "/bd"), "{\"bdUserId\":" + bd + "}").andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.bdUserId").value(bd));
         call(agentA, agency, put("/api/partner/tenants/" + cafe + "/bd"), "{\"bdUserId\":" + agentA + "}").andExpect(status().isNotFound());
         call(agentA, agency, get("/api/partner/team"), null).andExpect(jsonPath("$.data[1].tenantCount").value(3));
         platform(get("/api/platform/partners"), null).andExpect(jsonPath("$.data[0].members.length()").value(2));
-        call(agentA, agency, delete("/api/partner/team/" + agentA), null).andExpect(status().isNotFound());
-        call(agentA, agency, delete("/api/partner/team/" + bd), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
+        call(agentA, agency, delete("/api/partner/team/" + agentA + "?transferTo=0"), null).andExpect(status().isNotFound());
+        call(agentA, agency, delete("/api/partner/team/" + bd + "?transferTo=" + bd), null).andExpect(status().isNotFound());
+        call(agentA, agency, delete("/api/partner/team/" + bd), null).andExpect(status().isBadRequest());
+        call(agentA, agency, delete("/api/partner/team/" + bd + "?transferTo=0"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
         assertThat(owner.queryForObject("SELECT count(*) FROM partner_tenants WHERE bd_user_id IS NOT NULL", Long.class)).isZero();
         call(bd, agency, get("/api/partner/me"), null).andExpect(status().isForbidden());
     }
