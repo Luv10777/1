@@ -31,6 +31,12 @@
 - 激活码：额度卡片、生成弹窗（生成后直接复制或导出）、激活码详情抽屉（作废）。
 - 添加商户和添加 BD 都先按 UID 查询确认：姓名只显示第一个字，已归属其他服务商的只提示「已归属其他服务商」，不透露是哪家。
 
+### 名称、余额与欢迎
+
+- 服务商的名称就是平台在管理后台「服务商」页设置的名字（可在详情里点「改名称」修改），服务商后台的左上角、面包屑、标签页标题、工作台问候都用它。
+- 服务商后台右上角显示当前登录账号自己在一方志的烟火余额（和 wy 站右上角是同一个账户，实时同步）；BD 显示的是 BD 自己账号的余额。
+- 每个账号每天第一次进入工作台时弹出欢迎窗口：服务商名、问候、今天待跟进的商户、7 天内到期、我的烟火、（负责人）服务商可分配、激活码额度。
+
 ### 工作台与经营看板
 
 - **工作台**（登录后的首页）：今天要跟进的商户数、可分配烟火（负责人）、激活码额度，下面是待办，按类分组，点一条打开商户详情：
@@ -107,6 +113,7 @@ V81 给 `partner_members` 加 `role`（`OWNER`/`BD`，原有账号都是 `OWNER`
 | `GET /api/partner/distributions`、`POST /api/partner/distributions/{id}/retry` | 分配记录（可按 `recipientType`、`source` 筛）/ 补上未到账的一笔（仅负责人） |
 | `GET /api/partner/workbench` | 待办：`todos`（`type` 为 `EXPIRING`/`EXPIRED`/`LOW_BALANCE`/`NOT_STARTED`/`IDLE`，带商户）和各类数量 |
 | `GET /api/partner/dashboard?days=&bdUserId=` | 经营看板，`days` 取 1、7、30、90 |
+| `PUT /api/platform/partners/{id}` | `{name, contact}` 平台改服务商名称和联系方式 |
 | `GET /api/partner/me` 的 `role` | 当前账号的角色：`OWNER` 或 `BD`；BD 看不到 `creditsAvailable`，`tenantCount` 只算自己的 |
 | `GET /api/partner/tenants` | 名下商户（含会员状态、烟火余额、归属 BD），`keyword` 按商户名、联系人、UID 搜；`expiry` 取 `SOON7`/`SOON30`/`EXPIRED`/`NEVER`；负责人可传 `bdUserId`（0 表示负责人直接管的） |
 | `GET /api/partner/lookup?uid=` | 按 UID 预查询：商户名、打码姓名、`tenantState`（`NONE`/`MINE`/`TEAM`/`OTHER`）；负责人另有 `memberState`（`NONE`/`OWNER`/`BD`/`OTHER`） |

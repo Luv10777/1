@@ -13,9 +13,9 @@ public final class PartnerDtos {
     public record Partner(Long id, String name, String contact, String status, Long creditsAvailable, Instant createdAt) {}
     /** 一个套餐标识的激活码额度；planName、durationDays 取该标识最新的版本。 */
     public record Quota(String planCode, String planName, Integer durationDays, int quota, int used, int remaining) {}
-    /** role 是当前登录账号在服务商里的角色：OWNER 负责人、BD。BD 的 tenantCount 只算自己名下的。account 是负责人自己账号的烟火（BD 为空）。 */
+    /** role 是当前登录账号在服务商里的角色：OWNER 负责人、BD。BD 的 tenantCount 只算自己名下的。account 是当前登录账号自己在一方志的烟火（服务商后台右上角显示）。 */
     public record Overview(Partner partner, List<Quota> quotas, long tenantCount, String role, Account account) {}
-    /** 负责人自己一方志账号里的烟火：可用 = 赠送 + 充值，都能分给商户和 BD。 */
+    /** 登录账号自己在一方志的烟火：可用 = 赠送 + 充值；负责人的这部分能分给商户和 BD。 */
     public record Account(long available, long gift, long purchased) {}
     /**
      * 一笔分配记录。source：POOL（服务商可分配烟火）或 ACCOUNT（负责人自己的账号）；recipientType：TENANT（名下商户）或 BD；
@@ -98,6 +98,7 @@ public final class PartnerDtos {
     public record Grant(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
                         @Min(1) @Max(10000000) long credits, @NotBlank @Size(max=200) String note) {}
     public record SetQuota(@NotBlank @Pattern(regexp="[A-Z0-9_-]{2,60}") String planCode, @Min(0) @Max(1000000) int quota) {}
+    public record Rename(@NotBlank @Size(max=80) String name, @Size(max=120) String contact) {}
     public record SetStatus(@NotBlank @Pattern(regexp="ACTIVE|DISABLED") String status) {}
     /** partnerId 为空表示解除归属。 */
     public record Reassign(@Positive Long partnerId) {}

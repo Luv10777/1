@@ -33,6 +33,7 @@ export const partnerAdminApi = {
   create: values => post('/api/platform/partners', values),
   addMember: (id, uid) => post(`/api/platform/partners/${encodeURIComponent(id)}/members`, { uid: Number(uid) }),
   removeMember: (id, userId) => del(`/api/platform/partners/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`),
+  rename: (id, values) => put(`/api/platform/partners/${encodeURIComponent(id)}`, values),
   setStatus: (id, status) => post(`/api/platform/partners/${encodeURIComponent(id)}/status`, { status }),
   grant: (id, values) => post(`/api/platform/partners/${encodeURIComponent(id)}/credits`, values),
   setQuota: (id, planCode, quota) => put(`/api/platform/partners/${encodeURIComponent(id)}/quotas`, { planCode, quota }),

@@ -74,6 +74,15 @@ class PartnerStore {
         return num(query.getSingleResult());
     }
 
+    /** 平台改服务商的名称和联系方式；名称就是服务商在服务商后台里显示的名字。 */
+    @Transactional
+    public void rename(Long id, String name, String contact) {
+        var update = em.createNativeQuery("UPDATE partners SET name = :name, contact = :contact, updated_at = now() WHERE id = :id")
+                .setParameter("name", name).setParameter("id", id);
+        typed(update).setParameter("contact", contact, String.class);
+        update.executeUpdate();
+    }
+
     @Transactional
     public void setStatus(Long id, String status) {
         em.createNativeQuery("UPDATE partners SET status = :status, updated_at = now() WHERE id = :id")

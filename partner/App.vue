@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { BarChart3, Coins, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldCheck, Store, TicketCheck, Users } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
 import { isOwner, partner } from './partnerStore.js'
+import YanhuoIcon from '../src/components/YanhuoIcon.vue'
+
+const number = value => Number(value || 0).toLocaleString('zh-CN')
 
 const route = useRoute()
 const router = useRouter()
@@ -31,7 +34,7 @@ async function logout() {
     <a class="admin-skip" href="#partner-main">跳到主要内容</a>
     <button v-if="menuOpen" class="admin-menu-backdrop" aria-label="关闭导航" @click="menuOpen = false" />
     <aside class="admin-sidebar">
-      <RouterLink class="admin-brand" :to="{ name: 'partner-overview' }"><span class="admin-brand-mark">服</span><span><strong>服务商后台</strong><small>{{ partner.overview.partner.name }}</small></span></RouterLink>
+      <RouterLink class="admin-brand" :to="{ name: 'partner-overview' }"><span class="admin-brand-mark">服</span><span><strong>{{ partner.overview.partner.name }}</strong><small>一方志服务商后台</small></span></RouterLink>
       <nav aria-label="服务商后台导航">
         <div class="admin-nav-group">
           <RouterLink v-for="item in navigation" :key="item.name" :to="{ name: item.name }" :title="item.description" :class="{ active: route.name === item.name }" :aria-current="route.name === item.name ? 'page' : undefined" @click="menuOpen = false"><component :is="item.icon" :size="17" />{{ item.label }}</RouterLink>
@@ -41,8 +44,8 @@ async function logout() {
     </aside>
     <div class="admin-body">
       <header class="admin-topbar">
-        <div class="admin-crumb"><button class="admin-menu-toggle" type="button" :aria-expanded="menuOpen" aria-label="切换导航" @click="menuOpen = !menuOpen"><component :is="menuOpen ? PanelLeftClose : PanelLeftOpen" :size="20" /></button><span>服务商后台</span><span class="admin-topbar-separator">/</span><strong>{{ route.meta.title }}</strong></div>
-        <div class="admin-topbar-actions" style="margin-left:auto"><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '服').slice(0, 1) }}</span><span>{{ auth.user?.name || '服务商账号' }}<small>{{ isOwner() ? '负责人' : 'BD' }} · UID {{ auth.user?.uid || '—' }}</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div></div>
+        <div class="admin-crumb"><button class="admin-menu-toggle" type="button" :aria-expanded="menuOpen" aria-label="切换导航" @click="menuOpen = !menuOpen"><component :is="menuOpen ? PanelLeftClose : PanelLeftOpen" :size="20" /></button><span>{{ partner.overview.partner.name }}</span><span class="admin-topbar-separator">/</span><strong>{{ route.meta.title }}</strong></div>
+        <div class="admin-topbar-actions" style="margin-left:auto"><span class="partner-balance" :title="`你的一方志账号烟火 ${number(partner.overview.account?.available)}，与一方志站内余额同步`" :aria-label="`烟火余额 ${number(partner.overview.account?.available)}`"><span class="partner-balance-label">余额</span><YanhuoIcon :size="16" /><span class="mg-mono">{{ number(partner.overview.account?.available) }}</span></span><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '服').slice(0, 1) }}</span><span>{{ auth.user?.name || '服务商账号' }}<small>{{ isOwner() ? '负责人' : 'BD' }} · UID {{ auth.user?.uid || '—' }}</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div></div>
       </header>
       <main id="partner-main" class="admin-main" tabindex="-1"><RouterView /></main>
     </div>

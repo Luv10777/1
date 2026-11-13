@@ -143,7 +143,10 @@ class PartnerIntegrationTest {
     @Test void onlyPartnerAccountsAndBillingOperatorsReachTheirBackOffices() throws Exception {
         long a = partner("甲服务商", agentA);
         call(shopOwner, shop, get("/api/partner/me"), null).andExpect(status().isForbidden());
-        call(agentA, agency, get("/api/partner/me"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.partner.name").value("甲服务商"));
+        // 平台改的名称就是服务商后台里显示的服务商名。
+        platform(put("/api/platform/partners/" + a), "{\"name\":\"甲服务商（嘉兴）\",\"contact\":\"张经理\"}").andExpect(status().isOk());
+        call(agentA, agency, put("/api/platform/partners/" + a), "{\"name\":\"自己改\"}").andExpect(status().isForbidden());
+        call(agentA, agency, get("/api/partner/me"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.partner.name").value("甲服务商（嘉兴）"));
         call(agentA, agency, get("/api/platform/partners"), null).andExpect(status().isForbidden());
         // 一个账号只能属于一家服务商；停用后服务商后台不能再用。
         platform(post("/api/platform/partners"), "{\"name\":\"丙\",\"adminUid\":" + uid(agentA) + "}").andExpect(status().isConflict());
@@ -325,7 +328,7 @@ class PartnerIntegrationTest {
         TenantContext.runAs(agency, () -> billing.creditFromPartner(1000, "agency-topup-1", "测试", operator));
         call(agentA, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.account.available").value(1300))
                 .andExpect(jsonPath("$.data.account.gift").value(300));
-        call(bd, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.account").doesNotExist());
+        call(bd, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.account.available").value(1300));
 
         // 从自己账号分 500 给商户：先扣赠送 300，再扣充值 200；商户收到赠送 300、充值 200。重复提交不重复扣。
         String toShop = "{\"requestKey\":\"acct-shop-01\",\"credits\":500,\"source\":\"ACCOUNT\",\"note\":\"开业支持\"}";

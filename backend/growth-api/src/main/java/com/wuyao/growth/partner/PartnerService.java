@@ -45,10 +45,10 @@ public class PartnerService {
         var access = requirePartner(userId);
         var p = access.partner();
         var partner = access.owner() ? p.view() : new PartnerDtos.Partner(p.id(), p.name(), p.contact(), p.status(), null, p.createdAt());
-        return new PartnerDtos.Overview(partner, quotas(p.id()), visible(access).size(), access.role(), access.owner() ? account(userId) : null);
+        return new PartnerDtos.Overview(partner, quotas(p.id()), visible(access).size(), access.role(), account(userId));
     }
 
-    /** 负责人自己账号里的烟火，在负责人的商户里读。 */
+    /** 当前登录账号在一方志里的烟火（负责人和 BD 都是自己的账号），在账号所在的商户里读。 */
     PartnerDtos.Account account(Long userId) {
         var s = inScope(directory.user(userId).tenantId(), true, () -> billing.summary(false, false));
         return new PartnerDtos.Account(s.available(), s.giftAvailable(), s.purchasedAvailable());

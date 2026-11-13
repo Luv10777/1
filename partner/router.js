@@ -43,7 +43,7 @@ export function createPartnerRouter(history = createWebHistory()) {
     return { name: 'partner-forbidden', query: partner.error ? { reason: partner.error } : {} }
   })
   instance.afterEach(to => {
-    if (typeof document !== 'undefined') document.title = `服务商后台 · ${to.meta.title || '一方志'}`
+    if (typeof document !== 'undefined') document.title = `${partner.overview?.partner.name || '服务商后台'} · ${to.meta.title || '一方志'}`
   })
   return instance
 }
