@@ -74,7 +74,7 @@ public class PartnerInsights {
         Map<String, long[]> daily = new LinkedHashMap<>();
         for (LocalDate d = first; !d.isAfter(today); d = d.plusDays(1)) daily.put(d.toString(), new long[4]);
 
-        long consumed = 0, uses = 0, activeMembers = 0, expiring = 0, active = 0, firstUses = 0, newTenants = 0;
+        long consumed = 0, uses = 0, activeMembers = 0, expiring = 0, expired = 0, never = 0, active = 0, firstUses = 0, newTenants = 0;
         Map<String, Long> byCapability = new TreeMap<>();
         for (var r : rows) {
             var t = r.view();
@@ -82,6 +82,8 @@ public class PartnerInsights {
             if (Boolean.TRUE.equals(t.memberActive())) {
                 activeMembers++;
                 if (t.memberUntil().isBefore(now.plus(EXPIRING))) expiring++;
+            } else if (Boolean.FALSE.equals(t.memberActive())) {
+                if (t.memberUntil() == null) never++; else expired++;
             }
             if (u.lastUsedAt() != null && !u.lastUsedAt().isBefore(since)) active++;
             if (u.firstUsedAt() != null && !u.firstUsedAt().isBefore(since)) firstUses++;
@@ -134,7 +136,7 @@ public class PartnerInsights {
                         r.usage().consumed(), r.usage().uses(), r.usage().lastUsedAt())).toList();
         List<PartnerDtos.BdRank> bds = owner && bdUserId == null ? bdRanks(partnerId, rows, byCreator, since) : List.of();
         return new PartnerDtos.Dashboard(days, owner ? access.partner().creditsAvailable() : null, rows.size(), newTenants, activeMembers,
-                expiring, active, firstUses, consumed, uses, byCapability, granted, transferred, generated, redeemed, renewals, voided,
+                expiring, expired, never, active, firstUses, consumed, uses, byCapability, granted, transferred, generated, redeemed, renewals, voided,
                 points, top, bds);
     }
 

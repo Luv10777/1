@@ -301,6 +301,7 @@ class PartnerIntegrationTest {
         // 看板：负责人看全部和烟火，BD 只看自己的、没有烟火数字；按 BD 筛。
         call(agentA, agency, get("/api/partner/dashboard?days=7"), null).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenants").value(2)).andExpect(jsonPath("$.data.consumed").value(905))
+                .andExpect(jsonPath("$.data.activeMembers").value(2)).andExpect(jsonPath("$.data.neverActivated").value(0))
                 .andExpect(jsonPath("$.data.activeTenants").value(1)).andExpect(jsonPath("$.data.firstUses").value(1))
                 .andExpect(jsonPath("$.data.granted").value(5000)).andExpect(jsonPath("$.data.transferred").value(1000))
                 .andExpect(jsonPath("$.data.renewals").value(2)).andExpect(jsonPath("$.data.codesRedeemed").value(2))
