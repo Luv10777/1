@@ -43,6 +43,16 @@ public class PartnerController {
         return ApiResponse.ok(service.transfer(me.userId(), tenantId, input));
     }
 
+    @GetMapping("/lookup")
+    public ApiResponse<PartnerDtos.Lookup> lookup(@RequestParam Long uid, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.lookup(me.userId(), uid));
+    }
+
+    @GetMapping("/tenants/{tenantId}")
+    public ApiResponse<PartnerDtos.TenantDetail> tenant(@PathVariable Long tenantId, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.tenantDetail(me.userId(), tenantId));
+    }
+
     @PostMapping("/tenants/{tenantId}/renewals")
     public ApiResponse<PartnerDtos.TenantView> renew(@PathVariable Long tenantId, @Valid @RequestBody PartnerDtos.Renew input,
             @AuthenticationPrincipal AuthPrincipal me) {
@@ -65,9 +75,11 @@ public class PartnerController {
         return ApiResponse.ok(service.addBd(me.userId(), input.uid()));
     }
 
+    /** transferTo：他名下的商户转给哪个 BD，0 表示回到负责人直接管。 */
     @DeleteMapping("/team/{userId}")
-    public ApiResponse<List<PartnerDtos.Member>> removeBd(@PathVariable Long userId, @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.removeBd(me.userId(), userId));
+    public ApiResponse<List<PartnerDtos.Member>> removeBd(@PathVariable Long userId, @RequestParam long transferTo,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.removeBd(me.userId(), userId, transferTo));
     }
 
     /** createdBy 只对负责人有效：按生成人（负责人或某个 BD）筛。 */

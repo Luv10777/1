@@ -21,6 +21,16 @@
 | 服务商负责人 | 看可分配烟火、各套餐额度和流水；按 UID 添加 / 移除 BD（「团队」页）；按 UID 把商户加到名下；把商户调给某个 BD 或收回；一次给多个名下商户分烟火；在额度内生成、作废激活码，按码搜索、按生成人筛选、导出表格；按到期筛选商户并直接续期 |
 | BD | 只看自己名下的商户和自己生成的激活码；按 UID 加商户（归到自己）；在服务商的额度内生成、作废自己的激活码；给自己名下的商户续期。不能分烟火，看不到服务商的烟火余额和流水 |
 
+### 服务商后台的交互
+
+列表只用来浏览和筛选；点一行打开右侧详情抽屉，修改都在抽屉里做；新增类操作（添加商户、添加 BD、生成激活码、批量分配烟火）用居中弹窗。
+每次提交前先在页内确认这次改动的结果（例如分配后双方余额、续期后的到期日、移除 BD 时商户转给谁），不用浏览器自带的确认框。
+
+- 名下商户：商户详情抽屉里有基本信息、会员续期、分配烟火（负责人）、调整归属 BD（负责人）和往来记录；勾选多个商户后批量分配烟火。
+- 团队（负责人）：成员列表带名下商户数和激活码统计；成员详情抽屉里看业绩、名下商户，移除 BD 前选好他名下商户的去处。
+- 激活码：额度卡片、生成弹窗（生成后直接复制或导出）、激活码详情抽屉（作废）。
+- 添加商户和添加 BD 都先按 UID 查询确认：姓名只显示第一个字，已归属其他服务商的只提示「已归属其他服务商」，不透露是哪家。
+
 ### 名下商户与归属
 
 - 归属按**商户**算（同一商户的管理员和店员一起），以第一次为准：
@@ -34,7 +44,7 @@
 - 商户归在服务商下面的哪个 BD 记在 `partner_tenants.bd_user_id`，为空表示负责人直接管。
 - BD 按 UID 添加的商户、兑换了 BD 生成的激活码的商户（第一次归属时）归到这个 BD；负责人添加的归负责人直接管。
   商户已在本服务商名下但不归这个 BD 时，BD 再按 UID 添加会被拒绝，要负责人调配。
-- 负责人可以把商户在 BD 之间调配；BD 被移除时，他名下的商户回到负责人直接管，他生成的激活码照常可用。
+- 负责人可以把商户在 BD 之间调配；移除 BD 时必须指定他名下的商户转给哪个 BD 或回到负责人直接管，他生成的激活码照常可用。
 - BD 生成的激活码按 `billing_redeem_codes.created_by` 认人，没有另加列。
 
 ### 烟火
@@ -80,11 +90,13 @@ V81 给 `partner_members` 加 `role`（`OWNER`/`BD`，原有账号都是 `OWNER`
 | `GET /api/partner/me` | 服务商、可分配烟火、各套餐额度、名下商户数 |
 | `GET /api/partner/me` 的 `role` | 当前账号的角色：`OWNER` 或 `BD`；BD 看不到 `creditsAvailable`，`tenantCount` 只算自己的 |
 | `GET /api/partner/tenants` | 名下商户（含会员状态、烟火余额、归属 BD），`keyword` 按商户名、联系人、UID 搜；`expiry` 取 `SOON7`/`SOON30`/`EXPIRED`/`NEVER`；负责人可传 `bdUserId`（0 表示负责人直接管的） |
+| `GET /api/partner/lookup?uid=` | 按 UID 预查询：商户名、打码姓名、`tenantState`（`NONE`/`MINE`/`TEAM`/`OTHER`）；负责人另有 `memberState`（`NONE`/`OWNER`/`BD`/`OTHER`） |
+| `GET /api/partner/tenants/{tenantId}` | 商户详情：会员和余额、这家服务商分给他的烟火（仅负责人）、他兑换过的本服务商激活码（含直接续期） |
 | `POST /api/partner/tenants` | `{uid}` 按 UID 添加 |
 | `POST /api/partner/tenants/{tenantId}/credits` | `{requestKey, credits, note}` 分烟火（仅负责人） |
 | `POST /api/partner/tenants/{tenantId}/renewals` | `{requestKey, planCode}` 直接续期 |
 | `PUT /api/partner/tenants/{tenantId}/bd` | `{bdUserId}` 调给某个 BD，空表示收回（仅负责人） |
-| `GET/POST /api/partner/team`、`DELETE /api/partner/team/{userId}` | 团队列表 / 按 `{uid}` 添加 BD / 移除 BD（仅负责人） |
+| `GET/POST /api/partner/team`、`DELETE /api/partner/team/{userId}?transferTo=` | 团队列表（含每人激活码统计）/ 按 `{uid}` 添加 BD / 移除 BD，`transferTo` 为接手的 BD，0 表示回到负责人（仅负责人） |
 | `GET/POST /api/partner/codes` | 查看 / 生成激活码，生成参数 `{requestKey, planCode, quantity, note}`；查看可传 `keyword`、`status`，负责人可传 `createdBy` |
 | `POST /api/partner/codes/{id}/void` | 作废没兑换的激活码，额度不退回 |
 | `GET /api/partner/ledger` | 烟火流水（仅负责人） |

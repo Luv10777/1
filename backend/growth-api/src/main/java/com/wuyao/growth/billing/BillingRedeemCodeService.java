@@ -127,6 +127,13 @@ public class BillingRedeemCodeService {
         return new PageResult<>(items, page, size, total, (int) Math.ceil((double) total / size));
     }
 
+    /** 某个商户兑换过的、这家服务商生成的激活码（含直接续期），新的在前，最多 50 个。 */
+    @Transactional(readOnly = true)
+    public List<BillingDtos.RedeemCodeView> redeemedForPartner(Long partnerId, Long tenantId) {
+        return views(em.createQuery("from BillingRedeemCode c where c.partnerId = :p and c.redeemedTenantId = :t order by c.redeemedAt desc, c.id desc",
+                BillingRedeemCode.class).setParameter("p", partnerId).setParameter("t", tenantId).setMaxResults(50).getResultList());
+    }
+
     @Transactional
     public BillingDtos.RedeemCodeView voidCode(Long id, Long operator) {
         return voidCode(id, operator, null, null);

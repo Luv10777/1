@@ -1,5 +1,6 @@
 package com.wuyao.growth.partner;
 
+import com.wuyao.growth.billing.BillingDtos;
 import jakarta.validation.constraints.*;
 import java.time.Instant;
 import java.util.List;
@@ -14,8 +15,18 @@ public final class PartnerDtos {
     public record Quota(String planCode, String planName, Integer durationDays, int quota, int used, int remaining) {}
     /** role 是当前登录账号在服务商里的角色：OWNER 负责人、BD。BD 的 tenantCount 只算自己名下的。 */
     public record Overview(Partner partner, List<Quota> quotas, long tenantCount, String role) {}
+    /** 激活码统计：unused = generated - redeemed - voided；renewals 是其中直接续期的个数。 */
+    public record CodeStats(long generated, long redeemed, long unused, long voided, long renewals) {}
     /** 服务商的登录账号；role 为 OWNER 或 BD，tenantCount 是归到这个 BD 的商户数（负责人为空）。 */
-    public record Member(Long userId, Long uid, String name, String phone, String role, Long tenantCount, Instant createdAt) {}
+    public record Member(Long userId, Long uid, String name, String phone, String role, Long tenantCount, CodeStats codes, Instant createdAt) {}
+    /**
+     * 按 UID 预查询，添加商户或 BD 前确认对象。userName 打码；tenantState：NONE 没有归属、MINE 在我名下、
+     * TEAM 在本服务商但归别人管、OTHER 属于其他服务商（不透露是哪家）。tenantId 只在 MINE 时给出。
+     * memberState 只给负责人：NONE、OWNER、BD（本服务商的登录账号）、OTHER（其他服务商的登录账号）。
+     */
+    public record Lookup(Long uid, String userName, String tenantName, String tenantState, Long tenantId, String bdName, String memberState) {}
+    /** 商户详情：transfers 是这家服务商分给他的烟火（只给负责人，BD 为空），codes 是他兑换过的本服务商激活码（含直接续期）。 */
+    public record TenantDetail(TenantView tenant, List<LedgerEntry> transfers, List<BillingDtos.RedeemCodeView> codes) {}
     /** 名下商户；会员和余额读不到时为空。source 为 UID、CODE 或 PLATFORM；bdUserId 为空表示负责人直接管。 */
     public record TenantView(Long tenantId, String tenantName, Long ownerUid, String ownerName, String source, Instant boundAt,
                              Boolean memberActive, Instant memberUntil, String planName, Long creditsAvailable,

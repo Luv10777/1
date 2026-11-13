@@ -32,6 +32,8 @@ class PartnerStore {
     }
     record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long bdUserId) {}
     record LedgerRow(Long id, String type, long delta, long availableAfter, Long tenantId, String note, Instant createdAt) {}
+    /** 某个账号在这家服务商生成的激活码：总数、已兑换、已作废、其中直接续期。 */
+    record CodeStats(long generated, long redeemed, long voided, long renewals) {}
 
     private static final String PARTNER_COLUMNS = "p.id, p.name, p.contact, p.status, p.credits_available, p.created_at";
 
@@ -166,6 +168,27 @@ class PartnerStore {
         update.executeUpdate();
     }
 
+    /** 移除 BD 前把他名下的商户整体转给另一个 BD。 */
+    @Transactional
+    public void moveBdTenants(Long partnerId, Long from, Long to) {
+        em.createNativeQuery("UPDATE partner_tenants SET bd_user_id = :to WHERE partner_id = :p AND bd_user_id = :from")
+                .setParameter("to", to).setParameter("p", partnerId).setParameter("from", from).executeUpdate();
+    }
+
+    /** 每个登录账号生成的激活码统计，按生成人分组。 */
+    @Transactional(readOnly = true)
+    public Map<Long, CodeStats> codeStats(Long partnerId) {
+        List<?> rows = em.createNativeQuery("""
+                SELECT created_by, count(*), count(redeemed_at), count(voided_at), count(*) FILTER (WHERE batch_key LIKE 'partner-renew-%')
+                FROM billing_redeem_codes WHERE partner_id = :p GROUP BY created_by""").setParameter("p", partnerId).getResultList();
+        Map<Long, CodeStats> stats = new HashMap<>();
+        for (Object row : rows) {
+            Object[] r = (Object[]) row;
+            stats.put(num(r[0]), new CodeStats(num(r[1]), num(r[2]), num(r[3]), num(r[4])));
+        }
+        return stats;
+    }
+
     /** 激活码的生成人（BD 生成的码兑换后归到这个 BD）。 */
     @Transactional(readOnly = true)
     public Optional<Long> codeCreator(Long codeId) {
@@ -234,6 +257,17 @@ class PartnerStore {
                 SELECT id, type, delta, available_after, tenant_id, note, created_at FROM partner_credit_ledger
                 WHERE partner_id = :p ORDER BY id DESC LIMIT :limit OFFSET :offset""")
                 .setParameter("p", partnerId).setParameter("limit", size).setParameter("offset", (long) page * size).getResultList();
+        return rows.stream().map(r -> (Object[]) r).map(r -> new LedgerRow(num(r[0]), (String) r[1], num(r[2]), num(r[3]),
+                r[4] == null ? null : num(r[4]), (String) r[5], instant(r[6]))).toList();
+    }
+
+    /** 这家服务商分给某个商户的烟火流水，新的在前。 */
+    @Transactional(readOnly = true)
+    public List<LedgerRow> tenantLedger(Long partnerId, Long tenantId, int limit) {
+        List<?> rows = em.createNativeQuery("""
+                SELECT id, type, delta, available_after, tenant_id, note, created_at FROM partner_credit_ledger
+                WHERE partner_id = :p AND tenant_id = :t ORDER BY id DESC LIMIT :limit""")
+                .setParameter("p", partnerId).setParameter("t", tenantId).setParameter("limit", limit).getResultList();
         return rows.stream().map(r -> (Object[]) r).map(r -> new LedgerRow(num(r[0]), (String) r[1], num(r[2]), num(r[3]),
                 r[4] == null ? null : num(r[4]), (String) r[5], instant(r[6]))).toList();
     }
