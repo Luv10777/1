@@ -3,12 +3,14 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bell, ChevronRight, FileText, Flame, Inbox, LayoutDashboard, Store, ShieldCheck, LogOut, PanelLeftClose, PanelLeftOpen, Search, Ticket, Layers, Users, Percent, ChartColumn, TicketCheck, Handshake } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
+import { useNavigationProgress } from './navigation.js'
 import { platform } from '../src/stores/platform.js'
 import { pendingByRoute, pendingItems, pendingTotal, refreshPending, startPendingPolling, stopPendingPolling } from './pendingReviews.js'
 import CommandPalette from './CommandPalette.vue'
 
 const route = useRoute()
 const router = useRouter()
+const navigating = useNavigationProgress(router)
 const menuOpen = ref(false)
 const signingOut = ref(false)
 const paletteOpen = ref(false)
@@ -55,7 +57,7 @@ onMounted(() => document.addEventListener('keydown', onShortcut))
 
 // 待处理事项只在进入后台后轮询；切换页面时顺便刷新，处理完一项回到列表就能看到数字变化。
 watch(authorized, value => { if (value) startPendingPolling(); else stopPendingPolling() }, { immediate: true })
-watch(() => route.name, () => { noticesOpen.value = false; paletteOpen.value = false; if (authorized.value) refreshPending() })
+watch(() => route.name, () => { noticesOpen.value = false; paletteOpen.value = false; menuOpen.value = false; if (authorized.value) refreshPending() })
 onBeforeUnmount(() => { stopPendingPolling(); noticesOpen.value = false; document.removeEventListener('keydown', onShortcut) })
 
 async function logout() {
@@ -81,11 +83,12 @@ async function logout() {
     </aside>
     <div class="admin-body">
       <header class="admin-topbar">
+        <div class="admin-progress" :class="{ active: navigating }" aria-hidden="true" />
         <div class="admin-crumb"><button class="admin-menu-toggle" type="button" :aria-expanded="menuOpen" aria-label="切换后台导航" @click="menuOpen = !menuOpen"><component :is="menuOpen ? PanelLeftClose : PanelLeftOpen" :size="20" /></button><template v-if="currentGroup"><span>{{ currentGroup }}</span><span class="admin-topbar-separator">/</span></template><strong>{{ route.meta.title }}</strong></div>
         <button class="admin-search" type="button" aria-label="跳转到页面" @click="paletteOpen = true"><Search :size="16" /><span>跳转到页面…</span><kbd>Ctrl K</kbd></button>
         <div class="admin-topbar-actions"><div class="admin-notices"><button type="button" class="admin-notices-button" :aria-expanded="noticesOpen" :aria-label="pendingTotal ? `待处理事项 ${pendingTotal} 项` : '待处理事项'" @click="noticesOpen = !noticesOpen; noticesOpen && refreshPending()"><Bell :size="18" /><b v-if="pendingTotal">{{ pendingTotal > 99 ? '99+' : pendingTotal }}</b></button><div v-if="noticesOpen" class="admin-notices-panel"><strong>待处理事项</strong><p v-if="!pendingTotal" class="admin-notices-empty">暂时没有需要审核或处理的内容。</p><RouterLink v-for="item in pendingItems.filter(entry => entry.count)" v-else :key="item.key" :to="{ name: item.route, query: item.kind ? { kind: item.kind } : undefined }" @click="noticesOpen = false"><span>{{ item.label }}</span><b>{{ item.count }}</b><ChevronRight :size="15" /></RouterLink></div></div><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '管').slice(0, 1) }}</span><span>{{ auth.user?.name || '管理员' }}<small>平台管理员</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="15" />{{ signingOut ? '退出中…' : '退出' }}</button></div></div>
       </header>
-      <main id="admin-main" class="admin-main" tabindex="-1"><RouterView /></main>
+      <main id="admin-main" class="admin-main" tabindex="-1"><RouterView v-slot="{ Component, route: page }"><Transition name="ad-page" mode="out-in"><component :is="Component" :key="page.name" /></Transition></RouterView></main>
     </div>
     <CommandPalette :open="paletteOpen" :groups="navigation" @close="paletteOpen = false" />
   </div>

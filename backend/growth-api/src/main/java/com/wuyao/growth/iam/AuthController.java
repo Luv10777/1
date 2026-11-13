@@ -13,7 +13,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,8 +21,6 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthController {
-
-    private static final String WECHAT_STATE_COOKIE = "wechat_login_state";
 
     private final AuthService authService;
     private final WechatLoginService wechatLoginService;
@@ -75,7 +72,7 @@ public class AuthController {
     @GetMapping("/wechat/callback")
     public void wechatCallback(@RequestParam(required = false) String code,
                                @RequestParam(required = false) String state,
-                               @CookieValue(name = WECHAT_STATE_COOKIE, required = false) String browserState,
+                               @CookieValue(name = WechatLoginService.STATE_COOKIE, required = false) String browserState,
                                HttpServletResponse response) throws java.io.IOException {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader("Referrer-Policy", "no-referrer");
@@ -91,8 +88,7 @@ public class AuthController {
     }
 
     private void setWechatCookie(HttpServletResponse response, String value, long maxAge) {
-        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from(WECHAT_STATE_COOKIE, value)
-                .httpOnly(true).secure(true).sameSite("Lax").path("/api/auth/wechat").maxAge(maxAge).build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, WechatLoginService.stateCookie(value, maxAge));
     }
 
     @PostMapping("/wechat/complete")

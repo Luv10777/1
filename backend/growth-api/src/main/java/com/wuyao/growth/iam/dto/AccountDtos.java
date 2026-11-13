@@ -63,6 +63,36 @@ public final class AccountDtos {
     }
 
     /**
+     * 改绑或绑定手机号的第一步：证明是本人在操作。已绑手机号的发验证码到原手机号，
+     * 原手机号收不到短信时可以改用当前密码；没绑手机号的只能用当前密码。两者只发一样。
+     */
+    public record PhoneProofRequest(
+            @Pattern(regexp = "^\\d{6}$", message = "验证码必须是 6 位数字") String code,
+            @Size(max = 64) String currentPassword) {
+    }
+
+    /** 第二步：新手机号和发到新手机号的验证码。 */
+    public record PhoneChangeRequest(
+            @NotBlank(message = "请输入新手机号")
+            @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确") String phone,
+            @NotBlank(message = "请输入验证码")
+            @Pattern(regexp = "^\\d{6}$", message = "验证码必须是 6 位数字") String code) {
+    }
+
+    /**
+     * 本人的微信绑定情况。
+     *
+     * @param available 服务端是否配置了微信网站应用；没配置时不能扫码绑定
+     * @param nickname  绑定时微信给的昵称，可能为空
+     */
+    public record WechatBinding(boolean available, boolean bound, String nickname, Instant boundAt) {
+    }
+
+    /** 扫码绑定的授权地址，前端整页跳过去。 */
+    public record WechatBindStart(String url) {
+    }
+
+    /**
      * 注销前给本人看的说明。
      *
      * @param wholeTenant  注销后整个商户是否一起关闭：商户里没有别的管理员时，管理员注销就会关闭商户

@@ -1,9 +1,12 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, ChevronRight, CircleCheck, Coins, Lock, RefreshCw, ShieldCheck, Ticket, User } from 'lucide-vue-next'
+import { Check, ChevronRight, CircleCheck, Coins, KeyRound, Lock, MessageCircle, RefreshCw, ShieldCheck, Smartphone, Ticket, User } from 'lucide-vue-next'
 import { accountApi, validateAvatar } from '../services/accountApi'
 import UserAvatar from '../components/UserAvatar.vue'
+import PasswordDialog from '../components/settings/PasswordDialog.vue'
+import PhoneDialog from '../components/settings/PhoneDialog.vue'
+import WechatDialog from '../components/settings/WechatDialog.vue'
 import { platformManagementApi as identityApi } from '../services/platformManagement'
 import { referralApi } from '../services/referralApi'
 import { identityValidation, managementDate } from '../domain/platformManagement'
@@ -33,21 +36,16 @@ const avatarPreview = ref('')
 const savingAvatar = ref(false)
 const avatarMessage = ref({ text: '', error: false })
 
-const passwordOpen = ref(false)
-const byCode = ref(false)
-const savingPassword = ref(false)
+// 账号与安全：登录密码、手机号、微信三项，各自在弹窗里改。
+const dialog = ref('')
 const sendingCode = ref(false)
-const passwordError = ref('')
-const passwordNotice = ref('')
-const passwordDone = ref('')
-const passwordForm = reactive({ currentPassword: '', code: '', newPassword: '', confirmPassword: '' })
+const securityNotice = ref({ text: '', error: false })
+const wechat = ref(null)
+const wechatError = ref('')
 
 const roleText = computed(() => (profile.value?.role === 'STAFF' ? '店员' : '管理员'))
 const joinedAt = computed(() => (profile.value?.createdAt ? new Date(profile.value.createdAt).toLocaleDateString('zh-CN') : ''))
 const nameChanged = computed(() => nameDraft.value.trim() && nameDraft.value.trim() !== profile.value?.name)
-// 没设过密码的人只能用验证码；没绑手机号的账号只能用当前密码。
-const codeOnly = computed(() => !profile.value?.passwordSet)
-const canUseCode = computed(() => Boolean(profile.value?.phone))
 const maskedPhone = computed(() => profile.value?.phone?.replace(/^(\d{3})\d{4}(\d{4})$/, '$1 **** $2') || '')
 
 // 实名：本人提交姓名和身份证号，服务端当场向权威数据源核验是否一致，不做人工审核。资料在服务端加密保存，这里只拿到脱敏后的结果。
@@ -72,13 +70,46 @@ const canSubmitIdentity = computed(() => !identityLoading.value && !identityErro
 
 onMounted(async () => {
   document.querySelector('.page-scroll')?.classList.add('settings-scroll')
-  await Promise.all([load(), loadIdentity()])
-  // 旧的“用户实名”链接会带着 #identity 跳过来，直接定位到实名这一块。
-  if (route.hash === '#identity') {
+  readWechatResult()
+  await Promise.all([load(), loadIdentity(), loadWechat()])
+  // 旧的“用户实名”链接会带着 #identity 跳过来，直接定位到实名这一块；扫码绑定微信回来定位到账号与安全。
+  const anchor = route.hash === '#identity' ? 'identity' : securityNotice.value.text ? 'security' : ''
+  if (anchor) {
     await nextTick()
-    document.getElementById('identity')?.scrollIntoView({ block: 'start' })
+    document.getElementById(anchor)?.scrollIntoView({ block: 'start' })
   }
 })
+
+/** 扫码绑定微信后，回调把结果放在地址栏里带回来；读完就从地址栏去掉，刷新不会重复提示。 */
+function readWechatResult() {
+  const { wechat_bound: bound, wechat_error: failure, ...rest } = route.query
+  if (!bound && !failure) return
+  securityNotice.value = bound
+    ? { text: '微信已绑定。以后可以在登录页用这个微信扫码登录。', error: false }
+    : { text: `微信没有绑定成功：${failure}`, error: true }
+  router.replace({ query: rest, hash: route.hash })
+}
+
+async function loadWechat() {
+  wechatError.value = ''
+  try {
+    wechat.value = await accountApi.wechat()
+  } catch (error) {
+    wechatError.value = error.message || '微信绑定状态暂时无法读取'
+  }
+}
+
+function onPasswordSaved({ session, first }) {
+  auth.replaceSession(session)
+  profile.value = { ...profile.value, passwordSet: true }
+  dialog.value = ''
+  securityNotice.value = { text: `${first ? '密码已设置，以后也可以用手机号加密码登录。' : '密码已修改。'}其他电脑、手机和桌面端上的登录已退出。`, error: false }
+}
+
+function onPhoneChanged(saved) {
+  profile.value = { ...profile.value, ...saved }
+  auth.restore()
+}
 onBeforeUnmount(() => {
   document.querySelector('.page-scroll')?.classList.remove('settings-scroll')
   clearIdentityForm()
@@ -219,34 +250,23 @@ async function saveName() {
   }
 }
 
-function openPassword() {
-  Object.assign(passwordForm, { currentPassword: '', code: '', newPassword: '', confirmPassword: '' })
-  byCode.value = codeOnly.value
-  passwordError.value = ''
-  passwordNotice.value = ''
-  passwordDone.value = ''
-  passwordOpen.value = true
-}
-function closePassword() { if (!savingPassword.value) passwordOpen.value = false }
-function switchProof(useCode) {
-  byCode.value = useCode
-  passwordError.value = ''
-  passwordNotice.value = ''
+function openDialog(name) {
+  securityNotice.value = { text: '', error: false }
+  dialog.value = name
 }
 
-/** 验证码发到本人手机；改密码和注销共用，提示写到各自表单下面。 */
-async function sendCode(form = 'password') {
-  const [notice, failure] = form === 'closure' ? [closureNotice, closureError] : [passwordNotice, passwordError]
+/** 注销确认用的验证码，发到本人手机。 */
+async function sendCode() {
   if (sendingCode.value || auth.state.cooldown > 0) return
-  failure.value = ''
+  closureError.value = ''
   sendingCode.value = true
   try {
     const result = await auth.sendCode(profile.value.phone)
-    notice.value = result?.developmentMode
+    closureNotice.value = result?.developmentMode
       ? '当前为本地调试模式，不会发送短信。验证码请在后端控制台查看。'
       : `验证码已发送到 ${maskedPhone.value}，5 分钟内有效。`
   } catch (error) {
-    failure.value = error.message || '验证码发送失败，请稍后重试'
+    closureError.value = error.message || '验证码发送失败，请稍后重试'
   } finally {
     sendingCode.value = false
   }
@@ -292,30 +312,13 @@ async function confirmClosure() {
   }
 }
 
-async function savePassword() {
-  if (savingPassword.value) return
-  passwordError.value = ''
-  savingPassword.value = true
-  try {
-    const session = await accountApi.changePassword(passwordForm, byCode.value)
-    auth.replaceSession(session)
-    const first = !profile.value.passwordSet
-    profile.value = { ...profile.value, passwordSet: true }
-    passwordOpen.value = false
-    passwordDone.value = `${first ? '密码已设置，以后也可以用手机号加密码登录。' : '密码已修改。'}其他电脑、手机和桌面端上的登录已退出，需要重新登录。`
-  } catch (error) {
-    passwordError.value = error.message || '保存失败，请重试'
-  } finally {
-    savingPassword.value = false
-  }
-}
 </script>
 
 <template>
   <div class="settings-page">
     <header class="settings-header">
       <h1>设置</h1>
-      <p class="header-desc">查看和修改你自己的账号资料、登录密码、实名认证和外观。账号设置只影响当前登录的这个账号。</p>
+      <p class="header-desc">查看和修改你自己的账号资料、登录方式、实名认证和外观。账号设置只影响当前登录的这个账号。</p>
     </header>
 
     <section class="settings-card" aria-labelledby="appearance-title">
@@ -368,65 +371,65 @@ async function savePassword() {
         </form>
         <p v-if="nameMessage.text" class="inline-message" :class="{ error: nameMessage.error }" role="status">{{ nameMessage.text }}</p>
         <dl class="facts">
-          <div><dt>手机号</dt><dd>{{ profile.phone || '未绑定' }}</dd></div>
           <div v-if="profile.username"><dt>登录账号</dt><dd>{{ profile.username }}</dd></div>
           <div><dt>角色</dt><dd>{{ roleText }}</dd></div>
           <div v-if="joinedAt"><dt>注册时间</dt><dd>{{ joinedAt }}</dd></div>
         </dl>
-        <p class="card-foot">手机号和角色暂时不能在这里修改。{{ profile.role === 'STAFF' ? '需要调整请联系商户管理员。' : '' }}</p>
+        <p v-if="profile.role === 'STAFF'" class="card-foot">角色由商户管理员设置，需要调整请联系管理员。</p>
       </section>
 
-      <section class="settings-card" aria-labelledby="password-title">
+      <section id="security" class="settings-card" aria-labelledby="security-title">
         <header class="card-header">
           <div>
-            <h2 id="password-title">登录密码</h2>
-            <p v-if="profile.passwordSet">已设置。登录时可以用{{ profile.phone ? '手机号' : '账号' }}加密码，不用每次收验证码。</p>
-            <p v-else>还没有设置。目前只能用手机验证码登录；设置后也可以用手机号加密码登录。</p>
+            <h2 id="security-title">账号与安全</h2>
+            <p>管理登录这个账号的方式。改动只影响你自己。</p>
           </div>
-          <span class="state-badge" :class="{ on: profile.passwordSet }">{{ profile.passwordSet ? '已设置' : '未设置' }}</span>
         </header>
-        <p v-if="passwordDone" class="inline-message" role="status">{{ passwordDone }}</p>
-        <button v-if="!passwordOpen" class="ghost-button" @click="openPassword">{{ profile.passwordSet ? '修改密码' : '设置密码' }}</button>
-
-        <form v-else class="password-form" @submit.prevent="savePassword">
-          <label v-if="!byCode" class="field">
-            <span>当前密码</span>
-            <input v-model="passwordForm.currentPassword" type="password" autocomplete="current-password" maxlength="64" :disabled="savingPassword" />
-          </label>
-          <div v-else class="field">
-            <label for="settings-code">短信验证码</label>
-            <div class="code-row">
-              <input id="settings-code" v-model="passwordForm.code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码" :disabled="savingPassword" />
-              <button type="button" class="ghost-button" :disabled="savingPassword || sendingCode || auth.state.cooldown > 0" @click="sendCode('password')">
-                {{ sendingCode ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}
-              </button>
-            </div>
-            <small>验证码会发到 {{ maskedPhone }}。</small>
-          </div>
-          <p v-if="!codeOnly && canUseCode" class="proof-switch">
-            <button type="button" class="link-button" :disabled="savingPassword" @click="switchProof(!byCode)">
-              {{ byCode ? '改用当前密码验证' : '忘记当前密码？改用短信验证码' }}
-            </button>
+        <Transition name="notice">
+          <p v-if="securityNotice.text" class="security-notice" :class="{ error: securityNotice.error }" :role="securityNotice.error ? 'alert' : 'status'">
+            <Check v-if="!securityNotice.error" :size="15" aria-hidden="true" />{{ securityNotice.text }}
           </p>
-          <label class="field">
-            <span>新密码</span>
-            <input v-model="passwordForm.newPassword" type="password" autocomplete="new-password" maxlength="64" placeholder="8–64 位" :disabled="savingPassword" />
-          </label>
-          <label class="field">
-            <span>再输一次新密码</span>
-            <input v-model="passwordForm.confirmPassword" type="password" autocomplete="new-password" maxlength="64" :disabled="savingPassword" />
-          </label>
-          <p class="warning">保存后，这个账号在其他电脑、手机和桌面端上的登录都会退出。正在直播时，建议下播后再改。</p>
-          <p v-if="passwordNotice" class="inline-message" role="status">{{ passwordNotice }}</p>
-          <div class="form-footer">
-            <p v-if="passwordError" class="form-notice" role="alert">{{ passwordError }}</p>
-            <div>
-              <button type="button" class="ghost-button" :disabled="savingPassword" @click="closePassword">取消</button>
-              <button type="submit" class="primary-button" :disabled="savingPassword">{{ savingPassword ? '保存中…' : '保存密码' }}</button>
+        </Transition>
+        <ul class="security-list">
+          <li>
+            <span class="security-icon" aria-hidden="true"><KeyRound :size="19" /></span>
+            <div class="security-main">
+              <strong>登录密码</strong>
+              <span>{{ profile.passwordSet ? `可以用${profile.phone ? '手机号' : '账号'}加密码登录，不用每次收验证码` : '还没有设置，目前只能用验证码登录' }}</span>
             </div>
-          </div>
-        </form>
+            <span class="state-badge" :class="{ on: profile.passwordSet }"><i class="state-dot" aria-hidden="true" />{{ profile.passwordSet ? '已设置' : '未设置' }}</span>
+            <button type="button" class="ghost-button" :disabled="!profile.passwordSet && !profile.phone" :title="!profile.passwordSet && !profile.phone ? '请先绑定手机号' : undefined" @click="openDialog('password')">{{ profile.passwordSet ? '修改' : '设置' }}</button>
+          </li>
+          <li>
+            <span class="security-icon" aria-hidden="true"><Smartphone :size="19" /></span>
+            <div class="security-main">
+              <strong>手机号</strong>
+              <span v-if="profile.phone" class="security-value">{{ maskedPhone }}</span>
+              <span v-else>未绑定。绑定后可以收验证码登录、找回密码</span>
+            </div>
+            <span class="state-badge" :class="{ on: profile.phone }"><i class="state-dot" aria-hidden="true" />{{ profile.phone ? '已绑定' : '未绑定' }}</span>
+            <button type="button" :class="profile.phone ? 'ghost-button' : 'primary-button'" @click="openDialog('phone')">{{ profile.phone ? '更换' : '绑定' }}</button>
+          </li>
+          <li>
+            <span class="security-icon wechat" aria-hidden="true"><MessageCircle :size="19" /></span>
+            <div class="security-main">
+              <strong>微信</strong>
+              <span v-if="wechatError">{{ wechatError }}</span>
+              <span v-else-if="!wechat">正在查询…</span>
+              <span v-else-if="wechat.bound">已绑定{{ wechat.nickname ? `「${wechat.nickname}」` : '' }}，可以在登录页扫码登录</span>
+              <span v-else-if="wechat.available">微信尚未绑定。绑定后可以用微信扫码登录</span>
+              <span v-else>微信尚未绑定。扫码绑定暂未开放</span>
+            </div>
+            <span v-if="wechat" class="state-badge" :class="{ on: wechat.bound }"><i class="state-dot" aria-hidden="true" />{{ wechat.bound ? '已绑定' : '未绑定' }}</span>
+            <button v-if="wechatError" type="button" class="ghost-button" @click="loadWechat">重试</button>
+            <button v-else-if="wechat && !wechat.bound" type="button" class="primary-button" :disabled="!wechat.available" @click="openDialog('wechat')">扫码绑定</button>
+          </li>
+        </ul>
       </section>
+
+      <PasswordDialog :open="dialog === 'password'" :profile="profile" @close="dialog = ''" @saved="onPasswordSaved" />
+      <PhoneDialog :open="dialog === 'phone'" :profile="profile" @close="dialog = ''" @changed="onPhoneChanged" />
+      <WechatDialog :open="dialog === 'wechat'" @close="dialog = ''" />
 
       <section id="identity" class="settings-card" aria-labelledby="identity-title">
         <header class="card-header identity-header">
@@ -558,7 +561,7 @@ async function savePassword() {
                 <label for="closure-code">短信验证码</label>
                 <div class="code-row">
                   <input id="closure-code" v-model="closureForm.code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位验证码" :disabled="closing" />
-                  <button type="button" class="ghost-button" :disabled="closing || sendingCode || auth.state.cooldown > 0" @click="sendCode('closure')">
+                  <button type="button" class="ghost-button" :disabled="closing || sendingCode || auth.state.cooldown > 0" @click="sendCode">
                     {{ sendingCode ? '发送中…' : auth.state.cooldown > 0 ? `${auth.state.cooldown}s 后重试` : '获取验证码' }}
                   </button>
                 </div>
@@ -648,8 +651,25 @@ async function savePassword() {
 .card-foot { margin: 16px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 
 .password-form { max-width: 420px; }
-.proof-switch { margin: -6px 0 16px; font-size: 12px; }
-.warning { margin: 0 0 12px; padding: 10px 12px; border-radius: 4px; color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 8%, var(--color-bg-surface)); font-size: 12px; line-height: 1.7; }
+
+.security-list { margin: 0; padding: 0; list-style: none; border: 1px solid var(--color-border-subtle); border-radius: 10px; }
+.security-list li { display: flex; align-items: center; gap: 14px; padding: 16px 18px; transition: background-color .15s; }
+.security-list li + li { border-top: 1px solid var(--color-border-subtle); }
+.security-list li:hover { background: color-mix(in srgb, var(--color-bg-subtle) 55%, transparent); }
+.security-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; color: var(--color-accent-text); background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-surface)); }
+.security-icon.wechat { color: #07a35a; background: color-mix(in srgb, #07c160 12%, var(--color-bg-surface)); }
+.security-main { flex: 1; min-width: 0; }
+.security-main strong { display: block; font-size: 14px; }
+.security-main span { display: block; margin-top: 3px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.security-main .security-value { color: var(--color-primary); font-family: var(--font-mono); font-size: 13px; letter-spacing: .04em; }
+.security-list .state-badge { display: inline-flex; align-items: center; border-radius: 99px; padding: 3px 10px; }
+.security-list .ghost-button, .security-list .primary-button { min-width: 84px; border-radius: 6px; padding: 8px 14px; }
+.security-notice { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px; padding: 10px 14px; border-radius: 8px; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 8%, var(--color-bg-surface)); font-size: 13px; line-height: 1.6; }
+.security-notice svg { flex: none; margin-top: 3px; }
+.security-notice.error { color: var(--color-error); background: color-mix(in srgb, var(--color-error) 8%, var(--color-bg-surface)); }
+.notice-enter-active, .notice-leave-active { transition: opacity .2s ease, transform .2s ease; }
+.notice-enter-from, .notice-leave-to { opacity: 0; transform: translateY(-4px); }
+#security { scroll-margin-top: 20px; }
 .form-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 4px; }
 .form-footer > div { display: flex; gap: 9px; margin-left: auto; }
 .form-notice { margin: 0; color: var(--color-error); font-size: 12px; line-height: 1.6; }
@@ -729,5 +749,9 @@ async function savePassword() {
   .id-steps li::after { display: none; }
   .form-footer { flex-direction: column; align-items: stretch; }
   .form-footer > div { margin-left: 0; justify-content: flex-end; }
+  .security-list li { flex-wrap: wrap; padding: 14px; gap: 10px 12px; }
+  .security-main { flex-basis: calc(100% - 52px); }
+  .security-list .state-badge { margin-left: 52px; }
+  .security-list li > button { margin-left: auto; }
 }
 </style>

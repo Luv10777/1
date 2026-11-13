@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -44,6 +45,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 public class AuthService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Duration PHONE_CHANGE_TTL = Duration.ofMinutes(10);
     private static final DefaultRedisScript<Long> IP_LIMIT_SCRIPT = new DefaultRedisScript<>("""
             local minute = redis.call('INCR', KEYS[1])
             if minute == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
@@ -232,6 +234,71 @@ public class AuthService {
             }
             storeNewPassword(user, newPassword, "找回密码");
         });
+    }
+
+    /**
+     * 改绑或绑定手机号第一步：确认是本人。有验证码就核对发到原手机号的验证码，否则核对当前密码。
+     * 通过后十分钟内可以提交新手机号；这个标记只认这个账号，不发给前端任何凭证。
+     */
+    public void verifyPhoneChangeProof(Long userId, String code, String currentPassword) {
+        User account = userRepository.findById(userId)
+                .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+        if (code != null && !code.isBlank()) {
+            if (account.getPhone() == null) {
+                throw BizException.of(ErrorCode.BAD_REQUEST, "这个账号还没有绑定手机号，请用当前密码验证");
+            }
+            codeVerifier.verifyAndConsume(account.getPhone(), code);
+        } else if (account.getPasswordHash() != null) {
+            if (currentPassword == null || currentPassword.isEmpty()) {
+                throw BizException.of(ErrorCode.BAD_REQUEST, "请输入当前密码");
+            }
+            passwordVerifier.verifyCurrent(userId, currentPassword);
+        } else {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "请先用发到原手机号的验证码确认身份");
+        }
+        redis.opsForValue().set(phoneChangeKey(userId), "1", PHONE_CHANGE_TTL);
+    }
+
+    /**
+     * 第二步：换成新手机号。新手机号要收得到验证码，并且没有被别的账号占用。
+     * 换号后手机号验证码登录和手机号加密码登录都改用新号码，原号码随即释放；已登录的设备不受影响。
+     */
+    public void changePhone(Long userId, String phone, String code) {
+        if (!Boolean.TRUE.equals(redis.hasKey(phoneChangeKey(userId)))) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "身份确认已过期，请重新验证");
+        }
+        User current = userRepository.findById(userId)
+                .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+        if (phone.equals(current.getPhone())) {
+            throw BizException.of(ErrorCode.BAD_REQUEST, "新手机号和现在绑定的一样");
+        }
+        codeVerifier.verifyAndConsume(phone, code);
+        try {
+            transactions.executeWithoutResult(status -> {
+                // 和验证码登录用同一把锁：同一个号码不能一边被注册、一边被绑到这个账号上。
+                smsCodeRepository.lockPhone(phone);
+                if (userRepository.findByPhone(phone).isPresent()) {
+                    throw BizException.of(ErrorCode.CONFLICT, "这个手机号已经注册了其他账号，不能绑定");
+                }
+                User user = userRepository.findForUpdate(userId)
+                        .filter(candidate -> "ACTIVE".equals(candidate.getStatus()))
+                        .orElseThrow(() -> BizException.of(ErrorCode.UNAUTHORIZED, "账号不可用"));
+                user.setPhone(phone);
+                user.setUpdatedAt(Instant.now());
+                userRepository.flush();
+            });
+        } catch (DataIntegrityViolationException e) {
+            // 管理员添加店员不走这把锁，恰好同时占用了这个号码。
+            throw BizException.of(ErrorCode.CONFLICT, "这个手机号已经注册了其他账号，不能绑定");
+        }
+        redis.delete(phoneChangeKey(userId));
+        log.info("手机号已改绑: userId={}", userId);
+    }
+
+    private static String phoneChangeKey(Long userId) {
+        return "auth:phone-change:" + userId;
     }
 
     /** 调用方持有用户行锁。连带清掉失败计数和锁定，并让此前签发的令牌全部失效。 */
