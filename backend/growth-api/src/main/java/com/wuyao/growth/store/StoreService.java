@@ -40,6 +40,12 @@ public class StoreService {
                 .toList();
     }
 
+    /** 当前商户营业中的门店数（服务商后台看上手进度用）。 */
+    @Transactional(readOnly = true)
+    public long activeCount() {
+        return storeRepository.countByTenantIdAndStatus(TenantContext.require(), "ACTIVE");
+    }
+
     @Transactional
     public StoreDtos.StoreView create(StoreDtos.CreateRequest request, Long userId) {
         Long tenantId = TenantContext.require();

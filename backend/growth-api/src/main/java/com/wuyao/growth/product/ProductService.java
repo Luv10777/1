@@ -51,6 +51,12 @@ public class ProductService {
                 .toList());
     }
 
+    /** 当前商户没删除的商品数（服务商后台看上手进度用）。 */
+    @Transactional(readOnly = true)
+    public long activeCount() {
+        return productRepository.countByTenantIdAndDeletedAtIsNull(TenantContext.require());
+    }
+
     @Transactional
     public ProductDtos.View create(Long storeId, ProductDtos.CreateRequest req, Long userId) {
         storeAccessService.requireAccess(storeId, userId);

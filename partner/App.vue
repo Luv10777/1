@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldCheck, Store, TicketCheck, Users } from 'lucide-vue-next'
+import { BarChart3, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldCheck, Store, TicketCheck, Users } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
 import { isOwner, partner } from './partnerStore.js'
 
@@ -11,7 +11,8 @@ const menuOpen = ref(false)
 const signingOut = ref(false)
 const authorized = computed(() => route.meta.partner && auth.isAuthenticated && partner.overview)
 const navigation = computed(() => [
-  { name: 'partner-overview', label: '概览', description: '烟火余额、激活码额度与流水', icon: LayoutDashboard },
+  { name: 'partner-overview', label: '工作台', description: '今天要跟进的商户、额度与流水', icon: LayoutDashboard },
+  { name: 'partner-dashboard', label: '经营看板', description: '商户使用、烟火和激活码的统计', icon: BarChart3 },
   { name: 'partner-tenants', label: '名下商户', description: isOwner() ? '按 UID 添加商户，分配烟火、续期' : '按 UID 添加商户、续期', icon: Store },
   { name: 'partner-codes', label: '激活码', description: '在额度内生成、作废激活码', icon: TicketCheck },
   ...(isOwner() ? [{ name: 'partner-team', label: '团队', description: '添加 BD，查看各 BD 名下商户', icon: Users }] : []),

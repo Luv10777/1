@@ -16,6 +16,8 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
     java.util.List<Store> findAllByIdInAndStatus(java.util.Collection<Long> ids, String status);
     long countByBrandIdAndStatus(Long brandId, String status);
 
+    long countByTenantIdAndStatus(Long tenantId, String status);
+
     @Query("select s.brandId, count(s) from Store s where s.status = 'ACTIVE' and s.brandId is not null group by s.brandId")
     List<Object[]> countActiveByBrand();
 

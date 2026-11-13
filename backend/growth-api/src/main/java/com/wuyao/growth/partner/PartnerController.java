@@ -17,6 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PartnerController {
     private final PartnerService service;
+    private final PartnerInsights insights;
 
     @GetMapping("/me")
     public ApiResponse<PartnerDtos.Overview> me(@AuthenticationPrincipal AuthPrincipal me) {
@@ -41,6 +42,18 @@ public class PartnerController {
     public ApiResponse<PartnerDtos.TenantView> transfer(@PathVariable Long tenantId, @Valid @RequestBody PartnerDtos.Transfer input,
             @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(service.transfer(me.userId(), tenantId, input));
+    }
+
+    @GetMapping("/workbench")
+    public ApiResponse<PartnerDtos.Workbench> workbench(@AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(insights.workbench(me.userId()));
+    }
+
+    /** days：1（今天）、7、30、90；bdUserId 只对负责人有效，0 表示负责人直接管的。 */
+    @GetMapping("/dashboard")
+    public ApiResponse<PartnerDtos.Dashboard> dashboard(@RequestParam(defaultValue = "30") int days,
+            @RequestParam(required = false) Long bdUserId, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(insights.dashboard(me.userId(), days, bdUserId));
     }
 
     @GetMapping("/lookup")

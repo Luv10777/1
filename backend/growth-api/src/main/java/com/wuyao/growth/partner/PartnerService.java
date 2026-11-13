@@ -36,6 +36,9 @@ public class PartnerService {
     private final PlatformAccountDirectory directory;
     private final BillingService billing;
     private final BillingRedeemCodeService codes;
+    private final com.wuyao.growth.billing.BillingLedgerReport usage;
+    private final com.wuyao.growth.store.StoreService stores;
+    private final com.wuyao.growth.product.ProductService products;
     private final PlatformTransactionManager transactionManager;
 
     public PartnerDtos.Overview overview(Long userId) {
@@ -168,7 +171,20 @@ public class PartnerService {
         var view = tenantView(tenantId);
         var transfers = access.owner() ? store.tenantLedger(partnerId, tenantId, 50).stream().map(l -> new PartnerDtos.LedgerEntry(l.id(),
                 l.type(), l.delta(), l.availableAfter(), l.tenantId(), view.tenantName(), l.note(), l.createdAt())).toList() : null;
-        return new PartnerDtos.TenantDetail(view, transfers, codes.redeemedForPartner(partnerId, tenantId));
+        var facts = usage.usage(tenantId, Instant.now().minus(Duration.ofDays(30)));
+        var onboarding = inScope(tenantId, true, () -> new PartnerDtos.Onboarding(view.memberUntil() != null,
+                stores.activeCount(), products.activeCount(), facts.firstUsedAt() != null));
+        return new PartnerDtos.TenantDetail(view, transfers, codes.redeemedForPartner(partnerId, tenantId), usageOf(facts, 30), onboarding);
+    }
+
+    static PartnerDtos.Usage usageOf(com.wuyao.growth.billing.BillingDtos.TenantUsage u, int days) {
+        return new PartnerDtos.Usage(days, u.consumed(), u.uses(), u.consumedByCapability(), u.usesByCapability(), u.firstUsedAt(),
+                u.lastUsedAt(), u.lastTopUpCredits(), u.lastTopUpAt(), lowBalance(u.available(), u.lastTopUpCredits()));
+    }
+
+    /** 余额不足：可用烟火不到最近一笔充值的 10%。没充值过的商户不提醒。 */
+    static boolean lowBalance(long available, long lastTopUp) {
+        return lastTopUp > 0 && available * 10 <= lastTopUp;
     }
 
     /** 激活码列表。BD 只看自己生成的；负责人可以按生成人筛。 */
@@ -263,7 +279,7 @@ public class PartnerService {
     }
 
     /** 当前账号看得到的名下商户：负责人看全部，BD 只看归到自己的。 */
-    private List<PartnerStore.Binding> visible(PartnerStore.Access access) {
+    List<PartnerStore.Binding> visible(PartnerStore.Access access) {
         var all = store.tenants(access.partner().id());
         return access.owner() ? all : all.stream().filter(b -> access.userId().equals(b.bdUserId())).toList();
     }
@@ -343,7 +359,7 @@ public class PartnerService {
         return view(binding, tenantNames(), owners(), new HashMap<>());
     }
 
-    private PartnerDtos.TenantView view(PartnerStore.Binding b, Map<Long, String> names, Map<Long, PlatformAccountDirectory.PlatformUser> owners,
+    PartnerDtos.TenantView view(PartnerStore.Binding b, Map<Long, String> names, Map<Long, PlatformAccountDirectory.PlatformUser> owners,
                                         Map<Long, String> bdNames) {
         var owner = owners.get(b.tenantId());
         BillingDtos.Summary summary;
@@ -360,7 +376,7 @@ public class PartnerService {
     }
 
     /** 每个商户最早注册的管理员，作为商户的联系人展示。 */
-    private Map<Long, PlatformAccountDirectory.PlatformUser> owners() {
+    Map<Long, PlatformAccountDirectory.PlatformUser> owners() {
         Map<Long, PlatformAccountDirectory.PlatformUser> owners = new HashMap<>();
         for (var u : directory.users()) {
             if (!"OWNER".equals(u.role()) || "REMOVED".equals(u.status())) continue;

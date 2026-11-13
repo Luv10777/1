@@ -32,6 +32,10 @@ class PartnerStore {
     }
     record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long bdUserId) {}
     record LedgerRow(Long id, String type, long delta, long availableAfter, Long tenantId, String note, Instant createdAt) {}
+    /** 服务商烟火流水按北京时间日期、类型、商户合计。 */
+    record CreditDay(String date, String type, Long tenantId, long delta) {}
+    /** 一个激活码在看板里要用到的时间点；renewal 表示直接续期生成的码。 */
+    record CodeEvent(Long createdBy, Instant createdAt, Instant redeemedAt, Instant voidedAt, boolean renewal) {}
     /** 某个账号在这家服务商生成的激活码：总数、已兑换、已作废、其中直接续期。 */
     record CodeStats(long generated, long redeemed, long voided, long renewals) {}
 
@@ -259,6 +263,27 @@ class PartnerStore {
                 .setParameter("p", partnerId).setParameter("limit", size).setParameter("offset", (long) page * size).getResultList();
         return rows.stream().map(r -> (Object[]) r).map(r -> new LedgerRow(num(r[0]), (String) r[1], num(r[2]), num(r[3]),
                 r[4] == null ? null : num(r[4]), (String) r[5], instant(r[6]))).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CreditDay> creditDays(Long partnerId, Instant since) {
+        List<?> rows = em.createNativeQuery("""
+                SELECT to_char(created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD'), type, tenant_id, sum(delta)
+                FROM partner_credit_ledger WHERE partner_id = :p AND created_at >= :since GROUP BY 1, 2, 3""")
+                .setParameter("p", partnerId).setParameter("since", Timestamp.from(since)).getResultList();
+        return rows.stream().map(r -> (Object[]) r).map(r -> new CreditDay((String) r[0], (String) r[1],
+                r[2] == null ? null : num(r[2]), num(r[3]))).toList();
+    }
+
+    /** 这段时间里生成、兑换或作废过的本服务商激活码。 */
+    @Transactional(readOnly = true)
+    public List<CodeEvent> codeEvents(Long partnerId, Instant since) {
+        List<?> rows = em.createNativeQuery("""
+                SELECT created_by, created_at, redeemed_at, voided_at, batch_key LIKE 'partner-renew-%'
+                FROM billing_redeem_codes WHERE partner_id = :p AND (created_at >= :since OR redeemed_at >= :since OR voided_at >= :since)""")
+                .setParameter("p", partnerId).setParameter("since", Timestamp.from(since)).getResultList();
+        return rows.stream().map(r -> (Object[]) r).map(r -> new CodeEvent(num(r[0]), instant(r[1]),
+                r[2] == null ? null : instant(r[2]), r[3] == null ? null : instant(r[3]), Boolean.TRUE.equals(r[4]))).toList();
     }
 
     /** 这家服务商分给某个商户的烟火流水，新的在前。 */

@@ -1,9 +1,9 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { Check, Coins, History, RefreshCw, Store, UserRoundCog } from 'lucide-vue-next'
+import { Activity, Check, Coins, History, ListChecks, RefreshCw, Store, UserRoundCog } from 'lucide-vue-next'
 import { partnerApi, tenantSources } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
-import { dateText, membershipState, number, renewedUntil, tenantTimeline, transferError, transferPresets } from '../../src/domain/partnerOps.js'
+import { capabilityBars, dateText, membershipState, number, renewedUntil, sinceText, tenantTimeline, transferError, transferPresets } from '../../src/domain/partnerOps.js'
 import { bds, isOwner, loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
@@ -27,6 +27,18 @@ const available = computed(() => partner.overview?.partner.creditsAvailable || 0
 const quotas = computed(() => (partner.overview?.quotas || []).filter(q => q.planName))
 const timeline = computed(() => tenantTimeline(detail.value))
 const state = computed(() => tenant.value ? membershipState(tenant.value) : null)
+const usage = computed(() => detail.value?.usage || null)
+const usageBars = computed(() => capabilityBars(usage.value?.consumedByCapability))
+const steps = computed(() => {
+  const o = detail.value?.onboarding
+  if (!o) return []
+  return [
+    { done: o.activated, title: '开通会员', hint: o.activated ? '已开通过' : '可以在下方直接续期开通' },
+    { done: o.stores > 0, title: '建立门店', hint: o.stores > 0 ? `${o.stores} 家门店` : '还没有门店' },
+    { done: o.products > 0, title: '上传商品', hint: o.products > 0 ? `${o.products} 个商品` : '还没有商品资料' },
+    { done: o.firstUse, title: '完成第一次创作', hint: o.firstUse ? `首次使用 ${dateText(usage.value?.firstUsedAt)}` : '还没用过 AI 功能' },
+  ]
+})
 
 const renewal = reactive({ planCode: '', requestKey: '', confirming: false, error: '' })
 const transfer = reactive({ credits: '', note: '', requestKey: '', confirming: false, error: '' })
@@ -142,6 +154,27 @@ async function saveAssign() {
           <div><dt>烟火余额</dt><dd class="mg-mono">{{ tenant.creditsAvailable == null ? '—' : number(tenant.creditsAvailable) }}</dd></div>
           <div><dt>会员套餐</dt><dd>{{ tenant.memberActive ? tenant.planName || '会员' : state.short }}</dd></div>
         </dl>
+      </section>
+
+      <section v-if="usage" class="mg-detail-section" aria-labelledby="usage-title">
+        <h3 id="usage-title"><Activity :size="17" />使用情况（近 {{ usage.days }} 天）</h3>
+        <div class="partner-stats">
+          <div><span>消耗烟火</span><strong>{{ number(usage.consumed) }}</strong></div>
+          <div><span>使用次数</span><strong>{{ number(usage.uses) }}</strong></div>
+          <div><span>最近使用</span><strong class="partner-stat-text">{{ sinceText(usage.lastUsedAt) }}</strong></div>
+          <div :class="{ warn: usage.lowBalance }"><span>{{ usage.lowBalance ? '余额不足' : '当前余额' }}</span><strong>{{ number(tenant.creditsAvailable) }}</strong></div>
+        </div>
+        <ul v-if="usageBars.length" class="partner-hbars">
+          <li v-for="b in usageBars" :key="b.key"><span>{{ b.label }}</span><i><b :style="{ width: Math.max(2, b.ratio * 100) + '%' }" /></i><strong class="mg-mono">{{ number(b.value) }}<small> · {{ number(usage.usesByCapability[b.key]) }} 次</small></strong></li>
+        </ul>
+        <p class="mg-muted">{{ usage.lastTopUpCredits ? `最近一次充值 ${number(usage.lastTopUpCredits)} 烟火（${dateText(usage.lastTopUpAt)}），余额低于它的 10% 时提醒。` : '还没有充值记录。' }}只统计烟火和次数，不显示作品内容。</p>
+      </section>
+
+      <section v-if="steps.length" class="mg-detail-section">
+        <h3><ListChecks :size="17" />上手进度</h3>
+        <ol class="partner-steps">
+          <li v-for="s in steps" :key="s.title" :class="{ done: s.done }"><span class="partner-step-mark">{{ s.done ? '✓' : '' }}</span><div><b>{{ s.title }}</b><small>{{ s.hint }}</small></div></li>
+        </ol>
       </section>
 
       <section class="mg-detail-section" aria-labelledby="renew-title">

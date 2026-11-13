@@ -25,8 +25,39 @@ public final class PartnerDtos {
      * memberState 只给负责人：NONE、OWNER、BD（本服务商的登录账号）、OTHER（其他服务商的登录账号）。
      */
     public record Lookup(Long uid, String userName, String tenantName, String tenantState, Long tenantId, String bdName, String memberState) {}
-    /** 商户详情：transfers 是这家服务商分给他的烟火（只给负责人，BD 为空），codes 是他兑换过的本服务商激活码（含直接续期）。 */
-    public record TenantDetail(TenantView tenant, List<LedgerEntry> transfers, List<BillingDtos.RedeemCodeView> codes) {}
+    /**
+     * 商户详情：transfers 是这家服务商分给他的烟火（只给负责人，BD 为空），codes 是他兑换过的本服务商激活码（含直接续期），
+     * usage 是最近 30 天的使用情况，onboarding 是上手进度。
+     */
+    public record TenantDetail(TenantView tenant, List<LedgerEntry> transfers, List<BillingDtos.RedeemCodeView> codes,
+                               Usage usage, Onboarding onboarding) {}
+    /**
+     * 商户使用情况：只有烟火数和使用次数，不含作品内容。consumed、uses 和按功能的分组是最近 days 天；
+     * lowBalance 表示可用烟火不到最近一笔充值的 10%。
+     */
+    public record Usage(int days, long consumed, long uses, java.util.Map<String, Long> consumedByCapability,
+                        java.util.Map<String, Long> usesByCapability, Instant firstUsedAt, Instant lastUsedAt,
+                        long lastTopUpCredits, Instant lastTopUpAt, boolean lowBalance) {}
+    /** 上手进度，由系统按商户的真实数据判断：开通过会员、建了门店、上传了商品、用过一次 AI 功能。 */
+    public record Onboarding(boolean activated, long stores, long products, boolean firstUse) {}
+    /**
+     * 待办：type 为 EXPIRING（7 天内到期）、EXPIRED（30 天内刚过期）、LOW_BALANCE（余额不到最近充值的 10%）、
+     * NOT_STARTED（开通了还没用过）、IDLE（会员有效但 7 天没用）。同一个商户可以出现在几类里。
+     */
+    public record Todo(String type, TenantView tenant, Instant lastUsedAt, long lastTopUpCredits) {}
+    public record Workbench(List<Todo> todos, java.util.Map<String, Long> counts, Instant checkedAt) {}
+    /** 看板每天一个点（北京时间）：商户消耗、分给商户的烟火、新增商户、激活码兑换（含直接续期）。 */
+    public record DailyPoint(String date, long consumed, long transferred, long newTenants, long redeemed) {}
+    public record TenantRank(Long tenantId, String tenantName, String bdName, long consumed, long uses, Instant lastUsedAt) {}
+    public record BdRank(Long userId, String name, long tenants, long consumed, long activeTenants, long codesRedeemed, long renewals) {}
+    /**
+     * 经营看板（最近 days 天，days=1 是今天）。granted、transferred、creditsAvailable 和 bds 只给负责人，BD 为空。
+     * activeTenants 是这段时间用过 AI 功能的商户，firstUses 是这段时间第一次使用的商户。
+     */
+    public record Dashboard(int days, Long creditsAvailable, long tenants, long newTenants, long activeMembers, long expiringSoon,
+                            long activeTenants, long firstUses, long consumed, long uses, java.util.Map<String, Long> consumedByCapability,
+                            Long granted, Long transferred, long codesGenerated, long codesRedeemed, long renewals, long codesVoided,
+                            List<DailyPoint> daily, List<TenantRank> topTenants, List<BdRank> bds) {}
     /** 名下商户；会员和余额读不到时为空。source 为 UID、CODE 或 PLATFORM；bdUserId 为空表示负责人直接管。 */
     public record TenantView(Long tenantId, String tenantName, Long ownerUid, String ownerName, String source, Instant boundAt,
                              Boolean memberActive, Instant memberUntil, String planName, Long creditsAvailable,

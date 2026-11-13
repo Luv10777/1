@@ -163,6 +163,43 @@ public class BillingLedgerReport {
 
     private record TenantCredits(Object[] account, List<Object[]> sources) {}
 
+    /**
+     * 一个商户的使用情况（服务商后台用），在该商户的租户里只读查询。since 之前的扣费只计入首次 / 最近使用时间。
+     * 使用次数按扣费关联的预占计，同一次直播分几次扣也只算一次。
+     */
+    public BillingDtos.TenantUsage usage(Long tenantId, Instant since) {
+        return inTenant(tenantId, () -> {
+            Object[] facts = (Object[]) em.createNativeQuery("""
+                    SELECT (SELECT gift_available + purchased_available FROM billing_accounts WHERE tenant_id = :tenant),
+                           (SELECT min(created_at) FROM billing_ledger WHERE tenant_id = :tenant AND type = 'CAPTURE'),
+                           (SELECT max(created_at) FROM billing_ledger WHERE tenant_id = :tenant AND type = 'CAPTURE'),
+                           (SELECT purchased_delta FROM billing_ledger WHERE tenant_id = :tenant AND type = 'PURCHASE' AND purchased_delta > 0 ORDER BY id DESC LIMIT 1),
+                           (SELECT created_at FROM billing_ledger WHERE tenant_id = :tenant AND type = 'PURCHASE' AND purchased_delta > 0 ORDER BY id DESC LIMIT 1)""")
+                    .setParameter("tenant", tenantId).getSingleResult();
+            @SuppressWarnings("unchecked")
+            List<Object[]> rows = em.createNativeQuery("""
+                    SELECT to_char(l.created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD'), COALESCE(r.capability, 'OTHER'),
+                           COALESCE(SUM(-l.held_delta), 0), COUNT(DISTINCT l.reservation_id)
+                    FROM billing_ledger l
+                    LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id
+                    WHERE l.tenant_id = :tenant AND l.type = 'CAPTURE' AND l.created_at >= :since
+                    GROUP BY 1, 2""").setParameter("tenant", tenantId).setParameter("since", Timestamp.from(since)).getResultList();
+            long consumed = 0, uses = 0;
+            Map<String, Long> byCapability = new TreeMap<>(), usesByCapability = new TreeMap<>(), daily = new TreeMap<>();
+            for (Object[] r : rows) {
+                long amount = ((Number) r[2]).longValue(), count = ((Number) r[3]).longValue();
+                consumed += amount; uses += count;
+                byCapability.merge((String) r[1], amount, Long::sum);
+                usesByCapability.merge((String) r[1], count, Long::sum);
+                daily.merge((String) r[0], amount, Long::sum);
+            }
+            return new BillingDtos.TenantUsage(facts[0] == null ? 0 : ((Number) facts[0]).longValue(),
+                    facts[1] == null ? null : instant(facts[1]), facts[2] == null ? null : instant(facts[2]),
+                    facts[3] == null ? 0 : ((Number) facts[3]).longValue(), facts[4] == null ? null : instant(facts[4]),
+                    consumed, uses, byCapability, usesByCapability, daily);
+        });
+    }
+
     private Object[] balance(Long tenantId) {
         return (Object[]) em.createNativeQuery("SELECT gift_available, purchased_available, held FROM billing_accounts WHERE tenant_id = :tenant")
                 .setParameter("tenant", tenantId).getResultStream().findFirst().orElse(null);
