@@ -360,8 +360,9 @@ class PartnerStore {
     }
 
     private static String distributionWhere() {
-        return """
-                 WHERE partner_id = :p AND (:rt = '' OR recipient_type = :rt) AND (:s = '' OR source = :s)
+        // 前面留一个空格：文本块会去掉开头的缩进，拼在 FROM 表名后面要隔开。
+        return " " + """
+                WHERE partner_id = :p AND (:rt = '' OR recipient_type = :rt) AND (:s = '' OR source = :s)
                    AND (:t = 0 OR recipient_tenant_id = :t) AND (:u = 0 OR recipient_user_id = :u) AND created_at >= :since""";
     }
 
