@@ -8,8 +8,9 @@ const OverviewView = () => import('./views/OverviewView.vue')
 const TenantsView = () => import('./views/TenantsView.vue')
 const CodesView = () => import('./views/CodesView.vue')
 const TeamView = () => import('./views/TeamView.vue')
+const DashboardView = () => import('./views/DashboardView.vue')
 
-const PAGES = ['/overview', '/tenants', '/codes', '/team']
+const PAGES = ['/overview', '/dashboard', '/tenants', '/codes', '/team']
 export function partnerDestination(raw) {
   if (typeof raw !== 'string') return '/overview'
   return PAGES.includes(raw.split(/[?#]/)[0]) ? raw : '/overview'
@@ -21,7 +22,8 @@ export function createPartnerRouter(history = createWebHistory()) {
     routes: [
       { path: '/', redirect: '/overview' },
       { path: '/login', name: 'partner-login', component: LoginView, meta: { title: '服务商登录' } },
-      { path: '/overview', name: 'partner-overview', component: OverviewView, meta: { title: '概览', partner: true } },
+      { path: '/overview', name: 'partner-overview', component: OverviewView, meta: { title: '工作台', partner: true } },
+      { path: '/dashboard', name: 'partner-dashboard', component: DashboardView, meta: { title: '经营看板', partner: true } },
       { path: '/tenants', name: 'partner-tenants', component: TenantsView, meta: { title: '名下商户', partner: true } },
       { path: '/codes', name: 'partner-codes', component: CodesView, meta: { title: '激活码', partner: true } },
       { path: '/team', name: 'partner-team', component: TeamView, meta: { title: '团队', partner: true, owner: true } },

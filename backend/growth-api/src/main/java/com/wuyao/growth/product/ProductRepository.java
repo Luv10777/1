@@ -15,6 +15,8 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+    long countByTenantIdAndDeletedAtIsNull(Long tenantId);
+
     // Optional filters need an explicit JDBC string type even when their values are null.
     // Otherwise Hibernate/PostgreSQL can infer bytea for concat/lower on an unfiltered list.
     @Query("""

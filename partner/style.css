@@ -90,3 +90,66 @@
 
 /* 列表页筛选用的公共下拉（AppSelect）读这几个主站配色变量，服务商后台没有主站样式，要在这里补上，否则菜单是透明的。 */
 :root { --color-bg-surface:#fff; --color-bg-subtle:#f1f5f3; --color-border-subtle:#e1e6eb; --color-primary:#1e2932; --color-accent-text:#16825a; --shadow-paper-elevated:0 16px 36px -8px rgba(15,23,42,.16); }
+
+/* 工作台待办 */
+.partner-todo-groups { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); overflow:hidden; }
+.partner-todo-group { padding:14px 18px; background:#fff; box-shadow:1px 1px 0 var(--mg-line); }
+.management-page > .management-list + .management-list, .partner-dash-grid + .management-list { margin-top:16px; }
+.partner-todo-group header { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; }
+.partner-todo-group header small { flex-basis:100%; color:var(--mg-muted); font-size:12px; }
+.partner-todo-count { min-width:22px; padding:0 7px; border-radius:10px; background:var(--mg-soft); color:var(--mg-muted); font:600 12px/20px var(--font-mono); text-align:center; }
+.partner-todo-group:not(.empty) .partner-todo-count { background:#fdf0e1; color:#9a5f17; }
+.partner-todo-group ul { list-style:none; margin:0; padding:0; }
+.partner-todo-group li button { display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; padding:9px 8px; border:0; border-radius:5px; background:none; text-align:left; color:var(--mg-ink); font-size:13px; }
+.partner-todo-group li button:hover { background:#f5f8f6; }
+.partner-todo-group li button > span:first-child { display:grid; }
+.partner-todo-group li small { color:var(--mg-muted); font-size:12px; }
+.partner-todo-detail { display:inline-flex; align-items:center; gap:4px; color:var(--mg-muted); font-size:12px; text-align:right; }
+
+/* 经营看板 */
+.partner-dash-filters { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+.partner-segment { display:inline-flex; flex-wrap:wrap; padding:3px; border:1px solid var(--mg-line); border-radius:7px; background:#fff; }
+.partner-segment button { padding:5px 13px; border:0; border-radius:5px; background:none; color:var(--mg-muted); font-size:13px; }
+.partner-segment button.active { background:var(--mg-accent); color:#fff; }
+.partner-segment.small button { padding:3px 10px; font-size:12px; }
+.partner-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:16px; border:1px solid var(--mg-line); border-radius:8px; overflow:hidden; background:#fff; }
+.partner-kpis h2 { grid-column:1/-1; margin:0; padding:10px 18px; border-bottom:1px solid var(--mg-line); background:var(--mg-soft); font:600 13px/1.5 var(--font-sans); color:var(--mg-ink); }
+.partner-kpis > div { padding:14px 18px; background:#fff; box-shadow:1px 1px 0 var(--mg-line); }
+.partner-kpis span { display:block; color:var(--mg-muted); font-size:12px; }
+.partner-kpis strong { display:block; margin:4px 0 2px; font:600 24px/1.2 var(--font-mono); color:var(--mg-ink); }
+.partner-kpis small { color:var(--mg-muted); font-size:12px; }
+.partner-dash-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
+.partner-hbars { list-style:none; margin:0; padding:12px 18px; display:grid; gap:10px; }
+.mg-drawer-body .partner-hbars { padding:0 0 12px; }
+.partner-hbars li { display:grid; grid-template-columns:72px 1fr auto; align-items:center; gap:10px; font-size:12px; }
+.partner-hbars i { height:10px; border-radius:0 4px 4px 0; background:var(--mg-soft); }
+.partner-hbars i b { display:block; height:100%; border-radius:0 4px 4px 0; background:var(--mg-accent); }
+.partner-hbars small { color:var(--mg-muted); font-weight:400; }
+.partner-chart { padding:12px 20px 16px; }
+.partner-chart-total { margin:0 0 8px; color:var(--mg-muted); font-size:12px; }
+.partner-chart-body { display:grid; grid-template-columns:auto 1fr; gap:8px; }
+.partner-chart-axis { display:flex; flex-direction:column; justify-content:space-between; height:180px; color:var(--mg-muted); font:11px var(--font-mono); text-align:right; }
+.partner-chart-plot { position:relative; min-width:0; }
+.partner-chart-grid { position:absolute; inset:0 0 auto; height:180px; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none; }
+.partner-chart-grid i { border-top:1px solid #edf0f3; }
+.partner-chart-bars { position:relative; display:flex; align-items:flex-end; gap:2px; height:180px; border-bottom:1px solid #c9d1d9; }
+.partner-chart-col { position:relative; flex:1; display:flex; align-items:flex-end; justify-content:center; height:100%; padding:0; border:0; background:none; }
+.partner-chart-col:hover, .partner-chart-col:focus-visible { background:#f3f7f5; outline:0; }
+.partner-chart-col b { width:min(24px,70%); border-radius:4px 4px 0 0; background:var(--mg-accent); }
+.partner-chart-tip { position:absolute; bottom:calc(100% + 6px); left:50%; z-index:2; transform:translateX(-50%); padding:6px 9px; border:1px solid var(--mg-line); border-radius:6px; background:#fff; box-shadow:0 6px 18px rgb(18 29 42 / 12%); color:var(--mg-ink); font-size:12px; white-space:nowrap; }
+.partner-chart-tip small { display:block; color:var(--mg-muted); }
+.partner-chart-dates { display:flex; gap:2px; margin-top:4px; }
+.partner-chart-dates span { flex:1; color:var(--mg-muted); font:11px var(--font-mono); text-align:center; white-space:nowrap; }
+.partner-chart-toggle { margin-top:8px; }
+@media (max-width:760px) { .partner-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* 商户详情：使用情况与上手进度 */
+.partner-stats .warn { border-color:#f0d6b4; background:#fdf6ec; }
+.partner-stats .warn span { color:#9a5f17; }
+.partner-stat-text { font-size:15px !important; }
+.partner-steps { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.partner-steps li { display:flex; gap:10px; align-items:flex-start; font-size:13px; }
+.partner-steps li small { display:block; color:var(--mg-muted); font-size:12px; }
+.partner-step-mark { display:grid; place-items:center; flex-shrink:0; width:20px; height:20px; border:1px solid #c5ced6; border-radius:50%; color:#fff; font-size:12px; }
+.partner-steps li.done .partner-step-mark { border-color:var(--mg-accent); background:var(--mg-accent); }
+.partner-steps li:not(.done) b { color:var(--mg-muted); font-weight:500; }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
+import { capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
 
 const now = Date.parse('2026-11-13T00:00:00Z')
 
@@ -69,4 +69,14 @@ test('code export is excel friendly and quotes notes with commas', () => {
     { statuses: { UNUSED: '未使用' }, creators: { 9: '小周' } })
   assert.ok(csv.startsWith('﻿激活码,套餐'))
   assert.match(csv, /\r\nABCD,月卡,30,未使用,小周,,,"张三,李四",t\r\n$/)
+})
+
+test('dashboard helpers rank capabilities, pick a round axis maximum and describe recency', () => {
+  assert.deepEqual(capabilityBars({ IMAGE: 5, VIDEO: 900, COPY: 0 }).map(r => [r.label, r.ratio]), [['视频创作', 1], ['图片创作', 5 / 900]])
+  assert.equal(niceMax([0, 0]), 1)
+  assert.equal(niceMax([3, 905, 12]), 1000)
+  assert.equal(niceMax([140]), 200)
+  assert.equal(sinceText(null, now), '从未')
+  assert.equal(sinceText('2026-11-12T10:00:00Z', now), '今天')
+  assert.equal(sinceText('2026-11-03T00:00:00Z', now), '10 天前')
 })

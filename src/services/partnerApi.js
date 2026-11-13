@@ -5,6 +5,8 @@ const params = values => Object.fromEntries(Object.entries(values || {}).filter(
 /** 服务商后台（partner.yifangzhi.com）：只有服务商的登录账号能用，接口只返回自己这一家的数据。 */
 export const partnerApi = {
   me: () => get('/api/partner/me'),
+  workbench: () => get('/api/partner/workbench'),
+  dashboard: values => get('/api/partner/dashboard', params(values)),
   tenants: values => get('/api/partner/tenants', params(values)),
   tenant: tenantId => get(`/api/partner/tenants/${encodeURIComponent(tenantId)}`),
   lookup: uid => get('/api/partner/lookup', { uid: Number(uid) }),

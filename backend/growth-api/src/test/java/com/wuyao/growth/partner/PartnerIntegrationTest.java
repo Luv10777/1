@@ -3,6 +3,7 @@ package com.wuyao.growth.partner;
 import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.security.JwtService;
+import com.wuyao.growth.common.tenant.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -259,6 +260,59 @@ class PartnerIntegrationTest {
         call(agentA, agency, delete("/api/partner/team/" + bd + "?transferTo=0"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
         assertThat(owner.queryForObject("SELECT count(*) FROM partner_tenants WHERE bd_user_id IS NOT NULL", Long.class)).isZero();
         call(bd, agency, get("/api/partner/me"), null).andExpect(status().isForbidden());
+    }
+
+    @Test void workbenchAndDashboardShowUsageWithoutWorksAndFlagLowBalance() throws Exception {
+        long a = partner("甲服务商", agentA);
+        platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-wb-0001\",\"credits\":5000,\"note\":\"线下打款\"}").andExpect(status().isOk());
+        platform(put("/api/platform/partners/" + a + "/quotas"), "{\"planCode\":\"" + planCode + "\",\"quota\":5}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/team"), "{\"uid\":" + uid(bd) + "}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
+        call(bd, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(cafeOwner) + "}").andExpect(status().isOk());
+
+        // 冰雪时光：续期后分 1000 烟火，用掉 905，余 95 不到最近充值的 10%；一方小馆：续期了还没用过。
+        call(agentA, agency, post("/api/partner/tenants/" + shop + "/renewals"), "{\"requestKey\":\"renew-wb-01\",\"planCode\":\"" + planCode + "\"}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/tenants/" + cafe + "/renewals"), "{\"requestKey\":\"renew-wb-02\",\"planCode\":\"" + planCode + "\"}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-wb-01\",\"credits\":1000}").andExpect(status().isOk());
+        TenantContext.runAs(shop, () -> {
+            String image = billing.reserve("wb-image-" + UUID.randomUUID(), "IMAGE", 5, "图片创作预占");
+            billing.capture(image, 5, "wb-capture-image", "图片交付");
+            String video = billing.reserve("wb-video-" + UUID.randomUUID(), "VIDEO", 900, "视频创作预占");
+            billing.capture(video, 900, "wb-capture-video", "视频交付");
+            return null;
+        });
+
+        // 商户详情带使用情况和上手进度。
+        call(agentA, agency, get("/api/partner/tenants/" + shop), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.usage.consumed").value(905)).andExpect(jsonPath("$.data.usage.uses").value(2))
+                .andExpect(jsonPath("$.data.usage.consumedByCapability.VIDEO").value(900))
+                .andExpect(jsonPath("$.data.usage.lastTopUpCredits").value(1000)).andExpect(jsonPath("$.data.usage.lowBalance").value(true))
+                .andExpect(jsonPath("$.data.onboarding.activated").value(true)).andExpect(jsonPath("$.data.onboarding.firstUse").value(true))
+                .andExpect(jsonPath("$.data.onboarding.stores").value(0));
+
+        // 待办：负责人看到冰雪时光余额不足、一方小馆开通未使用；BD 只看到自己的一方小馆。
+        call(agentA, agency, get("/api/partner/workbench"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.counts.LOW_BALANCE").value(1)).andExpect(jsonPath("$.data.counts.NOT_STARTED").value(1))
+                .andExpect(jsonPath("$.data.counts.EXPIRING").value(0))
+                .andExpect(jsonPath("$.data.todos[?(@.type=='LOW_BALANCE')].tenant.tenantName").value("冰雪时光"));
+        call(bd, agency, get("/api/partner/workbench"), null).andExpect(jsonPath("$.data.todos.length()").value(1))
+                .andExpect(jsonPath("$.data.todos[0].type").value("NOT_STARTED")).andExpect(jsonPath("$.data.todos[0].tenant.tenantName").value("一方小馆"));
+
+        // 看板：负责人看全部和烟火，BD 只看自己的、没有烟火数字；按 BD 筛。
+        call(agentA, agency, get("/api/partner/dashboard?days=7"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenants").value(2)).andExpect(jsonPath("$.data.consumed").value(905))
+                .andExpect(jsonPath("$.data.activeTenants").value(1)).andExpect(jsonPath("$.data.firstUses").value(1))
+                .andExpect(jsonPath("$.data.granted").value(5000)).andExpect(jsonPath("$.data.transferred").value(1000))
+                .andExpect(jsonPath("$.data.renewals").value(2)).andExpect(jsonPath("$.data.codesRedeemed").value(2))
+                .andExpect(jsonPath("$.data.daily.length()").value(7)).andExpect(jsonPath("$.data.topTenants[0].tenantName").value("冰雪时光"))
+                .andExpect(jsonPath("$.data.bds[0].name").value("BD 小周")).andExpect(jsonPath("$.data.bds[0].tenants").value(1));
+        call(bd, agency, get("/api/partner/dashboard?days=30"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenants").value(1)).andExpect(jsonPath("$.data.consumed").value(0))
+                .andExpect(jsonPath("$.data.granted").doesNotExist()).andExpect(jsonPath("$.data.creditsAvailable").doesNotExist())
+                .andExpect(jsonPath("$.data.renewals").value(0)).andExpect(jsonPath("$.data.bds.length()").value(0));
+        call(agentA, agency, get("/api/partner/dashboard?days=7&bdUserId=" + bd), null)
+                .andExpect(jsonPath("$.data.tenants").value(1)).andExpect(jsonPath("$.data.transferred").value(0));
+        call(agentA, agency, get("/api/partner/dashboard?days=5"), null).andExpect(status().isBadRequest());
     }
 
     private long partner(String name, long admin) throws Exception {

@@ -85,6 +85,15 @@ public final class BillingDtos {
     public record PlatformLedgerSummary(int days, long consumed, long consumedToday, long refunded, long purchased,
                                         long granted, java.util.Map<String, Long> consumedByCapability) {}
 
+    /**
+     * 服务商后台看名下商户的使用情况：只有烟火数和使用次数，不含作品内容。
+     * firstUsedAt、lastUsedAt 是第一次和最近一次实际扣烟火的时间；lastTopUp 是最近一笔充值烟火（含服务商分配、充值码）。
+     * consumed、uses 和两个按功能的分组只算 since 之后；dailyConsumed 的键是北京时间日期（yyyy-MM-dd）。
+     */
+    public record TenantUsage(long available, Instant firstUsedAt, Instant lastUsedAt, long lastTopUpCredits, Instant lastTopUpAt,
+                              long consumed, long uses, java.util.Map<String, Long> consumedByCapability,
+                              java.util.Map<String, Long> usesByCapability, java.util.Map<String, Long> dailyConsumed) {}
+
     /** 某一天（北京时间）的全平台合计，口径同 PlatformLedgerSummary；没有流水的日子各项为 0。 */
     public record DailyCredits(java.time.LocalDate date, long consumed, long refunded, long purchased, long granted,
                                java.util.Map<String, Long> consumedByCapability) {}

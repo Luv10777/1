@@ -6,6 +6,39 @@ export const partnerRoles = { OWNER: '负责人', BD: 'BD' }
 export const expiryFilters = { SOON7: '7 天内到期', SOON30: '30 天内到期', EXPIRED: '已过期', NEVER: '从未开通' }
 export const transferPresets = [500, 1000, 2000, 5000]
 
+/** 待办分类：标题、说明和对服务商的建议动作。顺序就是首页的展示顺序。 */
+export const todoTypes = {
+  EXPIRING: { title: '7 天内到期', hint: '提醒续费，或直接用额度续期' },
+  EXPIRED: { title: '30 天内刚过期', hint: '会员已停，尽快联系续费' },
+  LOW_BALANCE: { title: '烟火余额不足', hint: '余额不到最近一次充值的 10%' },
+  NOT_STARTED: { title: '开通了还没用过', hint: '帮商户完成第一次创作' },
+  IDLE: { title: '7 天没有使用', hint: '回访了解原因，防止流失' },
+}
+export const capabilityNames = { IMAGE: '图片创作', IMAGE_INSPIRATION: '图片灵感', VIDEO: '视频创作', VIDEO_ANALYSIS: '视频反推', VIDEO_PLAN: '视频方案', COPY: '文案创作', LIVE: '实景直播', OTHER: '其他' }
+export const dashboardRanges = [{ value: 1, label: '今天' }, { value: 7, label: '7 天' }, { value: 30, label: '30 天' }, { value: 90, label: '90 天' }]
+
+/** 「3 天前」这类相对时间；没有时间返回「从未」。 */
+export function sinceText(value, now = Date.now()) {
+  if (!value) return '从未'
+  const days = Math.floor((now - new Date(value).getTime()) / DAY)
+  return days <= 0 ? '今天' : days === 1 ? '昨天' : `${days} 天前`
+}
+
+/** 把按功能的消耗变成从多到少的列表，每项带占最大值的比例（画横条用）。 */
+export function capabilityBars(byCapability) {
+  const rows = Object.entries(byCapability || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+  const max = rows.length ? rows[0][1] : 0
+  return rows.map(([key, value]) => ({ key, label: capabilityNames[key] || key, value, ratio: max ? value / max : 0 }))
+}
+
+/** 柱状图的纵轴上限：取不小于最大值的「好看」整数（1、2、5 乘 10 的幂），全 0 时为 1。 */
+export function niceMax(values) {
+  const max = Math.max(0, ...values)
+  if (max <= 0) return 1
+  const step = 10 ** Math.floor(Math.log10(max))
+  return [1, 2, 5, 10].map(m => m * step).find(v => v >= max)
+}
+
 const DAY = 24 * 60 * 60 * 1000
 export const dateText = value => {
   if (value == null) return '—'
