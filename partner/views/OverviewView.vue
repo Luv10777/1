@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-vue-next'
 import { partnerApi, ledgerTypes } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
-import { loadPartner, partner } from '../partnerStore.js'
+import { isOwner, loadPartner, partner } from '../partnerStore.js'
 
 const number = value => Number(value || 0).toLocaleString('zh-CN')
 const overview = computed(() => partner.overview)
@@ -19,6 +19,7 @@ async function load() {
   error.value = ''
   try {
     await loadPartner(true)
+    if (!isOwner()) return
     const result = await partnerApi.ledger({ page: page.value, size: 20 })
     ledger.value = result.items
     total.value = result.total
@@ -33,12 +34,12 @@ load()
 <template>
   <div class="management-page">
     <header class="management-heading">
-      <div><h1>概览</h1><p>平台发放的烟火可以分给名下商户；激活码额度按套餐分开，用完请联系平台追加。</p></div>
+      <div><h1>概览</h1><p v-if="isOwner()">平台发放的烟火可以分给名下商户；激活码额度按套餐分开，用完请联系平台追加。</p><p v-else>激活码额度是整个服务商共用的，用完请联系负责人。</p></div>
       <div class="management-heading-actions"><button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button></div>
     </header>
     <section v-if="overview" class="partner-cards" aria-label="服务商概况">
-      <div class="partner-card"><span>可分配烟火</span><strong>{{ number(overview.partner.creditsAvailable) }}</strong><small>分给名下商户后记入商户的充值烟火</small></div>
-      <div class="partner-card"><span>名下商户</span><strong>{{ number(overview.tenantCount) }}</strong><small>按 UID 添加，或兑换了你的激活码</small></div>
+      <div v-if="isOwner()" class="partner-card"><span>可分配烟火</span><strong>{{ number(overview.partner.creditsAvailable) }}</strong><small>分给名下商户后记入商户的充值烟火</small></div>
+      <div class="partner-card"><span>{{ isOwner() ? '名下商户' : '我名下的商户' }}</span><strong>{{ number(overview.tenantCount) }}</strong><small>按 UID 添加，或兑换了你的激活码</small></div>
     </section>
 
     <section class="management-list" aria-labelledby="quota-title">
@@ -59,7 +60,7 @@ load()
       </div>
     </section>
 
-    <section class="management-list" :aria-busy="loading" aria-labelledby="ledger-title">
+    <section v-if="isOwner()" class="management-list" :aria-busy="loading" aria-labelledby="ledger-title">
       <div class="mg-list-caption"><h2 id="ledger-title">烟火流水</h2></div>
       <div v-if="error" class="mg-state mg-error" role="alert"><p>{{ error }}</p><button class="mg-button" type="button" @click="load">重新读取</button></div>
       <div v-else-if="!ledger.length && !loading" class="mg-state"><h3>还没有流水</h3><p>平台发放烟火、你分给商户烟火后都会记在这里。</p></div>

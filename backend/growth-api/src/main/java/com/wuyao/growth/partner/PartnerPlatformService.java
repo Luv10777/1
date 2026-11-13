@@ -11,8 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * 平台管理服务商：建服务商、绑登录账号、线下收款后发烟火、按套餐标识分激活码额度、查看和改名下商户归属。
@@ -88,7 +86,7 @@ public class PartnerPlatformService {
     public PartnerDtos.Page<PartnerDtos.TenantView> tenants(Long partnerId, int page, int size, String keyword, Long operator) {
         requireOperator(operator);
         store.partner(partnerId).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "服务商不存在"));
-        return partners.tenantViews(store.tenants(partnerId), page, size, keyword);
+        return partners.tenantViews(store.tenants(partnerId), page, size, keyword, null);
     }
 
     public PartnerDtos.Page<PartnerDtos.LedgerEntry> ledger(Long partnerId, int page, int size, Long operator) {
@@ -122,7 +120,7 @@ public class PartnerPlatformService {
     }
 
     private void addMember(Long partnerId, PlatformAccountDirectory.PlatformUser user, Long operator) {
-        store.addMember(partnerId, user.id(), operator).ifPresent(other -> {
+        store.addMember(partnerId, user.id(), "OWNER", operator).ifPresent(other -> {
             throw BizException.of(ErrorCode.CONFLICT, "该账号已是另一家服务商的登录账号");
         });
     }
@@ -133,14 +131,7 @@ public class PartnerPlatformService {
     }
 
     private PartnerDtos.PlatformPartner view(PartnerStore.Row row) {
-        Map<Long, PlatformAccountDirectory.PlatformUser> users = store.members(row.id()).stream()
-                .map(m -> directory.user(m.userId())).filter(Objects::nonNull)
-                .collect(Collectors.toMap(PlatformAccountDirectory.PlatformUser::id, u -> u));
-        var members = store.members(row.id()).stream().map(m -> {
-            var u = users.get(m.userId());
-            return new PartnerDtos.Member(m.userId(), u.uid(), u.name(), u.phone(), m.createdAt());
-        }).toList();
-        return new PartnerDtos.PlatformPartner(row.view(), members, partners.quotas(row.id()), store.tenantCount(row.id()));
+        return new PartnerDtos.PlatformPartner(row.view(), partners.members(row.id()), partners.quotas(row.id()), store.tenantCount(row.id()));
     }
 
     private void requireOperator(Long operator) {

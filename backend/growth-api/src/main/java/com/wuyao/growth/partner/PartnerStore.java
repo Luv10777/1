@@ -25,16 +25,22 @@ class PartnerStore {
         PartnerDtos.Partner view() { return new PartnerDtos.Partner(id, name, contact, status, creditsAvailable, createdAt); }
     }
     record QuotaRow(String planCode, int quota, int used) {}
-    record MemberRow(Long userId, Instant createdAt) {}
-    record Binding(Long tenantId, Long partnerId, String source, Instant boundAt) {}
+    record MemberRow(Long userId, String role, Instant createdAt) {}
+    /** 当前登录账号所属的服务商和角色（OWNER 负责人、BD）。 */
+    record Access(Row partner, Long userId, String role) {
+        boolean owner() { return "OWNER".equals(role); }
+    }
+    record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long bdUserId) {}
     record LedgerRow(Long id, String type, long delta, long availableAfter, Long tenantId, String note, Instant createdAt) {}
 
     private static final String PARTNER_COLUMNS = "p.id, p.name, p.contact, p.status, p.credits_available, p.created_at";
 
     @Transactional(readOnly = true)
-    public Optional<Row> partnerOfUser(Long userId) {
-        return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p JOIN partner_members m ON m.partner_id = p.id WHERE m.user_id = :user",
+    public Optional<Access> accessOfUser(Long userId) {
+        var partner = rows("SELECT " + PARTNER_COLUMNS + " FROM partners p JOIN partner_members m ON m.partner_id = p.id WHERE m.user_id = :user",
                 Map.of("user", userId)).stream().findFirst();
+        return partner.map(p -> new Access(p, userId, (String) em.createNativeQuery("SELECT role FROM partner_members WHERE user_id = :user")
+                .setParameter("user", userId).getSingleResult()));
     }
 
     @Transactional(readOnly = true)
@@ -67,24 +73,35 @@ class PartnerStore {
 
     @Transactional(readOnly = true)
     public List<MemberRow> members(Long partnerId) {
-        List<?> rows = em.createNativeQuery("SELECT user_id, created_at FROM partner_members WHERE partner_id = :id ORDER BY created_at, user_id")
+        List<?> rows = em.createNativeQuery("SELECT user_id, role, created_at FROM partner_members WHERE partner_id = :id ORDER BY role DESC, created_at, user_id")
                 .setParameter("id", partnerId).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new MemberRow(num(r[0]), instant(r[1]))).toList();
+        return rows.stream().map(r -> (Object[]) r).map(r -> new MemberRow(num(r[0]), (String) r[1], instant(r[2]))).toList();
     }
 
-    /** @return 该账号已属于的服务商；为空表示这次加上了 */
+    /** @return 该账号已属于的服务商；为空表示这次加上了（已在这家的账号角色不变） */
     @Transactional
-    public Optional<Long> addMember(Long partnerId, Long userId, Long actor) {
-        em.createNativeQuery("INSERT INTO partner_members(user_id, partner_id, created_by) VALUES (:user, :partner, :actor) ON CONFLICT (user_id) DO NOTHING")
-                .setParameter("user", userId).setParameter("partner", partnerId).setParameter("actor", actor).executeUpdate();
+    public Optional<Long> addMember(Long partnerId, Long userId, String role, Long actor) {
+        em.createNativeQuery("INSERT INTO partner_members(user_id, partner_id, role, created_by) VALUES (:user, :partner, :role, :actor) ON CONFLICT (user_id) DO NOTHING")
+                .setParameter("user", userId).setParameter("partner", partnerId).setParameter("role", role).setParameter("actor", actor).executeUpdate();
         Long owner = num(em.createNativeQuery("SELECT partner_id FROM partner_members WHERE user_id = :user").setParameter("user", userId).getSingleResult());
         return owner.equals(partnerId) ? Optional.empty() : Optional.of(owner);
     }
 
+    /** 移除登录账号；它名下的商户回到负责人直接管。 */
     @Transactional
     public int removeMember(Long partnerId, Long userId) {
+        em.createNativeQuery("UPDATE partner_tenants SET bd_user_id = NULL WHERE partner_id = :partner AND bd_user_id = :user")
+                .setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
         return em.createNativeQuery("DELETE FROM partner_members WHERE partner_id = :partner AND user_id = :user")
                 .setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
+    }
+
+    /** 该账号在这家服务商的角色；不是这家的账号时为空。 */
+    @Transactional(readOnly = true)
+    public Optional<String> role(Long partnerId, Long userId) {
+        List<?> rows = em.createNativeQuery("SELECT role FROM partner_members WHERE partner_id = :partner AND user_id = :user")
+                .setParameter("partner", partnerId).setParameter("user", userId).getResultList();
+        return rows.stream().map(r -> (String) r).findFirst();
     }
 
     @Transactional(readOnly = true)
@@ -119,21 +136,41 @@ class PartnerStore {
                 .setParameter("n", quantity).setParameter("id", partnerId).setParameter("code", planCode).executeUpdate();
     }
 
+    private static final String BINDING_COLUMNS = "tenant_id, partner_id, source, bound_at, bd_user_id";
+
     @Transactional(readOnly = true)
     public Optional<Binding> binding(Long tenantId) {
-        List<?> rows = em.createNativeQuery("SELECT tenant_id, partner_id, source, bound_at FROM partner_tenants WHERE tenant_id = :t")
+        List<?> rows = em.createNativeQuery("SELECT " + BINDING_COLUMNS + " FROM partner_tenants WHERE tenant_id = :t")
                 .setParameter("t", tenantId).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new Binding(num(r[0]), num(r[1]), (String) r[2], instant(r[3]))).findFirst();
+        return rows.stream().map(r -> binding((Object[]) r)).findFirst();
     }
 
-    /** 第一次归属为准：已经归属任何服务商时不改。@return 当前归属的服务商 */
+    /** 第一次归属为准：已经归属任何服务商时不改（BD 也不改）。@return 当前的归属 */
     @Transactional
-    public Long bindIfAbsent(Long tenantId, Long partnerId, String source, Long actor) {
-        var insert = em.createNativeQuery("INSERT INTO partner_tenants(tenant_id, partner_id, source, changed_by) VALUES (:t, :p, :s, :a) ON CONFLICT (tenant_id) DO NOTHING")
+    public Binding bindIfAbsent(Long tenantId, Long partnerId, String source, Long actor, Long bdUserId) {
+        var insert = em.createNativeQuery("""
+                INSERT INTO partner_tenants(tenant_id, partner_id, source, changed_by, bd_user_id) VALUES (:t, :p, :s, :a, :bd)
+                ON CONFLICT (tenant_id) DO NOTHING""")
                 .setParameter("t", tenantId).setParameter("p", partnerId).setParameter("s", source);
-        typed(insert).setParameter("a", actor, Long.class);
+        typed(insert).setParameter("a", actor, Long.class).setParameter("bd", bdUserId, Long.class);
         insert.executeUpdate();
-        return num(em.createNativeQuery("SELECT partner_id FROM partner_tenants WHERE tenant_id = :t").setParameter("t", tenantId).getSingleResult());
+        return binding(tenantId).orElseThrow();
+    }
+
+    /** 负责人把名下商户调给某个 BD；bdUserId 为空表示收回由负责人直接管。 */
+    @Transactional
+    public void setBd(Long tenantId, Long partnerId, Long bdUserId) {
+        var update = em.createNativeQuery("UPDATE partner_tenants SET bd_user_id = :bd WHERE tenant_id = :t AND partner_id = :p")
+                .setParameter("t", tenantId).setParameter("p", partnerId);
+        typed(update).setParameter("bd", bdUserId, Long.class);
+        update.executeUpdate();
+    }
+
+    /** 激活码的生成人（BD 生成的码兑换后归到这个 BD）。 */
+    @Transactional(readOnly = true)
+    public Optional<Long> codeCreator(Long codeId) {
+        List<?> rows = em.createNativeQuery("SELECT created_by FROM billing_redeem_codes WHERE id = :id").setParameter("id", codeId).getResultList();
+        return rows.stream().map(PartnerStore::num).findFirst();
     }
 
     /** 平台改归属；partnerId 为空时解除。 */
@@ -145,15 +182,20 @@ class PartnerStore {
         }
         em.createNativeQuery("""
                 INSERT INTO partner_tenants(tenant_id, partner_id, source, changed_by) VALUES (:t, :p, 'PLATFORM', :a)
-                ON CONFLICT (tenant_id) DO UPDATE SET partner_id = EXCLUDED.partner_id, source = 'PLATFORM', bound_at = now(), changed_by = EXCLUDED.changed_by""")
+                ON CONFLICT (tenant_id) DO UPDATE SET partner_id = EXCLUDED.partner_id, source = 'PLATFORM', bound_at = now(),
+                    changed_by = EXCLUDED.changed_by, bd_user_id = NULL""")
                 .setParameter("t", tenantId).setParameter("p", partnerId).setParameter("a", actor).executeUpdate();
     }
 
     @Transactional(readOnly = true)
     public List<Binding> tenants(Long partnerId) {
-        List<?> rows = em.createNativeQuery("SELECT tenant_id, partner_id, source, bound_at FROM partner_tenants WHERE partner_id = :p ORDER BY bound_at DESC, tenant_id DESC")
+        List<?> rows = em.createNativeQuery("SELECT " + BINDING_COLUMNS + " FROM partner_tenants WHERE partner_id = :p ORDER BY bound_at DESC, tenant_id DESC")
                 .setParameter("p", partnerId).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new Binding(num(r[0]), num(r[1]), (String) r[2], instant(r[3]))).toList();
+        return rows.stream().map(r -> binding((Object[]) r)).toList();
+    }
+
+    private static Binding binding(Object[] r) {
+        return new Binding(num(r[0]), num(r[1]), (String) r[2], instant(r[3]), r[4] == null ? null : num(r[4]));
     }
 
     @Transactional(readOnly = true)

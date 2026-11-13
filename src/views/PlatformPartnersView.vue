@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Check, ChevronRight, Plus, RefreshCw, Store, X } from 'lucide-vue-next'
+import { Check, ChevronLeft, ChevronRight, Plus, RefreshCw, Store, X } from 'lucide-vue-next'
 import { partnerAdminApi as api, ledgerTypes, tenantSources, validUid } from '../services/partnerApi'
 import { activationPlans, planAdminApi } from '../services/planAdminApi'
 import { managementDate } from '../domain/platformManagement'
@@ -19,6 +19,10 @@ const selected = computed(() => partners.value.find(item => item.partner.id === 
 const tenants = ref([])
 const ledger = ref([])
 const detailError = ref('')
+// 名下商户和流水分别翻页，每页 20 条。
+const tenantPaging = reactive({ page: 0, total: 0 })
+const ledgerPaging = reactive({ page: 0, total: 0 })
+const pageCount = paging => Math.ceil(paging.total / 20)
 
 const createForm = reactive({ open: false, name: '', contact: '', adminUid: '', error: '' })
 const grantForm = reactive({ credits: '', note: '', requestKey: '', error: '' })
@@ -51,6 +55,8 @@ async function select(id) {
   Object.assign(grantForm, { credits: '', note: '', requestKey: 'grant-' + crypto.randomUUID(), error: '' })
   Object.assign(quotaForm, { planCode: '', quota: '', error: '' })
   Object.assign(memberForm, { uid: '', error: '' })
+  tenantPaging.page = 0
+  ledgerPaging.page = 0
   await loadDetail()
 }
 
@@ -58,13 +64,18 @@ async function loadDetail() {
   if (!selectedId.value) return
   detailError.value = ''
   try {
-    const [tenantPage, ledgerPage] = await Promise.all([api.tenants(selectedId.value, { size: 50 }), api.ledger(selectedId.value, { size: 20 })])
+    const [tenantPage, ledgerPage] = await Promise.all([api.tenants(selectedId.value, { page: tenantPaging.page, size: 20 }),
+      api.ledger(selectedId.value, { page: ledgerPaging.page, size: 20 })])
     tenants.value = tenantPage.items
     ledger.value = ledgerPage.items
+    tenantPaging.total = tenantPage.total
+    ledgerPaging.total = ledgerPage.total
   } catch (failure) {
     detailError.value = failure.message || '名下商户和流水暂时无法读取。'
   }
 }
+
+function turn(paging, next) { paging.page = next; loadDetail() }
 
 async function run(work, done) {
   if (busy.value) return
@@ -220,8 +231,8 @@ load()
           </form>
           <form class="partner-admin-form" @submit.prevent="addMember">
             <h3>登录账号</h3>
-            <ul class="partner-members"><li v-for="member in selected.members" :key="member.userId"><span>{{ member.name || '未命名' }} · UID {{ member.uid }}</span><button class="mg-text-button" type="button" :disabled="busy" @click="removeMember(member)">移除</button></li></ul>
-            <label>添加账号的 UID<input v-model="memberForm.uid" inputmode="numeric" maxlength="8" /></label>
+            <ul class="partner-members"><li v-for="member in selected.members" :key="member.userId"><span>{{ member.role === 'BD' ? 'BD' : '负责人' }} · {{ member.name || '未命名' }} · UID {{ member.uid }}<template v-if="member.role === 'BD'"> · 名下 {{ member.tenantCount }} 个商户</template></span><button class="mg-text-button" type="button" :disabled="busy" @click="removeMember(member)">移除</button></li></ul>
+            <label>添加负责人账号的 UID<input v-model="memberForm.uid" inputmode="numeric" maxlength="8" /><small>BD 由服务商负责人在自己的后台添加。</small></label>
             <p v-if="memberForm.error" class="mg-error" role="alert">{{ memberForm.error }}</p>
             <div><button class="mg-button" type="submit" :disabled="busy">添加</button></div>
           </form>
@@ -229,19 +240,20 @@ load()
       </section>
 
       <section class="management-list" aria-labelledby="partner-tenants-title">
-        <div class="mg-list-caption"><h2 id="partner-tenants-title">名下商户（最近 50 个）</h2></div>
+        <div class="mg-list-caption"><h2 id="partner-tenants-title">名下商户</h2></div>
         <div v-if="detailError" class="mg-state mg-error" role="alert"><p>{{ detailError }}</p></div>
         <div v-else-if="!tenants.length" class="mg-state"><p>还没有名下商户。</p></div>
         <div v-else class="management-table-wrap">
           <table class="management-table">
-            <thead><tr><th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>归属方式</th></tr></thead>
-            <tbody><tr v-for="item in tenants" :key="item.tenantId"><td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td><td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td><td>{{ membership(item) }}</td><td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td><td><span>{{ tenantSources[item.source] || item.source }}</span><small>{{ managementDate(item.boundAt) }}</small></td></tr></tbody>
+            <thead><tr><th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>归属方式</th><th>BD</th></tr></thead>
+            <tbody><tr v-for="item in tenants" :key="item.tenantId"><td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td><td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td><td>{{ membership(item) }}</td><td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td><td><span>{{ tenantSources[item.source] || item.source }}</span><small>{{ managementDate(item.boundAt) }}</small></td><td>{{ item.bdName || (item.bdUserId ? '—' : '负责人直接管') }}</td></tr></tbody>
           </table>
         </div>
+        <footer v-if="pageCount(tenantPaging) > 1" class="management-pagination"><span>共 {{ number(tenantPaging.total) }} 个商户</span><div><button class="mg-page-button" type="button" :disabled="tenantPaging.page === 0" aria-label="上一页" @click="turn(tenantPaging, tenantPaging.page - 1)"><ChevronLeft :size="16" /></button><span>{{ tenantPaging.page + 1 }} / {{ pageCount(tenantPaging) }}</span><button class="mg-page-button" type="button" :disabled="tenantPaging.page + 1 >= pageCount(tenantPaging)" aria-label="下一页" @click="turn(tenantPaging, tenantPaging.page + 1)"><ChevronRight :size="16" /></button></div></footer>
       </section>
 
       <section class="management-list" aria-labelledby="partner-ledger-title">
-        <div class="mg-list-caption"><h2 id="partner-ledger-title">烟火流水（最近 20 条）</h2></div>
+        <div class="mg-list-caption"><h2 id="partner-ledger-title">烟火流水</h2></div>
         <div v-if="!ledger.length" class="mg-state"><p>还没有流水。</p></div>
         <div v-else class="management-table-wrap">
           <table class="management-table">
@@ -249,6 +261,7 @@ load()
             <tbody><tr v-for="item in ledger" :key="item.id"><td class="mg-time">{{ managementDate(item.createdAt) }}</td><td>{{ ledgerTypes[item.type] || item.type }}</td><td>{{ item.tenantName || '—' }}</td><td class="code-number mg-mono">{{ item.delta > 0 ? '+' : '' }}{{ number(item.delta) }}</td><td class="code-number mg-mono">{{ number(item.availableAfter) }}</td><td>{{ item.note || '—' }}</td></tr></tbody>
           </table>
         </div>
+        <footer v-if="pageCount(ledgerPaging) > 1" class="management-pagination"><span>共 {{ number(ledgerPaging.total) }} 条</span><div><button class="mg-page-button" type="button" :disabled="ledgerPaging.page === 0" aria-label="上一页" @click="turn(ledgerPaging, ledgerPaging.page - 1)"><ChevronLeft :size="16" /></button><span>{{ ledgerPaging.page + 1 }} / {{ pageCount(ledgerPaging) }}</span><button class="mg-page-button" type="button" :disabled="ledgerPaging.page + 1 >= pageCount(ledgerPaging)" aria-label="下一页" @click="turn(ledgerPaging, ledgerPaging.page + 1)"><ChevronRight :size="16" /></button></div></footer>
       </section>
     </template>
 

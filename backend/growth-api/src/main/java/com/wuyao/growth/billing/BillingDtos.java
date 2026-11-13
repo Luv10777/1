@@ -106,7 +106,8 @@ public final class BillingDtos {
     /** status 为 UNUSED、REDEEMED、VOIDED 或 EXPIRED；planName、durationDays 只有激活码才有。 */
     public record RedeemCodeView(Long id, String code, String kind, long credits, long amountMinor, String status, String note,
                                  Instant expiresAt, Instant createdAt, Long redeemedTenantId, String redeemedTenantName,
-                                 Instant redeemedAt, Instant voidedAt, Long planId, String planName, Integer durationDays, Long partnerId) {}
+                                 Instant redeemedAt, Instant voidedAt, Long planId, String planName, Integer durationDays, Long partnerId,
+                                 Long createdBy) {}
     public record Redeem(@NotBlank @Size(max=40) String code) {}
     /** 服务商生成的激活码被兑换后发出，与兑换同一事务；服务商模块据此把商户归到服务商名下（第一次归属为准）。 */
     public record PartnerCodeRedeemed(Long tenantId, Long codeId, Long partnerId) {}

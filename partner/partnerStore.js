@@ -2,11 +2,14 @@ import { reactive, watch } from 'vue'
 import { auth } from '../src/stores/auth.js'
 import { partnerApi } from '../src/services/partnerApi.js'
 
-/** 当前登录账号所属的服务商；换账号时清空重读。 */
-export const partner = reactive({ overview: null, loaded: false, error: '' })
+/** 当前登录账号所属的服务商；换账号时清空重读。team 只有负责人能读（BD 列表）。 */
+export const partner = reactive({ overview: null, loaded: false, error: '', team: [] })
 let pending = null
 
-watch(() => auth.user?.id, () => { pending = null; Object.assign(partner, { overview: null, loaded: false, error: '' }) }, { flush: 'sync' })
+watch(() => auth.user?.id, () => { pending = null; Object.assign(partner, { overview: null, loaded: false, error: '', team: [] }) }, { flush: 'sync' })
+
+/** 负责人看全部、分烟火、管 BD；BD 只看自己名下的商户和自己生成的码。 */
+export const isOwner = () => partner.overview?.role === 'OWNER'
 
 export async function loadPartner(force = false) {
   if (!auth.isAuthenticated) return false
@@ -22,3 +25,13 @@ export async function loadPartner(force = false) {
   }).finally(() => { pending = null })
   return pending
 }
+
+/** 负责人的团队（负责人和 BD）；BD 调用时返回空列表。 */
+export async function loadTeam() {
+  if (!isOwner()) return (partner.team = [])
+  partner.team = await partnerApi.team()
+  return partner.team
+}
+
+/** 团队里的 BD，供筛选和调配用。 */
+export const bds = () => partner.team.filter(member => member.role === 'BD')
