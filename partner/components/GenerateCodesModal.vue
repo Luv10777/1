@@ -14,7 +14,7 @@ const props = defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close', 'created'])
 
 const plans = computed(() => partner.overview?.plans || [])
-const form = reactive({ planCode: '', quantity: '10', note: '', requestKey: '', confirming: false, error: '' })
+const form = reactive({ planCode: '', quantity: '1', note: '', requestKey: '', confirming: false, error: '' })
 const busy = ref(false)
 const created = ref([])
 const copied = ref('')
@@ -26,7 +26,7 @@ watch(() => props.open, open => {
   if (!open) return
   created.value = []
   copied.value = ''
-  Object.assign(form, { planCode: plans.value[0]?.planCode || '', quantity: '10', note: '', requestKey: 'codes-' + crypto.randomUUID(), confirming: false, error: '' })
+  Object.assign(form, { planCode: plans.value[0]?.planCode || '', quantity: '1', note: '', requestKey: 'codes-' + crypto.randomUUID(), confirming: false, error: '' })
 })
 
 function ask() {
