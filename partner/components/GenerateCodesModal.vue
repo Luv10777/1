@@ -3,38 +3,35 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Copy, Download } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
 import { formatRedeemCode } from '../../src/services/redeemCodeAdminApi.js'
-import { codesCsv, downloadCsv, number } from '../../src/domain/partnerOps.js'
+import { codesCsv, downloadCsv } from '../../src/domain/partnerOps.js'
 import { loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 import OptionCards from './OptionCards.vue'
 
-/** 生成激活码弹窗：选套餐和数量，确认后生成；生成的码在弹窗里直接复制或导出。 */
+/** 生成激活码弹窗：选套餐和数量（不限个数，每批最多 200 个），确认后生成；生成的码在弹窗里直接复制或导出。 */
 const props = defineProps({ open: { type: Boolean, default: false } })
 const emit = defineEmits(['close', 'created'])
 
-const quotas = computed(() => (partner.overview?.quotas || []).filter(q => q.planName))
+const plans = computed(() => partner.overview?.plans || [])
 const form = reactive({ planCode: '', quantity: '10', note: '', requestKey: '', confirming: false, error: '' })
 const busy = ref(false)
 const created = ref([])
 const copied = ref('')
-const quota = computed(() => quotas.value.find(q => q.planCode === form.planCode))
-const planOptions = computed(() => quotas.value.map(q => ({ value: q.planCode, title: `${q.planName} · ${q.durationDays} 天`,
-  detail: q.remaining < 1 ? '额度已用完' : `还能生成 ${number(q.remaining)} 个`, disabled: q.remaining < 1 })))
+const plan = computed(() => plans.value.find(p => p.planCode === form.planCode))
+const planOptions = computed(() => plans.value.map(p => ({ value: p.planCode, title: `${p.planName} · ${p.durationDays} 天`, detail: '不限个数' })))
 const quantity = computed(() => Number(form.quantity))
 
 watch(() => props.open, open => {
   if (!open) return
   created.value = []
   copied.value = ''
-  Object.assign(form, { planCode: quotas.value.find(q => q.remaining > 0)?.planCode || '', quantity: '10', note: '', requestKey: 'codes-' + crypto.randomUUID(), confirming: false, error: '' })
+  Object.assign(form, { planCode: plans.value[0]?.planCode || '', quantity: '10', note: '', requestKey: 'codes-' + crypto.randomUUID(), confirming: false, error: '' })
 })
 
 function ask() {
-  const q = quota.value
-  form.error = !q ? '请选择套餐。'
-    : !Number.isInteger(quantity.value) || quantity.value < 1 || quantity.value > 200 ? '一次生成 1 至 200 个。'
-      : quantity.value > q.remaining ? `「${q.planName}」还能生成 ${q.remaining} 个。` : ''
+  form.error = !plan.value ? '请选择套餐。'
+    : !Number.isInteger(quantity.value) || quantity.value < 1 || quantity.value > 200 ? '一次生成 1 至 200 个。' : ''
   form.confirming = !form.error
 }
 
@@ -46,7 +43,7 @@ async function generate() {
     await loadPartner(true)
     emit('created', created.value)
   } catch (failure) {
-    form.error = failure.message || '生成失败，请稍后再确认一次（不会重复扣额度）。'
+    form.error = failure.message || '生成失败，请稍后再确认一次（不会重复生成）。'
     form.confirming = false
   } finally { busy.value = false }
 }
@@ -68,15 +65,15 @@ function exportCreated() {
       <p v-if="copied" class="mg-muted" role="status">{{ copied }}</p>
     </template>
     <template v-else>
-      <div v-if="!quotas.length" class="mg-state"><p>没有可用的激活码额度，请联系平台或负责人分配。</p></div>
+      <div v-if="!plans.length" class="mg-state"><p>平台还没有建会员套餐，请联系平台。</p></div>
       <template v-else>
         <p class="partner-field-label">选择套餐</p>
         <OptionCards v-model="form.planCode" :options="planOptions" label="套餐" :disabled="busy || form.confirming" />
-        <label class="partner-field">数量<input v-model="form.quantity" type="number" min="1" max="200" step="1" inputmode="numeric" :disabled="busy || form.confirming" /><small>一次最多 200 个。</small></label>
+        <label class="partner-field">数量<input v-model="form.quantity" type="number" min="1" max="200" step="1" inputmode="numeric" :disabled="busy || form.confirming" /><small>不限个数，一次最多 200 个。</small></label>
         <label class="partner-field">备注（可选）<input v-model="form.note" maxlength="200" placeholder="例如：某某商户、某次活动" :disabled="busy || form.confirming" /></label>
         <ConfirmBox v-if="form.confirming" :busy="busy" confirm-text="确认生成" @confirm="generate" @cancel="form.confirming = false">
-          <p>生成 <b>{{ quantity }}</b> 个「{{ quota.planName }}」激活码（每个 {{ quota.durationDays }} 天），额度剩 {{ quota.remaining }} → <b>{{ quota.remaining - quantity }}</b> 个。</p>
-          <p>激活码不送烟火；作废后额度不退回。</p>
+          <p>生成 <b>{{ quantity }}</b> 个「{{ plan.planName }}」激活码（每个 {{ plan.durationDays }} 天）。</p>
+          <p>激活码不送烟火；没兑换的可以作废。</p>
         </ConfirmBox>
         <p v-if="form.error" class="mg-inline-error" role="alert">{{ form.error }}</p>
       </template>
@@ -89,7 +86,7 @@ function exportCreated() {
       </template>
       <template v-else>
         <button class="mg-button" type="button" :disabled="busy" @click="emit('close')">取消</button>
-        <button v-if="quotas.length" class="mg-button mg-primary" type="button" :disabled="busy || form.confirming" @click="ask">生成</button>
+        <button v-if="plans.length" class="mg-button mg-primary" type="button" :disabled="busy || form.confirming" @click="ask">生成</button>
       </template>
     </template>
   </PartnerPanel>

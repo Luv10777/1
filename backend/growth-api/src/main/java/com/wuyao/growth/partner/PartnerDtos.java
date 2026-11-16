@@ -1,6 +1,7 @@
 package com.wuyao.growth.partner;
 
 import com.wuyao.growth.billing.BillingDtos;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.Instant;
 import java.util.List;
@@ -9,33 +10,47 @@ import java.util.List;
 public final class PartnerDtos {
     private PartnerDtos() {}
 
-    /** creditsAvailable 只给负责人和平台看，BD 看到的是空。 */
+    /** creditsAvailable 是团队账户的可用烟火（读不到时为空）。 */
     public record Partner(Long id, String name, String contact, String status, Long creditsAvailable, Instant createdAt) {}
-    /** 一个套餐标识的激活码额度；planName、durationDays 取该标识最新的版本。 */
-    public record Quota(String planCode, String planName, Integer durationDays, int quota, int used, int remaining) {}
-    /** role 是当前登录账号在服务商里的角色：OWNER 负责人、BD。BD 的 tenantCount 只算自己名下的。account 是当前登录账号自己在一方志的烟火（服务商后台右上角显示）。 */
-    public record Overview(Partner partner, List<Quota> quotas, long tenantCount, String role, Account account) {}
-    /** 登录账号自己在一方志的烟火：可用 = 赠送 + 充值；负责人的这部分能分给商户和 BD。 */
-    public record Account(long available, long gift, long purchased) {}
+    /** 服务商能生成激活码的套餐（不限个数），名字和天数取该标识最新的版本。 */
+    public record Plan(String planCode, String planName, Integer durationDays) {}
+    /** 成员的权限：商户、激活码、分配烟火、财务查看、团队管理。负责人全部为 true。 */
+    public record Permissions(boolean tenants, boolean codes, boolean distribute, boolean finance, boolean team) {
+        static Permissions of(PartnerStore.Perms p) { return new Permissions(p.tenants(), p.codes(), p.distribute(), p.finance(), p.team()); }
+        PartnerStore.Perms perms() { return new PartnerStore.Perms(tenants, codes, distribute, finance, team); }
+    }
     /**
-     * 一笔分配记录。source：POOL（服务商可分配烟火）或 ACCOUNT（负责人自己的账号）；recipientType：TENANT（名下商户）或 BD；
-     * gift、purchased 是对方收到的赠送和充值烟火；status 为 DONE（已到账）或 PENDING（已扣来源，对方还没入账，用同一请求重试即可补上）。
+     * 当前登录账号看到的服务商。role 为 OWNER（负责人）或 MEMBER（成员）；displayName 是他在团队里的称呼，为空时前端先请他填；
+     * account 是团队账户的烟火（成员在一方志里创作和分给商户都扣它）；monthCodes 是本月（北京时间）这家服务商生成的激活码个数。
+     */
+    public record Overview(Partner partner, List<Plan> plans, long tenantCount, String role, Permissions permissions,
+                           String displayName, String userName, Account account, long monthCodes) {}
+    /** 团队账户的烟火：可用 = 赠送 + 充值。 */
+    public record Account(long available, long gift, long purchased) {}
+    /** 一方志站内判断要不要显示「服务商后台」入口：不是服务商成员时 member 为 false，其余为空。 */
+    public record Membership(boolean member, String partnerName, String role, boolean active) {}
+    /**
+     * 一笔分配记录。source：POOL（V84 以前的可分配烟火）或 ACCOUNT（团队账户）；recipientType：TENANT（V84 以前还有 BD）；
+     * gift、purchased 是对方收到的赠送和充值烟火；status 为 DONE（已到账）或 PENDING（已扣团队账户，对方还没入账，用同一请求重试即可补上）。
      */
     public record Distribution(Long id, String source, String recipientType, Long recipientTenantId, String recipientName,
-                               Long recipientUserId, long credits, long gift, long purchased, String note, String actorName,
-                               String status, Instant createdAt) {}
+                               Long recipientUserId, long credits, long gift, long purchased, String note, Long actorUserId,
+                               String actorName, String status, Instant createdAt) {}
     /** 激活码统计：unused = generated - redeemed - voided；renewals 是其中直接续期的个数。 */
     public record CodeStats(long generated, long redeemed, long unused, long voided, long renewals) {}
-    /** 服务商的登录账号；role 为 OWNER 或 BD，tenantCount 是归到这个 BD 的商户数（负责人为空）。 */
-    public record Member(Long userId, Long uid, String name, String phone, String role, Long tenantCount, CodeStats codes, Instant createdAt) {}
     /**
-     * 按 UID 预查询，添加商户或 BD 前确认对象。userName 打码；tenantState：NONE 没有归属、MINE 在我名下、
-     * TEAM 在本服务商但归别人管、OTHER 属于其他服务商（不透露是哪家）。tenantId 只在 MINE 时给出。
-     * memberState 只给负责人：NONE、OWNER、BD（本服务商的登录账号）、OTHER（其他服务商的登录账号）。
+     * 服务商的登录账号。name 是一方志账号名，displayName 是团队里的称呼（没填时为空）；phone 只给有团队管理权限的人看；
+     * monthlyCap 是每月最多分出的烟火（空表示不限），distributedThisMonth 是本月已分出的；tenantsAdded 是他按 UID 加进来的商户数。
      */
-    public record Lookup(Long uid, String userName, String tenantName, String tenantState, Long tenantId, String bdName, String memberState) {}
+    public record Member(Long userId, Long uid, String name, String displayName, String phone, String role, Permissions permissions,
+                         Long monthlyCap, long distributedThisMonth, long tenantsAdded, CodeStats codes, Instant createdAt) {}
     /**
-     * 商户详情：transfers 是这家服务商分给他的烟火（只给负责人，BD 为空），codes 是他兑换过的本服务商激活码（含直接续期），
+     * 按 UID 预查询，添加商户前确认对象。userName 打码；tenantState：NONE 没有归属、MINE 在本服务商名下、
+     * OTHER 属于其他服务商（不透露是哪家）。tenantId 只在 MINE 时给出。
+     */
+    public record Lookup(Long uid, String userName, String tenantName, String tenantState, Long tenantId) {}
+    /**
+     * 商户详情：transfers 是这家服务商分给他的烟火（有分配或财务权限的人可见，否则为空），codes 是他兑换过的本服务商激活码（含直接续期），
      * usage 是最近 30 天的使用情况，onboarding 是上手进度。
      */
     public record TenantDetail(TenantView tenant, List<Distribution> transfers, List<BillingDtos.RedeemCodeView> codes,
@@ -57,47 +72,54 @@ public final class PartnerDtos {
     public record Workbench(List<Todo> todos, java.util.Map<String, Long> counts, Instant checkedAt) {}
     /** 看板每天一个点（北京时间）：商户消耗、分给商户的烟火、新增商户、激活码兑换（含直接续期）。 */
     public record DailyPoint(String date, long consumed, long transferred, long newTenants, long redeemed) {}
-    public record TenantRank(Long tenantId, String tenantName, String bdName, long consumed, long uses, Instant lastUsedAt) {}
-    public record BdRank(Long userId, String name, long tenants, long consumed, long activeTenants, long codesRedeemed, long renewals) {}
+    public record TenantRank(Long tenantId, String tenantName, long consumed, long uses, Instant lastUsedAt) {}
+    /** 成员这段时间做的事：按 UID 加的商户、生成和被兑换的激活码、直接续期、分出去的烟火（没有财务权限的人看到的是空）。 */
+    public record MemberRank(Long userId, String name, long tenantsAdded, long codesGenerated, long codesRedeemed, long renewals,
+                             Long distributed) {}
     /**
-     * 经营看板（最近 days 天，days=1 是今天）。granted、transferred、creditsAvailable 和 bds 只给负责人，BD 为空。
+     * 经营看板（最近 days 天，days=1 是今天）。creditsAvailable、granted、transferred 只给有财务权限的人，其余为空。
      * activeTenants 是这段时间用过 AI 功能的商户，firstUses 是这段时间第一次使用的商户。
      * 会员状态按现在算：activeMembers（含 7 天内到期的 expiringSoon）、expiredMembers（开通过已过期）、neverActivated（从未开通）。
      */
-    public record Dashboard(int days, Long creditsAvailable, Long transferredToBds, long tenants, long newTenants, long activeMembers, long expiringSoon,
+    public record Dashboard(int days, Long creditsAvailable, long tenants, long newTenants, long activeMembers, long expiringSoon,
                             long expiredMembers, long neverActivated,
                             long activeTenants, long firstUses, long consumed, long uses, java.util.Map<String, Long> consumedByCapability,
                             Long granted, Long transferred, long codesGenerated, long codesRedeemed, long renewals, long codesVoided,
-                            List<DailyPoint> daily, List<TenantRank> topTenants, List<BdRank> bds) {}
-    /** 名下商户；会员和余额读不到时为空。source 为 UID、CODE 或 PLATFORM；bdUserId 为空表示负责人直接管。 */
+                            List<DailyPoint> daily, List<TenantRank> topTenants, List<MemberRank> members) {}
+    /** 名下商户；会员和余额读不到时为空。source 为 UID、CODE 或 PLATFORM；addedByName 是按 UID 添加他的成员。 */
     public record TenantView(Long tenantId, String tenantName, Long ownerUid, String ownerName, String source, Instant boundAt,
-                             Boolean memberActive, Instant memberUntil, String planName, Long creditsAvailable,
-                             Long bdUserId, String bdName) {}
-    /** 服务商烟火流水：GRANT 平台发放（正），TRANSFER 分给名下商户（负）。 */
-    public record LedgerEntry(Long id, String type, long delta, long availableAfter, Long tenantId, String tenantName,
-                              String note, Instant createdAt) {}
+                             Boolean memberActive, Instant memberUntil, String planName, Long creditsAvailable, String addedByName) {}
+    /**
+     * 服务商流水：GRANT 平台发放（V84 起直接进团队账户，availableAfter 为空）；TRANSFER 是 V84 以前从可分配烟火分给商户的，
+     * 以及 V84 把剩余的可分配烟火转进团队账户的那一笔。
+     */
+    public record LedgerEntry(Long id, String type, long delta, Long availableAfter, Long tenantId, String tenantName,
+                              String note, String actorName, Instant createdAt) {}
     public record Page<T>(List<T> items, int page, int size, long total) {}
 
     public record UidRequest(@NotNull @Min(10000000) @Max(99999999) Long uid) {}
-    /** source：POOL（默认，服务商可分配烟火）或 ACCOUNT（负责人自己的账号）。 */
     public record Transfer(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
-                           @Min(1) @Max(1000000) long credits, @Size(max=200) String note,
-                           @Pattern(regexp="POOL|ACCOUNT") String source) {}
+                           @Min(1) @Max(1000000) long credits, @Size(max=200) String note) {}
     public record NewCodes(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,60}") String requestKey,
                            @NotBlank @Pattern(regexp="[A-Z0-9_-]{2,60}") String planCode,
                            @Min(1) @Max(200) int quantity, @Size(max=200) String note) {}
-    /** 用一个激活码额度直接给名下商户开通或顺延会员。 */
+    /** 直接给名下商户开通或顺延会员（不扣额度，激活码不限个数）。 */
     public record Renew(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,60}") String requestKey,
                         @NotBlank @Pattern(regexp="[A-Z0-9_-]{2,60}") String planCode) {}
-    /** 负责人把商户调给某个 BD；bdUserId 为空表示收回由负责人直接管。 */
-    public record AssignBd(@Positive Long bdUserId) {}
+    /** 按手机号加成员：没注册过的在团队账户里新建一个员工账号，name 是账号名；已是团队账户员工的直接加进来。 */
+    public record NewMember(@NotBlank @Size(max=20) String phone, @NotBlank @Size(max=20) String name,
+                            @NotNull @Valid Permissions permissions, @Positive @Max(100000000) Long monthlyCap) {}
+    /** 改成员：权限、每月分配上限（空表示不限）、团队称呼（空表示不改）。 */
+    public record UpdateMember(@NotNull @Valid Permissions permissions, @Positive @Max(100000000) Long monthlyCap,
+                               @Size(max=20) String displayName) {}
+    public record DisplayName(@NotBlank @Size(max=20) String displayName) {}
 
-    public record PlatformPartner(Partner partner, List<Member> members, List<Quota> quotas, long tenantCount) {}
+    /** teamTenantName 是团队账户（负责人的一方志商户）的名字。 */
+    public record PlatformPartner(Partner partner, List<Member> members, long tenantCount, Long teamTenantId, String teamTenantName) {}
     public record NewPartner(@NotBlank @Size(max=80) String name, @Size(max=120) String contact,
                              @NotNull @Min(10000000) @Max(99999999) Long adminUid) {}
     public record Grant(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
                         @Min(1) @Max(10000000) long credits, @NotBlank @Size(max=200) String note) {}
-    public record SetQuota(@NotBlank @Pattern(regexp="[A-Z0-9_-]{2,60}") String planCode, @Min(0) @Max(1000000) int quota) {}
     public record Rename(@NotBlank @Size(max=80) String name, @Size(max=120) String contact) {}
     public record SetStatus(@NotBlank @Pattern(regexp="ACTIVE|DISABLED") String status) {}
     /** partnerId 为空表示解除归属。 */

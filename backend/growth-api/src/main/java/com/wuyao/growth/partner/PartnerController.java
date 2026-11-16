@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** 服务商后台的接口：只有服务商的登录账号能用，见 PartnerService.requirePartner。 */
+/** 服务商后台的接口：只有服务商的登录账号能用，各项操作再按成员权限核对，见 PartnerService.require。 */
 @RestController
 @RequestMapping("/api/partner")
 @RequiredArgsConstructor
@@ -24,13 +24,24 @@ public class PartnerController {
         return ApiResponse.ok(service.overview(me.userId()));
     }
 
-    /** expiry：SOON7、SOON30、EXPIRED、NEVER；bdUserId 只对负责人有效，0 表示负责人直接管的。 */
+    /** 自己在团队里的称呼。 */
+    @PutMapping("/me/name")
+    public ApiResponse<PartnerDtos.Overview> displayName(@Valid @RequestBody PartnerDtos.DisplayName input, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.setDisplayName(me.userId(), input.displayName()));
+    }
+
+    /** 一方志站内用：当前账号是不是服务商成员。不是成员也正常返回（member 为 false）。 */
+    @GetMapping("/membership")
+    public ApiResponse<PartnerDtos.Membership> membership(@AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.membership(me.userId()));
+    }
+
+    /** expiry：SOON7、SOON30、EXPIRED、NEVER。 */
     @GetMapping("/tenants")
     public ApiResponse<PartnerDtos.Page<PartnerDtos.TenantView>> tenants(@RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String expiry, @RequestParam(required = false) Long bdUserId,
-            @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.tenants(me.userId(), page, size, keyword, expiry, bdUserId));
+            @RequestParam(required = false) String expiry, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.tenants(me.userId(), page, size, keyword, expiry));
     }
 
     @PostMapping("/tenants")
@@ -49,11 +60,10 @@ public class PartnerController {
         return ApiResponse.ok(insights.workbench(me.userId()));
     }
 
-    /** days：1（今天）、7、30、90；bdUserId 只对负责人有效，0 表示负责人直接管的。 */
+    /** days：1（今天）、7、30、90。 */
     @GetMapping("/dashboard")
-    public ApiResponse<PartnerDtos.Dashboard> dashboard(@RequestParam(defaultValue = "30") int days,
-            @RequestParam(required = false) Long bdUserId, @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(insights.dashboard(me.userId(), days, bdUserId));
+    public ApiResponse<PartnerDtos.Dashboard> dashboard(@RequestParam(defaultValue = "30") int days, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(insights.dashboard(me.userId(), days));
     }
 
     @GetMapping("/lookup")
@@ -72,25 +82,12 @@ public class PartnerController {
         return ApiResponse.ok(service.renew(me.userId(), tenantId, input));
     }
 
-    @PutMapping("/tenants/{tenantId}/bd")
-    public ApiResponse<PartnerDtos.TenantView> assignBd(@PathVariable Long tenantId, @Valid @RequestBody PartnerDtos.AssignBd input,
-            @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.assignBd(me.userId(), tenantId, input.bdUserId()));
-    }
-
-    @PostMapping("/team/{userId}/credits")
-    public ApiResponse<PartnerDtos.Distribution> transferToBd(@PathVariable Long userId, @Valid @RequestBody PartnerDtos.Transfer input,
-            @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.transferToBd(me.userId(), userId, input));
-    }
-
-    /** 分配记录：recipientType 为 TENANT 或 BD，source 为 POOL 或 ACCOUNT。 */
+    /** 分配记录：有财务权限的看全部（可按商户、操作人筛），只有分配权限的只看自己分出去的。 */
     @GetMapping("/distributions")
     public ApiResponse<PartnerDtos.Page<PartnerDtos.Distribution>> distributions(@RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String recipientType,
-            @RequestParam(required = false) String source, @RequestParam(required = false) Long tenantId,
-            @RequestParam(required = false) Long bdUserId, @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.distributions(me.userId(), page, size, recipientType, source, tenantId, bdUserId));
+            @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) Long tenantId,
+            @RequestParam(required = false) Long actorUserId, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.distributions(me.userId(), page, size, tenantId, actorUserId));
     }
 
     @PostMapping("/distributions/{id}/retry")
@@ -104,18 +101,22 @@ public class PartnerController {
     }
 
     @PostMapping("/team")
-    public ApiResponse<List<PartnerDtos.Member>> addBd(@Valid @RequestBody PartnerDtos.UidRequest input, @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.addBd(me.userId(), input.uid()));
+    public ApiResponse<List<PartnerDtos.Member>> addMember(@Valid @RequestBody PartnerDtos.NewMember input, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.addMember(me.userId(), input));
     }
 
-    /** transferTo：他名下的商户转给哪个 BD，0 表示回到负责人直接管。 */
-    @DeleteMapping("/team/{userId}")
-    public ApiResponse<List<PartnerDtos.Member>> removeBd(@PathVariable Long userId, @RequestParam long transferTo,
+    @PutMapping("/team/{userId}")
+    public ApiResponse<List<PartnerDtos.Member>> updateMember(@PathVariable Long userId, @Valid @RequestBody PartnerDtos.UpdateMember input,
             @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.removeBd(me.userId(), userId, transferTo));
+        return ApiResponse.ok(service.updateMember(me.userId(), userId, input));
     }
 
-    /** createdBy 只对负责人有效：按生成人（负责人或某个 BD）筛。 */
+    @DeleteMapping("/team/{userId}")
+    public ApiResponse<List<PartnerDtos.Member>> removeMember(@PathVariable Long userId, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.removeMember(me.userId(), userId));
+    }
+
+    /** createdBy：按生成人筛。 */
     @GetMapping("/codes")
     public ApiResponse<PageResult<BillingDtos.RedeemCodeView>> codes(@RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String status,

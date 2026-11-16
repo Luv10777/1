@@ -7,7 +7,7 @@ import { managementDate } from '../../src/domain/platformManagement.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 
-/** 激活码详情：状态、生成人、兑换商户；没兑换的可以复制、作废（作废后额度不退回）。 */
+/** 激活码详情：状态、生成人、兑换商户；没兑换的可以复制、作废。 */
 const props = defineProps({ code: { type: Object, default: null }, creatorName: { type: String, default: '' } })
 const emit = defineEmits(['close', 'updated'])
 
@@ -56,9 +56,9 @@ async function voidCode() {
       </section>
       <section v-if="unused" class="mg-detail-section">
         <h3><Ban :size="17" />作废</h3>
-        <p class="mg-muted">作废后这个码不能再兑换，已用掉的额度不退回。码已经发给商户、但还没兑换时可以作废防止被用。</p>
+        <p class="mg-muted">作废后这个码不能再兑换。码已经发给商户、但还没兑换时可以作废防止被用。</p>
         <ConfirmBox v-if="confirming" danger :busy="busy" confirm-text="确认作废" @confirm="voidCode" @cancel="confirming = false">
-          <p>作废激活码 <b class="mg-mono">{{ formatRedeemCode(code.code) }}</b>（{{ code.planName }}），额度不退回。</p>
+          <p>作废激活码 <b class="mg-mono">{{ formatRedeemCode(code.code) }}</b>（{{ code.planName }}），作废后不能恢复。</p>
         </ConfirmBox>
         <div v-else class="partner-section-actions"><button class="mg-button mg-danger" type="button" :disabled="busy" @click="confirming = true">作废这个码</button></div>
         <p v-if="error" class="mg-inline-error" role="alert">{{ error }}</p>

@@ -128,7 +128,7 @@ onMounted(async () => {
   try {
     const result = await auth.completeWechat({ ticket })
     if (result?.tokenPair) {
-      await router.replace(safeRedirect(route.query.redirect))
+      await goAfterLogin()
       return
     }
     wechatNickname.value = result.nickname || '微信用户'
@@ -230,7 +230,7 @@ async function completeWechatBinding() {
       return
     }
     if (!result?.tokenPair) throw new Error('微信绑定未完成，请重新尝试。')
-    await router.replace(safeRedirect(route.query.redirect))
+    await goAfterLogin()
   } catch (err) {
     error.value = err.message || '微信绑定失败，请稍后重试。'
   } finally {
@@ -266,12 +266,22 @@ async function submit() {
   try {
     if (activeTab.value === 'sms') await auth.login(form.phone.trim(), form.code)
     else await auth.loginWithPassword(form.account.trim(), form.password)
-    await router.replace(safeRedirect(route.query.redirect))
+    await goAfterLogin()
   } catch (err) {
     error.value = err.message || '登录失败，请稍后重试。'
   } finally {
     busy.value = false
   }
+}
+
+// 服务商后台（/partner/）是另一个页面，登录后要整页跳过去；其余在本站内跳转。
+async function goAfterLogin() {
+  const target = safeRedirect(route.query.redirect)
+  if (/^\/partner(?:[/?#]|$)/.test(target)) {
+    window.location.assign(target)
+    return
+  }
+  await router.replace(target)
 }
 
 function trustedLink(raw) {

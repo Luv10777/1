@@ -29,7 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * 用户 ID 与服务商：平台建服务商、发烟火、分激活码额度；服务商按用户 ID 添加名下商户、分烟火、在额度内生成激活码；
+ * 用户 ID 与服务商：平台建服务商（负责人的商户就是团队账户）、把烟火发进团队账户；服务商按用户 ID 添加名下商户、
+ * 从团队账户分烟火、不限个数地生成激活码；成员按手机号加入团队账户，按权限做事；
  * 兑换服务商的激活码归属到该服务商（第一次为准），平台可以改归属。用户编号 1 在计费运营名单里。
  */
 @SpringBootTest(properties = {"spring.config.import=", "growth.worker.enabled=false", "logging.level.root=WARN",
@@ -48,25 +49,27 @@ class PartnerIntegrationTest {
         r.add("growth.jwt.secret", () -> "test-only-random-signing-secret-0123456789abcdef");
     }
 
+    static final String MEMBER_PERMS = "{\"tenants\":true,\"codes\":true,\"distribute\":false,\"finance\":false,\"team\":false}";
+
     @Autowired BillingService billing;
     @Autowired JwtService jwt;
     @Autowired MockMvc mvc;
     JdbcTemplate owner;
-    long ops, agency, shop, cafe, bakery, operator, agentA, agentB, bd, shopOwner, cafeOwner, bakeryOwner;
+    long ops, agency, agencyB, shop, cafe, bakery, operator, agentA, agentB, shopOwner, cafeOwner, bakeryOwner;
     String planCode;
 
     @BeforeEach void setUp() {
         owner = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
         owner.execute("TRUNCATE tenants, billing_redeem_codes, tasks RESTART IDENTITY CASCADE");
         ops = tenant("平台");
-        agency = tenant("代理公司");
+        agency = tenant("甲公司");
+        agencyB = tenant("乙公司");
         shop = tenant("冰雪时光");
         cafe = tenant("一方小馆");
         bakery = tenant("麦香烘焙");
         operator = user(ops, "ops", "运营小王");
-        agentA = user(agency, "agent-a", "甲服务商");
-        agentB = user(agency, "agent-b", "乙服务商");
-        bd = user(agency, "bd", "BD 小周");
+        agentA = user(agency, "agent-a", "甲老板");
+        agentB = user(agencyB, "agent-b", "乙老板");
         shopOwner = user(shop, "shop", "李老板");
         cafeOwner = user(cafe, "cafe", "陈老板");
         bakeryOwner = user(bakery, "bakery", "王老板");
@@ -76,206 +79,174 @@ class PartnerIntegrationTest {
 
     @Test void everyAccountGetsADistinctEightDigitUidShownOnItsProfile() throws Exception {
         List<Long> uids = owner.queryForList("SELECT uid FROM users ORDER BY id", Long.class);
-        assertThat(uids).hasSize(7).doesNotHaveDuplicates().allSatisfy(uid -> assertThat(uid).isBetween(10_000_000L, 99_999_999L));
+        assertThat(uids).hasSize(6).doesNotHaveDuplicates().allSatisfy(uid -> assertThat(uid).isBetween(10_000_000L, 99_999_999L));
         mvc.perform(get("/api/auth/me").header("Authorization", bearer(shopOwner, shop)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.uid").value(uid(shopOwner)));
     }
 
-    @Test void partnersShareCreditsAndCodesWithTenantsTheyOwnAndTheFirstOwnerWins() throws Exception {
+    @Test void grantsLandInTheTeamAccountAndCodesAreUnlimited() throws Exception {
         long a = partner("甲服务商", agentA), b = partner("乙服务商", agentB);
-        platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-a-0001\",\"credits\":1000,\"note\":\"线下打款\"}").andExpect(status().isOk());
+        platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-a-0001\",\"credits\":1000,\"note\":\"线下打款\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.teamTenantName").value("甲公司"));
         platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-a-0001\",\"credits\":1000,\"note\":\"线下打款\"}")
                 .andExpect(jsonPath("$.data.partner.creditsAvailable").value(1000));
-        platform(put("/api/platform/partners/" + a + "/quotas"), "{\"planCode\":\"" + planCode + "\",\"quota\":2}")
-                .andExpect(jsonPath("$.data.quotas[0].remaining").value(2));
-        platform(put("/api/platform/partners/" + b + "/quotas"), "{\"planCode\":\"" + planCode + "\",\"quota\":1}").andExpect(status().isOk());
+        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, agency)).isEqualTo(1000);
 
-        // 按用户 ID 添加名下商户；别家已经添加的不能再加。
+        // 按用户 ID 添加名下商户；别家已经添加的不能再加；团队账户自己不能加。
         call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.tenantName").value("冰雪时光")).andExpect(jsonPath("$.data.source").value("UID"));
-        call(agentB, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isConflict());
+        call(agentB, agencyB, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isConflict());
         call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":99999999}").andExpect(status().isNotFound());
+        call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(agentA) + "}").andExpect(status().isBadRequest());
 
-        // 分烟火：记入商户的充值烟火，同一请求只分一次；不在名下的商户不能分，超出余额不能分。
+        // 分烟火：从团队账户扣，记入商户的充值烟火；同一请求只分一次；不在名下的商户不能分，超出余额不能分。
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-0001\",\"credits\":300}")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.creditsAvailable").value(300));
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-0001\",\"credits\":300}").andExpect(status().isOk());
         assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, shop)).isEqualTo(300);
-        assertThat(owner.queryForObject("SELECT credits_available FROM partners WHERE id=?", Long.class, a)).isEqualTo(700);
+        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, agency)).isEqualTo(700);
         call(agentA, agency, post("/api/partner/tenants/" + cafe + "/credits"), "{\"requestKey\":\"transfer-0002\",\"credits\":10}").andExpect(status().isNotFound());
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-0003\",\"credits\":800}")
                 .andExpect(jsonPath("$.code").value(9003));
-        assertThat(owner.queryForObject("SELECT credits_available FROM partners WHERE id=?", Long.class, a)).isEqualTo(700);
+        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, agency)).isEqualTo(700);
 
-        // 额度内生成激活码；同一请求重复提交不重复扣额度，超出额度拒绝。
+        // 激活码不限个数；同一请求重复提交返回同一批码。
         String batch = "{\"requestKey\":\"codes-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":2}";
         String first = call(agentA, agency, post("/api/partner/codes"), batch).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2)).andReturn().getResponse().getContentAsString();
         // 重复提交返回同一批码（只比码：第一次返回的时间带纳秒，再读出来是数据库的微秒）。
         call(agentA, agency, post("/api/partner/codes"), batch).andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].code").value(codeAt(first, 0))).andExpect(jsonPath("$.data[1].code").value(codeAt(first, 1)));
-        call(agentA, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-0002\",\"planCode\":\"" + planCode + "\",\"quantity\":1}")
+        call(agentA, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-0002\",\"planCode\":\"" + planCode + "\",\"quantity\":200}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(200));
+        call(agentA, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-0003\",\"planCode\":\"" + planCode + "\",\"quantity\":201}")
                 .andExpect(status().isBadRequest());
-        assertThat(owner.queryForObject("SELECT used FROM partner_code_quotas WHERE partner_id=?", Integer.class, a)).isEqualTo(2);
-        call(agentA, agency, get("/api/partner/codes"), null).andExpect(jsonPath("$.data.total").value(2));
+        call(agentA, agency, get("/api/partner/codes"), null).andExpect(jsonPath("$.data.total").value(202));
+        call(agentA, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.monthCodes").value(202))
+                .andExpect(jsonPath("$.data.plans[0].planCode").value(planCode)).andExpect(jsonPath("$.data.account.available").value(700));
         String codeA = owner.queryForObject("SELECT code FROM billing_redeem_codes WHERE partner_id=? ORDER BY id LIMIT 1", String.class, a);
 
         // 一方小馆兑换甲的码，归到甲名下；之后再兑换乙的码，会员顺延但归属不变。
         redeem(cafeOwner, cafe, codeA).andExpect(status().isOk()).andExpect(jsonPath("$.data.planName").value("月卡"));
         assertThat(owner.queryForMap("SELECT partner_id, source FROM partner_tenants WHERE tenant_id=?", cafe))
                 .containsEntry("partner_id", a).containsEntry("source", "CODE");
-        call(agentB, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-b-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":1}").andExpect(status().isOk());
+        call(agentB, agencyB, post("/api/partner/codes"), "{\"requestKey\":\"codes-b-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":1}").andExpect(status().isOk());
         String codeB = owner.queryForObject("SELECT code FROM billing_redeem_codes WHERE partner_id=?", String.class, b);
         redeem(cafeOwner, cafe, codeB).andExpect(status().isOk());
         assertThat(owner.queryForObject("SELECT partner_id FROM partner_tenants WHERE tenant_id=?", Long.class, cafe)).isEqualTo(a);
         call(agentA, agency, get("/api/partner/tenants"), null).andExpect(jsonPath("$.data.total").value(2));
-        call(agentB, agency, get("/api/partner/tenants"), null).andExpect(jsonPath("$.data.total").value(0));
+        call(agentB, agencyB, get("/api/partner/tenants"), null).andExpect(jsonPath("$.data.total").value(0));
 
-        // 只有平台能改归属。
+        // 只有平台能改归属。服务商流水只记平台发放。
         platform(get("/api/platform/partners/lookup?uid=" + uid(cafeOwner)), null).andExpect(jsonPath("$.data.partnerName").value("甲服务商"));
         platform(put("/api/platform/partners/assignments/" + cafe), "{\"partnerId\":" + b + "}").andExpect(status().isOk());
         assertThat(owner.queryForMap("SELECT partner_id, source FROM partner_tenants WHERE tenant_id=?", cafe))
                 .containsEntry("partner_id", b).containsEntry("source", "PLATFORM");
-        call(agentA, agency, get("/api/partner/ledger"), null).andExpect(jsonPath("$.data.total").value(2))
-                .andExpect(jsonPath("$.data.items[0].type").value("TRANSFER")).andExpect(jsonPath("$.data.items[0].delta").value(-300));
+        call(agentA, agency, get("/api/partner/ledger"), null).andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].type").value("GRANT")).andExpect(jsonPath("$.data.items[0].delta").value(1000))
+                .andExpect(jsonPath("$.data.items[0].availableAfter").doesNotExist());
     }
 
     @Test void onlyPartnerAccountsAndBillingOperatorsReachTheirBackOffices() throws Exception {
         long a = partner("甲服务商", agentA);
         call(shopOwner, shop, get("/api/partner/me"), null).andExpect(status().isForbidden());
+        // 一方志站内问身份：不是成员也正常返回。
+        call(shopOwner, shop, get("/api/partner/membership"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.member").value(false));
+        call(agentA, agency, get("/api/partner/membership"), null).andExpect(jsonPath("$.data.member").value(true))
+                .andExpect(jsonPath("$.data.role").value("OWNER")).andExpect(jsonPath("$.data.partnerName").value("甲服务商"));
         // 平台改的名称就是服务商后台里显示的服务商名。
         platform(put("/api/platform/partners/" + a), "{\"name\":\"甲服务商（嘉兴）\",\"contact\":\"张经理\"}").andExpect(status().isOk());
         call(agentA, agency, put("/api/platform/partners/" + a), "{\"name\":\"自己改\"}").andExpect(status().isForbidden());
-        call(agentA, agency, get("/api/partner/me"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.partner.name").value("甲服务商（嘉兴）"));
+        call(agentA, agency, get("/api/partner/me"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.partner.name").value("甲服务商（嘉兴）"))
+                .andExpect(jsonPath("$.data.role").value("OWNER")).andExpect(jsonPath("$.data.permissions.finance").value(true));
         call(agentA, agency, get("/api/platform/partners"), null).andExpect(status().isForbidden());
         // 一个账号只能属于一家服务商；停用后服务商后台不能再用。
         platform(post("/api/platform/partners"), "{\"name\":\"丙\",\"adminUid\":" + uid(agentA) + "}").andExpect(status().isConflict());
         platform(post("/api/platform/partners/" + a + "/status"), "{\"status\":\"DISABLED\"}").andExpect(status().isOk());
         call(agentA, agency, get("/api/partner/me"), null).andExpect(status().isForbidden());
+        call(agentA, agency, get("/api/partner/membership"), null).andExpect(jsonPath("$.data.active").value(false));
     }
 
-    @Test void bdsManageOnlyTheirOwnTenantsAndOwnersRenewVoidAndReassign() throws Exception {
+    @Test void membersJoinTheTeamAccountByPhoneAndWorkWithinTheirPermissions() throws Exception {
         long a = partner("甲服务商", agentA);
-        platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-bd-0001\",\"credits\":5000,\"note\":\"线下打款\"}").andExpect(status().isOk());
-        platform(put("/api/platform/partners/" + a + "/quotas"), "{\"planCode\":\"" + planCode + "\",\"quota\":5}").andExpect(status().isOk());
+        platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-m-0001\",\"credits\":2000,\"note\":\"线下打款\"}").andExpect(status().isOk());
 
-        // 负责人按 UID 加 BD；BD 不能管团队，负责人不能被当成 BD 再加一次。
-        call(agentA, agency, post("/api/partner/team"), "{\"uid\":" + uid(bd) + "}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[1].role").value("BD")).andExpect(jsonPath("$.data[1].tenantCount").value(0));
-        call(agentA, agency, post("/api/partner/team"), "{\"uid\":" + uid(agentA) + "}").andExpect(status().isConflict());
-        call(bd, agency, get("/api/partner/team"), null).andExpect(status().isForbidden());
-        call(bd, agency, get("/api/partner/me"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.role").value("BD"))
-                .andExpect(jsonPath("$.data.partner.creditsAvailable").doesNotExist());
+        // 负责人按手机号加成员：在团队账户里新建一个员工账号。同一个号不能再加；注册了别的商户的号不能加。
+        call(agentA, agency, post("/api/partner/team"), member("13800001111", "周晓", MEMBER_PERMS, null)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[1].role").value("MEMBER")).andExpect(jsonPath("$.data[1].phone").value("13800001111"))
+                .andExpect(jsonPath("$.data[1].permissions.distribute").value(false));
+        long staff = owner.queryForObject("SELECT id FROM users WHERE phone='13800001111'", Long.class);
+        assertThat(owner.queryForMap("SELECT tenant_id, role FROM users WHERE id=?", staff)).containsEntry("tenant_id", agency).containsEntry("role", "STAFF");
+        call(agentA, agency, post("/api/partner/team"), member("13800001111", "周晓", MEMBER_PERMS, null)).andExpect(status().isConflict());
+        owner.update("UPDATE users SET phone='13900002222' WHERE id=?", shopOwner);
+        call(agentA, agency, post("/api/partner/team"), member("13900002222", "李", MEMBER_PERMS, null)).andExpect(status().isConflict());
 
-        // BD 按 UID 加的商户归到这个 BD；负责人直接加的 BD 看不到，BD 也不能再加到自己名下。
-        call(bd, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.bdUserId").value(bd)).andExpect(jsonPath("$.data.bdName").value("BD 小周"));
-        call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(cafeOwner) + "}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.bdUserId").doesNotExist());
-        call(bd, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(cafeOwner) + "}").andExpect(status().isConflict());
-        call(bd, agency, get("/api/partner/tenants"), null).andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.items[0].tenantName").value("冰雪时光"));
-        call(agentA, agency, get("/api/partner/tenants"), null).andExpect(jsonPath("$.data.total").value(2));
-        call(agentA, agency, get("/api/partner/tenants?bdUserId=0"), null).andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.items[0].tenantName").value("一方小馆"));
+        // 成员第一次进来还没有称呼；称呼团队内不能重名。团队账户的烟火大家看到的是同一个数。
+        call(staff, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.role").value("MEMBER"))
+                .andExpect(jsonPath("$.data.displayName").doesNotExist()).andExpect(jsonPath("$.data.userName").value("周晓"))
+                .andExpect(jsonPath("$.data.account.available").value(2000)).andExpect(jsonPath("$.data.partner.creditsAvailable").value(2000));
+        call(staff, agency, put("/api/partner/me/name"), "{\"displayName\":\"小周\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.displayName").value("小周"));
+        call(agentA, agency, put("/api/partner/me/name"), "{\"displayName\":\"小周\"}").andExpect(status().isConflict());
+        call(agentA, agency, put("/api/partner/me/name"), "{\"displayName\":\"   \"}").andExpect(status().isBadRequest());
 
-        // 只有负责人能分烟火、看服务商流水。
-        call(bd, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-bd-01\",\"credits\":10}").andExpect(status().isForbidden());
-        call(bd, agency, get("/api/partner/ledger"), null).andExpect(status().isForbidden());
-        call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-bd-02\",\"credits\":2000}").andExpect(status().isOk());
-        call(agentA, agency, post("/api/partner/tenants/" + cafe + "/credits"), "{\"requestKey\":\"transfer-bd-03\",\"credits\":2000}").andExpect(status().isOk());
-        assertThat(owner.queryForObject("SELECT credits_available FROM partners WHERE id=?", Long.class, a)).isEqualTo(1000);
+        // 默认能管商户和激活码，不能分烟火、看流水、管团队；团队列表看不到手机号。
+        call(staff, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.addedByName").value("小周"));
+        call(staff, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-m-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":1}").andExpect(status().isOk());
+        call(staff, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"m-transfer-01\",\"credits\":10}").andExpect(status().isForbidden());
+        call(staff, agency, get("/api/partner/ledger"), null).andExpect(status().isForbidden());
+        call(staff, agency, get("/api/partner/distributions"), null).andExpect(status().isForbidden());
+        call(staff, agency, post("/api/partner/team"), member("13800003333", "吴", MEMBER_PERMS, null)).andExpect(status().isForbidden());
+        call(staff, agency, get("/api/partner/team"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data[1].phone").doesNotExist())
+                .andExpect(jsonPath("$.data[1].tenantsAdded").value(1)).andExpect(jsonPath("$.data[1].codes.generated").value(1));
 
-        // BD 生成的码兑换后归到这个 BD；BD 只看自己生成的码，负责人能按生成人筛。
-        call(bd, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-bd-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":2}")
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].createdBy").value(bd));
-        call(agentA, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-own-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":1}").andExpect(status().isOk());
-        call(bd, agency, get("/api/partner/codes"), null).andExpect(jsonPath("$.data.total").value(2));
-        call(agentA, agency, get("/api/partner/codes"), null).andExpect(jsonPath("$.data.total").value(3));
-        call(agentA, agency, get("/api/partner/codes?createdBy=" + bd), null).andExpect(jsonPath("$.data.total").value(2));
-        List<Long> bdCodes = owner.queryForList("SELECT id FROM billing_redeem_codes WHERE created_by=? ORDER BY id", Long.class, bd);
-        long ownCode = owner.queryForObject("SELECT id FROM billing_redeem_codes WHERE created_by=?", Long.class, agentA);
-        redeem(bakeryOwner, bakery, owner.queryForObject("SELECT code FROM billing_redeem_codes WHERE id=?", String.class, bdCodes.get(0))).andExpect(status().isOk());
-        assertThat(owner.queryForObject("SELECT bd_user_id FROM partner_tenants WHERE tenant_id=?", Long.class, bakery)).isEqualTo(bd);
+        // 负责人给分配权限并设每月上限 500：分 300 可以，再分 300 超上限被拒；只看得到自己分出去的。
+        String distribute = "{\"tenants\":true,\"codes\":true,\"distribute\":true,\"finance\":false,\"team\":false}";
+        call(agentA, agency, put("/api/partner/team/" + staff), "{\"permissions\":" + distribute + ",\"monthlyCap\":500}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[1].monthlyCap").value(500));
+        call(staff, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"m-transfer-02\",\"credits\":300}").andExpect(status().isOk());
+        call(staff, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"m-transfer-03\",\"credits\":300}").andExpect(status().isBadRequest());
+        call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"o-transfer-01\",\"credits\":600}").andExpect(status().isOk());
+        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, shop)).isEqualTo(900);
+        call(staff, agency, get("/api/partner/distributions"), null).andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].actorName").value("小周"));
+        call(agentA, agency, get("/api/partner/distributions"), null).andExpect(jsonPath("$.data.total").value(2));
+        call(agentA, agency, get("/api/partner/team"), null).andExpect(jsonPath("$.data[1].distributedThisMonth").value(300));
 
-        // 作废：只能作废没兑换的；BD 不能作废负责人的码；额度不退回。
-        call(bd, agency, post("/api/partner/codes/" + ownCode + "/void"), null).andExpect(status().isNotFound());
-        call(bd, agency, post("/api/partner/codes/" + bdCodes.get(0) + "/void"), null).andExpect(status().isConflict());
-        call(bd, agency, post("/api/partner/codes/" + bdCodes.get(1) + "/void"), null).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("VOIDED"));
-        call(agentA, agency, post("/api/partner/codes/" + ownCode + "/void"), null).andExpect(status().isOk());
-        assertThat(owner.queryForObject("SELECT used FROM partner_code_quotas WHERE partner_id=?", Integer.class, a)).isEqualTo(3);
+        // 有团队管理权限的成员：能加人，但只能给出自己也有的权限，分配和财务只有负责人能给；不能改自己、不能动负责人。
+        String manager = "{\"tenants\":true,\"codes\":true,\"distribute\":true,\"finance\":false,\"team\":true}";
+        call(agentA, agency, put("/api/partner/team/" + staff), "{\"permissions\":" + manager + ",\"monthlyCap\":500}").andExpect(status().isOk());
+        call(staff, agency, post("/api/partner/team"), member("13800003333", "吴凡", distribute, null)).andExpect(status().isForbidden());
+        call(staff, agency, post("/api/partner/team"), member("13800003333", "吴凡", MEMBER_PERMS, null)).andExpect(status().isOk());
+        long second = owner.queryForObject("SELECT id FROM users WHERE phone='13800003333'", Long.class);
+        call(staff, agency, put("/api/partner/team/" + second), "{\"permissions\":" + distribute + "}").andExpect(status().isForbidden());
+        call(staff, agency, put("/api/partner/team/" + second), "{\"permissions\":" + MEMBER_PERMS + ",\"displayName\":\"小吴\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[2].displayName").value("小吴"));
+        call(staff, agency, put("/api/partner/team/" + staff), "{\"permissions\":" + manager + ",\"monthlyCap\":500}").andExpect(status().isForbidden());
+        call(staff, agency, put("/api/partner/team/" + agentA), "{\"permissions\":" + MEMBER_PERMS + "}").andExpect(status().isForbidden());
+        call(staff, agency, delete("/api/partner/team/" + agentA), null).andExpect(status().isForbidden());
 
-        // 直接续期：扣一个额度，在原到期日上顺延；同一请求重复提交不重复扣、不重复顺延。BD 只能续自己的商户。
-        java.time.Instant before = java.time.Instant.parse(owner.queryForObject(
-                "SELECT to_char(member_until AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM billing_accounts WHERE tenant_id=?", String.class, bakery));
-        String renew = "{\"requestKey\":\"renew-0001\",\"planCode\":\"" + planCode + "\"}";
-        call(bd, agency, post("/api/partner/tenants/" + bakery + "/renewals"), renew).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.memberActive").value(true));
-        call(bd, agency, post("/api/partner/tenants/" + bakery + "/renewals"), renew).andExpect(status().isOk());
-        java.time.Instant after = java.time.Instant.parse(owner.queryForObject(
-                "SELECT to_char(member_until AT TIME ZONE 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM billing_accounts WHERE tenant_id=?", String.class, bakery));
-        assertThat(java.time.Duration.between(before, after)).isEqualTo(java.time.Duration.ofDays(30));
-        assertThat(owner.queryForObject("SELECT used FROM partner_code_quotas WHERE partner_id=?", Integer.class, a)).isEqualTo(4);
-        assertThat(owner.queryForObject("SELECT note FROM billing_redeem_codes WHERE batch_key LIKE 'partner-renew-%'", String.class)).isEqualTo("直接续期");
-        call(bd, agency, post("/api/partner/tenants/" + cafe + "/renewals"), "{\"requestKey\":\"renew-0002\",\"planCode\":\"" + planCode + "\"}")
-                .andExpect(status().isNotFound());
-
-        // 到期筛选：冰雪时光和一方小馆从未开通，麦香烘焙 60 天后才到期。
-        call(agentA, agency, get("/api/partner/tenants?expiry=NEVER"), null).andExpect(jsonPath("$.data.total").value(2));
-        call(agentA, agency, get("/api/partner/tenants?expiry=SOON30"), null).andExpect(jsonPath("$.data.total").value(0));
-        call(bd, agency, get("/api/partner/tenants?expiry=NEVER"), null).andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.items[0].tenantName").value("冰雪时光"));
-        call(agentA, agency, get("/api/partner/tenants?expiry=BAD"), null).andExpect(status().isBadRequest());
-
-        // 按 UID 预查询：负责人看得到归属和账号身份，BD 只看商户这边；姓名打码。
-        call(agentA, agency, get("/api/partner/lookup?uid=" + uid(shopOwner)), null).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.tenantState").value("MINE")).andExpect(jsonPath("$.data.tenantId").value(shop))
-                .andExpect(jsonPath("$.data.userName").value("李**")).andExpect(jsonPath("$.data.bdName").value("BD 小周"))
-                .andExpect(jsonPath("$.data.memberState").value("NONE"));
-        call(bd, agency, get("/api/partner/lookup?uid=" + uid(cafeOwner)), null)
-                .andExpect(jsonPath("$.data.tenantState").value("TEAM")).andExpect(jsonPath("$.data.tenantId").doesNotExist())
-                .andExpect(jsonPath("$.data.memberState").doesNotExist());
-        call(agentA, agency, get("/api/partner/lookup?uid=" + uid(bd)), null).andExpect(jsonPath("$.data.memberState").value("BD"));
-        call(agentA, agency, get("/api/partner/lookup?uid=99999999"), null).andExpect(status().isNotFound());
-
-        // 商户详情：负责人看得到分给他的烟火，BD 看不到；兑换记录含直接续期；不归自己管的看不到。
-        call(agentA, agency, get("/api/partner/tenants/" + shop), null).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.tenant.tenantName").value("冰雪时光")).andExpect(jsonPath("$.data.transfers[0].credits").value(2000)).andExpect(jsonPath("$.data.transfers[0].source").value("POOL"));
-        call(bd, agency, get("/api/partner/tenants/" + bakery), null).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.transfers").doesNotExist()).andExpect(jsonPath("$.data.codes.length()").value(2))
-                .andExpect(jsonPath("$.data.codes[0].note").value("直接续期"));
-        call(bd, agency, get("/api/partner/tenants/" + cafe), null).andExpect(status().isNotFound());
-        call(agentA, agency, get("/api/partner/team"), null).andExpect(jsonPath("$.data[1].codes.generated").value(3))
-                .andExpect(jsonPath("$.data[1].codes.redeemed").value(2)).andExpect(jsonPath("$.data[1].codes.voided").value(1))
-                .andExpect(jsonPath("$.data[1].codes.unused").value(0)).andExpect(jsonPath("$.data[1].codes.renewals").value(1));
-
-        // 负责人调配商户；移除 BD 时指定商户转给谁（0 表示回到负责人直接管）。
-        call(bd, agency, put("/api/partner/tenants/" + cafe + "/bd"), "{\"bdUserId\":" + bd + "}").andExpect(status().isForbidden());
-        call(agentA, agency, put("/api/partner/tenants/" + cafe + "/bd"), "{\"bdUserId\":" + bd + "}").andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.bdUserId").value(bd));
-        call(agentA, agency, put("/api/partner/tenants/" + cafe + "/bd"), "{\"bdUserId\":" + agentA + "}").andExpect(status().isNotFound());
-        call(agentA, agency, get("/api/partner/team"), null).andExpect(jsonPath("$.data[1].tenantCount").value(3));
-        platform(get("/api/platform/partners"), null).andExpect(jsonPath("$.data[0].members.length()").value(2));
-        call(agentA, agency, delete("/api/partner/team/" + agentA + "?transferTo=0"), null).andExpect(status().isNotFound());
-        call(agentA, agency, delete("/api/partner/team/" + bd + "?transferTo=" + bd), null).andExpect(status().isNotFound());
-        call(agentA, agency, delete("/api/partner/team/" + bd), null).andExpect(status().isBadRequest());
-        call(agentA, agency, delete("/api/partner/team/" + bd + "?transferTo=0"), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
-        assertThat(owner.queryForObject("SELECT count(*) FROM partner_tenants WHERE bd_user_id IS NOT NULL", Long.class)).isZero();
-        call(bd, agency, get("/api/partner/me"), null).andExpect(status().isForbidden());
+        // 移除成员：一并移出团队账户（账号停用、手机号释放），服务商后台进不去了。
+        call(staff, agency, delete("/api/partner/team/" + second), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2));
+        assertThat(owner.queryForMap("SELECT status, phone FROM users WHERE id=?", second)).containsEntry("status", "REMOVED").containsEntry("phone", null);
+        assertThat(owner.queryForObject("SELECT count(*) FROM partner_members WHERE user_id=?", Long.class, second)).isZero();
+        call(staff, agency, get("/api/partner/membership"), null).andExpect(jsonPath("$.data.member").value(true)).andExpect(jsonPath("$.data.role").value("MEMBER"));
     }
 
     @Test void workbenchAndDashboardShowUsageWithoutWorksAndFlagLowBalance() throws Exception {
         long a = partner("甲服务商", agentA);
         platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-wb-0001\",\"credits\":5000,\"note\":\"线下打款\"}").andExpect(status().isOk());
-        platform(put("/api/platform/partners/" + a + "/quotas"), "{\"planCode\":\"" + planCode + "\",\"quota\":5}").andExpect(status().isOk());
-        call(agentA, agency, post("/api/partner/team"), "{\"uid\":" + uid(bd) + "}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/team"), member("13800004444", "周晓", MEMBER_PERMS, null)).andExpect(status().isOk());
+        long staff = owner.queryForObject("SELECT id FROM users WHERE phone='13800004444'", Long.class);
         call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
-        call(bd, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(cafeOwner) + "}").andExpect(status().isOk());
+        call(staff, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(cafeOwner) + "}").andExpect(status().isOk());
 
         // 冰雪时光：续期后分 1000 烟火，用掉 905，余 95 不到最近充值的 10%；一方小馆：续期了还没用过。
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/renewals"), "{\"requestKey\":\"renew-wb-01\",\"planCode\":\"" + planCode + "\"}").andExpect(status().isOk());
-        call(agentA, agency, post("/api/partner/tenants/" + cafe + "/renewals"), "{\"requestKey\":\"renew-wb-02\",\"planCode\":\"" + planCode + "\"}").andExpect(status().isOk());
+        call(staff, agency, post("/api/partner/tenants/" + cafe + "/renewals"), "{\"requestKey\":\"renew-wb-02\",\"planCode\":\"" + planCode + "\"}").andExpect(status().isOk());
+        call(staff, agency, post("/api/partner/tenants/" + cafe + "/renewals"), "{\"requestKey\":\"renew-wb-02\",\"planCode\":\"" + planCode + "\"}").andExpect(status().isOk());
+        assertThat(owner.queryForObject("SELECT note FROM billing_redeem_codes WHERE batch_key LIKE 'partner-renew-%' LIMIT 1", String.class)).isEqualTo("直接续期");
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"transfer-wb-01\",\"credits\":1000}").andExpect(status().isOk());
         TenantContext.runAs(shop, () -> {
             String image = billing.reserve("wb-image-" + UUID.randomUUID(), "IMAGE", 5, "图片创作预占");
@@ -285,89 +256,66 @@ class PartnerIntegrationTest {
             return null;
         });
 
-        // 商户详情带使用情况和上手进度。
+        // 商户详情带使用情况和上手进度；没有分配和财务权限的成员看不到分给他的烟火。
         call(agentA, agency, get("/api/partner/tenants/" + shop), null).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.usage.consumed").value(905)).andExpect(jsonPath("$.data.usage.uses").value(2))
                 .andExpect(jsonPath("$.data.usage.consumedByCapability.VIDEO").value(900))
                 .andExpect(jsonPath("$.data.usage.lastTopUpCredits").value(1000)).andExpect(jsonPath("$.data.usage.lowBalance").value(true))
                 .andExpect(jsonPath("$.data.onboarding.activated").value(true)).andExpect(jsonPath("$.data.onboarding.firstUse").value(true))
-                .andExpect(jsonPath("$.data.onboarding.stores").value(0));
+                .andExpect(jsonPath("$.data.onboarding.stores").value(0)).andExpect(jsonPath("$.data.transfers[0].credits").value(1000));
+        call(staff, agency, get("/api/partner/tenants/" + shop), null).andExpect(status().isOk()).andExpect(jsonPath("$.data.transfers").doesNotExist());
 
-        // 待办：负责人看到冰雪时光余额不足、一方小馆开通未使用；BD 只看到自己的一方小馆。
-        call(agentA, agency, get("/api/partner/workbench"), null).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.counts.LOW_BALANCE").value(1)).andExpect(jsonPath("$.data.counts.NOT_STARTED").value(1))
-                .andExpect(jsonPath("$.data.counts.EXPIRING").value(0))
-                .andExpect(jsonPath("$.data.todos[?(@.type=='LOW_BALANCE')].tenant.tenantName").value("冰雪时光"));
-        call(bd, agency, get("/api/partner/workbench"), null).andExpect(jsonPath("$.data.todos.length()").value(1))
-                .andExpect(jsonPath("$.data.todos[0].type").value("NOT_STARTED")).andExpect(jsonPath("$.data.todos[0].tenant.tenantName").value("一方小馆"));
+        // 待办：名下商户整个服务商共有，成员和负责人看到的一样。
+        for (long who : new long[]{agentA, staff})
+            call(who, agency, get("/api/partner/workbench"), null).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.counts.LOW_BALANCE").value(1)).andExpect(jsonPath("$.data.counts.NOT_STARTED").value(1))
+                    .andExpect(jsonPath("$.data.counts.EXPIRING").value(0))
+                    .andExpect(jsonPath("$.data.todos[?(@.type=='LOW_BALANCE')].tenant.tenantName").value("冰雪时光"));
 
-        // 看板：负责人看全部和烟火，BD 只看自己的、没有烟火数字；按 BD 筛。
+        // 看板：烟火数字只给有财务权限的人；成员表列出每个人做的事。
         call(agentA, agency, get("/api/partner/dashboard?days=7"), null).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenants").value(2)).andExpect(jsonPath("$.data.consumed").value(905))
                 .andExpect(jsonPath("$.data.activeMembers").value(2)).andExpect(jsonPath("$.data.neverActivated").value(0))
                 .andExpect(jsonPath("$.data.activeTenants").value(1)).andExpect(jsonPath("$.data.firstUses").value(1))
                 .andExpect(jsonPath("$.data.granted").value(5000)).andExpect(jsonPath("$.data.transferred").value(1000))
+                .andExpect(jsonPath("$.data.creditsAvailable").value(4000))
                 .andExpect(jsonPath("$.data.renewals").value(2)).andExpect(jsonPath("$.data.codesRedeemed").value(2))
                 .andExpect(jsonPath("$.data.daily.length()").value(7)).andExpect(jsonPath("$.data.topTenants[0].tenantName").value("冰雪时光"))
-                .andExpect(jsonPath("$.data.bds[0].name").value("BD 小周")).andExpect(jsonPath("$.data.bds[0].tenants").value(1));
-        call(bd, agency, get("/api/partner/dashboard?days=30"), null).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.tenants").value(1)).andExpect(jsonPath("$.data.consumed").value(0))
-                .andExpect(jsonPath("$.data.granted").doesNotExist()).andExpect(jsonPath("$.data.creditsAvailable").doesNotExist())
-                .andExpect(jsonPath("$.data.renewals").value(0)).andExpect(jsonPath("$.data.bds.length()").value(0));
-        call(agentA, agency, get("/api/partner/dashboard?days=7&bdUserId=" + bd), null)
-                .andExpect(jsonPath("$.data.tenants").value(1)).andExpect(jsonPath("$.data.transferred").value(0));
+                .andExpect(jsonPath("$.data.members[1].name").value("周晓")).andExpect(jsonPath("$.data.members[1].tenantsAdded").value(1))
+                .andExpect(jsonPath("$.data.members[1].renewals").value(1)).andExpect(jsonPath("$.data.members[0].distributed").value(1000));
+        call(staff, agency, get("/api/partner/dashboard?days=30"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenants").value(2)).andExpect(jsonPath("$.data.granted").doesNotExist())
+                .andExpect(jsonPath("$.data.creditsAvailable").doesNotExist()).andExpect(jsonPath("$.data.members[0].distributed").doesNotExist());
         call(agentA, agency, get("/api/partner/dashboard?days=5"), null).andExpect(status().isBadRequest());
     }
 
-    @Test void ownersDistributeTheirOwnAccountCreditsToTenantsAndBdsWithRecords() throws Exception {
+    @Test void teamAccountGiftGoesOutFirstAndPendingDistributionsCanBeCompleted() throws Exception {
         long a = partner("甲服务商", agentA);
-        call(agentA, agency, post("/api/partner/team"), "{\"uid\":" + uid(bd) + "}").andExpect(status().isOk());
         call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
-        // 负责人自己的账号：平台赠送 300、充值 1000（用服务商分配的充值烟火模拟到账）。
+        // 团队账户：平台赠送 300、充值 1000。
         TenantContext.runAs(agency, () -> billing.grantCredits(300, "agency-gift-1", operator));
         TenantContext.runAs(agency, () -> billing.creditFromPartner(1000, "agency-topup-1", "测试", operator));
         call(agentA, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.account.available").value(1300))
                 .andExpect(jsonPath("$.data.account.gift").value(300));
-        call(bd, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.account.available").value(1300));
 
-        // 从自己账号分 500 给商户：先扣赠送 300，再扣充值 200；商户收到赠送 300、充值 200。重复提交不重复扣。
-        String toShop = "{\"requestKey\":\"acct-shop-01\",\"credits\":500,\"source\":\"ACCOUNT\",\"note\":\"开业支持\"}";
+        // 分 500 给商户：先扣赠送 300，再扣充值 200；商户收到赠送 300、充值 200。重复提交不重复扣。
+        String toShop = "{\"requestKey\":\"acct-shop-01\",\"credits\":500,\"note\":\"开业支持\"}";
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), toShop).andExpect(status().isOk());
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), toShop).andExpect(status().isOk());
         assertThat(owner.queryForMap("SELECT gift_available, purchased_available FROM billing_accounts WHERE tenant_id=?", shop))
                 .containsEntry("gift_available", 300L).containsEntry("purchased_available", 200L);
         assertThat(owner.queryForMap("SELECT gift_available, purchased_available FROM billing_accounts WHERE tenant_id=?", agency))
                 .containsEntry("gift_available", 0L).containsEntry("purchased_available", 800L);
-        // 同一个请求换数量会被拒绝；超过账号余额拒绝；服务商的可分配烟火没动。
+        // 同一个请求换数量会被拒绝；超过余额拒绝。
         call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), toShop.replace("500", "600")).andExpect(status().isBadRequest());
-        call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"acct-shop-02\",\"credits\":5000,\"source\":\"ACCOUNT\"}")
+        call(agentA, agency, post("/api/partner/tenants/" + shop + "/credits"), "{\"requestKey\":\"acct-shop-02\",\"credits\":5000}")
                 .andExpect(jsonPath("$.code").value(9003));
-        assertThat(owner.queryForObject("SELECT credits_available FROM partners WHERE id=?", Long.class, a)).isZero();
+        call(agentA, agency, get("/api/partner/distributions"), null).andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].gift").value(300)).andExpect(jsonPath("$.data.items[0].purchased").value(200))
+                .andExpect(jsonPath("$.data.items[0].note").value("开业支持")).andExpect(jsonPath("$.data.items[0].actorName").value("甲老板"))
+                .andExpect(jsonPath("$.data.items[0].source").value("ACCOUNT"));
 
-        // 分给 BD：进 BD 的账号；BD 和负责人同一个商户账号时不用分。BD 不能分烟火。
-        long bdShop = tenant("BD 自己的店");
-        long bd2 = user(bdShop, "bd-2", "BD 小吴");
-        call(agentA, agency, post("/api/partner/team"), "{\"uid\":" + uid(bd2) + "}").andExpect(status().isOk());
-        call(agentA, agency, post("/api/partner/team/" + bd2 + "/credits"), "{\"requestKey\":\"acct-bd-01\",\"credits\":300,\"source\":\"ACCOUNT\"}")
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.recipientType").value("BD")).andExpect(jsonPath("$.data.recipientName").value("BD 小吴"))
-                .andExpect(jsonPath("$.data.status").value("DONE"));
-        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, bdShop)).isEqualTo(300);
-        call(agentA, agency, post("/api/partner/team/" + bd + "/credits"), "{\"requestKey\":\"acct-bd-02\",\"credits\":10,\"source\":\"ACCOUNT\"}")
-                .andExpect(status().isBadRequest());
-        call(agentA, agency, post("/api/partner/team/" + shopOwner + "/credits"), "{\"requestKey\":\"acct-bd-03\",\"credits\":10,\"source\":\"ACCOUNT\"}")
-                .andExpect(status().isNotFound());
-        call(bd, agency, post("/api/partner/team/" + bd2 + "/credits"), "{\"requestKey\":\"acct-bd-04\",\"credits\":10,\"source\":\"ACCOUNT\"}")
-                .andExpect(status().isForbidden());
-
-        // 分配记录：两笔，新的在前；按对象和来源筛；BD 看不到。
-        call(agentA, agency, get("/api/partner/distributions"), null).andExpect(jsonPath("$.data.total").value(2))
-                .andExpect(jsonPath("$.data.items[0].recipientType").value("BD")).andExpect(jsonPath("$.data.items[1].gift").value(300))
-                .andExpect(jsonPath("$.data.items[1].purchased").value(200)).andExpect(jsonPath("$.data.items[1].note").value("开业支持"))
-                .andExpect(jsonPath("$.data.items[1].actorName").value("甲服务商"));
-        call(agentA, agency, get("/api/partner/distributions?recipientType=TENANT&source=ACCOUNT"), null).andExpect(jsonPath("$.data.total").value(1));
-        call(agentA, agency, get("/api/partner/distributions?source=POOL"), null).andExpect(jsonPath("$.data.total").value(0));
-        call(bd, agency, get("/api/partner/distributions"), null).andExpect(status().isForbidden());
-        // 未到账的一笔可以补上：模拟入账前中断（只扣了来源、记了分配），补上后到账且不重复扣。
+        // 未到账的一笔可以补上：模拟入账前中断（只扣了团队账户、记了分配），补上后到账且不重复扣。
         TenantContext.runAs(agency, () -> billing.debitForPartner(50, "partner-transfer:" + a + ":acct-pending-01", "分配给商户「冰雪时光」", agentA));
         owner.update("INSERT INTO partner_distributions(partner_id, request_key, source, recipient_type, recipient_tenant_id, credits, gift_credits, purchased_credits, actor_user_id) "
                 + "VALUES (?, ?, 'ACCOUNT', 'TENANT', ?, 50, 0, 50, ?)", a, "partner-transfer:" + a + ":acct-pending-01", shop, agentA);
@@ -376,9 +324,8 @@ class PartnerIntegrationTest {
                 .andExpect(jsonPath("$.data.status").value("DONE"));
         call(agentA, agency, post("/api/partner/distributions/" + pending + "/retry"), null).andExpect(jsonPath("$.data.status").value("DONE"));
         assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, shop)).isEqualTo(250);
-        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, agency)).isEqualTo(450);
-        call(agentA, agency, get("/api/partner/dashboard?days=7"), null).andExpect(jsonPath("$.data.transferred").value(550))
-                .andExpect(jsonPath("$.data.transferredToBds").value(300));
+        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, agency)).isEqualTo(750);
+        call(agentA, agency, get("/api/partner/dashboard?days=7"), null).andExpect(jsonPath("$.data.transferred").value(550));
     }
 
     @Test void crmPersistsFollowUpsRejectsStaleEditsAndKeepsPartnersIsolated() throws Exception {
@@ -387,18 +334,20 @@ class PartnerIntegrationTest {
         String profile="{\"contactName\":\"李经理\",\"contactPhone\":\"13800000000\",\"industry\":\"餐饮\",\"region\":\"杭州\",\"stage\":\"ACTIVE\",\"version\":0}";
         call(agentA,agency,put("/api/partner/tenants/"+shop+"/profile"),profile).andExpect(status().isOk()).andExpect(jsonPath("$.data.version").value(1));
         call(agentA,agency,put("/api/partner/tenants/"+shop+"/profile"),profile).andExpect(status().isConflict());
-        call(agentB,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isNotFound());
+        call(agentB,agencyB,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isNotFound());
         String next=java.time.Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
         String follow="{\"requestKey\":\"follow-0001\",\"channel\":\"WECHAT\",\"content\":\"已完成首次培训，预约回访\",\"stage\":\"ACTIVE\",\"nextFollowUpAt\":\""+next+"\",\"version\":1}";
         call(agentA,agency,post("/api/partner/tenants/"+shop+"/follow-ups"),follow).andExpect(status().isOk()).andExpect(jsonPath("$.data.followUps.total").value(1)).andExpect(jsonPath("$.data.profile.version").value(2));
         call(agentA,agency,post("/api/partner/tenants/"+shop+"/follow-ups"),follow).andExpect(status().isOk()).andExpect(jsonPath("$.data.followUps.total").value(1));
         call(agentA,agency,get("/api/partner/follow-ups/due"),null).andExpect(jsonPath("$.data[0].tenantId").value(shop));
-        call(agentA,agency,post("/api/partner/team"),"{\"uid\":"+uid(bd)+"}").andExpect(status().isOk());
-        call(bd,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isNotFound());
-        call(agentA,agency,put("/api/partner/tenants/"+shop+"/bd"),"{\"bdUserId\":"+bd+"}").andExpect(status().isOk());
-        call(bd,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isOk()).andExpect(jsonPath("$.data.profile.contactName").value("李经理"));
+        // 成员看商户档案要有「商户」权限。
+        call(agentA,agency,post("/api/partner/team"),member("13800005555","周晓","{\"tenants\":false,\"codes\":true,\"distribute\":false,\"finance\":false,\"team\":false}",null)).andExpect(status().isOk());
+        long staff=owner.queryForObject("SELECT id FROM users WHERE phone='13800005555'",Long.class);
+        call(staff,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isForbidden());
+        call(agentA,agency,put("/api/partner/team/"+staff),"{\"permissions\":"+MEMBER_PERMS+"}").andExpect(status().isOk());
+        call(staff,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isOk()).andExpect(jsonPath("$.data.profile.contactName").value("李经理"));
         platform(put("/api/platform/partners/assignments/"+shop),"{\"partnerId\":"+b+"}").andExpect(status().isOk());
-        call(agentB,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(jsonPath("$.data.profile.version").value(0)).andExpect(jsonPath("$.data.followUps.total").value(0));
+        call(agentB,agencyB,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(jsonPath("$.data.profile.version").value(0)).andExpect(jsonPath("$.data.followUps.total").value(0));
         assertThat(owner.queryForObject("SELECT count(*) FROM partner_follow_ups WHERE partner_id=?",Long.class,a)).isEqualTo(1);
     }
 
@@ -435,6 +384,10 @@ class PartnerIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='PURCHASE'",Long.class)).isEqualTo(1);
         call(cafeOwner,cafe,get("/api/billing/operations/orders?state=PAID&paymentMethod=MANUAL"),null).andExpect(jsonPath("$.data.paidMinor").value(50000)).andExpect(jsonPath("$.data.page.total").value(1));
         assertThat(TenantContext.get()).isNull();
+    }
+
+    private static String member(String phone, String name, String perms, Long cap) {
+        return "{\"phone\":\"" + phone + "\",\"name\":\"" + name + "\",\"permissions\":" + perms + (cap == null ? "" : ",\"monthlyCap\":" + cap) + "}";
     }
 
     private long partner(String name, long admin) throws Exception {

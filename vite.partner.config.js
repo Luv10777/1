@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => {
     publicDir: false,
     plugins: [vue()],
     optimizeDeps: { include: ['vue', 'vue-router', 'lucide-vue-next', '@headlessui/vue'] },
-    define: { 'import.meta.env.VITE_APP_CONTEXT': JSON.stringify('partner') },
+    // 服务商后台挂在一方志站的 /partner/ 下，和一方志共用登录（不设 VITE_APP_CONTEXT，令牌存在同一处）。
+    base: '/partner/',
     server: {
       host: '127.0.0.1', port: 4178, strictPort: true,
       fs: { allow: [projectRoot] },
@@ -28,6 +29,7 @@ export default defineConfig(({ mode }) => {
       headers: { 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' },
     },
     preview: { host: '127.0.0.1', port: 4178, strictPort: true, proxy },
-    build: { outDir: '../dist-partner', emptyOutDir: true, target: 'es2020' },
+    // 构建进一方志站的 dist/partner/，和站点一起发布；先跑主站构建（它会清空 dist/）。
+    build: { outDir: '../dist/partner', emptyOutDir: true, target: 'es2020' },
   }
 })

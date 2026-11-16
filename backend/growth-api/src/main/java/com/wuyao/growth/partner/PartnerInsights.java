@@ -16,7 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 服务商后台的待办首页和经营看板。负责人看全部（可按 BD 筛），BD 只看自己名下的商户和自己生成的激活码。
+ * 服务商后台的待办首页和经营看板，要有「商户」权限；名下商户整个服务商共有。烟火数字只给有财务权限的人。
  * 商户的会员、余额和使用情况要在每个商户的租户里各读一次，商户很多时会慢，届时改成每天汇总。
  */
 @Service
@@ -34,9 +34,9 @@ public class PartnerInsights {
 
     /** 待办：即将到期、刚过期、余额不足、开通了没用过、7 天没用。每项带上商户，前端点开就是商户详情。 */
     public PartnerDtos.Workbench workbench(Long userId) {
-        var access = partners.requirePartner(userId);
+        var access = partners.require(userId, PartnerStore.Perms::tenants, "商户");
         Instant now = Instant.now();
-        var rows = rows(partners.visible(access), now);
+        var rows = rows(store.tenants(access.partner().id()), now);
         List<PartnerDtos.Todo> todos = new ArrayList<>();
         for (var r : rows) {
             var t = r.view();
@@ -55,21 +55,18 @@ public class PartnerInsights {
         return new PartnerDtos.Workbench(todos, counts, now);
     }
 
-    /** 经营看板：最近 days 天（1 是今天）的商户、消耗、烟火和激活码数字，按天的趋势，商户和 BD 排行。 */
-    public PartnerDtos.Dashboard dashboard(Long userId, int days, Long bdUserId) {
+    /** 经营看板：最近 days 天（1 是今天）的商户、消耗、烟火和激活码数字，按天的趋势，商户排行和成员做的事。 */
+    public PartnerDtos.Dashboard dashboard(Long userId, int days) {
         if (!Set.of(1, 7, 30, 90).contains(days)) throw BizException.of(ErrorCode.BAD_REQUEST, "时间范围只能是今天、7 天、30 天或 90 天");
-        var access = partners.requirePartner(userId);
-        boolean owner = access.owner();
+        var access = partners.require(userId, PartnerStore.Perms::tenants, "商户");
+        boolean finance = access.perms().finance();
         Long partnerId = access.partner().id();
         Instant now = Instant.now();
         LocalDate today = LocalDate.now(ZONE), first = today.minusDays(days - 1L);
         Instant since = days == 1 ? today.atStartOfDay(ZONE).toInstant() : now.minus(Duration.ofDays(days));
 
-        var bindings = partners.visible(access);
-        if (owner && bdUserId != null)
-            bindings = bindings.stream().filter(b -> bdUserId == 0 ? b.bdUserId() == null : bdUserId.equals(b.bdUserId())).toList();
+        var bindings = store.tenants(partnerId);
         var rows = rows(bindings, since);
-        Set<Long> tenantIds = bindings.stream().map(PartnerStore.Binding::tenantId).collect(Collectors.toSet());
 
         Map<String, long[]> daily = new LinkedHashMap<>();
         for (LocalDate d = first; !d.isAfter(today); d = d.plusDays(1)) daily.put(d.toString(), new long[4]);
@@ -96,34 +93,27 @@ public class PartnerInsights {
             if (boundDay != null) boundDay[2]++;
         }
 
-        Long granted = null, transferred = null, toBds = null;
-        if (owner) {
-            long g = 0, x = 0, b = 0;
-            for (var c : store.creditDays(partnerId, since)) if ("GRANT".equals(c.type())) g += c.delta();
-            for (var d : store.distributions(partnerId, null, null, null, null, since, 0, 100000)) {
-                if ("BD".equals(d.recipientType())) { b += d.credits(); continue; }
-                if (!tenantIds.contains(d.recipientTenantId())) continue;
-                x += d.credits();
+        // 分给商户的烟火按天也画在趋势里；只给有财务权限的人。
+        long granted = 0, transferred = 0;
+        Map<Long, Long> distributedBy = new HashMap<>();
+        if (finance) {
+            for (var c : store.creditDays(partnerId, since)) if ("GRANT".equals(c.type())) granted += c.delta();
+            for (var d : store.distributions(partnerId, "TENANT", null, null, null, since, 0, 100000)) {
+                transferred += d.credits();
+                distributedBy.merge(d.actorUserId(), d.credits(), Long::sum);
                 var p = daily.get(LocalDate.ofInstant(d.createdAt(), ZONE).toString());
                 if (p != null) p[1] += d.credits();
             }
-            granted = bdUserId == null ? g : null;
-            transferred = x;
-            toBds = bdUserId == null ? b : null;
         }
 
-        // 激活码按生成人认：BD 只算自己的；负责人按 BD 筛时只算那个 BD 的，「我直接管的」算负责人账号生成的。
-        Set<Long> creators = !owner ? Set.of(userId) : bdUserId == null ? null : bdUserId == 0
-                ? store.members(partnerId).stream().filter(m -> "OWNER".equals(m.role())).map(PartnerStore.MemberRow::userId).collect(Collectors.toSet())
-                : Set.of(bdUserId);
+        // 按生成人：这段时间生成的、被兑换的、直接续期的。
         long generated = 0, redeemed = 0, renewals = 0, voided = 0;
         Map<Long, long[]> byCreator = new HashMap<>();
         for (var c : store.codeEvents(partnerId, since)) {
-            if (creators != null && !creators.contains(c.createdBy())) continue;
-            var stat = byCreator.computeIfAbsent(c.createdBy(), k -> new long[2]);
-            if (!c.createdAt().isBefore(since)) { generated++; if (c.renewal()) { renewals++; stat[1]++; } }
+            var stat = byCreator.computeIfAbsent(c.createdBy(), k -> new long[3]);
+            if (!c.createdAt().isBefore(since)) { generated++; stat[0]++; if (c.renewal()) { renewals++; stat[2]++; } }
             if (c.redeemedAt() != null) {
-                if (!c.redeemedAt().isBefore(since)) { redeemed++; stat[0]++; }
+                if (!c.redeemedAt().isBefore(since)) { redeemed++; stat[1]++; }
                 var p = daily.get(LocalDate.ofInstant(c.redeemedAt(), ZONE).toString());
                 if (p != null) p[3]++;
             }
@@ -134,26 +124,21 @@ public class PartnerInsights {
                 e.getValue()[2], e.getValue()[3])).toList();
         var top = rows.stream().filter(r -> r.usage().consumed() > 0)
                 .sorted(Comparator.comparingLong((Row r) -> r.usage().consumed()).reversed())
-                .limit(10).map(r -> new PartnerDtos.TenantRank(r.view().tenantId(), r.view().tenantName(), r.view().bdName(),
+                .limit(10).map(r -> new PartnerDtos.TenantRank(r.view().tenantId(), r.view().tenantName(),
                         r.usage().consumed(), r.usage().uses(), r.usage().lastUsedAt())).toList();
-        List<PartnerDtos.BdRank> bds = owner && bdUserId == null ? bdRanks(partnerId, rows, byCreator, since) : List.of();
-        return new PartnerDtos.Dashboard(days, owner ? access.partner().creditsAvailable() : null, toBds, rows.size(), newTenants, activeMembers,
-                expiring, expired, never, active, firstUses, consumed, uses, byCapability, granted, transferred, generated, redeemed, renewals, voided,
-                points, top, bds);
-    }
-
-    private List<PartnerDtos.BdRank> bdRanks(Long partnerId, List<Row> rows, Map<Long, long[]> byCreator, Instant since) {
-        List<PartnerDtos.BdRank> ranks = new ArrayList<>();
-        for (var m : partners.members(partnerId)) {
-            if (!"BD".equals(m.role())) continue;
-            var mine = rows.stream().filter(r -> m.userId().equals(r.view().bdUserId())).toList();
-            var codes = byCreator.getOrDefault(m.userId(), new long[2]);
-            ranks.add(new PartnerDtos.BdRank(m.userId(), m.name(), mine.size(), mine.stream().mapToLong(r -> r.usage().consumed()).sum(),
-                    mine.stream().filter(r -> r.usage().lastUsedAt() != null && !r.usage().lastUsedAt().isBefore(since)).count(),
-                    codes[0], codes[1]));
+        Map<Long, Long> added = bindings.stream().filter(b -> "UID".equals(b.source()) && b.changedBy() != null && !b.boundAt().isBefore(since))
+                .collect(Collectors.groupingBy(PartnerStore.Binding::changedBy, Collectors.counting()));
+        Map<Long, String> names = partners.memberNames(partnerId);
+        List<PartnerDtos.MemberRank> members = new ArrayList<>();
+        for (var m : store.members(partnerId)) {
+            var codes = byCreator.getOrDefault(m.userId(), new long[3]);
+            members.add(new PartnerDtos.MemberRank(m.userId(), names.get(m.userId()), added.getOrDefault(m.userId(), 0L), codes[0], codes[1], codes[2],
+                    finance ? distributedBy.getOrDefault(m.userId(), 0L) : null));
         }
-        ranks.sort(Comparator.comparingLong(PartnerDtos.BdRank::consumed).reversed());
-        return ranks;
+        var team = finance ? partners.teamAccount(access.partner()) : null;
+        return new PartnerDtos.Dashboard(days, team == null ? null : team.available(), rows.size(), newTenants, activeMembers,
+                expiring, expired, never, active, firstUses, consumed, uses, byCapability, finance ? granted : null, finance ? transferred : null,
+                generated, redeemed, renewals, voided, points, top, members);
     }
 
     record Row(PartnerDtos.TenantView view, BillingDtos.TenantUsage usage) {}
@@ -161,8 +146,8 @@ public class PartnerInsights {
     private List<Row> rows(List<PartnerStore.Binding> bindings, Instant since) {
         Map<Long, String> names = partners.tenantNames();
         Map<Long, PlatformAccountDirectory.PlatformUser> owners = partners.owners();
-        Map<Long, String> bdNames = new HashMap<>();
-        return bindings.stream().map(b -> new Row(partners.view(b, names, owners, bdNames), report.usage(b.tenantId(), since))).toList();
+        Map<Long, String> people = new HashMap<>();
+        return bindings.stream().map(b -> new Row(partners.view(b, names, owners, people), report.usage(b.tenantId(), since))).toList();
     }
 
     private static PartnerDtos.Todo todo(String type, Row r) {

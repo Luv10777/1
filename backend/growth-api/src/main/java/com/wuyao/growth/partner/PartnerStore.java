@@ -14,25 +14,38 @@ import java.util.*;
 
 /**
  * 服务商相关的几张平台级表（不开行级隔离，见 V79）。只在服务层使用：调用方先核对平台运营或服务商身份。
- * 改余额、改额度都先锁服务商或额度那一行，同一家服务商的写入排队执行。
+ * 改成员、分烟火都先锁服务商那一行，同一家服务商的这些写入排队执行。
  */
 @Component
 @RequiredArgsConstructor
 class PartnerStore {
     private final EntityManager em;
 
-    record Row(Long id, String name, String contact, String status, long creditsAvailable, Instant createdAt) {
-        PartnerDtos.Partner view() { return new PartnerDtos.Partner(id, name, contact, status, creditsAvailable, createdAt); }
-    }
-    record QuotaRow(String planCode, int quota, int used) {}
-    record MemberRow(Long userId, String role, Instant createdAt) {}
-    /** 当前登录账号所属的服务商和角色（OWNER 负责人、BD）。 */
-    record Access(Row partner, Long userId, String role) {
+    /** teamTenantId 是服务商的团队账户（负责人的一方志商户），烟火都记在它的账本里。 */
+    record Row(Long id, String name, String contact, String status, Long teamTenantId, Instant createdAt) {}
+    /**
+     * 服务商的一个登录账号。role 为 OWNER（负责人，全部权限）或 MEMBER（成员，按 perms）；
+     * monthlyCap 是成员每月最多分出的烟火，空表示不限；displayName 是团队里的称呼，空表示还没填。
+     */
+    record MemberRow(Long userId, String role, Perms perms, Long monthlyCap, String displayName, Instant createdAt) {
         boolean owner() { return "OWNER".equals(role); }
+        Perms effective() { return owner() ? Perms.ALL : perms; }
     }
-    record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long bdUserId) {}
-    record LedgerRow(Long id, String type, long delta, long availableAfter, Long tenantId, String note, Instant createdAt) {}
-    /** 一笔分配：source 为 POOL（可分配烟火）或 ACCOUNT（负责人自己的账号），recipientType 为 TENANT 或 BD。 */
+    /** 成员的几项权限：商户、激活码、分配烟火、财务查看、团队管理。 */
+    record Perms(boolean tenants, boolean codes, boolean distribute, boolean finance, boolean team) {
+        static final Perms ALL = new Perms(true, true, true, true, true);
+    }
+    /** 当前登录账号所属的服务商和他在这家的身份。 */
+    record Access(Row partner, MemberRow member) {
+        Long userId() { return member.userId(); }
+        boolean owner() { return member.owner(); }
+        Perms perms() { return member.effective(); }
+    }
+    /** changedBy：按 UID 添加的是添加人，兑换激活码归属的为空，平台改的是平台运营。 */
+    record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long changedBy) {}
+    /** 服务商流水：GRANT 平台发放（V84 起直接进团队账户，availableAfter 为空），TRANSFER 是 V84 以前从可分配烟火分出去的。 */
+    record LedgerRow(Long id, String type, long delta, Long availableAfter, Long tenantId, String note, Long actorUserId, Instant createdAt) {}
+    /** 一笔分配：source 为 POOL（V84 以前的可分配烟火）或 ACCOUNT（团队账户）；recipientType 为 TENANT（V84 以前还有 BD）。 */
     record Distribution(Long id, String requestKey, String source, String recipientType, Long recipientTenantId, Long recipientUserId,
                         long credits, long gift, long purchased, String note, Long actorUserId, String status, Instant createdAt) {}
     /** 服务商烟火流水按北京时间日期、类型、商户合计。 */
@@ -42,14 +55,15 @@ class PartnerStore {
     /** 某个账号在这家服务商生成的激活码：总数、已兑换、已作废、其中直接续期。 */
     record CodeStats(long generated, long redeemed, long voided, long renewals) {}
 
-    private static final String PARTNER_COLUMNS = "p.id, p.name, p.contact, p.status, p.credits_available, p.created_at";
+    private static final String PARTNER_COLUMNS = "p.id, p.name, p.contact, p.status, p.team_tenant_id, p.created_at";
+    private static final String MEMBER_COLUMNS = "user_id, role, can_tenants, can_codes, can_distribute, can_finance, can_team, "
+            + "distribute_monthly_cap, display_name, created_at";
 
     @Transactional(readOnly = true)
     public Optional<Access> accessOfUser(Long userId) {
         var partner = rows("SELECT " + PARTNER_COLUMNS + " FROM partners p JOIN partner_members m ON m.partner_id = p.id WHERE m.user_id = :user",
                 Map.of("user", userId)).stream().findFirst();
-        return partner.map(p -> new Access(p, userId, (String) em.createNativeQuery("SELECT role FROM partner_members WHERE user_id = :user")
-                .setParameter("user", userId).getSingleResult()));
+        return partner.flatMap(p -> member(p.id(), userId).map(m -> new Access(p, m)));
     }
 
     @Transactional(readOnly = true)
@@ -67,9 +81,9 @@ class PartnerStore {
     }
 
     @Transactional
-    public Long createPartner(String name, String contact, Long actor) {
-        var query = em.createNativeQuery("INSERT INTO partners(name, contact, created_by) VALUES (:name, :contact, :actor) RETURNING id")
-                .setParameter("name", name).setParameter("actor", actor);
+    public Long createPartner(String name, String contact, Long teamTenantId, Long actor) {
+        var query = em.createNativeQuery("INSERT INTO partners(name, contact, team_tenant_id, created_by) VALUES (:name, :contact, :team, :actor) RETURNING id")
+                .setParameter("name", name).setParameter("team", teamTenantId).setParameter("actor", actor);
         typed(query).setParameter("contact", contact, String.class);
         return num(query.getSingleResult());
     }
@@ -89,11 +103,51 @@ class PartnerStore {
                 .setParameter("status", status).setParameter("id", id).executeUpdate();
     }
 
+    /** 负责人在前，其余按加入先后。 */
     @Transactional(readOnly = true)
     public List<MemberRow> members(Long partnerId) {
-        List<?> rows = em.createNativeQuery("SELECT user_id, role, created_at FROM partner_members WHERE partner_id = :id ORDER BY role DESC, created_at, user_id")
+        List<?> rows = em.createNativeQuery("SELECT " + MEMBER_COLUMNS + " FROM partner_members WHERE partner_id = :id ORDER BY role = 'OWNER' DESC, created_at, user_id")
                 .setParameter("id", partnerId).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new MemberRow(num(r[0]), (String) r[1], instant(r[2]))).toList();
+        return rows.stream().map(r -> memberRow((Object[]) r)).toList();
+    }
+
+    /** 该账号在这家服务商的身份；不是这家的账号时为空。 */
+    @Transactional(readOnly = true)
+    public Optional<MemberRow> member(Long partnerId, Long userId) {
+        List<?> rows = em.createNativeQuery("SELECT " + MEMBER_COLUMNS + " FROM partner_members WHERE partner_id = :partner AND user_id = :user")
+                .setParameter("partner", partnerId).setParameter("user", userId).getResultList();
+        return rows.stream().map(r -> memberRow((Object[]) r)).findFirst();
+    }
+
+    private static MemberRow memberRow(Object[] r) {
+        return new MemberRow(num(r[0]), (String) r[1], new Perms((Boolean) r[2], (Boolean) r[3], (Boolean) r[4], (Boolean) r[5], (Boolean) r[6]),
+                r[7] == null ? null : num(r[7]), (String) r[8], instant(r[9]));
+    }
+
+    /** 改成员的权限和每月分配上限（负责人的这几列不起作用）。 */
+    @Transactional
+    public void setPermissions(Long partnerId, Long userId, Perms perms, Long monthlyCap) {
+        var update = em.createNativeQuery("""
+                UPDATE partner_members SET can_tenants = :t, can_codes = :c, can_distribute = :d, can_finance = :f, can_team = :m,
+                    distribute_monthly_cap = :cap WHERE partner_id = :partner AND user_id = :user""")
+                .setParameter("t", perms.tenants()).setParameter("c", perms.codes()).setParameter("d", perms.distribute())
+                .setParameter("f", perms.finance()).setParameter("m", perms.team())
+                .setParameter("partner", partnerId).setParameter("user", userId);
+        typed(update).setParameter("cap", monthlyCap, Long.class);
+        update.executeUpdate();
+    }
+
+    /** 团队里已经有别人用这个称呼。 */
+    @Transactional(readOnly = true)
+    public boolean displayNameTaken(Long partnerId, Long userId, String name) {
+        return !em.createNativeQuery("SELECT 1 FROM partner_members WHERE partner_id = :partner AND display_name = :name AND user_id <> :user")
+                .setParameter("partner", partnerId).setParameter("name", name).setParameter("user", userId).getResultList().isEmpty();
+    }
+
+    @Transactional
+    public void setDisplayName(Long partnerId, Long userId, String name) {
+        em.createNativeQuery("UPDATE partner_members SET display_name = :name WHERE partner_id = :partner AND user_id = :user")
+                .setParameter("name", name).setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
     }
 
     /** @return 该账号已属于的服务商；为空表示这次加上了（已在这家的账号角色不变） */
@@ -105,56 +159,19 @@ class PartnerStore {
         return owner.equals(partnerId) ? Optional.empty() : Optional.of(owner);
     }
 
-    /** 移除登录账号；它名下的商户回到负责人直接管。 */
+    @Transactional
+    public void setRole(Long partnerId, Long userId, String role) {
+        em.createNativeQuery("UPDATE partner_members SET role = :role WHERE partner_id = :partner AND user_id = :user")
+                .setParameter("role", role).setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
+    }
+
     @Transactional
     public int removeMember(Long partnerId, Long userId) {
-        em.createNativeQuery("UPDATE partner_tenants SET bd_user_id = NULL WHERE partner_id = :partner AND bd_user_id = :user")
-                .setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
         return em.createNativeQuery("DELETE FROM partner_members WHERE partner_id = :partner AND user_id = :user")
                 .setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
     }
 
-    /** 该账号在这家服务商的角色；不是这家的账号时为空。 */
-    @Transactional(readOnly = true)
-    public Optional<String> role(Long partnerId, Long userId) {
-        List<?> rows = em.createNativeQuery("SELECT role FROM partner_members WHERE partner_id = :partner AND user_id = :user")
-                .setParameter("partner", partnerId).setParameter("user", userId).getResultList();
-        return rows.stream().map(r -> (String) r).findFirst();
-    }
-
-    @Transactional(readOnly = true)
-    public List<QuotaRow> quotas(Long partnerId) {
-        List<?> rows = em.createNativeQuery("SELECT plan_code, quota, used FROM partner_code_quotas WHERE partner_id = :id ORDER BY plan_code")
-                .setParameter("id", partnerId).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new QuotaRow((String) r[0], num(r[1]).intValue(), num(r[2]).intValue())).toList();
-    }
-
-    @Transactional
-    public Optional<QuotaRow> lockQuota(Long partnerId, String planCode) {
-        List<?> rows = em.createNativeQuery("SELECT plan_code, quota, used FROM partner_code_quotas WHERE partner_id = :id AND plan_code = :code FOR UPDATE")
-                .setParameter("id", partnerId).setParameter("code", planCode).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new QuotaRow((String) r[0], num(r[1]).intValue(), num(r[2]).intValue())).findFirst();
-    }
-
-    /** 设总额度；不能低于已经生成的个数。 */
-    @Transactional
-    public void setQuota(Long partnerId, String planCode, int quota) {
-        var current = lockQuota(partnerId, planCode);
-        if (current.isPresent() && quota < current.get().used())
-            throw BizException.of(ErrorCode.BAD_REQUEST, "额度不能低于已生成的 " + current.get().used() + " 个");
-        em.createNativeQuery("""
-                INSERT INTO partner_code_quotas(partner_id, plan_code, quota) VALUES (:id, :code, :quota)
-                ON CONFLICT (partner_id, plan_code) DO UPDATE SET quota = EXCLUDED.quota, updated_at = now()""")
-                .setParameter("id", partnerId).setParameter("code", planCode).setParameter("quota", quota).executeUpdate();
-    }
-
-    @Transactional
-    public void useQuota(Long partnerId, String planCode, int quantity) {
-        em.createNativeQuery("UPDATE partner_code_quotas SET used = used + :n, updated_at = now() WHERE partner_id = :id AND plan_code = :code")
-                .setParameter("n", quantity).setParameter("id", partnerId).setParameter("code", planCode).executeUpdate();
-    }
-
-    private static final String BINDING_COLUMNS = "tenant_id, partner_id, source, bound_at, bd_user_id";
+    private static final String BINDING_COLUMNS = "tenant_id, partner_id, source, bound_at, changed_by";
 
     @Transactional(readOnly = true)
     public Optional<Binding> binding(Long tenantId) {
@@ -163,32 +180,16 @@ class PartnerStore {
         return rows.stream().map(r -> binding((Object[]) r)).findFirst();
     }
 
-    /** 第一次归属为准：已经归属任何服务商时不改（BD 也不改）。@return 当前的归属 */
+    /** 第一次归属为准：已经归属任何服务商时不改。@return 当前的归属 */
     @Transactional
-    public Binding bindIfAbsent(Long tenantId, Long partnerId, String source, Long actor, Long bdUserId) {
+    public Binding bindIfAbsent(Long tenantId, Long partnerId, String source, Long actor) {
         var insert = em.createNativeQuery("""
-                INSERT INTO partner_tenants(tenant_id, partner_id, source, changed_by, bd_user_id) VALUES (:t, :p, :s, :a, :bd)
+                INSERT INTO partner_tenants(tenant_id, partner_id, source, changed_by) VALUES (:t, :p, :s, :a)
                 ON CONFLICT (tenant_id) DO NOTHING""")
                 .setParameter("t", tenantId).setParameter("p", partnerId).setParameter("s", source);
-        typed(insert).setParameter("a", actor, Long.class).setParameter("bd", bdUserId, Long.class);
+        typed(insert).setParameter("a", actor, Long.class);
         insert.executeUpdate();
         return binding(tenantId).orElseThrow();
-    }
-
-    /** 负责人把名下商户调给某个 BD；bdUserId 为空表示收回由负责人直接管。 */
-    @Transactional
-    public void setBd(Long tenantId, Long partnerId, Long bdUserId) {
-        var update = em.createNativeQuery("UPDATE partner_tenants SET bd_user_id = :bd WHERE tenant_id = :t AND partner_id = :p")
-                .setParameter("t", tenantId).setParameter("p", partnerId);
-        typed(update).setParameter("bd", bdUserId, Long.class);
-        update.executeUpdate();
-    }
-
-    /** 移除 BD 前把他名下的商户整体转给另一个 BD。 */
-    @Transactional
-    public void moveBdTenants(Long partnerId, Long from, Long to) {
-        em.createNativeQuery("UPDATE partner_tenants SET bd_user_id = :to WHERE partner_id = :p AND bd_user_id = :from")
-                .setParameter("to", to).setParameter("p", partnerId).setParameter("from", from).executeUpdate();
     }
 
     /** 每个登录账号生成的激活码统计，按生成人分组。 */
@@ -205,13 +206,6 @@ class PartnerStore {
         return stats;
     }
 
-    /** 激活码的生成人（BD 生成的码兑换后归到这个 BD）。 */
-    @Transactional(readOnly = true)
-    public Optional<Long> codeCreator(Long codeId) {
-        List<?> rows = em.createNativeQuery("SELECT created_by FROM billing_redeem_codes WHERE id = :id").setParameter("id", codeId).getResultList();
-        return rows.stream().map(PartnerStore::num).findFirst();
-    }
-
     /** 平台改归属；partnerId 为空时解除。 */
     @Transactional
     public void reassign(Long tenantId, Long partnerId, Long actor) {
@@ -222,7 +216,7 @@ class PartnerStore {
         em.createNativeQuery("""
                 INSERT INTO partner_tenants(tenant_id, partner_id, source, changed_by) VALUES (:t, :p, 'PLATFORM', :a)
                 ON CONFLICT (tenant_id) DO UPDATE SET partner_id = EXCLUDED.partner_id, source = 'PLATFORM', bound_at = now(),
-                    changed_by = EXCLUDED.changed_by, bd_user_id = NULL""")
+                    changed_by = EXCLUDED.changed_by""")
                 .setParameter("t", tenantId).setParameter("p", partnerId).setParameter("a", actor).executeUpdate();
     }
 
@@ -247,34 +241,24 @@ class PartnerStore {
         return !em.createNativeQuery("SELECT 1 FROM partner_credit_ledger WHERE event_key = :k").setParameter("k", key).getResultList().isEmpty();
     }
 
-    /**
-     * 改服务商余额并记一条流水，调用方已锁住服务商那一行并确认 event_key 没有记过。
-     * @return 变动后的余额
-     */
+    /** 记一条平台发放（烟火已进团队账户），调用方已确认 event_key 没有记过。 */
     @Transactional
-    public long move(Row locked, String key, String type, long delta, Long tenantId, String note, Long actor) {
-        long after = Math.addExact(locked.creditsAvailable(), delta);
-        if (after < 0) throw BizException.of(ErrorCode.INSUFFICIENT_YANHUO, "服务商烟火不足，当前可分配 " + locked.creditsAvailable());
-        em.createNativeQuery("UPDATE partners SET credits_available = :after, updated_at = now() WHERE id = :id")
-                .setParameter("after", after).setParameter("id", locked.id()).executeUpdate();
-        var insert = em.createNativeQuery("""
-                INSERT INTO partner_credit_ledger(partner_id, event_key, type, delta, available_after, tenant_id, note, actor_user_id)
-                VALUES (:p, :k, :type, :delta, :after, :t, :note, :a)""")
-                .setParameter("p", locked.id()).setParameter("k", key).setParameter("type", type).setParameter("delta", delta)
-                .setParameter("after", after).setParameter("a", actor);
-        typed(insert).setParameter("t", tenantId, Long.class).setParameter("note", note, String.class);
-        insert.executeUpdate();
-        return after;
+    public void recordGrant(Long partnerId, String key, long credits, String note, Long actor) {
+        em.createNativeQuery("""
+                INSERT INTO partner_credit_ledger(partner_id, event_key, type, delta, tenant_id, note, actor_user_id)
+                VALUES (:p, :k, 'GRANT', :delta, NULL, :note, :a)""")
+                .setParameter("p", partnerId).setParameter("k", key).setParameter("delta", credits).setParameter("note", note)
+                .setParameter("a", actor).executeUpdate();
     }
 
     @Transactional(readOnly = true)
     public List<LedgerRow> ledger(Long partnerId, int page, int size) {
         List<?> rows = em.createNativeQuery("""
-                SELECT id, type, delta, available_after, tenant_id, note, created_at FROM partner_credit_ledger
+                SELECT id, type, delta, available_after, tenant_id, note, actor_user_id, created_at FROM partner_credit_ledger
                 WHERE partner_id = :p ORDER BY id DESC LIMIT :limit OFFSET :offset""")
                 .setParameter("p", partnerId).setParameter("limit", size).setParameter("offset", (long) page * size).getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new LedgerRow(num(r[0]), (String) r[1], num(r[2]), num(r[3]),
-                r[4] == null ? null : num(r[4]), (String) r[5], instant(r[6]))).toList();
+        return rows.stream().map(r -> (Object[]) r).map(r -> new LedgerRow(num(r[0]), (String) r[1], num(r[2]), r[3] == null ? null : num(r[3]),
+                r[4] == null ? null : num(r[4]), (String) r[5], num(r[6]), instant(r[7]))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -341,36 +325,43 @@ class PartnerStore {
                 .setParameter("k", key).executeUpdate();
     }
 
-    /** 分配记录，新的在前；各筛选为空时不限。 */
+    /** 分配记录，新的在前；各筛选为空时不限，actor 只看某个人分出去的。 */
     @Transactional(readOnly = true)
-    public List<Distribution> distributions(Long partnerId, String recipientType, String source, Long tenantId, Long userId,
+    public List<Distribution> distributions(Long partnerId, String recipientType, String source, Long tenantId, Long actor,
                                             Instant since, int page, int size) {
         var query = em.createNativeQuery("SELECT " + DISTRIBUTION_COLUMNS + " FROM partner_distributions" + distributionWhere()
                 + " ORDER BY id DESC LIMIT :limit OFFSET :offset");
-        bindDistributionFilters(query, partnerId, recipientType, source, tenantId, userId, since);
+        bindDistributionFilters(query, partnerId, recipientType, source, tenantId, actor, since);
         List<?> rows = query.setParameter("limit", size).setParameter("offset", (long) page * size).getResultList();
         return rows.stream().map(r -> distribution((Object[]) r)).toList();
     }
 
     @Transactional(readOnly = true)
-    public long distributionCount(Long partnerId, String recipientType, String source, Long tenantId, Long userId, Instant since) {
+    public long distributionCount(Long partnerId, String recipientType, String source, Long tenantId, Long actor, Instant since) {
         var query = em.createNativeQuery("SELECT count(*) FROM partner_distributions" + distributionWhere());
-        bindDistributionFilters(query, partnerId, recipientType, source, tenantId, userId, since);
+        bindDistributionFilters(query, partnerId, recipientType, source, tenantId, actor, since);
         return num(query.getSingleResult());
+    }
+
+    /** 某个人从 since 起分出去的烟火合计（含还没到账的），用来卡每月上限。 */
+    @Transactional(readOnly = true)
+    public long distributedBy(Long partnerId, Long actor, Instant since) {
+        return num(em.createNativeQuery("SELECT COALESCE(sum(credits), 0) FROM partner_distributions WHERE partner_id = :p AND actor_user_id = :a AND created_at >= :since")
+                .setParameter("p", partnerId).setParameter("a", actor).setParameter("since", Timestamp.from(since)).getSingleResult());
     }
 
     private static String distributionWhere() {
         // 前面留一个空格：文本块会去掉开头的缩进，拼在 FROM 表名后面要隔开。
         return " " + """
                 WHERE partner_id = :p AND (:rt = '' OR recipient_type = :rt) AND (:s = '' OR source = :s)
-                   AND (:t = 0 OR recipient_tenant_id = :t) AND (:u = 0 OR recipient_user_id = :u) AND created_at >= :since""";
+                   AND (:t = 0 OR recipient_tenant_id = :t) AND (:u = 0 OR actor_user_id = :u) AND created_at >= :since""";
     }
 
     private static void bindDistributionFilters(jakarta.persistence.Query query, Long partnerId, String recipientType, String source,
-                                                Long tenantId, Long userId, Instant since) {
+                                                Long tenantId, Long actor, Instant since) {
         query.setParameter("p", partnerId).setParameter("rt", recipientType == null ? "" : recipientType)
                 .setParameter("s", source == null ? "" : source).setParameter("t", tenantId == null ? 0L : tenantId)
-                .setParameter("u", userId == null ? 0L : userId).setParameter("since", Timestamp.from(since == null ? Instant.EPOCH : since));
+                .setParameter("u", actor == null ? 0L : actor).setParameter("since", Timestamp.from(since == null ? Instant.EPOCH : since));
     }
 
     @Transactional(readOnly = true)
@@ -382,7 +373,8 @@ class PartnerStore {
         var query = em.createNativeQuery(sql);
         params.forEach(query::setParameter);
         List<?> rows = query.getResultList();
-        return rows.stream().map(r -> (Object[]) r).map(r -> new Row(num(r[0]), (String) r[1], (String) r[2], (String) r[3], num(r[4]), instant(r[5]))).toList();
+        return rows.stream().map(r -> (Object[]) r).map(r -> new Row(num(r[0]), (String) r[1], (String) r[2], (String) r[3],
+                r[4] == null ? null : num(r[4]), instant(r[5]))).toList();
     }
 
     /** 可能为空的参数要带上类型绑定，否则 PostgreSQL 推断不出空值的类型。 */

@@ -56,12 +56,6 @@ public class PartnerPlatformController {
         return ApiResponse.ok(service.grant(id, input, me.userId()));
     }
 
-    @PutMapping("/{id}/quotas")
-    public ApiResponse<PartnerDtos.PlatformPartner> quota(@PathVariable Long id, @Valid @RequestBody PartnerDtos.SetQuota input,
-            @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.setQuota(id, input, me.userId()));
-    }
-
     @GetMapping("/{id}/tenants")
     public ApiResponse<PartnerDtos.Page<PartnerDtos.TenantView>> tenants(@PathVariable Long id, @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String keyword, @AuthenticationPrincipal AuthPrincipal me) {

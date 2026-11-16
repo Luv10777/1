@@ -7,7 +7,7 @@ import java.time.*;
 import java.sql.Timestamp;
 import java.util.*;
 
-/** Only called inside PartnerCrmService transactions, after partner and BD authorization. */
+/** Only called inside PartnerCrmService transactions, after partner membership and permission checks. */
 @Repository @RequiredArgsConstructor
 class PartnerCrmStore {
     private final EntityManager em;

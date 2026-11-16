@@ -1,20 +1,18 @@
 <script setup>
-import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, ref } from 'vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
 import { capabilityBars, dashboardRanges, memberSegments, number, percent, sinceText } from '../../src/domain/partnerOps.js'
-import { bds, isOwner, loadTeam } from '../partnerStore.js'
+import { can } from '../partnerStore.js'
 import TenantDrawer from '../components/TenantDrawer.vue'
 import DailyBars from '../components/DailyBars.vue'
 
 /**
- * 经营看板，从上到下：四个核心指标 → 每天趋势和会员状态 → 按功能消耗和商户排行 → （负责人）烟火去向和 BD 业绩。
+ * 经营看板，从上到下：四个核心指标 → 每天趋势和会员状态 → 按功能消耗和商户排行 → 烟火去向（财务权限）和成员做的事。
  * 只有烟火数和使用次数，不含作品内容。
  */
-const owner = computed(() => isOwner())
+const finance = computed(() => can('finance'))
 const days = ref(30)
-const bdFilter = ref('')
 const data = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -22,7 +20,7 @@ const metric = ref('consumed')
 const openTenant = ref(null)
 const metrics = computed(() => [
   { key: 'consumed', label: '消耗烟火' },
-  ...(owner.value ? [{ key: 'transferred', label: '分给商户' }] : []),
+  ...(finance.value ? [{ key: 'transferred', label: '分给商户' }] : []),
   { key: 'redeemed', label: '激活码兑换' },
   { key: 'newTenants', label: '新增商户' },
 ])
@@ -30,32 +28,26 @@ const bars = computed(() => capabilityBars(data.value?.consumedByCapability))
 const segments = computed(() => memberSegments(data.value))
 const segmentTotal = computed(() => segments.value.reduce((sum, s) => sum + s.value, 0))
 const range = computed(() => dashboardRanges.find(r => r.value === days.value)?.label || '')
-const scope = computed(() => !owner.value ? '名下' : bdFilter.value === '' ? '全部' : bdFilter.value === '0' ? '负责人直属'
-  : `BD ${bds().find(b => String(b.userId) === bdFilter.value)?.name || ''}`)
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const query = { days: days.value }
-    if (owner.value && bdFilter.value !== '') query.bdUserId = bdFilter.value
-    data.value = await partnerApi.dashboard(query)
+    data.value = await partnerApi.dashboard({ days: days.value })
     if (!metrics.value.some(m => m.key === metric.value)) metric.value = 'consumed'
   } catch (failure) {
     error.value = failure.message || '看板暂时无法读取。'
   } finally { loading.value = false }
 }
 function pickRange(value) { days.value = value; load() }
-if (owner.value) loadTeam().catch(() => {})
 load()
 </script>
 
 <template>
   <div class="management-page pw-page">
     <header class="pw-head">
-      <div><p class="pw-date">{{ scope }}商户 · {{ range }}</p><h1>经营看板</h1></div>
+      <div><p class="pw-date">全部名下商户 · {{ range }}</p><h1>经营看板</h1></div>
       <div class="pw-head-tools">
-        <label v-if="owner && bds().length" class="mg-select"><span class="sr-only">范围</span><AppSelect v-model="bdFilter" aria-label="按 BD 查看" @change="load"><option value="">全部商户</option><option value="0">负责人直属</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">BD · {{ b.name || b.uid }}</option></AppSelect></label>
         <div class="partner-segment" role="group" aria-label="时间范围">
           <button v-for="r in dashboardRanges" :key="r.value" type="button" :class="{ active: days === r.value }" :aria-pressed="days === r.value" :disabled="loading" @click="pickRange(r.value)">{{ r.label }}</button>
         </div>
@@ -126,7 +118,7 @@ load()
             <li v-for="(t, i) in data.topTenants" :key="t.tenantId">
               <button type="button" @click="openTenant = t.tenantId">
                 <em class="mg-mono">{{ i + 1 }}</em>
-                <span><b>{{ t.tenantName || '商户' }}</b><small>{{ number(t.uses) }} 次 · 最近 {{ sinceText(t.lastUsedAt) }}{{ owner && t.bdName ? ` · BD ${t.bdName}` : '' }}</small></span>
+                <span><b>{{ t.tenantName || '商户' }}</b><small>{{ number(t.uses) }} 次 · 最近 {{ sinceText(t.lastUsedAt) }}</small></span>
                 <strong class="mg-mono">{{ number(t.consumed) }}</strong>
               </button>
             </li>
@@ -134,37 +126,35 @@ load()
         </section>
       </div>
 
-      <div v-if="owner" class="pw-grid pw-grid-1-2">
-        <section class="pw-card" aria-labelledby="flow-title">
+      <div class="pw-grid" :class="finance ? 'pw-grid-1-2' : 'pw-grid-1'">
+        <section v-if="finance" class="pw-card" aria-labelledby="flow-title">
           <header class="pw-card-head"><h2 id="flow-title">烟火去向</h2><span class="mg-muted">{{ range }}</span></header>
           <dl class="pw-flow">
             <div v-if="data.granted != null"><dt>平台发放</dt><dd class="mg-mono pw-plus">+{{ number(data.granted) }}</dd></div>
             <div><dt>分给商户</dt><dd class="mg-mono">−{{ number(data.transferred) }}</dd></div>
-            <div v-if="data.transferredToBds != null"><dt>分给 BD</dt><dd class="mg-mono">−{{ number(data.transferredToBds) }}</dd></div>
-            <div class="pw-flow-total"><dt>服务商现在可分配</dt><dd class="mg-mono">{{ number(data.creditsAvailable) }}</dd></div>
+            <div class="pw-flow-total"><dt>团队烟火现在</dt><dd class="mg-mono">{{ number(data.creditsAvailable) }}</dd></div>
           </dl>
         </section>
-        <section class="pw-card" aria-labelledby="bd-title">
-          <header class="pw-card-head"><h2 id="bd-title">BD 业绩</h2><span class="mg-muted">{{ range }}</span></header>
-          <p v-if="!data.bds.length" class="pw-empty">{{ bdFilter ? '按 BD 查看时不显示业绩对比。' : '还没有 BD，可在「团队」页添加。' }}</p>
-          <div v-else class="management-table-wrap">
+        <section class="pw-card" aria-labelledby="member-rank-title">
+          <header class="pw-card-head"><h2 id="member-rank-title">成员做的事</h2><span class="mg-muted">{{ range }}</span></header>
+          <div class="management-table-wrap">
             <table class="management-table">
-              <thead><tr><th>BD</th><th class="code-number">商户</th><th class="code-number">活跃</th><th class="code-number">消耗</th><th class="code-number">兑换</th><th class="code-number">续期</th></tr></thead>
+              <thead><tr><th>成员</th><th class="code-number">加的商户</th><th class="code-number">生成激活码</th><th class="code-number">被兑换</th><th class="code-number">直接续期</th><th v-if="finance" class="code-number">分出烟火</th></tr></thead>
               <tbody>
-                <tr v-for="b in data.bds" :key="b.userId">
-                  <td>{{ b.name || '—' }}</td>
-                  <td class="code-number mg-mono">{{ number(b.tenants) }}</td>
-                  <td class="code-number mg-mono">{{ number(b.activeTenants) }}</td>
-                  <td class="code-number mg-mono">{{ number(b.consumed) }}</td>
-                  <td class="code-number mg-mono">{{ number(b.codesRedeemed) }}</td>
-                  <td class="code-number mg-mono">{{ number(b.renewals) }}</td>
+                <tr v-for="m in data.members" :key="m.userId">
+                  <td>{{ m.name || '—' }}</td>
+                  <td class="code-number mg-mono">{{ number(m.tenantsAdded) }}</td>
+                  <td class="code-number mg-mono">{{ number(m.codesGenerated) }}</td>
+                  <td class="code-number mg-mono">{{ number(m.codesRedeemed) }}</td>
+                  <td class="code-number mg-mono">{{ number(m.renewals) }}</td>
+                  <td v-if="finance" class="code-number mg-mono">{{ number(m.distributed) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </section>
       </div>
-      <p class="pw-note">只统计烟火数和使用次数，不含商户的作品内容。作废的激活码 {{ number(data.codesVoided) }} 个，额度不退回。</p>
+      <p class="pw-note">只统计烟火数和使用次数，不含商户的作品内容。作废的激活码 {{ number(data.codesVoided) }} 个。</p>
     </template>
 
     <TenantDrawer :tenant-id="openTenant" @close="openTenant = null" @updated="load" />

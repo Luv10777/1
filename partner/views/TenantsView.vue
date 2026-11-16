@@ -2,27 +2,27 @@
 import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, reactive, ref } from 'vue'
 import { Check, ChevronLeft, ChevronRight, Coins, Plus, RefreshCw, Search, X } from 'lucide-vue-next'
-import { partnerApi } from '../../src/services/partnerApi.js'
+import { partnerApi, tenantSources } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
 import { expiryFilters, membershipState, number } from '../../src/domain/partnerOps.js'
-import { bds, isOwner, loadPartner, loadTeam, partner } from '../partnerStore.js'
+import { can, loadPartner, partner } from '../partnerStore.js'
 import TenantDrawer from '../components/TenantDrawer.vue'
 import AddByUidModal from '../components/AddByUidModal.vue'
 import BatchTransferModal from '../components/BatchTransferModal.vue'
 
-// 名下商户：列表只负责浏览和筛选；点一行打开详情抽屉，续期、分烟火、调整归属都在抽屉里做。
+// 名下商户（整个团队共有）：列表只负责浏览和筛选；点一行打开详情抽屉，续期、分烟火、档案跟进都在抽屉里做。
 const records = ref([])
 const total = ref(0)
 const page = ref(0)
 const keyword = ref('')
 const expiry = ref('')
-const bdFilter = ref('')
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const pages = computed(() => Math.ceil(total.value / 20))
-const owner = computed(() => isOwner())
-const available = computed(() => partner.overview?.partner.creditsAvailable || 0)
+// 有分配权限的人才能勾选商户批量分烟火。
+const distributor = computed(() => can('distribute'))
+const available = computed(() => partner.overview?.account?.available || 0)
 
 const openTenant = ref(null)
 const adding = ref(false)
@@ -35,9 +35,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const query = { page: page.value, size: 20, keyword: keyword.value.trim(), expiry: expiry.value }
-    if (owner.value && bdFilter.value !== '') query.bdUserId = bdFilter.value
-    const result = await partnerApi.tenants(query)
+    const result = await partnerApi.tenants({ page: page.value, size: 20, keyword: keyword.value.trim(), expiry: expiry.value })
     records.value = result.items
     total.value = result.total
   } catch (failure) {
@@ -58,7 +56,7 @@ function togglePage() {
 async function added(tenant) {
   adding.value = false
   success.value = `已添加「${tenant.tenantName || '商户'}」`
-  await Promise.all([search(), loadPartner(true), owner.value ? loadTeam() : null])
+  await Promise.all([search(), loadPartner(true)])
 }
 function batchDone(updated) {
   updated.forEach(replace)
@@ -66,19 +64,15 @@ function batchDone(updated) {
   if (updated.length) success.value = `已给 ${updated.length} 个商户分配烟火`
 }
 function closeBatch() { batch.value = [] }
-async function tenantUpdated(row) {
-  replace(row)
-  if (owner.value) await loadTeam().catch(() => {})
-}
+function tenantUpdated(row) { replace(row) }
 
-if (owner.value) loadTeam().catch(() => {})
 load()
 </script>
 
 <template>
   <div class="management-page">
     <header class="management-heading">
-      <div><h1>名下商户</h1><p>点一行查看商户详情，在里面续期{{ owner ? '、分配烟火、调整归属的 BD' : '' }}。<template v-if="owner">可分配烟火：{{ number(available) }}。</template><template v-else>烟火由负责人分配。</template></p></div>
+      <div><h1>名下商户</h1><p>名下商户整个团队共有。点一行查看商户详情，在里面续期{{ distributor ? '、分配烟火' : '' }}、记跟进。<template v-if="distributor">团队烟火：{{ number(available) }}。</template></p></div>
       <div class="management-heading-actions">
         <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
         <button class="mg-button mg-primary" type="button" @click="adding = true"><Plus :size="15" />添加商户</button>
@@ -90,32 +84,31 @@ load()
       <form class="management-filters" @submit.prevent="search">
         <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索商户名、联系人或 UID" aria-label="搜索商户" maxlength="60" /></label>
         <label class="mg-select"><span class="sr-only">会员状态</span><AppSelect v-model="expiry" @change="search"><option value="">全部会员状态</option><option v-for="(label, value) in expiryFilters" :key="value" :value="value">{{ label }}</option></AppSelect></label>
-        <label v-if="owner" class="mg-select"><span class="sr-only">BD</span><AppSelect v-model="bdFilter" @change="search"><option value="">全部 BD</option><option value="0">负责人直属</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">{{ b.name || b.uid }}</option></AppSelect></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
       </form>
-      <div v-if="owner && picked.size" class="partner-toolbar">
+      <div v-if="distributor && picked.size" class="partner-toolbar">
         <span>已选 {{ picked.size }} 个商户</span>
         <button class="mg-text-button" type="button" @click="picked.clear()">清空</button>
         <button class="mg-button mg-primary" type="button" @click="batch = [...picked.values()]"><Coins :size="15" />批量分配烟火</button>
       </div>
       <div v-if="error" class="mg-state mg-error" role="alert"><p>{{ error }}</p><button class="mg-button" type="button" @click="load">重新读取</button></div>
-      <div v-else-if="!records.length && !loading" class="mg-state"><h3>{{ keyword || expiry || bdFilter ? '没有匹配的商户' : '还没有名下商户' }}</h3><p>可通过右上角「添加商户」建立归属；商户兑换本服务商生成的激活码后，符合归属条件时将自动加入。</p></div>
+      <div v-else-if="!records.length && !loading" class="mg-state"><h3>{{ keyword || expiry ? '没有匹配的商户' : '还没有名下商户' }}</h3><p>可通过右上角「添加商户」建立归属；商户兑换本服务商生成的激活码后，符合归属条件时将自动加入。</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
           <thead>
             <tr>
-              <th v-if="owner" class="partner-check"><input type="checkbox" :checked="allPicked" aria-label="选择本页全部商户" @change="togglePage" /></th>
-              <th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th v-if="owner">归属</th><th>加入时间</th>
+              <th v-if="distributor" class="partner-check"><input type="checkbox" :checked="allPicked" aria-label="选择本页全部商户" @change="togglePage" /></th>
+              <th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>来源</th><th>加入时间</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in records" :key="item.tenantId" class="partner-row" tabindex="0" @click="openTenant = item.tenantId" @keydown.enter="openTenant = item.tenantId">
-              <td v-if="owner" class="partner-check" @click.stop><input type="checkbox" :checked="picked.has(item.tenantId)" :aria-label="`选择${item.tenantName || '商户'}`" @change="togglePick(item)" /></td>
+              <td v-if="distributor" class="partner-check" @click.stop><input type="checkbox" :checked="picked.has(item.tenantId)" :aria-label="`选择${item.tenantName || '商户'}`" @change="togglePick(item)" /></td>
               <td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td>
               <td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td>
               <td :class="['partner-member', membershipState(item).tone]"><span>{{ membershipState(item).short }}</span><small v-if="item.memberUntil">{{ item.planName || '会员' }} · {{ managementDate(item.memberUntil).slice(0, 10) }}</small></td>
               <td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td>
-              <td v-if="owner"><span class="partner-pill" :class="{ bd: item.bdUserId }">{{ item.bdUserId ? `BD · ${item.bdName || '—'}` : '负责人直属' }}</span></td>
+              <td><span>{{ tenantSources[item.source] || item.source }}</span><small v-if="item.addedByName">{{ item.addedByName }} 添加</small></td>
               <td>{{ managementDate(item.boundAt) }}</td>
             </tr>
           </tbody>
@@ -125,7 +118,7 @@ load()
     </section>
 
     <TenantDrawer :tenant-id="openTenant" @close="openTenant = null" @updated="tenantUpdated" />
-    <AddByUidModal :open="adding" mode="tenant" @close="adding = false" @added="added" />
+    <AddByUidModal :open="adding" @close="adding = false" @added="added" />
     <BatchTransferModal :tenants="batch" @close="closeBatch" @done="batchDone" />
   </div>
 </template>
