@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Check, ChevronRight, CircleCheck, Coins, KeyRound, Lock, MessageCircle, RefreshCw, ShieldCheck, Smartphone, Ticket, User } from 'lucide-vue-next'
+import { Check, ChevronRight, CircleAlert, CircleCheck, Coins, Eye, History, KeyRound, Lock, MessageCircle, RefreshCw, ShieldCheck, Smartphone, Ticket, User } from 'lucide-vue-next'
 import { accountApi, validateAvatar } from '../services/accountApi'
 import UserAvatar from '../components/UserAvatar.vue'
 import PasswordDialog from '../components/settings/PasswordDialog.vue'
@@ -469,7 +469,7 @@ async function confirmClosure() {
           </div>
         </template>
 
-        <template v-else-if="identity">
+        <template v-else-if="identity && !identityOpen">
           <dl class="facts">
             <div><dt>姓名</dt><dd>{{ identity.legalNameMasked }}</dd></div>
             <div><dt>身份证号</dt><dd>{{ identity.idNumberMasked }}</dd></div>
@@ -503,28 +503,56 @@ async function confirmClosure() {
           </div>
         </div>
 
-        <form v-else class="password-form" autocomplete="off" @submit.prevent="submitIdentity">
-          <label class="field">
-            <span>真实姓名</span>
-            <input v-model="identityForm.legalName" name="legal-name" autocomplete="off" maxlength="40" placeholder="与身份证上的姓名一致" :disabled="identitySubmitting" />
-          </label>
-          <label class="field">
-            <span>居民身份证号码</span>
-            <input v-model="identityForm.idNumber" name="id-number" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="18" placeholder="18 位身份证号码" :disabled="identitySubmitting" />
-            <small>只用于平台核对身份，提交后这里只显示打码后的号码。</small>
-          </label>
-          <label class="consent">
-            <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
-            <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
-          </label>
-          <p class="hint">姓名和身份证号在服务端加密保存，只有平台授权人员能查看完整资料，每次查看都会留下记录。</p>
-          <div class="form-footer">
+        <!-- 填写实名：左边表单，右边说明实名后能做什么、资料怎样保存；窄屏上下排列。 -->
+        <form v-else class="id-form" autocomplete="off" @submit.prevent="submitIdentity">
+          <div class="id-form-main">
+            <ol class="id-progress" aria-label="实名步骤">
+              <li class="on"><b>01</b>填写信息</li>
+              <li :class="{ on: identitySubmitting }"><b>02</b>当场核验</li>
+              <li><b>03</b>解锁权益</li>
+            </ol>
+            <div v-if="identity?.status === 'REJECTED'" class="id-rejected" role="alert">
+              <CircleAlert :size="20" aria-hidden="true" />
+              <div>
+                <strong>上次核验没有通过</strong>
+                <p v-if="identity.reviewNote">原因：{{ identity.reviewNote }}</p>
+                <p>请核对姓名和身份证号后重新提交。</p>
+              </div>
+            </div>
+            <div class="id-fields">
+              <div class="id-fields-box">
+                <label class="id-field">
+                  <span>真实姓名</span>
+                  <input v-model="identityForm.legalName" name="legal-name" autocomplete="off" maxlength="40" placeholder="与身份证上的姓名一致" :disabled="identitySubmitting" />
+                </label>
+                <label class="id-field">
+                  <span>居民身份证号</span>
+                  <input v-model="identityForm.idNumber" class="id-number-input" name="id-number" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="18" placeholder="18 位，末位可能是 X" :disabled="identitySubmitting" />
+                </label>
+              </div>
+              <p>只用于核对本人身份，提交后只显示打码后的号码。</p>
+            </div>
+            <label class="id-consent">
+              <input v-model="identityForm.declarationAccepted" type="checkbox" :disabled="identitySubmitting" />
+              <span>我确认以上是本人真实、准确的身份信息，已阅读<a href="/policies/identity" target="_blank" rel="noopener noreferrer">《敏感个人信息处理说明》</a>，并单独同意平台为本次实名审核处理。不能替别人提交。</span>
+            </label>
             <p v-if="identityFormError" class="form-notice" role="alert">{{ identityFormError }}</p>
-            <div>
-              <button type="button" class="ghost-button" :disabled="identitySubmitting" @click="closeIdentity">取消</button>
-              <button type="submit" class="primary-button" :disabled="identitySubmitting">{{ identitySubmitting ? '提交中…' : '提交实名' }}</button>
+            <div class="id-form-actions">
+              <button type="submit" class="primary-button" :disabled="identitySubmitting">{{ identitySubmitting ? '正在核验…' : identity ? '重新提交核验' : '提交并核验' }}</button>
+              <button type="button" class="secondary-button" :disabled="identitySubmitting" @click="closeIdentity">取消</button>
+              <small>提交后当场核验，马上出结果。</small>
             </div>
           </div>
+          <aside class="id-aside">
+            <h3>实名后可以</h3>
+            <div class="id-aside-perk"><span><Ticket :size="18" aria-hidden="true" /></span><p><b>领取专属邀请码</b>邀请商户注册，对方充值、开通会员按比例返现。</p></div>
+            <div class="id-aside-perk"><span><Coins :size="18" aria-hidden="true" /></span><p><b>返利提现</b>绑定本人银行卡，平台审核后转账到账。</p></div>
+            <h3 class="id-aside-divided">你的资料怎样保存</h3>
+            <p class="id-aside-row"><Lock :size="16" aria-hidden="true" />姓名和身份证号在服务端加密保存。</p>
+            <p class="id-aside-row"><Eye :size="16" aria-hidden="true" />提交后这里只显示打码后的号码。</p>
+            <p class="id-aside-row"><History :size="16" aria-hidden="true" />只有平台授权人员能查看完整资料，每次查看都会留下记录。</p>
+            <p class="id-aside-help">核验遇到问题？人工客服 <a :href="`tel:${LEGAL_ENTITY.phone}`">{{ LEGAL_ENTITY.phone }}</a></p>
+          </aside>
         </form>
       </section>
 
@@ -724,7 +752,55 @@ async function confirmClosure() {
 .id-secure svg { flex: none; margin-top: 2px; }
 .id-foot-actions { display: flex; align-items: center; gap: 16px; margin-left: auto; }
 .id-foot .link-button { display: inline-flex; align-items: center; gap: 4px; color: var(--color-text-muted); font-weight: 500; }
-.identity-header ~ .password-form { margin-top: 20px; }
+/* 填写实名：左表单右说明；姓名和身份证号合成一个分组框，和下方同意框同样的边框与圆角。 */
+.id-form { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 32px; margin-top: 24px; }
+.id-form-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.id-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.id-progress li { display: flex; align-items: baseline; gap: 8px; padding-top: 10px; border-top: 4px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 14px; font-weight: 500; }
+.id-progress li.on { border-top-color: var(--color-accent); color: var(--color-primary); font-weight: 600; }
+.id-progress b { font: 600 13px var(--font-mono); }
+.id-progress li.on b { color: var(--color-accent-text); }
+.id-rejected { display: flex; gap: 12px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--color-error) 30%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--color-error) 6%, var(--color-bg-surface)); color: var(--color-error); }
+.id-rejected svg { flex: none; margin-top: 1px; }
+.id-rejected strong { font-size: 14px; }
+.id-rejected p { margin: 4px 0 0; color: var(--color-primary); font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+.id-fields { display: flex; flex-direction: column; gap: 8px; }
+.id-fields > p { margin: 0 0 0 2px; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+.id-fields-box { overflow: hidden; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); transition: border-color .15s; }
+.id-fields-box:focus-within { border-color: var(--color-accent); }
+.id-field { display: flex; align-items: center; gap: 16px; padding: 0 18px; cursor: text; }
+.id-field + .id-field { border-top: 1px solid var(--color-border-subtle); }
+.id-field > span { flex: 0 0 96px; color: var(--color-text-muted); font-size: 14px; }
+.id-field input { flex: 1; min-width: 0; height: 54px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--color-primary); font: 500 15px var(--font-sans); }
+.id-field input.id-number-input { font-family: var(--font-mono); letter-spacing: .04em; }
+.id-field input:disabled { color: var(--color-text-muted); }
+.id-consent { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-subtle); color: var(--color-primary); font-size: 13px; line-height: 1.75; cursor: pointer; }
+.id-consent input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--color-accent); }
+.id-consent a { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.id-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.id-form-actions .primary-button { min-width: 160px; }
+.id-form-actions small { color: var(--color-text-muted); font-size: 13px; }
+.id-aside { display: flex; flex-direction: column; gap: 12px; padding: 24px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-subtle); }
+.id-aside h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.id-aside .id-aside-divided { margin-top: 10px; padding-top: 20px; border-top: 1px solid var(--color-border-subtle); }
+.id-aside-perk { display: flex; align-items: flex-start; gap: 12px; }
+.id-aside-perk > span { display: grid; flex: 0 0 36px; place-items: center; width: 36px; height: 36px; border: 1px solid var(--color-border-subtle); border-radius: 8px; background: var(--color-bg-surface); color: var(--color-accent-text); }
+.id-aside-perk p { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+.id-aside-perk b { display: block; color: var(--color-primary); font-size: 14px; font-weight: 600; }
+.id-aside-row { display: flex; align-items: flex-start; gap: 10px; margin: 0; color: var(--color-primary); font-size: 13px; line-height: 1.6; }
+.id-aside-row svg { flex: none; margin-top: 3px; color: var(--color-accent-text); }
+.id-aside-help { margin: auto 0 0; padding-top: 14px; border-top: 1px solid var(--color-border-subtle); color: var(--color-text-muted); font-size: 13px; }
+.id-aside-help a { color: var(--color-accent-text); font-family: var(--font-mono); font-weight: 600; }
+@media (max-width: 900px) { .id-form { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
+@media (max-width: 640px) {
+  .id-field { flex-direction: column; align-items: stretch; gap: 0; padding: 10px 14px 0; }
+  .id-field > span { flex-basis: auto; font-size: 12px; }
+  .id-field input { height: 40px; font-size: 16px; }
+  .id-form-actions { flex-direction: column; align-items: stretch; }
+  .id-form-actions .primary-button, .id-form-actions .secondary-button { width: 100%; }
+  .id-form-actions small { text-align: center; }
+  .id-aside { padding: 18px 16px; }
+}
 .id-foot .link-button:hover:not(:disabled) { color: var(--color-accent-text); }
 
 .danger-card { border-color: color-mix(in srgb, var(--color-error) 28%, var(--color-border-subtle)); }
