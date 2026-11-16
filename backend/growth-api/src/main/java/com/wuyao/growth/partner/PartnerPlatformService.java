@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 平台管理服务商：建服务商、绑登录账号、线下收款后发烟火、按套餐标识分激活码额度、查看和改名下商户归属。
+ * 平台管理服务商：建服务商（负责人的一方志商户就是团队账户）、绑负责人账号、线下收款后把烟火发进团队账户、
+ * 查看和改名下商户归属。服务商生成激活码不限个数。
  * 涉及烟火和激活码，只开放给计费运营名单（BILLING_OPERATOR_USER_IDS）。
  */
 @Service
@@ -34,7 +35,7 @@ public class PartnerPlatformService {
     public PartnerDtos.PlatformPartner create(PartnerDtos.NewPartner input, Long operator) {
         requireOperator(operator);
         var admin = user(input.adminUid());
-        Long id = store.createPartner(input.name().trim(), PartnerService.blank(input.contact()) ? null : input.contact().trim(), operator);
+        Long id = store.createPartner(input.name().trim(), PartnerService.blank(input.contact()) ? null : input.contact().trim(), admin.tenantId(), operator);
         addMember(id, admin, operator);
         return view(store.partner(id).orElseThrow());
     }
@@ -72,24 +73,24 @@ public class PartnerPlatformService {
         return view(store.partner(partnerId).orElseThrow());
     }
 
-    /** 线下收款后给服务商发烟火；同一 requestKey 只发一次。 */
-    @Transactional
+    /**
+     * 线下收款后给服务商发烟火：记入团队账户的充值烟火，服务商流水记一条发放。两边在团队账户的同一个事务里写；
+     * 同一 requestKey 只发一次。
+     */
     public PartnerDtos.PlatformPartner grant(Long partnerId, PartnerDtos.Grant input, Long operator) {
         requireOperator(operator);
-        var row = store.lockPartner(partnerId);
+        var row = store.partner(partnerId).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "服务商不存在"));
+        if (row.teamTenantId() == null) throw PartnerService.bad("这家服务商还没有团队账户，先添加负责人");
         String key = "partner-grant:" + input.requestKey();
-        if (!store.eventExists(key)) store.move(row, key, "GRANT", input.credits(), null, input.note().trim(), operator);
+        String note = input.note().trim();
+        partners.inScope(row.teamTenantId(), false, () -> {
+            store.lockPartner(partnerId);
+            if (store.eventExists(key)) return null;
+            billing.creditPartnerGrant(input.credits(), input.requestKey(), row.name(), note, operator);
+            store.recordGrant(partnerId, key, input.credits(), note, operator);
+            return null;
+        });
         return view(store.partner(partnerId).orElseThrow());
-    }
-
-    /** 设某个套餐标识的激活码总额度（例如 20 个），不能低于已经生成的个数。 */
-    @Transactional
-    public PartnerDtos.PlatformPartner setQuota(Long partnerId, PartnerDtos.SetQuota input, Long operator) {
-        requireOperator(operator);
-        var row = store.lockPartner(partnerId);
-        if (billing.activationPlans().stream().noneMatch(p -> p.code().equals(input.planCode()))) throw PartnerService.bad("没有这个套餐，不能分配额度");
-        store.setQuota(partnerId, input.planCode(), input.quota());
-        return view(row);
     }
 
     public PartnerDtos.Page<PartnerDtos.TenantView> tenants(Long partnerId, int page, int size, String keyword, Long operator) {
@@ -128,10 +129,12 @@ public class PartnerPlatformService {
         store.reassign(tenantId, partnerId, operator);
     }
 
+    /** 平台加的都是负责人；这个账号已是本服务商成员时升为负责人。 */
     private void addMember(Long partnerId, PlatformAccountDirectory.PlatformUser user, Long operator) {
         store.addMember(partnerId, user.id(), "OWNER", operator).ifPresent(other -> {
             throw BizException.of(ErrorCode.CONFLICT, "该账号已是另一家服务商的登录账号");
         });
+        store.setRole(partnerId, user.id(), "OWNER");
     }
 
     private PlatformAccountDirectory.PlatformUser user(Long uid) {
@@ -140,7 +143,8 @@ public class PartnerPlatformService {
     }
 
     private PartnerDtos.PlatformPartner view(PartnerStore.Row row) {
-        return new PartnerDtos.PlatformPartner(row.view(), partners.members(row.id()), partners.quotas(row.id()), store.tenantCount(row.id()));
+        return new PartnerDtos.PlatformPartner(partners.partnerView(row, partners.teamAccount(row)), partners.members(row.id(), true),
+                store.tenantCount(row.id()), row.teamTenantId(), row.teamTenantId() == null ? null : partners.tenantNames().get(row.teamTenantId()));
     }
 
     private void requireOperator(Long operator) {

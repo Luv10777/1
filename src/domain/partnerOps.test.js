@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { accountSplit, defaultSource, sourceBalance, followUpTodos, groupTodos, memberSegments, percent, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
+import { accountSplit, displayNameError, followUpTodos, grantError, greeting, groupTodos, memberSegments, percent, permissionText, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
 
 const now = Date.parse('2026-11-13T00:00:00Z')
 
@@ -49,19 +49,40 @@ test('a failed transfer keeps going and reports per tenant with its own request 
 
 test('tenant timeline merges transfers, codes and renewals newest first', () => {
   const rows = tenantTimeline({
-    transfers: [{ id: 1, credits: 2000, source: 'ACCOUNT', status: 'DONE', note: '活动', createdAt: '2026-11-10T00:00:00Z' }],
+    transfers: [{ id: 1, credits: 2000, source: 'ACCOUNT', status: 'DONE', note: '活动', actorName: '小周', createdAt: '2026-11-10T00:00:00Z' }],
     codes: [{ id: 5, planName: '月卡', durationDays: 30, note: '直接续期', redeemedAt: '2026-11-12T00:00:00Z' },
       { id: 4, planName: '月卡', durationDays: 30, note: null, redeemedAt: '2026-11-01T00:00:00Z' }],
   })
-  assert.deepEqual(rows.map(r => [r.kind, r.title]), [['renew', '直接续期 · 月卡 30 天'], ['transfer', '分配 2,000 烟火 · 我的账号'], ['code', '兑换激活码 · 月卡 30 天']])
+  assert.deepEqual(rows.map(r => [r.kind, r.title]), [['renew', '直接续期 · 月卡 30 天'], ['transfer', '分配 2,000 烟火 · 小周'], ['code', '兑换激活码 · 月卡 30 天']])
 })
 
-test('lookup verdicts never reveal another partner and only allow free tenants or accounts', () => {
-  assert.equal(lookupVerdict({ tenantState: 'NONE' }, true).can, true)
-  assert.equal(lookupVerdict({ tenantState: 'OTHER' }, true).can, false)
-  assert.match(lookupVerdict({ tenantState: 'TEAM', bdName: '小周' }, false).text, /小周/)
-  assert.equal(memberVerdict({ memberState: 'NONE' }).can, true)
-  assert.equal(memberVerdict({ memberState: 'BD' }).can, false)
+test('lookup verdicts never reveal another partner and only allow free tenants', () => {
+  assert.equal(lookupVerdict({ tenantState: 'NONE' }).can, true)
+  assert.equal(lookupVerdict({ tenantState: 'MINE' }).can, false)
+  assert.equal(lookupVerdict({ tenantState: 'OTHER' }).can, false)
+  assert.doesNotMatch(lookupVerdict({ tenantState: 'OTHER' }).text, /服务商「/)
+})
+
+test('members can only hand out permissions they hold and never the money ones', () => {
+  const owner = { role: 'OWNER' }
+  const manager = { role: 'MEMBER', permissions: { tenants: true, codes: false, distribute: true, finance: false, team: true } }
+  const none = { tenants: false, codes: false, distribute: false, finance: false, team: false }
+  assert.equal(grantError(owner, none, { ...none, distribute: true, finance: true }, null, 500), '')
+  assert.match(grantError(manager, none, { ...none, distribute: true }), /只有负责人/)
+  assert.match(grantError(manager, { ...none, distribute: true }, { ...none, distribute: true }, 500, 800), /只有负责人/)
+  assert.match(grantError(manager, none, { ...none, codes: true }), /激活码/)
+  assert.equal(grantError(manager, none, { ...none, tenants: true, team: true }), '')
+  assert.equal(grantError(manager, { ...none, codes: true }, { ...none, codes: true }), '')
+  assert.equal(permissionText({ role: 'OWNER' }), '全部')
+  assert.equal(permissionText({ role: 'MEMBER', permissions: { tenants: true, finance: true } }), '商户、财务查看')
+  assert.equal(permissionText({ role: 'MEMBER', permissions: none }), '无')
+})
+
+test('team names are 1 to 20 characters and greetings follow the hour', () => {
+  assert.match(displayNameError('  '), /请填写/)
+  assert.match(displayNameError('一'.repeat(21)), /20/)
+  assert.equal(displayNameError(' 小周 '), '')
+  assert.deepEqual([3, 8, 12, 15, 20].map(greeting), ['夜深了', '早上好', '中午好', '下午好', '晚上好'])
 })
 
 test('code export is excel friendly and quotes notes with commas', () => {
@@ -96,9 +117,9 @@ test('booked follow-ups join the to-do list, keeping the richer tenant row from 
   ]
   const todos = followUpTodos(due)
   assert.deepEqual(todos.map(t => [t.tenant.tenantId, t.type, t.tenant.ownerName, t.tenant.followUpOnly]), [[1, 'FOLLOW_UP', '王老板', true], [4, 'FOLLOW_UP', null, true]])
-  const rows = groupTodos([{ type: 'IDLE', tenant: { tenantId: 1, ownerName: '王某', bdName: '小林' } }, ...todos])
+  const rows = groupTodos([{ type: 'IDLE', tenant: { tenantId: 1, ownerName: '王某', addedByName: '小林' } }, ...todos])
   assert.deepEqual(rows.map(r => [r.tenant.tenantId, r.reasons.map(x => x.type)]), [[1, ['FOLLOW_UP', 'IDLE']], [4, ['FOLLOW_UP']]])
-  assert.equal(rows[0].tenant.bdName, '小林')
+  assert.equal(rows[0].tenant.addedByName, '小林')
   assert.deepEqual(followUpTodos(null), [])
 })
 
@@ -110,12 +131,8 @@ test('member segments split active from expiring and percentages handle zero', (
   assert.equal(percent(1, 0), '—')
 })
 
-test('credit sources default to the partner pool and split account credits gift first', () => {
-  const overview = { partner: { creditsAvailable: 0 }, account: { available: 800, gift: 300, purchased: 500 } }
-  assert.equal(defaultSource(overview), 'ACCOUNT')
-  assert.equal(defaultSource({ ...overview, partner: { creditsAvailable: 10 } }), 'POOL')
-  assert.equal(sourceBalance(overview, 'ACCOUNT'), 800)
-  assert.equal(sourceBalance(overview, 'POOL'), 0)
-  assert.deepEqual(accountSplit(overview.account, 500), { gift: 300, purchased: 200 })
-  assert.deepEqual(accountSplit(overview.account, 100), { gift: 100, purchased: 0 })
+test('team account credits go out gift first', () => {
+  const account = { available: 800, gift: 300, purchased: 500 }
+  assert.deepEqual(accountSplit(account, 500), { gift: 300, purchased: 200 })
+  assert.deepEqual(accountSplit(account, 100), { gift: 100, purchased: 0 })
 })

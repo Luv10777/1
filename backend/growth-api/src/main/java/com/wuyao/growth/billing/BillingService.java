@@ -292,7 +292,21 @@ public class BillingService {
         return true;
     }
     /**
-     * 服务商负责人从自己的账号分出烟火（充值和赠送都能分，先扣赠送）：记一条 TRANSFER 流水。调用方切到负责人的商户后新开事务调用。
+     * 平台线下收款后给服务商发烟火：记入服务商团队账户的充值烟火（账本 PURCHASE），不发 OrderPaid。
+     * 调用方切到团队账户后新开事务调用。@return 是否入账；同一 requestKey 已处理过时为 false
+     */
+    @Transactional
+    public boolean creditPartnerGrant(long credits,String requestKey,String partnerName,String note,Long actor) {
+        if(credits<1) throw bad("发放的烟火必须大于零");
+        var a=store.lockAccount(); String key="partner-grant:"+requestKey;
+        if(store.eventExists(key)) return false;
+        a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),credits));
+        String description="平台发放服务商「"+partnerName+"」烟火："+note;
+        ledger(a,key,"PURCHASE",description.length()>240?description.substring(0,240):description,0,credits,0,null,null,actor);
+        return true;
+    }
+    /**
+     * 服务商从团队账户分出烟火（充值和赠送都能分，先扣赠送）：记一条 TRANSFER 流水。调用方切到团队账户后新开事务调用。
      * 同一 requestKey 已处理过时返回第一次扣的拆分；数量不同则拒绝。
      */
     @Transactional
@@ -305,7 +319,7 @@ public class BillingService {
             if(split.total()!=credits) throw bad("分配请求已用于不同的数量，请刷新后重试");
             return split;
         }
-        if(a.available()<credits) throw BizException.of(ErrorCode.INSUFFICIENT_YANHUO,"你的账号烟火不足，当前可用 "+a.available());
+        if(a.available()<credits) throw BizException.of(ErrorCode.INSUFFICIENT_YANHUO,"团队账户烟火不足，当前可用 "+a.available());
         long gift=Math.min(a.getGiftAvailable(),credits),purchased=credits-gift;
         a.setGiftAvailable(a.getGiftAvailable()-gift); a.setPurchasedAvailable(a.getPurchasedAvailable()-purchased);
         ledger(a,key,"TRANSFER",description,-gift,-purchased,0,null,null,actor);

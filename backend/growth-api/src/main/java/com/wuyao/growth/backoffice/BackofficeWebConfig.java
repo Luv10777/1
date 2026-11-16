@@ -43,7 +43,9 @@ public class BackofficeWebConfig implements WebMvcConfigurer {
             @Override public void afterCompletion(HttpServletRequest req, HttpServletResponse res, Object handler, Exception ex) {
                 record(req,res.getStatus());
             }
-        }).addPathPatterns("/api/platform/**","/api/billing/operations/**","/api/partner/**");
+        }).addPathPatterns("/api/platform/**","/api/billing/operations/**","/api/partner/**")
+                // 一方志站内问「我是不是服务商成员」，不是成员时也要正常返回。
+                .excludePathPatterns("/api/partner/membership");
     }
     private void record(HttpServletRequest req,int status) {
         if(Set.of("GET","HEAD","OPTIONS").contains(req.getMethod()) || Boolean.TRUE.equals(req.getAttribute("backoffice.audited"))) return;
@@ -80,7 +82,8 @@ public class BackofficeWebConfig implements WebMvcConfigurer {
         if(p.contains("/security/roles")) return "调整管理员角色";
         if(p.contains("/follow-ups")) return "记录商户跟进";
         if(p.endsWith("/profile")) return "更新商户档案";
-        if(p.contains("/assignments/") || p.endsWith("/bd")) return "调整商户归属";
+        if(p.contains("/assignments/")) return "调整商户归属";
+        if(p.endsWith("/me/name")) return "修改团队称呼";
         if(p.endsWith("/credits")) return "分配烟火";
         if(p.contains("/codes") || p.contains("/redeem-codes")) return "管理兑换码";
         if(p.endsWith("/confirm")) return "确认订单收款";

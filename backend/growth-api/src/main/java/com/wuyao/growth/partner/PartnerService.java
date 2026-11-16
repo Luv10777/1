@@ -7,7 +7,9 @@ import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
 import com.wuyao.growth.common.web.PageResult;
+import com.wuyao.growth.iam.service.AccountService;
 import com.wuyao.growth.iam.service.PlatformAccountDirectory;
+import com.wuyao.growth.store.StoreMembershipService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -17,15 +19,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 服务商后台（partner.yifangzhi.com）。登录账号分负责人（OWNER）和 BD：
- * 负责人看全部、分烟火、管 BD 和调配商户；BD 只看和管自己名下的商户与自己生成的激活码，不能分烟火。
- * 每个接口先确认当前账号属于一家启用中的服务商，只能动这一家的数据。
+ * 服务商后台（wy.yifangzhi.com/partner/）。每家服务商有一个团队账户（负责人的一方志商户），平台发的烟火进它的账本，
+ * 成员都是它的员工：在一方志里创作直接扣它，分给名下商户也从它扣。
+ * 登录账号分负责人（OWNER，平台开通，全部权限）和成员（MEMBER，按勾选的权限）；名下商户整个服务商共有，不分到个人。
+ * 每个接口先确认当前账号属于一家启用中的服务商、有这项权限，只能动这一家的数据。
  */
 @Service
 @RequiredArgsConstructor
@@ -39,220 +44,278 @@ public class PartnerService {
     private final com.wuyao.growth.billing.BillingLedgerReport usage;
     private final com.wuyao.growth.store.StoreService stores;
     private final com.wuyao.growth.product.ProductService products;
+    private final AccountService accounts;
+    private final StoreMembershipService memberships;
     private final PlatformTransactionManager transactionManager;
 
     public PartnerDtos.Overview overview(Long userId) {
         var access = requirePartner(userId);
         var p = access.partner();
-        var partner = access.owner() ? p.view() : new PartnerDtos.Partner(p.id(), p.name(), p.contact(), p.status(), null, p.createdAt());
-        return new PartnerDtos.Overview(partner, quotas(p.id()), visible(access).size(), access.role(), account(userId));
+        var team = teamAccount(p);
+        Instant monthStart = monthStart();
+        long monthCodes = store.codeEvents(p.id(), monthStart).stream().filter(c -> !c.createdAt().isBefore(monthStart)).count();
+        return new PartnerDtos.Overview(partnerView(p, team), plans(), store.tenantCount(p.id()), access.member().role(),
+                PartnerDtos.Permissions.of(access.perms()), access.member().displayName(), userName(userId), team, monthCodes);
     }
 
-    /** 当前登录账号在一方志里的烟火（负责人和 BD 都是自己的账号），在账号所在的商户里读。 */
-    PartnerDtos.Account account(Long userId) {
-        var s = inScope(directory.user(userId).tenantId(), true, () -> billing.summary(false, false));
-        return new PartnerDtos.Account(s.available(), s.giftAvailable(), s.purchasedAvailable());
+    /** 一方志站内用：当前账号是不是服务商成员（决定右上角要不要显示「服务商后台」）。不是成员时不报错。 */
+    public PartnerDtos.Membership membership(Long userId) {
+        return store.accessOfUser(userId).map(a -> new PartnerDtos.Membership(true, a.partner().name(), a.member().role(),
+                "ACTIVE".equals(a.partner().status()))).orElse(new PartnerDtos.Membership(false, null, null, false));
     }
 
-    public PartnerDtos.Page<PartnerDtos.TenantView> tenants(Long userId, int page, int size, String keyword, String expiry, Long bdUserId) {
-        var access = requirePartner(userId);
-        var bindings = visible(access);
-        // 负责人可以按 BD 筛（0 表示负责人直接管的）；BD 本来就只看得到自己的。
-        if (access.owner() && bdUserId != null)
-            bindings = bindings.stream().filter(b -> bdUserId == 0 ? b.bdUserId() == null : bdUserId.equals(b.bdUserId())).toList();
-        return tenantViews(bindings, page, size, keyword, expiry);
+    /** 团队账户的烟火，在团队账户里读；还没有团队账户或读不到时为空。 */
+    PartnerDtos.Account teamAccount(PartnerStore.Row partner) {
+        if (partner.teamTenantId() == null) return null;
+        try {
+            var s = inScope(partner.teamTenantId(), true, () -> billing.summary(false, false));
+            return new PartnerDtos.Account(s.available(), s.giftAvailable(), s.purchasedAvailable());
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
-    /**
-     * 按 UID 把该账号所属的商户加到名下，BD 加的归到这个 BD。第一次归属为准：已归属别家服务商的不能加；
-     * 已在本服务商名下但不归这个 BD 的，要由负责人调配。
-     */
+    PartnerDtos.Partner partnerView(PartnerStore.Row p, PartnerDtos.Account team) {
+        return new PartnerDtos.Partner(p.id(), p.name(), p.contact(), p.status(), team == null ? null : team.available(), p.createdAt());
+    }
+
+    /** 能生成激活码的套餐：全部激活码套餐，不限个数。 */
+    List<PartnerDtos.Plan> plans() {
+        Map<String, BillingDtos.PlanSnapshot> latest = new LinkedHashMap<>();
+        for (var plan : billing.activationPlans()) latest.putIfAbsent(plan.code(), plan);
+        return latest.values().stream().map(p -> new PartnerDtos.Plan(p.code(), p.name(), p.durationDays())).toList();
+    }
+
+    public PartnerDtos.Page<PartnerDtos.TenantView> tenants(Long userId, int page, int size, String keyword, String expiry) {
+        var access = require(userId, PartnerStore.Perms::tenants, "商户");
+        return tenantViews(store.tenants(access.partner().id()), page, size, keyword, expiry);
+    }
+
+    /** 按 UID 把该账号所属的商户加到名下。第一次归属为准：已归属别家服务商的不能加。 */
     public PartnerDtos.TenantView addTenant(Long userId, Long uid) {
-        var access = requirePartner(userId);
+        var access = require(userId, PartnerStore.Perms::tenants, "商户");
         var user = directory.userByUid(uid).filter(u -> !"REMOVED".equals(u.status()))
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个 UID，请核对后重新输入"));
-        var binding = store.bindIfAbsent(user.tenantId(), access.partner().id(), "UID", userId, access.owner() ? null : userId);
+        if (user.tenantId().equals(access.partner().teamTenantId())) throw bad("这是你们的团队账户，不能加成名下商户");
+        var binding = store.bindIfAbsent(user.tenantId(), access.partner().id(), "UID", userId);
         if (!binding.partnerId().equals(access.partner().id())) throw BizException.of(ErrorCode.CONFLICT, "该用户已归属其他服务商，不能添加");
-        if (!access.owner() && !userId.equals(binding.bdUserId()))
-            throw BizException.of(ErrorCode.CONFLICT, "该商户已在本服务商名下，请联系负责人调配给你");
         return tenantView(user.tenantId());
     }
 
     /**
-     * 负责人把服务商的烟火分给名下商户，记入商户的充值烟火。先在服务商这边扣减记账，再切到商户入账；
-     * 两步各自按 requestKey 去重，商户入账失败时用同一 requestKey 再提交一次即可补上，不会重复扣减。
+     * 从团队账户分烟火给名下商户（先扣赠送，对方收到时赠送仍是赠送、充值仍是充值）。
+     * 成员受每月上限约束；负责人不限。中途失败时用同一 requestKey 再提交即可补上，不会重复扣。
      */
     public PartnerDtos.TenantView transfer(Long userId, Long tenantId, PartnerDtos.Transfer input) {
-        var access = requireOwner(userId);
-        var binding = store.binding(tenantId).filter(b -> b.partnerId().equals(access.partner().id()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该商户不在你名下"));
-        distribute(access, input, "TENANT", binding.tenantId(), null);
+        var access = require(userId, PartnerStore.Perms::distribute, "分配烟火");
+        var binding = owned(access, tenantId);
+        distribute(access, input.requestKey(), input.credits(), blank(input.note()) ? null : input.note().trim(), binding.tenantId());
         return tenantView(binding.tenantId());
     }
 
-    /** 负责人把烟火分给自己的 BD，进 BD 自己的一方志账号。 */
-    public PartnerDtos.Distribution transferToBd(Long userId, Long bdUserId, PartnerDtos.Transfer input) {
-        var access = requireOwner(userId);
-        if (store.role(access.partner().id(), bdUserId).filter("BD"::equals).isEmpty()) throw BizException.of(ErrorCode.NOT_FOUND, "该账号不是你的 BD");
-        var record = distribute(access, input, "BD", directory.user(bdUserId).tenantId(), bdUserId);
-        return distributionViews(List.of(record)).getFirst();
-    }
-
     /**
-     * 分一笔烟火：先从来源扣（可分配烟火记服务商流水；负责人账号记一条转出，先扣赠送），记下分配，再给对方入账，最后标记到账。
-     * 每一步都按 requestKey 去重：中途失败时用同一 requestKey 再提交，已经做过的步骤不会重复。
-     * 负责人账号分出的赠送烟火对方收到仍是赠送烟火，充值仍是充值；可分配烟火对方收到的是充值烟火。
+     * 分一笔烟火：在团队账户的一个事务里锁服务商、核对上限、扣团队账户、记下分配；再切到商户入账，最后标记到账。
+     * 每一步都按请求去重：中途失败时用同一请求再走一遍，已经做过的步骤不会重复。
+     * V84 以前从可分配烟火（POOL）分出、还没到账的老记录，补上时只做入账那一步。
      */
-    private PartnerStore.Distribution distribute(PartnerStore.Access access, PartnerDtos.Transfer input, String recipientType,
-                                                 Long recipientTenant, Long recipientUser) {
+    private PartnerStore.Distribution distribute(PartnerStore.Access access, String requestKey, long credits, String note, Long recipientTenant) {
         var partner = access.partner();
         Long actor = access.userId();
-        String source = blank(input.source()) ? "POOL" : input.source();
-        String key = "partner-transfer:" + partner.id() + ":" + input.requestKey();
-        String note = blank(input.note()) ? null : input.note().trim();
+        String key = "partner-transfer:" + partner.id() + ":" + requestKey;
         var existing = store.distributionByKey(key);
         if (existing.isPresent()) {
             var d = existing.get();
-            if (!d.source().equals(source) || !d.recipientTenantId().equals(recipientTenant) || d.credits() != input.credits()
-                    || !Objects.equals(d.recipientUserId(), recipientUser))
+            if (!d.recipientTenantId().equals(recipientTenant) || d.credits() != credits)
                 throw bad("分配请求已用于其他对象或数量，请刷新后重试");
             if ("DONE".equals(d.status())) return d;
+            if ("POOL".equals(d.source())) {
+                inScope(recipientTenant, false, () -> billing.creditFromPartner(credits, key, partner.name(), d.actorUserId()));
+                tx(false, () -> { store.completeDistribution(key); return null; });
+                return store.distributionByKey(key).orElseThrow();
+            }
         }
-        Long ownTenant = directory.user(actor).tenantId();
-        if ("ACCOUNT".equals(source) && ownTenant.equals(recipientTenant))
-            throw bad("对方和你用的是同一个商户账号，烟火本来就共用，不用分");
-        String who = "服务商「" + partner.name() + "」";
-        BillingDtos.CreditSplit split;
-        if ("POOL".equals(source)) {
-            tx(false, () -> {
-                var locked = store.lockPartner(partner.id());
-                if (!store.eventExists(key)) store.move(locked, key, "TRANSFER", -input.credits(), recipientTenant, note, actor);
-                return null;
-            });
-            split = new BillingDtos.CreditSplit(0, input.credits());
-        } else {
-            String target = "BD".equals(recipientType) ? "BD「" + userName(recipientUser) + "」" : "商户「" + tenantNames().get(recipientTenant) + "」";
-            split = inScope(ownTenant, false, () -> billing.debitForPartner(input.credits(), key, "分配给" + target, actor));
-        }
-        tx(false, () -> {
-            store.recordDistribution(partner.id(), key, source, recipientType, recipientTenant, recipientUser, split.gift(), split.purchased(), note, actor);
-            return null;
+        Long team = partner.teamTenantId();
+        if (team == null) throw bad("服务商还没有团队账户，请联系平台");
+        if (team.equals(recipientTenant)) throw bad("这是你们的团队账户，不用分");
+        String target = "商户「" + tenantNames().get(recipientTenant) + "」";
+        var split = inScope(team, false, () -> {
+            store.lockPartner(partner.id());
+            var recorded = store.distributionByKey(key);
+            if (recorded.isPresent()) return new BillingDtos.CreditSplit(recorded.get().gift(), recorded.get().purchased());
+            Long cap = access.owner() ? null : store.member(partner.id(), actor).map(PartnerStore.MemberRow::monthlyCap).orElse(null);
+            if (cap != null) {
+                long used = store.distributedBy(partner.id(), actor, monthStart());
+                if (used + credits > cap) throw bad("超出你每月的分配上限 " + cap + "，本月还能分 " + Math.max(0, cap - used));
+            }
+            var s = billing.debitForPartner(credits, key, "分配给" + target, actor);
+            store.recordDistribution(partner.id(), key, "ACCOUNT", "TENANT", recipientTenant, null, s.gift(), s.purchased(), note, actor);
+            return s;
         });
-        if ("POOL".equals(source)) inScope(recipientTenant, false, () -> billing.creditFromPartner(input.credits(), key, partner.name(), actor));
-        else inScope(recipientTenant, false, () -> billing.creditFromPartnerAccount(split, key, who + "负责人分配烟火", actor));
+        inScope(recipientTenant, false, () -> billing.creditFromPartnerAccount(split, key, "服务商「" + partner.name() + "」分配烟火", actor));
         tx(false, () -> { store.completeDistribution(key); return null; });
         return store.distributionByKey(key).orElseThrow();
     }
 
     /** 补上一笔「未到账」的分配：用原来的请求再走一遍，已经做过的步骤不会重复，不会再扣一次。 */
     public PartnerDtos.Distribution retryDistribution(Long userId, Long id) {
-        var access = requireOwner(userId);
+        var access = require(userId, PartnerStore.Perms::distribute, "分配烟火");
         var d = store.distribution(access.partner().id(), id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "分配记录不存在"));
-        if ("DONE".equals(d.status())) return distributionViews(List.of(d)).getFirst();
-        String prefix = "partner-transfer:" + access.partner().id() + ":";
-        var input = new PartnerDtos.Transfer(d.requestKey().substring(prefix.length()), d.credits(), d.note(), d.source());
-        return distributionViews(List.of(distribute(access, input, d.recipientType(), d.recipientTenantId(), d.recipientUserId()))).getFirst();
-    }
-
-    /** 分配记录（只给负责人）：recipientType、source 为空时不限；tenantId、bdUserId 只看分给某个商户或 BD 的。 */
-    public PartnerDtos.Page<PartnerDtos.Distribution> distributions(Long userId, int page, int size, String recipientType, String source,
-                                                                    Long tenantId, Long bdUserId) {
-        var access = requireOwner(userId);
-        checkPage(page, size);
-        if (!blank(recipientType) && !Set.of("TENANT", "BD").contains(recipientType) || !blank(source) && !Set.of("POOL", "ACCOUNT").contains(source))
-            throw bad("筛选条件无效");
-        Long partnerId = access.partner().id();
-        var rows = store.distributions(partnerId, recipientType, source, tenantId, bdUserId, null, page, size);
-        return new PartnerDtos.Page<>(distributionViews(rows), page, size, store.distributionCount(partnerId, recipientType, source, tenantId, bdUserId, null));
-    }
-
-    List<PartnerDtos.Distribution> distributionViews(List<PartnerStore.Distribution> rows) {
-        Map<Long, String> names = tenantNames();
-        Map<Long, String> users = new HashMap<>();
-        return rows.stream().map(d -> new PartnerDtos.Distribution(d.id(), d.source(), d.recipientType(), d.recipientTenantId(),
-                d.recipientUserId() != null ? users.computeIfAbsent(d.recipientUserId(), this::userName) : names.get(d.recipientTenantId()),
-                d.recipientUserId(), d.credits(), d.gift(), d.purchased(), d.note(), users.computeIfAbsent(d.actorUserId(), this::userName),
-                d.status(), d.createdAt())).toList();
-    }
-
-    /** 负责人把名下商户调给某个 BD，或收回由自己直接管。 */
-    @Transactional
-    public PartnerDtos.TenantView assignBd(Long userId, Long tenantId, Long bdUserId) {
-        var access = requireOwner(userId);
-        Long partnerId = access.partner().id();
-        store.lockPartner(partnerId);
-        store.binding(tenantId).filter(b -> b.partnerId().equals(partnerId))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该商户不在你名下"));
-        if (bdUserId != null && store.role(partnerId, bdUserId).filter("BD"::equals).isEmpty())
-            throw BizException.of(ErrorCode.NOT_FOUND, "该账号不是你的 BD");
-        store.setBd(tenantId, partnerId, bdUserId);
-        return tenantView(tenantId);
-    }
-
-    /** 负责人看团队：负责人和 BD 的登录账号，BD 带名下商户数。 */
-    public List<PartnerDtos.Member> team(Long userId) {
-        return members(requireOwner(userId).partner().id());
-    }
-
-    /** 负责人按 UID 添加 BD；一个账号最多属于一家服务商。 */
-    @Transactional
-    public List<PartnerDtos.Member> addBd(Long userId, Long uid) {
-        var access = requireOwner(userId);
-        Long partnerId = access.partner().id();
-        store.lockPartner(partnerId);
-        var user = directory.userByUid(uid).filter(u -> !"REMOVED".equals(u.status()))
-                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个 UID，请核对后重新输入"));
-        store.addMember(partnerId, user.id(), "BD", userId).ifPresent(other -> {
-            throw BizException.of(ErrorCode.CONFLICT, "该账号已是另一家服务商的登录账号");
-        });
-        if (store.role(partnerId, user.id()).filter("BD"::equals).isEmpty())
-            throw BizException.of(ErrorCode.CONFLICT, "该账号已是本服务商的负责人");
-        return members(partnerId);
+        if (!"DONE".equals(d.status())) {
+            if (!"TENANT".equals(d.recipientType())) throw bad("这笔是分给 BD 的老记录，不能再补");
+            String prefix = "partner-transfer:" + access.partner().id() + ":";
+            d = distribute(access, d.requestKey().substring(prefix.length()), d.credits(), d.note(), d.recipientTenantId());
+        }
+        return distributionViews(access.partner().id(), List.of(d)).getFirst();
     }
 
     /**
-     * 负责人移除 BD。他名下的商户先整体转给 transferTo 指定的 BD，transferTo 为 0 时回到负责人直接管。
-     * 负责人账号只能由平台移除。
+     * 分配记录：有财务权限的看全部（可按商户、操作人筛）；只有分配权限的只看自己分出去的。
      */
-    @Transactional
-    public List<PartnerDtos.Member> removeBd(Long userId, Long bdUserId, long transferTo) {
-        var access = requireOwner(userId);
+    public PartnerDtos.Page<PartnerDtos.Distribution> distributions(Long userId, int page, int size, Long tenantId, Long actorUserId) {
+        var access = require(userId, p -> p.finance() || p.distribute(), "分配烟火");
+        checkPage(page, size);
         Long partnerId = access.partner().id();
-        store.lockPartner(partnerId);
-        if (store.role(partnerId, bdUserId).filter("BD"::equals).isEmpty()) throw BizException.of(ErrorCode.NOT_FOUND, "该账号不是你的 BD");
-        if (transferTo != 0) {
-            if (transferTo == bdUserId || store.role(partnerId, transferTo).filter("BD"::equals).isEmpty())
-                throw BizException.of(ErrorCode.NOT_FOUND, "接手的账号不是你的 BD");
-            store.moveBdTenants(partnerId, bdUserId, transferTo);
-        }
-        store.removeMember(partnerId, bdUserId);
-        return members(partnerId);
+        Long actor = access.perms().finance() ? actorUserId : userId;
+        var rows = store.distributions(partnerId, null, null, tenantId, actor, null, page, size);
+        return new PartnerDtos.Page<>(distributionViews(partnerId, rows), page, size, store.distributionCount(partnerId, null, null, tenantId, actor, null));
     }
 
-    /** 按 UID 预查询：添加商户或 BD 前，先确认对方是谁、现在归属在哪。 */
-    public PartnerDtos.Lookup lookup(Long userId, Long uid) {
+    List<PartnerDtos.Distribution> distributionViews(Long partnerId, List<PartnerStore.Distribution> rows) {
+        Map<Long, String> names = tenantNames();
+        Map<Long, String> people = memberNames(partnerId);
+        return rows.stream().map(d -> new PartnerDtos.Distribution(d.id(), d.source(), d.recipientType(), d.recipientTenantId(),
+                d.recipientUserId() != null ? people.computeIfAbsent(d.recipientUserId(), this::userName) : names.get(d.recipientTenantId()),
+                d.recipientUserId(), d.credits(), d.gift(), d.purchased(), d.note(), d.actorUserId(),
+                people.computeIfAbsent(d.actorUserId(), this::userName), d.status(), d.createdAt())).toList();
+    }
+
+    /** 团队成员。手机号只给有团队管理权限的人看。 */
+    public List<PartnerDtos.Member> team(Long userId) {
         var access = requirePartner(userId);
+        return members(access.partner().id(), access.perms().team());
+    }
+
+    /**
+     * 按手机号加成员：没注册过的在团队账户里新建员工账号（以后用这个手机号登录一方志）；已是团队账户员工的直接加进来；
+     * 注册了别的商户的手机号不能加。分配烟火、财务查看和分配上限只有负责人能给；成员只能给出自己也有的权限。
+     */
+    public List<PartnerDtos.Member> addMember(Long userId, PartnerDtos.NewMember input) {
+        var access = require(userId, PartnerStore.Perms::team, "团队管理");
+        var partner = access.partner();
+        Long team = partner.teamTenantId();
+        if (team == null) throw bad("服务商还没有团队账户，请联系平台");
+        var perms = input.permissions().perms();
+        Long cap = perms.distribute() ? input.monthlyCap() : null;
+        checkGrant(access, null, perms, null, cap);
+        String phone = input.phone().trim();
+        var existing = directory.users().stream().filter(u -> phone.equals(u.phone()) && !"REMOVED".equals(u.status())).findFirst();
+        Long memberId;
+        if (existing.isPresent()) {
+            if (!team.equals(existing.get().tenantId())) throw BizException.of(ErrorCode.CONFLICT, "这个手机号已经注册了其他商户，请换一个手机号");
+            memberId = existing.get().id();
+            if (store.member(partner.id(), memberId).isPresent()) throw BizException.of(ErrorCode.CONFLICT, "他已经是团队成员了");
+        } else {
+            memberId = inScope(team, false, () -> accounts.createStaff(phone, input.name()).id());
+        }
+        tx(false, () -> {
+            store.lockPartner(partner.id());
+            store.addMember(partner.id(), memberId, "MEMBER", userId).ifPresent(other -> {
+                throw BizException.of(ErrorCode.CONFLICT, "该账号已是另一家服务商的成员");
+            });
+            if (store.member(partner.id(), memberId).orElseThrow().owner()) throw BizException.of(ErrorCode.CONFLICT, "该账号已是本服务商的负责人");
+            store.setPermissions(partner.id(), memberId, perms, cap);
+            return null;
+        });
+        return members(partner.id(), true);
+    }
+
+    /** 改成员的权限、每月分配上限和团队称呼。负责人的权限不能改；不能改自己的权限。 */
+    @Transactional
+    public List<PartnerDtos.Member> updateMember(Long userId, Long memberId, PartnerDtos.UpdateMember input) {
+        var access = require(userId, PartnerStore.Perms::team, "团队管理");
+        Long partnerId = access.partner().id();
+        store.lockPartner(partnerId);
+        var target = store.member(partnerId, memberId).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该账号不是本服务商的成员"));
+        if (target.owner()) throw BizException.of(ErrorCode.FORBIDDEN, "负责人的权限不能改");
+        if (memberId.equals(userId)) throw BizException.of(ErrorCode.FORBIDDEN, "不能改自己的权限");
+        var perms = input.permissions().perms();
+        Long cap = perms.distribute() ? input.monthlyCap() : null;
+        checkGrant(access, target.perms(), perms, target.monthlyCap(), cap);
+        store.setPermissions(partnerId, memberId, perms, cap);
+        if (!blank(input.displayName())) saveDisplayName(partnerId, memberId, input.displayName());
+        return members(partnerId, true);
+    }
+
+    /**
+     * 移除成员：移出服务商；他是团队账户的员工时一并移除（不能再登录一方志、不能再用团队烟火，手机号释放）。
+     * 负责人只能由平台移除；不能移除自己。
+     */
+    public List<PartnerDtos.Member> removeMember(Long userId, Long memberId) {
+        var access = require(userId, PartnerStore.Perms::team, "团队管理");
+        var partner = access.partner();
+        if (memberId.equals(userId)) throw BizException.of(ErrorCode.FORBIDDEN, "不能移除自己");
+        var target = store.member(partner.id(), memberId).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该账号不是本服务商的成员"));
+        if (target.owner()) throw BizException.of(ErrorCode.FORBIDDEN, "负责人只能由平台移除");
+        var user = directory.user(memberId);
+        if (partner.teamTenantId() != null && partner.teamTenantId().equals(user.tenantId()) && AccountService.STAFF.equals(user.role())
+                && !"REMOVED".equals(user.status())) {
+            inScope(partner.teamTenantId(), false, () -> { accounts.removeStaff(memberId); memberships.removeAll(memberId); return null; });
+        }
+        tx(false, () -> { store.lockPartner(partner.id()); store.removeMember(partner.id(), memberId); return null; });
+        return members(partner.id(), true);
+    }
+
+    /** 自己在团队里的称呼，第一次进服务商后台时填，之后可以改。 */
+    @Transactional
+    public PartnerDtos.Overview setDisplayName(Long userId, String name) {
+        var access = requirePartner(userId);
+        store.lockPartner(access.partner().id());
+        saveDisplayName(access.partner().id(), userId, name);
+        return overview(userId);
+    }
+
+    private void saveDisplayName(Long partnerId, Long memberId, String raw) {
+        String name = raw == null ? "" : raw.trim();
+        if (name.isEmpty() || name.codePointCount(0, name.length()) > 20) throw bad("称呼要 1 到 20 个字");
+        if (store.displayNameTaken(partnerId, memberId, name)) throw BizException.of(ErrorCode.CONFLICT, "团队里已经有人叫这个名字了");
+        store.setDisplayName(partnerId, memberId, name);
+    }
+
+    /**
+     * 核对这次能不能把权限从 before 改成 after。分配烟火、财务查看和分配上限只有负责人能动；
+     * 成员只能给出自己也有的权限（商户、激活码、团队管理）。before 为空表示新加的成员（全部从无到有）。
+     */
+    private static void checkGrant(PartnerStore.Access access, PartnerStore.Perms before, PartnerStore.Perms after, Long capBefore, Long capAfter) {
+        if (access.owner()) return;
+        var from = before == null ? new PartnerStore.Perms(false, false, false, false, false) : before;
+        if (from.distribute() != after.distribute() || from.finance() != after.finance() || !Objects.equals(capBefore, capAfter))
+            throw BizException.of(ErrorCode.FORBIDDEN, "分配烟火、财务查看和分配上限只有负责人能设");
+        var mine = access.perms();
+        if (after.tenants() && !from.tenants() && !mine.tenants() || after.codes() && !from.codes() && !mine.codes()
+                || after.team() && !from.team() && !mine.team())
+            throw BizException.of(ErrorCode.FORBIDDEN, "只能给出你自己也有的权限");
+    }
+
+    /** 按 UID 预查询：添加商户前先确认对方是谁、现在归属在哪。 */
+    public PartnerDtos.Lookup lookup(Long userId, Long uid) {
+        var access = require(userId, PartnerStore.Perms::tenants, "商户");
         Long partnerId = access.partner().id();
         var user = directory.userByUid(uid).filter(u -> !"REMOVED".equals(u.status()))
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "没有找到这个 UID，请核对后重新输入"));
         var binding = store.binding(user.tenantId());
         boolean ours = binding.filter(b -> b.partnerId().equals(partnerId)).isPresent();
-        String state = binding.isEmpty() ? "NONE" : !ours ? "OTHER"
-                : access.owner() || userId.equals(binding.get().bdUserId()) ? "MINE" : "TEAM";
-        String bdName = ours && binding.get().bdUserId() != null ? userName(binding.get().bdUserId()) : null;
-        String member = access.owner() ? store.role(partnerId, user.id())
-                .orElseGet(() -> store.accessOfUser(user.id()).isPresent() ? "OTHER" : "NONE") : null;
-        return new PartnerDtos.Lookup(user.uid(), mask(user.name()), tenantNames().get(user.tenantId()), state,
-                "MINE".equals(state) ? user.tenantId() : null, bdName, member);
+        String state = binding.isEmpty() ? "NONE" : ours ? "MINE" : "OTHER";
+        return new PartnerDtos.Lookup(user.uid(), mask(user.name()), tenantNames().get(user.tenantId()), state, ours ? user.tenantId() : null);
     }
 
-    /** 商户详情：会员、余额、归属，以及这家服务商给他的分配（负责人可见）和他兑换过的本服务商激活码。 */
+    /** 商户详情：会员、余额，这家服务商给他的分配（有分配或财务权限才看得到）和他兑换过的本服务商激活码。 */
     public PartnerDtos.TenantDetail tenantDetail(Long userId, Long tenantId) {
-        var access = requirePartner(userId);
+        var access = require(userId, PartnerStore.Perms::tenants, "商户");
         Long partnerId = access.partner().id();
         owned(access, tenantId);
         var view = tenantView(tenantId);
-        var transfers = access.owner() ? distributionViews(store.distributions(partnerId, "TENANT", null, tenantId, null, null, 0, 50)) : null;
+        boolean money = access.perms().distribute() || access.perms().finance();
+        var transfers = money ? distributionViews(partnerId, store.distributions(partnerId, "TENANT", null, tenantId, null, null, 0, 50)) : null;
         var facts = usage.usage(tenantId, Instant.now().minus(Duration.ofDays(30)));
         var onboarding = inScope(tenantId, true, () -> new PartnerDtos.Onboarding(view.memberUntil() != null,
                 stores.activeCount(), products.activeCount(), facts.firstUsedAt() != null));
@@ -269,35 +332,32 @@ public class PartnerService {
         return lastTopUp > 0 && available * 10 <= lastTopUp;
     }
 
-    /** 激活码列表。BD 只看自己生成的；负责人可以按生成人筛。 */
+    /** 激活码列表，可按生成人筛。 */
     public PageResult<BillingDtos.RedeemCodeView> codes(Long userId, int page, int size, String status, String keyword, Long creator) {
-        var access = requirePartner(userId);
-        return codes.listForPartner(access.partner().id(), access.owner() ? creator : userId, page, size, status, keyword);
+        var access = require(userId, PartnerStore.Perms::codes, "激活码");
+        return codes.listForPartner(access.partner().id(), creator, page, size, status, keyword);
     }
 
-    /**
-     * 在额度内生成激活码，按该套餐标识最新的版本开通。额度扣减和生成在同一事务；同一 requestKey 重复提交返回第一次那批，不再扣额度。
-     */
+    /** 生成激活码（不限个数，每批最多 200 个），按该套餐标识最新的版本开通。同一 requestKey 重复提交返回第一次那批。 */
     @Transactional
     public List<BillingDtos.RedeemCodeView> createCodes(Long userId, PartnerDtos.NewCodes input) {
-        var access = requirePartner(userId);
+        var access = require(userId, PartnerStore.Perms::codes, "激活码");
         return generate(access, input.planCode(), input.quantity(), "partner-" + access.partner().id() + "-" + input.requestKey(),
                 blank(input.note()) ? null : input.note().trim(), userId);
     }
 
-    /** 作废还没兑换的激活码，额度不退回。负责人能作废本服务商的码，BD 只能作废自己生成的。 */
+    /** 作废还没兑换的激活码。 */
     public BillingDtos.RedeemCodeView voidCode(Long userId, Long codeId) {
-        var access = requirePartner(userId);
-        return codes.voidForPartner(codeId, access.partner().id(), access.owner() ? null : userId, userId);
+        var access = require(userId, PartnerStore.Perms::codes, "激活码");
+        return codes.voidForPartner(codeId, access.partner().id(), null, userId);
     }
 
     /**
-     * 直接续期：用一个激活码额度给名下商户开通或顺延会员，不用把码发给商户再兑换。
-     * 在商户的租户里一个事务做完扣额度、生成码、兑换；同一 requestKey 重复提交不再扣额度，也不重复顺延。
-     * 生成的码备注「直接续期」，在激活码列表里能对账。
+     * 直接续期：给名下商户开通或顺延会员，不用把码发给商户再兑换。在商户的租户里一个事务做完生成码、兑换；
+     * 同一 requestKey 重复提交不重复顺延。生成的码备注「直接续期」，在激活码列表里能对账。
      */
     public PartnerDtos.TenantView renew(Long userId, Long tenantId, PartnerDtos.Renew input) {
-        var access = requirePartner(userId);
+        var access = require(userId, PartnerStore.Perms::tenants, "商户");
         var binding = owned(access, tenantId);
         String batch = "partner-renew-" + access.partner().id() + "-" + input.requestKey();
         inScope(binding.tenantId(), false, () -> {
@@ -310,19 +370,25 @@ public class PartnerService {
     }
 
     public PartnerDtos.Page<PartnerDtos.LedgerEntry> ledger(Long userId, int page, int size) {
-        return ledgerOf(requireOwner(userId).partner().id(), page, size);
+        return ledgerOf(require(userId, PartnerStore.Perms::finance, "财务查看").partner().id(), page, size);
     }
 
-    /** 当前账号管得到的商户：负责人管本服务商全部，BD 只管归到自己的。 */
+    /** 本服务商名下的商户（整个服务商共有）。 */
     PartnerStore.Binding owned(PartnerStore.Access access, Long tenantId) {
         return store.binding(tenantId).filter(b -> b.partnerId().equals(access.partner().id()))
-                .filter(b -> access.owner() || access.userId().equals(b.bdUserId()))
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该商户不在你名下"));
     }
 
     String userName(Long id) {
         var u = directory.user(id);
         return u == null || u.name() == null ? "" : u.name();
+    }
+
+    /** 成员在团队里的称呼，没填的用账号名。 */
+    Map<Long, String> memberNames(Long partnerId) {
+        Map<Long, String> names = new HashMap<>();
+        for (var m : store.members(partnerId)) names.put(m.userId(), blank(m.displayName()) ? userName(m.userId()) : m.displayName());
+        return names;
     }
 
     /** 姓名只留第一个字，其余打星号；空名返回空。 */
@@ -334,70 +400,50 @@ public class PartnerService {
     }
 
     private List<BillingDtos.RedeemCodeView> generate(PartnerStore.Access access, String planCode, int quantity, String batch, String note, Long userId) {
-        Long partnerId = access.partner().id();
         var plan = billing.activationPlans().stream().filter(p -> p.code().equals(planCode)).findFirst()
                 .orElseThrow(() -> bad("没有这个套餐，不能生成激活码"));
-        var quota = store.lockQuota(partnerId, planCode)
-                .orElseThrow(() -> bad("平台还没有给你分配「" + plan.name() + "」的激活码额度"));
-        if (!codes.batchExists(batch)) {
-            int remaining = quota.quota() - quota.used();
-            if (remaining < quantity) throw bad("「" + plan.name() + "」激活码额度不足，还能生成 " + remaining + " 个");
-            store.useQuota(partnerId, planCode, quantity);
-        }
-        return codes.createForPartner(partnerId, plan.id(), quantity, batch, note, userId);
+        return codes.createForPartner(access.partner().id(), plan.id(), quantity, batch, note, userId);
     }
 
     public Long auditPartnerId(Long userId) { return requirePartner(userId).partner().id(); }
 
     PartnerStore.Access requirePartner(Long userId) {
         var access = store.accessOfUser(userId)
-                .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "这个账号还不是服务商账号，请联系平台开通"));
+                .orElseThrow(() -> BizException.of(ErrorCode.FORBIDDEN, "这个账号还不是服务商成员，请联系服务商负责人或平台"));
         if (!"ACTIVE".equals(access.partner().status())) throw BizException.of(ErrorCode.FORBIDDEN, "服务商已停用，请联系平台");
         return access;
     }
 
-    private PartnerStore.Access requireOwner(Long userId) {
+    /** 当前账号要有某项权限（负责人全部都有）。 */
+    PartnerStore.Access require(Long userId, Predicate<PartnerStore.Perms> permission, String name) {
         var access = requirePartner(userId);
-        if (!access.owner()) throw BizException.of(ErrorCode.FORBIDDEN, "只有服务商负责人能做这项操作");
+        if (!permission.test(access.perms())) throw BizException.of(ErrorCode.FORBIDDEN, "你没有「" + name + "」权限，请联系负责人开通");
         return access;
     }
 
-    /** 当前账号看得到的名下商户：负责人看全部，BD 只看归到自己的。 */
-    List<PartnerStore.Binding> visible(PartnerStore.Access access) {
-        var all = store.tenants(access.partner().id());
-        return access.owner() ? all : all.stream().filter(b -> access.userId().equals(b.bdUserId())).toList();
-    }
-
-    /** 服务商的登录账号，负责人在前；BD 带名下商户数，每个账号带自己生成的激活码统计。 */
-    List<PartnerDtos.Member> members(Long partnerId) {
-        Map<Long, Long> counts = store.tenants(partnerId).stream().filter(b -> b.bdUserId() != null)
-                .collect(Collectors.groupingBy(PartnerStore.Binding::bdUserId, Collectors.counting()));
+    /** 服务商的登录账号，负责人在前；带权限、本月分配、按 UID 加的商户数和生成的激活码统计。 */
+    List<PartnerDtos.Member> members(Long partnerId, boolean withPhone) {
         Map<Long, PartnerStore.CodeStats> stats = store.codeStats(partnerId);
+        Map<Long, Long> added = store.tenants(partnerId).stream().filter(b -> "UID".equals(b.source()) && b.changedBy() != null)
+                .collect(Collectors.groupingBy(PartnerStore.Binding::changedBy, Collectors.counting()));
+        Instant monthStart = monthStart();
         return store.members(partnerId).stream().map(m -> {
             var u = directory.user(m.userId());
             var s = stats.getOrDefault(m.userId(), new PartnerStore.CodeStats(0, 0, 0, 0));
             var codeStats = new PartnerDtos.CodeStats(s.generated(), s.redeemed(), s.generated() - s.redeemed() - s.voided(), s.voided(), s.renewals());
-            return new PartnerDtos.Member(m.userId(), u == null ? null : u.uid(), u == null ? null : u.name(), u == null ? null : u.phone(),
-                    m.role(), "BD".equals(m.role()) ? counts.getOrDefault(m.userId(), 0L) : null, codeStats, m.createdAt());
-        }).toList();
-    }
-
-    /** 额度按套餐标识列出，套餐名和天数取最新的版本。 */
-    List<PartnerDtos.Quota> quotas(Long partnerId) {
-        Map<String, BillingDtos.PlanSnapshot> plans = billing.activationPlans().stream()
-                .collect(Collectors.toMap(BillingDtos.PlanSnapshot::code, p -> p, (a, b) -> a));
-        return store.quotas(partnerId).stream().map(q -> {
-            var plan = plans.get(q.planCode());
-            return new PartnerDtos.Quota(q.planCode(), plan == null ? null : plan.name(), plan == null ? null : plan.durationDays(),
-                    q.quota(), q.used(), q.quota() - q.used());
+            return new PartnerDtos.Member(m.userId(), u == null ? null : u.uid(), u == null ? null : u.name(), m.displayName(),
+                    withPhone && u != null ? u.phone() : null, m.role(), PartnerDtos.Permissions.of(m.effective()), m.owner() ? null : m.monthlyCap(),
+                    store.distributedBy(partnerId, m.userId(), monthStart), added.getOrDefault(m.userId(), 0L), codeStats, m.createdAt());
         }).toList();
     }
 
     PartnerDtos.Page<PartnerDtos.LedgerEntry> ledgerOf(Long partnerId, int page, int size) {
         checkPage(page, size);
         Map<Long, String> names = tenantNames();
+        Map<Long, String> people = new HashMap<>();
         var items = store.ledger(partnerId, page, size).stream().map(l -> new PartnerDtos.LedgerEntry(l.id(), l.type(), l.delta(),
-                l.availableAfter(), l.tenantId(), l.tenantId() == null ? null : names.get(l.tenantId()), l.note(), l.createdAt())).toList();
+                l.availableAfter(), l.tenantId(), l.tenantId() == null ? null : names.get(l.tenantId()), l.note(),
+                people.computeIfAbsent(l.actorUserId(), this::userName), l.createdAt())).toList();
         return new PartnerDtos.Page<>(items, page, size, store.ledgerCount(partnerId));
     }
 
@@ -410,7 +456,7 @@ public class PartnerService {
         if (!blank(expiry) && !EXPIRY_FILTERS.contains(expiry)) throw bad("筛选条件无效");
         Map<Long, String> names = tenantNames();
         Map<Long, PlatformAccountDirectory.PlatformUser> owners = owners();
-        Map<Long, String> bdNames = new HashMap<>();
+        Map<Long, String> people = new HashMap<>();
         String key = blank(keyword) ? "" : keyword.trim().toLowerCase(Locale.ROOT);
         var matched = bindings.stream().filter(b -> key.isEmpty() || Stream.of(names.get(b.tenantId()), String.valueOf(b.tenantId()),
                         owners.get(b.tenantId()) == null ? null : owners.get(b.tenantId()).name(),
@@ -418,11 +464,11 @@ public class PartnerService {
                 .filter(Objects::nonNull).anyMatch(v -> v.toLowerCase(Locale.ROOT).contains(key))).toList();
         if (blank(expiry)) {
             int start = (int) Math.min((long) page * size, matched.size()), end = Math.min(start + size, matched.size());
-            var items = matched.subList(start, end).stream().map(b -> view(b, names, owners, bdNames)).toList();
+            var items = matched.subList(start, end).stream().map(b -> view(b, names, owners, people)).toList();
             return new PartnerDtos.Page<>(items, page, size, matched.size());
         }
         Instant now = Instant.now();
-        var filtered = matched.stream().map(b -> view(b, names, owners, bdNames)).filter(v -> expiring(v, expiry, now))
+        var filtered = matched.stream().map(b -> view(b, names, owners, people)).filter(v -> expiring(v, expiry, now))
                 .sorted(Comparator.comparing(PartnerDtos.TenantView::memberUntil, Comparator.nullsLast(Comparator.naturalOrder()))).toList();
         int start = (int) Math.min((long) page * size, filtered.size()), end = Math.min(start + size, filtered.size());
         return new PartnerDtos.Page<>(filtered.subList(start, end), page, size, filtered.size());
@@ -443,20 +489,18 @@ public class PartnerService {
         return view(binding, tenantNames(), owners(), new HashMap<>());
     }
 
+    /** people 缓存添加人的称呼：同一家服务商的成员用团队称呼，平台运营等其他人用账号名。 */
     PartnerDtos.TenantView view(PartnerStore.Binding b, Map<Long, String> names, Map<Long, PlatformAccountDirectory.PlatformUser> owners,
-                                        Map<Long, String> bdNames) {
+                                Map<Long, String> people) {
         var owner = owners.get(b.tenantId());
         BillingDtos.Summary summary;
         try { summary = inScope(b.tenantId(), true, () -> billing.summary(false, false)); }
         catch (RuntimeException e) { summary = null; }
-        String bdName = b.bdUserId() == null ? null : bdNames.computeIfAbsent(b.bdUserId(), id -> {
-            var u = directory.user(id);
-            return u == null || u.name() == null ? "" : u.name();
-        });
+        String addedBy = "UID".equals(b.source()) && b.changedBy() != null ? people.computeIfAbsent(b.changedBy(), id ->
+                store.member(b.partnerId(), id).map(PartnerStore.MemberRow::displayName).filter(n -> !blank(n)).orElseGet(() -> userName(id))) : null;
         return new PartnerDtos.TenantView(b.tenantId(), names.get(b.tenantId()), owner == null ? null : owner.uid(), owner == null ? null : owner.name(),
                 b.source(), b.boundAt(), summary == null ? null : summary.memberActive(), summary == null ? null : summary.memberUntil(),
-                summary == null || summary.plan() == null ? null : summary.plan().name(), summary == null ? null : summary.available(),
-                b.bdUserId(), bdName);
+                summary == null || summary.plan() == null ? null : summary.plan().name(), summary == null ? null : summary.available(), addedBy);
     }
 
     /** 每个商户最早注册的管理员，作为商户的联系人展示。 */
@@ -473,6 +517,11 @@ public class PartnerService {
         return directory.scopes().stream().collect(Collectors.toMap(PlatformAccountDirectory.Scope::id, s -> s.name() == null ? "" : s.name()));
     }
 
+    /** 本月第一天零点（北京时间）。 */
+    static Instant monthStart() {
+        return LocalDate.now(PartnerInsights.ZONE).withDayOfMonth(1).atStartOfDay(PartnerInsights.ZONE).toInstant();
+    }
+
     private <T> T tx(boolean readOnly, Supplier<T> work) {
         var tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -481,7 +530,7 @@ public class PartnerService {
     }
 
     /** 商户的账本受 RLS 约束：切到该商户后新开事务。 */
-    private <T> T inScope(Long tenantId, boolean readOnly, Supplier<T> work) {
+    <T> T inScope(Long tenantId, boolean readOnly, Supplier<T> work) {
         return TenantContext.runAs(tenantId, () -> tx(readOnly, work));
     }
 

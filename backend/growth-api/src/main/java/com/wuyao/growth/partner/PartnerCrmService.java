@@ -15,14 +15,18 @@ public class PartnerCrmService {
 
     @Transactional(readOnly=true)
     public PartnerCrmDtos.Crm crm(Long actor,Long tenant,int page,int size) {
-        paging(page,size); var a=partners.requirePartner(actor); partners.owned(a,tenant);
+        paging(page,size); var a=access(actor); partners.owned(a,tenant);
         long total=number(store.query("SELECT count(*) FROM partner_follow_ups WHERE partner_id=:p AND tenant_id=:t","p",a.partner().id(),"t",tenant).getSingleResult());
         return new PartnerCrmDtos.Crm(store.profile(a.partner().id(),tenant),new PartnerDtos.Page<>(store.followUps(a.partner().id(),tenant,page,size).stream().map(PartnerCrmStore::followUp).toList(),page,size,total));
     }
     private PartnerStore.Access lock(Long actor,Long tenant) {
-        var a=partners.requirePartner(actor); partners.owned(a,tenant);
+        var a=access(actor); partners.owned(a,tenant);
         store.query("SELECT id FROM partners WHERE id=:p FOR UPDATE", "p", a.partner().id()).getSingleResult();
-        store.lockTenant(tenant); a=partners.requirePartner(actor); partners.owned(a,tenant); return a;
+        store.lockTenant(tenant); a=access(actor); partners.owned(a,tenant); return a;
+    }
+    /** 商户档案和跟进记录要有「商户」权限，名下商户整个服务商共有。 */
+    private PartnerStore.Access access(Long actor) {
+        return partners.require(actor,PartnerStore.Perms::tenants,"商户");
     }
     @Transactional
     public PartnerCrmDtos.Profile saveProfile(Long actor,Long tenant,PartnerCrmDtos.SaveProfile input) {
@@ -45,10 +49,9 @@ public class PartnerCrmService {
     }
     @Transactional(readOnly=true)
     public List<PartnerCrmDtos.Due> due(Long actor) {
-        var a=partners.requirePartner(actor); var names=partners.tenantNames();
-        var allowed=new HashSet<>(partners.visible(a).stream().map(PartnerStore.Binding::tenantId).toList());
+        var a=access(actor); var names=partners.tenantNames();
         return store.rows("SELECT tenant_id,contact_name,contact_phone,industry,region,stage,next_follow_up_at,note,version,updated_at FROM partner_merchant_profiles WHERE partner_id=:p AND next_follow_up_at IS NOT NULL AND next_follow_up_at<=:until ORDER BY next_follow_up_at,tenant_id","p",a.partner().id(),"until",Instant.now().plus(Duration.ofDays(7))).stream()
-                .filter(r -> allowed.contains(number(r[0]))).map(r -> new PartnerCrmDtos.Due(number(r[0]),names.get(number(r[0])),null,profile(Arrays.copyOfRange(r,1,10)))).toList();
+                .map(r -> new PartnerCrmDtos.Due(number(r[0]),names.get(number(r[0])),profile(Arrays.copyOfRange(r,1,10)))).toList();
     }
     private static void paging(int p,int s) { if(p<0 || p>1000 || s<1 || s>100) throw bad("分页参数无效"); }
     private static void version(PartnerCrmDtos.Profile p,long v) { if(p.version()!=v) throw conflict("商户档案已被其他成员更新，请刷新后重新提交"); }

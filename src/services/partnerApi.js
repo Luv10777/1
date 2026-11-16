@@ -2,13 +2,16 @@ import { del, get, post, put } from '../utils/request.js'
 
 const params = values => Object.fromEntries(Object.entries(values || {}).filter(([, value]) => value != null && value !== ''))
 
-/** 服务商后台（partner.yifangzhi.com）：只有服务商的登录账号能用，接口只返回自己这一家的数据。 */
+/** 服务商后台（wy.yifangzhi.com/partner/）：只有服务商的成员能用，接口只返回自己这一家的数据，各项操作按成员权限。 */
 export const partnerApi = {
   crm: (tenantId, values) => get(`/api/partner/tenants/${encodeURIComponent(tenantId)}/crm`, params(values)),
   saveProfile: (tenantId, values) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/profile`, values),
   followUp: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/follow-ups`, values),
   dueFollowUps: () => get('/api/partner/follow-ups/due'),
   me: () => get('/api/partner/me'),
+  /** 一方志站内判断要不要显示「服务商后台」入口；不是成员也正常返回。 */
+  membership: () => get('/api/partner/membership'),
+  setDisplayName: displayName => put('/api/partner/me/name', { displayName }),
   workbench: () => get('/api/partner/workbench'),
   dashboard: values => get('/api/partner/dashboard', params(values)),
   tenants: values => get('/api/partner/tenants', params(values)),
@@ -17,14 +20,15 @@ export const partnerApi = {
   addTenant: uid => post('/api/partner/tenants', { uid: Number(uid) }),
   transfer: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/credits`, values),
   renew: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/renewals`, values),
-  assignBd: (tenantId, bdUserId) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/bd`, { bdUserId: bdUserId || null }),
   team: () => get('/api/partner/team'),
-  transferToBd: (userId, values) => post(`/api/partner/team/${encodeURIComponent(userId)}/credits`, values),
+  /** { phone, name, permissions, monthlyCap }：按手机号把人加进团队账户。 */
+  addMember: values => post('/api/partner/team', values),
+  /** { permissions, monthlyCap, displayName }。 */
+  updateMember: (userId, values) => put(`/api/partner/team/${encodeURIComponent(userId)}`, values),
+  removeMember: userId => del(`/api/partner/team/${encodeURIComponent(userId)}`),
+  /** 有财务权限的可按 tenantId、actorUserId 筛；只有分配权限的只返回自己分出去的。 */
   distributions: values => get('/api/partner/distributions', params(values)),
   retryDistribution: id => post(`/api/partner/distributions/${encodeURIComponent(id)}/retry`, {}),
-  addBd: uid => post('/api/partner/team', { uid: Number(uid) }),
-  /** transferTo：他名下的商户转给哪个 BD，0 表示回到负责人直接管。 */
-  removeBd: (userId, transferTo) => del(`/api/partner/team/${encodeURIComponent(userId)}?transferTo=${encodeURIComponent(transferTo || 0)}`),
   codes: values => get('/api/partner/codes', params(values)),
   createCodes: values => post('/api/partner/codes', values),
   voidCode: id => post(`/api/partner/codes/${encodeURIComponent(id)}/void`, {}),
@@ -40,7 +44,6 @@ export const partnerAdminApi = {
   rename: (id, values) => put(`/api/platform/partners/${encodeURIComponent(id)}`, values),
   setStatus: (id, status) => post(`/api/platform/partners/${encodeURIComponent(id)}/status`, { status }),
   grant: (id, values) => post(`/api/platform/partners/${encodeURIComponent(id)}/credits`, values),
-  setQuota: (id, planCode, quota) => put(`/api/platform/partners/${encodeURIComponent(id)}/quotas`, { planCode, quota }),
   tenants: (id, values) => get(`/api/platform/partners/${encodeURIComponent(id)}/tenants`, params(values)),
   ledger: (id, values) => get(`/api/platform/partners/${encodeURIComponent(id)}/ledger`, params(values)),
   lookup: uid => get('/api/platform/partners/lookup', { uid }),
@@ -48,7 +51,8 @@ export const partnerAdminApi = {
 }
 
 export const tenantSources = { UID: '手动添加', CODE: '兑换激活码', PLATFORM: '平台指定' }
-export const ledgerTypes = { GRANT: '平台发放', TRANSFER: '分给商户' }
+/** TRANSFER 是 V84 以前从「可分配烟火」分给商户的，以及升级时把剩余的可分配烟火转进团队账户的那一笔。 */
+export const ledgerTypes = { GRANT: '平台发放', TRANSFER: '旧可分配烟火转出' }
 
 /** UID 是 8 位数字。 */
 export const validUid = value => /^[1-9]\d{7}$/.test(String(value || '').trim())

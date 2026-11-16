@@ -19,6 +19,11 @@ export default defineConfig(({ command, mode }) => {
         changeOrigin: true,
         ws: true,
       },
+      // 服务商后台由 npm run dev:partner 在 4178 提供；转过来以后和一方志同一个地址，登录是同一个。
+      '/partner': {
+        target: 'http://127.0.0.1:4178',
+        ws: true,
+      },
     },
   },
   build: {

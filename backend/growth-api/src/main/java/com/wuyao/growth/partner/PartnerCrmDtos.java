@@ -15,5 +15,5 @@ public final class PartnerCrmDtos {
             @NotBlank @Pattern(regexp="PHONE|WECHAT|VISIT|OTHER") String channel,@NotBlank @Size(max=2000) String content,
             @NotBlank @Pattern(regexp="ACTIVE|AT_RISK|DORMANT") String stage,Instant nextFollowUpAt,@Min(0) long version) {}
     public record Crm(Profile profile,PartnerDtos.Page<FollowUp> followUps) {}
-    public record Due(Long tenantId,String tenantName,String bdName,Profile profile) {}
+    public record Due(Long tenantId,String tenantName,Profile profile) {}
 }

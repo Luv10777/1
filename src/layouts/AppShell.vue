@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import IdentityPrompt from '../components/IdentityPrompt.vue'
 import { identityMissing } from '../stores/identity'
 import { auth } from '../stores/auth'
-import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket } from 'lucide-vue-next'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket, Briefcase } from 'lucide-vue-next'
 import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
 import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { billing, number, refreshBilling } from '../stores/billing'
@@ -18,6 +18,8 @@ import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 import { aiCreationHidden, allianceHidden, isHiddenRoute } from '../utils/site'
 import { memberGateState } from '../utils/memberGate'
+import { inDesktop } from '../utils/desktop'
+import { partnerApi } from '../services/partnerApi'
 
 const route = useRoute()
 let billingTimer
@@ -26,6 +28,16 @@ watch(() => [auth.user?.id, auth.tenantId], () => refreshBilling(), { immediate:
 onMounted(() => { billingTimer = setInterval(reloadBalance, 30000); window.addEventListener('focus', reloadBalance) })
 onBeforeUnmount(() => { clearInterval(billingTimer); window.removeEventListener('focus', reloadBalance) })
 // 顶栏铃铛的未读数：进页面、切路由、回到窗口和每分钟各读一次；通知页改了已读状态会马上刷新。
+// 服务商的负责人和成员：右上角显示「服务商后台」，在新标签页打开 /partner/（同一个站，登录是同一个）。
+// 只在网页上的 AI 创作站显示；桌面端、安卓端和主域名不显示。这里只决定显示入口，权限以后端为准。
+const partnerMembership = ref(null)
+const partnerEntryAllowed = !aiCreationHidden && !inDesktop && !/YifangzhiAndroid\//.test(globalThis.navigator?.userAgent || '')
+watch(() => auth.user?.id, async id => {
+  partnerMembership.value = null
+  if (!id || !partnerEntryAllowed) return
+  try { partnerMembership.value = await partnerApi.membership() } catch { /* 读不到就不显示入口 */ }
+}, { immediate: true })
+const showPartnerEntry = computed(() => Boolean(partnerMembership.value?.member && partnerMembership.value.active))
 const unreadNotices = ref(0)
 async function loadUnreadNotices() {
   if (!auth.isAuthenticated) { unreadNotices.value = 0; return }
@@ -341,6 +353,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
             <RouterLink v-if="auth.isAuthenticated && !aiCreationHidden" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
+            <a v-if="showPartnerEntry" href="/partner/" target="_blank" rel="noopener" class="topbar-entry topbar-entry-primary" :title="`进入「${partnerMembership.partnerName || '服务商'}」的服务商后台`"><Briefcase :size="15" aria-hidden="true" />服务商后台</a>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink v-if="!allianceHidden" to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
             <RouterLink v-if="!allianceHidden" to="/information" class="topbar-entry topbar-entry-primary"><FilePenLine :size="15" aria-hidden="true" />信息发布</RouterLink>
