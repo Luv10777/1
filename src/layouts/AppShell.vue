@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import IdentityPrompt from '../components/IdentityPrompt.vue'
 import { identityMissing } from '../stores/identity'
 import { auth } from '../stores/auth'
-import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight } from 'lucide-vue-next'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket } from 'lucide-vue-next'
 import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
 import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { billing, number, refreshBilling } from '../stores/billing'
@@ -59,6 +59,8 @@ const memberTier = computed(() => {
 })
 // AI 创作站上未激活的账号只能查看，页面顶部提示去激活；主域名不受影响，套餐页自己有说明。
 const showActivation = computed(() => auth.isAuthenticated && !aiCreationHidden && memberTier.value?.paid === false && route.name !== 'billing')
+// 去「套餐与权益」直接打开输入激活码（activate）或购买激活码（buy）弹窗，激活后可回到当前页。
+const billingLink = action => ({ name: 'billing', query: { membership: 'required', [action]: '1', redirect: route.fullPath, module: route.meta.title } })
 const needsStore = computed(() => auth.isAuthenticated && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
 function openStoreForm() { storeModalOpen.value = true }
 // 侧边栏和顶栏使用当前账号资料；未设置头像时回退到名字首字。
@@ -344,7 +346,17 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
         </div>
       </header>
       <div ref="pageScroll" class="page-scroll" :class="{ 'page-scroll-workspace': edgeWorkspace }">
-        <p v-if="showActivation" class="activation-banner" role="status">账号还未激活，现在只能查看。<RouterLink :to="{ name: 'billing', query: { membership: 'required', activate: '1', redirect: route.fullPath, module: route.meta.title } }">去输入激活码</RouterLink></p>
+        <section v-if="showActivation" class="activation-banner" role="status" aria-labelledby="activation-banner-title">
+          <span class="activation-banner-icon" aria-hidden="true"><LockKeyhole :size="18" :stroke-width="1.75" /></span>
+          <div class="activation-banner-copy">
+            <strong id="activation-banner-title">账号还没开通会员，现在只能查看</strong>
+            <span>AI 功能需要用激活码开通会员后才能使用。{{ billing.summary?.canManage ? '已有激活码直接输入；没有的话可以在站内购买。' : '已有激活码直接输入；没有的话请联系店铺管理员购买。' }}</span>
+          </div>
+          <div class="activation-banner-actions">
+            <RouterLink class="primary-button compact" :to="billingLink('activate')"><KeyRound :size="15" aria-hidden="true" />输入激活码</RouterLink>
+            <RouterLink v-if="billing.summary?.canManage" class="secondary-button compact" :to="billingLink('buy')"><Ticket :size="15" aria-hidden="true" />购买激活码</RouterLink>
+          </div>
+        </section>
         <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
           <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>
@@ -375,8 +387,22 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
 .page-scroll.page-scroll-workspace > :first-child { flex: none; }
 .page-scroll.page-scroll-workspace > .site-footer { flex: none; height: auto; min-height: 0; margin: 0; padding: 12px 16px; }
 
-.activation-banner { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--night-panel); color: var(--ink); font-size: 13px; line-height: 1.6; }
-.activation-banner a { margin-left: 4px; color: var(--color-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+/* 未开通会员的提示条：只占自己的高度，不吃页面首个子元素的 min-height，工作台页面里也保留内边距。 */
+.page-scroll > .activation-banner { display: flex; flex: none; align-items: center; gap: 14px; width: auto; height: auto; min-height: 0; margin: 0 0 20px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--color-accent) 5%, var(--night-panel)); box-shadow: var(--shadow-paper); color: var(--ink); }
+.page-scroll.page-scroll-workspace > .activation-banner { margin: 12px var(--shell-inline, 16px) 0; }
+.activation-banner-icon { display: grid; flex: 0 0 36px; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); }
+.activation-banner-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.activation-banner-copy strong { font-size: 14px; font-weight: 600; line-height: 1.5; }
+.activation-banner-copy span { color: var(--ink-muted); font-size: 13px; line-height: 1.6; }
+.activation-banner-actions { display: flex; flex: none; gap: 8px; }
+.activation-banner-actions a { gap: 6px; padding: 0 14px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .page-scroll > .activation-banner { flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 14px; }
+  .page-scroll.page-scroll-workspace > .activation-banner { margin: 12px 12px 0; }
+  .activation-banner-copy { flex-basis: calc(100% - 50px); }
+  .activation-banner-actions { flex-basis: 100%; }
+  .activation-banner-actions a { flex: 1; }
+}
 .store-context-state { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px; text-align: center; }
 .store-context-state > span { font-size: 36px; color: var(--muted, #8d8478); }
 .store-context-state h2 { margin: 20px 0 8px; font-size: 22px; }

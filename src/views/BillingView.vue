@@ -82,7 +82,10 @@ const closeTopup = () => {
 }
 watch(() => route.query.topup, value => { if (value && account.value) openTopup() })
 const openBuy = async () => { pendingPlan.value = billing.plans[0] || null; await nextTick(); planDialog.value?.showModal() }
-const closePlan = () => { planDialog.value?.close(); pendingPlan.value = null }
+const closePlan = () => {
+  planDialog.value?.close(); pendingPlan.value = null
+  if (route.query.buy) router.replace({ query: { ...route.query, buy: undefined } })
+}
 const closeSuccess = () => { successDialog.value?.close(); topupResult.value = null }
 const closePayment = () => {
   clearTimeout(paymentTimer); paymentDialog.value?.close(); payment.value = null; qr.value = ''; qrVersion += 1; refreshButton.value?.focus()
@@ -259,6 +262,8 @@ onMounted(async () => {
   if (disposed) return
   if (route.query.topup && account.value) openTopup()
   else if (route.query.activate && account.value) openActivate()
+  // 未开通会员的提示里点「购买激活码」带 ?buy=1 过来；只有管理员能买，其他情况停在页面上。
+  else if (route.query.buy && account.value?.canManage && billing.plans.length) openBuy()
   balanceTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshBilling() }, 30000)
   globalThis.window?.addEventListener('focus', checkOnReturn)
   globalThis.document?.addEventListener?.('visibilitychange', checkOnReturn)
