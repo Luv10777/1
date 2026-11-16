@@ -299,3 +299,8 @@
 .pw-kpi-text { font-size:17px!important; }
 .pwl-hero h2 { margin-top:14px; }
 .pwl-hero .pwl-date { margin:6px 0 0; }
+/* 激活码列表里的复制按钮 */
+.partner-code-cell { display:inline-flex; align-items:center; gap:10px; }
+.partner-copy { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border:1px solid var(--mg-line); border-radius:5px; background:#fff; color:var(--mg-muted); font:12px/1.6 var(--font-sans); cursor:pointer; }
+.partner-copy:hover { border-color:var(--mg-accent); color:var(--mg-accent); }
+.partner-copy.done { border-color:var(--mg-accent); color:var(--mg-accent); }
