@@ -314,7 +314,7 @@ public class PartnerService {
     }
 
     /** 当前账号管得到的商户：负责人管本服务商全部，BD 只管归到自己的。 */
-    private PartnerStore.Binding owned(PartnerStore.Access access, Long tenantId) {
+    PartnerStore.Binding owned(PartnerStore.Access access, Long tenantId) {
         return store.binding(tenantId).filter(b -> b.partnerId().equals(access.partner().id()))
                 .filter(b -> access.owner() || access.userId().equals(b.bdUserId()))
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该商户不在你名下"));
@@ -346,6 +346,8 @@ public class PartnerService {
         }
         return codes.createForPartner(partnerId, plan.id(), quantity, batch, note, userId);
     }
+
+    public Long auditPartnerId(Long userId) { return requirePartner(userId).partner().id(); }
 
     PartnerStore.Access requirePartner(Long userId) {
         var access = store.accessOfUser(userId)

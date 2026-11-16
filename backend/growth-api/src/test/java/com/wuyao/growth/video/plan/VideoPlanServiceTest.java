@@ -58,6 +58,27 @@ class VideoPlanServiceTest {
         verify(billing, never()).reserve(anyString(), anyString(), anyLong(), anyString());
     }
 
+    @Test void durationAndOriginalBriefSurviveTheWorkerQueueAndCannotReuseAnotherRequest() {
+        when(gateway.configured(ModelAlias.VIDEO_PLANNER)).thenReturn(true);
+        when(plans.findByRequestKey("duration-key")).thenReturn(Optional.empty());
+        when(plans.saveAndFlush(any())).thenAnswer(call -> { VideoPlan p = call.getArgument(0); p.setId(7L); return p; });
+        var task = new Task(); task.setId(70L);
+        when(tasks.submit(anyString(), anyString(), any(), anyString(), anyLong())).thenAnswer(call -> { task.setPayload(call.getArgument(2)); return task; });
+        var request = new VideoPlanDtos.Create("duration-key", List.of(5L), false, null, "生成20s宣传视频",
+                null, null, 10, 30, "9:16", "活动开展10天，人物口播宣传");
+        TenantContext.runAs(3L, () -> service.create(request, 1L));
+        assertThat((Map<String, Object>) task.getPayload().get("constraints"))
+                .containsEntry("durationSeconds", 20).containsEntry("sourceBrief", "活动开展10天，人物口播宣传");
+        var prior = new VideoPlan(); prior.setId(7L); prior.setTaskId(70L); prior.setImageAssetIds(List.of(5L)); prior.setIdea(request.idea());
+        when(plans.findByRequestKey("duration-key")).thenReturn(Optional.of(prior));
+        when(taskRepository.findById(70L)).thenReturn(Optional.of(task));
+        TenantContext.runAs(3L, () -> service.create(request, 1L));
+        var changed = new VideoPlanDtos.Create("duration-key", List.of(5L), false, null, request.idea(),
+                null, null, 10, 30, "16:9", request.sourceBrief());
+        assertThatThrownBy(() -> TenantContext.runAs(3L, () -> service.create(changed, 1L))).isInstanceOf(BizException.class);
+        verify(billing, times(1)).reserve(anyString(), anyString(), anyLong(), anyString());
+    }
+
     @Test void retryingTheSameRequestReturnsTheExistingPlanWithoutAnotherReservation() {
         when(gateway.configured(ModelAlias.VIDEO_PLANNER)).thenReturn(true);
         var prior = new VideoPlan(); prior.setId(7L); prior.setImageAssetIds(List.of(5L));
@@ -122,6 +143,8 @@ class VideoPlanServiceTest {
         when(taskRepository.findOwnedRunning(70L, 1)).thenReturn(Optional.empty());
         assertThat(service.begin(7L, task)).isFalse();
         assertThat(service.completed(7L, task, List.of())).isFalse();
+        assertThat(service.checkpoint(7L, task, Map.of())).isFalse();
+        assertThat(service.needsDetails(7L, task, Map.of("question", "活动权益是什么？"))).isFalse();
         service.failed(7L, task, "stale failure");
         verifyNoInteractions(plans);
         verify(billing, never()).capture(anyString(), anyLong(), anyString(), anyString());
@@ -135,6 +158,21 @@ class VideoPlanServiceTest {
         service.taskFailed(new TaskTerminalFailure(3L, 70L, VideoPlanGenerateHandler.TYPE, Map.of("planId", 7L)));
         assertThat(plan.getStatus()).isEqualTo("FAILED");
         verify(billing).release(eq("r1"), eq("video-plan:7:release"), anyString());
+    }
+
+    @Test void clarificationRefundsOnceAndSurvivesGetWithoutExposingIntermediateDrafts() {
+        var task = new Task(); task.setId(70L); task.setAttempts(1);
+        var plan = new VideoPlan(); plan.setId(7L); plan.setTaskId(70L); plan.setStatus("GENERATING"); plan.setBillingReservationId("r1");
+        when(taskRepository.findOwnedRunning(70L,1)).thenReturn(Optional.of(task));
+        when(plans.lock(7L)).thenReturn(Optional.of(plan)); when(plans.findById(7L)).thenReturn(Optional.of(plan));
+        assertThat(service.checkpoint(7L,task,Map.of("concept", Map.of("question","")))).isTrue();
+        assertThat(service.get(7L).phase()).isEqualTo("DRAFT"); assertThat(service.get(7L).plans()).isEmpty();
+        var details = Map.<String,Object>of("question","充值有哪些赠送权益？","originalIdea","双十一20秒推广");
+        assertThat(service.needsDetails(7L,task,details)).isTrue();
+        assertThat(service.needsDetails(7L,task,details)).isFalse();
+        assertThat(service.get(7L).clarification()).isEqualTo(details); assertThat(service.get(7L).status()).isEqualTo("FAILED");
+        verify(billing).release(eq("r1"),eq("video-plan:7:release"),anyString());
+        verify(billing,never()).capture(anyString(),anyLong(),anyString(),anyString());
     }
 
     @Test void historyListsSucceededBatchesAndKeepsTheSlotOfADeletedImage() {

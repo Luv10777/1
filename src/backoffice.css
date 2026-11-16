@@ -1,0 +1,25 @@
+.bo-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.bo-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--mg-text, #303b3c); }
+.bo-field input, .bo-field select, .bo-field textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--mg-line, #e0e6e5); border-radius: 7px; background: var(--mg-surface, #fff); color: inherit; font: inherit; box-sizing: border-box; }
+.bo-field input:focus-visible, .bo-field select:focus-visible, .bo-field textarea:focus-visible { outline: 2px solid #26665b; outline-offset: 2px; }
+.bo-field textarea { resize: vertical; }
+.bo-wide { grid-column: 1 / -1; }
+.bo-actions { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+.bo-records { list-style: none; margin: 12px 0 0; padding: 0; }
+.bo-records li { padding: 14px 0; border-top: 1px solid var(--mg-line, #e0e6e5); }
+.bo-records p { margin: 6px 0; white-space: pre-wrap; line-height: 1.7; overflow-wrap: anywhere; }
+.bo-muted { font-size: 12px; color: var(--mg-muted, #727e7a); }
+.bo-metrics { display: flex; flex-wrap: wrap; gap: 24px; padding: 20px 0; }
+.bo-metrics div { min-width: 150px; display: flex; flex-direction: column; gap: 7px; }
+.bo-metrics span { font-size: 12px; color: var(--mg-muted, #727e7a); }
+.bo-metrics strong { font-size: 25px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.bo-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.bo-heading h1 { margin: 0 0 6px; font-size: 25px; }
+.bo-heading p { margin: 0; color: var(--mg-muted, #727e7a); font-size: 13px; }
+.bo-panel { padding: 20px; border: 1px solid var(--mg-line, #e0e6e5); border-radius: 10px; margin-bottom: 18px; }
+.bo-checks { display: flex; flex-wrap: wrap; gap: 15px; }
+.bo-checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.bo-status { font-size: 12px; font-weight: 500; white-space: nowrap; }
+.bo-status.PAID { color: #26665b; }.bo-status.PARTIAL, .bo-status.AT_RISK { color: #997220; }.bo-status.VOID { color: #727e7a; }
+.bo-compact-title { margin: 0 0 16px; font-size: 16px; }
+@media (max-width: 640px) { .bo-form { grid-template-columns: 1fr; }.bo-heading { align-items: flex-start; }.bo-metrics { gap: 16px; }.bo-metrics div { min-width: 120px; } }

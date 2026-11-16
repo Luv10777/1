@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ArrowRight, Inbox, RefreshCw } from 'lucide-vue-next'
+import { hasPlatformPermission } from '../../src/stores/platform.js'
 import { platformManagementApi } from '../../src/services/platformManagement.js'
 import { ledgerAdminApi, ledgerCapabilities } from '../../src/services/ledgerAdminApi.js'
 import { capabilityShares, creditMetrics, creditRanges, DAILY_DAYS, periodStats, windowRows } from '../../src/domain/creditStats.js'
-import { pendingTotal } from '../pendingReviews.js'
+import { pendingItems, pendingTotal } from '../pendingReviews.js'
 import DeltaBadge from '../DeltaBadge.vue'
 
 const loading = ref(false)
@@ -23,15 +24,16 @@ const greeting = computed(() => {
   return hour < 11 ? '早上好' : hour < 13 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
 })
 const dateLabel = computed(() => new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(now.value)))
+const pendingDestination = computed(() => pendingItems.value.find(item => item.count)?.route || 'admin-home')
 const kpis = computed(() => {
   const users = userSummary.value
   return [
-    { label: '用户总数', value: users?.users, previous: users?.usersWeekAgo, compare: '比 7 天前' },
-    { label: '近 7 天登录', value: users?.activeLast7Days, previous: users?.activePrevious7Days, compare: '比上个 7 天', pending: users && users.activePrevious7Days == null ? '登录记录积累中，满 14 天后显示涨幅' : '' },
-    { label: '近 7 天新增', value: users?.newLast7Days, previous: users?.newPrevious7Days, compare: '比上个 7 天' },
-    { label: '已入驻商家', value: platformSummary.value?.approvedMerchants, helper: '入驻审核通过' },
-    { label: '在线信息', value: platformSummary.value?.publishedInformation, helper: '已发布且在有效期内' },
-  ]
+    { permission: 'USERS', label: '用户总数', value: users?.users, previous: users?.usersWeekAgo, compare: '比 7 天前' },
+    { permission: 'USERS', label: '近 7 天登录', value: users?.activeLast7Days, previous: users?.activePrevious7Days, compare: '比上个 7 天', pending: users && users.activePrevious7Days == null ? '登录记录积累中，满 14 天后显示涨幅' : '' },
+    { permission: 'USERS', label: '近 7 天新增', value: users?.newLast7Days, previous: users?.newPrevious7Days, compare: '比上个 7 天' },
+    { permission: 'REVIEW', label: '已入驻商家', value: platformSummary.value?.approvedMerchants, helper: '入驻审核通过' },
+    { permission: 'REVIEW', label: '在线信息', value: platformSummary.value?.publishedInformation, helper: '已发布且在有效期内' },
+  ].filter(item => hasPlatformPermission(item.permission))
 })
 const range = computed(() => creditRanges.find(item => item.key === rangeKey.value))
 const stats = computed(() => periodStats(daily.value, range.value.days))
@@ -51,7 +53,7 @@ async function load() {
   loading.value = true
   now.value = Date.now()
   const [platformResult, userResult, dailyResult] = await Promise.allSettled([
-    platformManagementApi.summary(), platformManagementApi.userSummary(), ledgerAdminApi.daily(DAILY_DAYS),
+    hasPlatformPermission('REVIEW') ? platformManagementApi.summary() : Promise.resolve(null), hasPlatformPermission('USERS') ? platformManagementApi.userSummary() : Promise.resolve(null), hasPlatformPermission('FINANCE') ? ledgerAdminApi.daily(DAILY_DAYS) : Promise.resolve([]),
   ])
   if (attempt !== generation) return
   platformSummary.value = platformResult.status === 'fulfilled' ? platformResult.value : null
@@ -71,15 +73,15 @@ onBeforeUnmount(() => { generation++ })
     <header class="ad-page-head">
       <div>
         <h1>{{ greeting }}</h1>
-        <p>{{ dateLabel }}<template v-if="pendingTotal"> · 有 <RouterLink class="wb-pending" :to="{ name: 'admin-review' }">{{ pendingTotal }} 件待处理</RouterLink></template></p>
+        <p>{{ dateLabel }}<template v-if="pendingTotal"> · 有 <RouterLink class="wb-pending" :to="{ name: pendingDestination }">{{ pendingTotal }} 件待处理</RouterLink></template></p>
       </div>
       <div class="wb-head-actions">
         <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
-        <RouterLink class="mg-button mg-primary" :to="{ name: 'admin-review' }"><Inbox :size="15" />开始逐条处理</RouterLink>
+        <RouterLink v-if="hasPlatformPermission('REVIEW', 'ALLIANCE')" class="mg-button mg-primary" :to="{ name: 'admin-review' }"><Inbox :size="15" />开始逐条处理</RouterLink>
       </div>
     </header>
 
-    <section class="wb-kpis" aria-label="平台概况">
+    <section v-if="kpis.length" class="wb-kpis" aria-label="平台概况">
       <div v-for="item in kpis" :key="item.label">
         <span>{{ item.label }}</span>
         <strong>{{ number(item.value) }}</strong>
@@ -90,7 +92,7 @@ onBeforeUnmount(() => { generation++ })
     <p v-if="summaryError" class="ad-note">{{ summaryError }}</p>
 
     <div class="wb-grid">
-      <section class="ad-panel" aria-labelledby="wb-stats-title">
+      <section v-if="hasPlatformPermission('FINANCE')" class="ad-panel" aria-labelledby="wb-stats-title">
         <header>
           <h2 id="wb-stats-title">烟火统计</h2>
           <div class="wb-ranges" role="tablist" aria-label="时间段">
@@ -131,7 +133,7 @@ onBeforeUnmount(() => { generation++ })
         </template>
       </section>
 
-      <section class="ad-panel" aria-labelledby="wb-share-title">
+      <section v-if="hasPlatformPermission('FINANCE')" class="ad-panel" aria-labelledby="wb-share-title">
         <header><h2 id="wb-share-title">{{ range.label }}烟火花在哪</h2><RouterLink class="mg-text-button" :to="{ name: 'admin-credits' }">看流水<ArrowRight :size="13" /></RouterLink></header>
         <p v-if="ledgerError" class="wb-empty">{{ ledgerError }}</p>
         <p v-else-if="!shares.length" class="wb-empty">{{ range.label }}还没有消耗。</p>

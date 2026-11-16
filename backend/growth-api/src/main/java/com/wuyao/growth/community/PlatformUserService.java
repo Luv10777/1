@@ -32,7 +32,7 @@ public class PlatformUserService {
     private static final Set<String> ROLES = Set.of("OWNER", "STAFF");
 
     private final PlatformManagementService management;
-    private final PlatformProperties config;
+    private final com.wuyao.growth.backoffice.BackofficeAccess access;
     private final PlatformAccountDirectory directory;
     private final PlatformManagementAuditRepository audits;
     private final BillingService billing;
@@ -41,7 +41,7 @@ public class PlatformUserService {
 
     /** 默认不列出已被商户移除的账号；按状态筛选 REMOVED 时才显示。 */
     public PageResult<PlatformDtos.UserView> users(AuthPrincipal me, int page, int size, String status, String role, String keyword) {
-        management.requireOperator(me);
+        access.require(me.userId(), "USERS");
         if (page < 0 || size < 1 || size > 100) throw BizException.of(ErrorCode.BAD_REQUEST, "分页参数无效");
         checkFilter(status, STATUSES);
         checkFilter(role, ROLES);
@@ -66,7 +66,7 @@ public class PlatformUserService {
     }
 
     public PlatformDtos.UserSummary summary(AuthPrincipal me) {
-        management.requireOperator(me);
+        access.require(me.userId(), "USERS");
         Instant now = Instant.now();
         Instant weekAgo = now.minus(Duration.ofDays(7));
         Instant twoWeeksAgo = now.minus(Duration.ofDays(14));
@@ -84,13 +84,13 @@ public class PlatformUserService {
 
     /** 停用立即让对方所有设备下线；不能停用自己和平台运营账号。 */
     public PlatformDtos.UserView suspension(AuthPrincipal me, Long userId, PlatformDtos.UserSuspensionRequest request) {
-        management.requireOperator(me);
+        access.require(me.userId(), "USERS");
         String note = request.note() == null ? "" : request.note().trim();
         if (note.length() < 5 || note.length() > 500) throw BizException.of(ErrorCode.BAD_REQUEST, "请填写5至500字的处理依据");
         boolean suspend = request.suspended();
         if (suspend && userId.equals(me.userId())) throw BizException.of(ErrorCode.CONFLICT, "不能停用自己的账号");
-        if (suspend && config.getOperatorUserIds().contains(userId)) {
-            throw BizException.of(ErrorCode.CONFLICT, "平台运营账号不能在这里停用，请先从运营名单中移除");
+        if (suspend && access.access(userId).operator()) {
+            throw BizException.of(ErrorCode.CONFLICT, "管理员账号不能在这里停用，请先解除后台授权");
         }
         Long tenantId = directory.user(userId).tenantId();
         var updated = inScope(tenantId, false, () -> {
@@ -106,7 +106,7 @@ public class PlatformUserService {
 
     /** 会员按商户计：给某个账号开通或关闭，就是给他所属的商户开通或关闭。 */
     public PlatformDtos.UserView membership(AuthPrincipal me, Long userId, PlatformDtos.MembershipRequest request) {
-        management.requireOperator(me);
+        access.require(me.userId(), "USER_BILLING");
         String note = reason(request.note());
         boolean grant = request.granted();
         if (grant && request.planId() == null) throw BizException.of(ErrorCode.BAD_REQUEST, "请选择要开通的套餐");
@@ -118,7 +118,7 @@ public class PlatformUserService {
     }
 
     public PlatformDtos.UserView credits(AuthPrincipal me, Long userId, PlatformDtos.CreditGrantRequest request) {
-        management.requireOperator(me);
+        access.require(me.userId(), "USER_BILLING");
         String note = reason(request.note());
         return billingChange(me, userId, "GRANT_CREDITS", () ->
                 billing.grantCredits(request.credits(), request.requestKey(), me.userId()) ? request.credits() + " 烟火：" + note : null);
@@ -153,7 +153,7 @@ public class PlatformUserService {
         return new PlatformDtos.UserView(u.id(), u.tenantId(), tenantName, u.name(), PlatformManagementService.maskPhone(u.phone()),
                 u.username(), u.role(), u.status(), u.lastLoginAt(), u.createdAt(), u.suspendedAt(),
                 member.memberActive(), member.memberUntil(), member.plan() == null ? null : member.plan().name(),
-                member.available(), config.getOperatorUserIds().contains(u.id()), identity, u.uid());
+                member.available(), access.access(u.id()).operator(), identity, u.uid());
     }
 
     /** 商户里实名核验通过的账号，按用户编号取。核验不一致或未提交的不在其中，列表显示为未实名。 */

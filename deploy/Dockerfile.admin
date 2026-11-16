@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY admin ./admin
 COPY src ./src
+COPY public/favicon.png ./public/favicon.png
 COPY vite.admin.config.js ./
 RUN npm run build:admin
 

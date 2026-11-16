@@ -15,6 +15,8 @@ public class VideoPlanProperties {
     private String baseUrl = "https://api.onlyrouter.ai/v1";
     private String apiKey = "";
     private String model = "gpt-6-luna";
+    /** Independent screenplay model; an empty value uses the configured shared image planner. */
+    private String scriptModel = "";
     private int timeoutSeconds = 120;
     /** 30 张图时实测输出最高约 6900；超出上限会整单失败。 */
     private int maxTokens = 12000;

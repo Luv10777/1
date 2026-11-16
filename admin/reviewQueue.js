@@ -17,13 +17,13 @@ const sources = {
  * 读取五类待处理事项。某一类读不到不影响其他类：失败的类放在 failed，
  * 分页接口还有更多记录时放在 more（类 → 总数）。
  */
-export async function loadReviewQueue() {
-  const results = await Promise.allSettled(reviewKindOrder.map(kind => sources[kind]()))
+export async function loadReviewQueue(kinds = reviewKindOrder) {
+  const results = await Promise.allSettled(kinds.map(kind => sources[kind]()))
   const items = []
   const failed = []
   const more = {}
   results.forEach((result, index) => {
-    const kind = reviewKindOrder[index]
+    const kind = kinds[index]
     if (result.status === 'rejected') { failed.push(kind); return }
     const value = result.value
     const list = Array.isArray(value) ? value : value?.items || []

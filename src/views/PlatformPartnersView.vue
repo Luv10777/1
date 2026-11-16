@@ -187,7 +187,7 @@ load()
 <template>
   <div class="management-page">
     <header class="management-heading">
-      <div><div class="management-breadcrumb"><span>平台管理</span><ChevronRight :size="13" /><span>服务商</span></div><h1>服务商</h1><p>服务商用自己的一方志账号登录 partner.yifangzhi.com。线下收款后在这里给服务商发烟火、按套餐分激活码额度；名下商户第一次归属为准，只有这里能改。</p></div>
+      <div><div class="management-breadcrumb"><span>平台管理</span><ChevronRight :size="13" /><span>服务商</span></div><h1>服务商</h1><p>管理服务商账号、烟火发放、激活码额度及商户归属。商户以首次建立的服务商归属为准，跨服务商调整由平台管理。</p></div>
       <div class="management-heading-actions">
         <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
         <button v-if="!forbidden" class="mg-button mg-primary" type="button" @click="createForm.open = true"><Plus :size="15" />新建服务商</button>
@@ -207,7 +207,7 @@ load()
     </section>
 
     <section class="management-list" :aria-busy="loading" aria-label="服务商列表">
-      <div v-if="forbidden" class="mg-state mg-error" role="alert"><Store :size="30" /><h3>没有服务商管理权限</h3><p>服务商涉及烟火和激活码，需要把你的账号加入服务端配置 BILLING_OPERATOR_USER_IDS 后才能管理。</p></div>
+      <div v-if="forbidden" class="mg-state mg-error" role="alert"><Store :size="30" /><h3>没有服务商管理权限</h3><p>当前账号未获服务商管理权限，请联系平台管理员授权。</p></div>
       <div v-else-if="error" class="mg-state mg-error" role="alert"><h3>暂时无法读取</h3><p>{{ error }}</p><button class="mg-button" type="button" @click="load">重新读取</button></div>
       <div v-else-if="!partners.length && !loading" class="mg-state"><Store :size="32" /><h3>还没有服务商</h3><p>点右上角「新建服务商」。</p></div>
       <div v-else class="management-table-wrap">
@@ -267,8 +267,8 @@ load()
         <div v-else-if="!tenants.length" class="mg-state"><p>还没有名下商户。</p></div>
         <div v-else class="management-table-wrap">
           <table class="management-table">
-            <thead><tr><th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>归属方式</th><th>BD</th></tr></thead>
-            <tbody><tr v-for="item in tenants" :key="item.tenantId"><td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td><td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td><td>{{ membership(item) }}</td><td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td><td><span>{{ tenantSources[item.source] || item.source }}</span><small>{{ managementDate(item.boundAt) }}</small></td><td>{{ item.bdName || (item.bdUserId ? '—' : '负责人直接管') }}</td></tr></tbody>
+            <thead><tr><th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th>加入时间</th><th>归属</th></tr></thead>
+            <tbody><tr v-for="item in tenants" :key="item.tenantId"><td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td><td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td><td>{{ membership(item) }}</td><td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td><td>{{ managementDate(item.boundAt) }}</td><td>{{ item.bdName || (item.bdUserId ? '—' : '负责人直属') }}</td></tr></tbody>
           </table>
         </div>
         <footer v-if="pageCount(tenantPaging) > 1" class="management-pagination"><span>共 {{ number(tenantPaging.total) }} 个商户</span><div><button class="mg-page-button" type="button" :disabled="tenantPaging.page === 0" aria-label="上一页" @click="turn(tenantPaging, tenantPaging.page - 1)"><ChevronLeft :size="16" /></button><span>{{ tenantPaging.page + 1 }} / {{ pageCount(tenantPaging) }}</span><button class="mg-page-button" type="button" :disabled="tenantPaging.page + 1 >= pageCount(tenantPaging)" aria-label="下一页" @click="turn(tenantPaging, tenantPaging.page + 1)"><ChevronRight :size="16" /></button></div></footer>

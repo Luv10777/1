@@ -78,11 +78,11 @@ test('inspiration plans send the left reference images and style, then fill only
     const generating = panel.button('生成灵感方案').props.onClick()
     await panel.settle()
     assert.deepEqual({ ...panel.requests[0], requestKey: undefined },
-      { requestKey: undefined, imageAssetIds: [11], style: '写实摄影', idea: '新品香水上新', previousId: null })
+      { requestKey: undefined, imageAssetIds: [11], style: '写实摄影', idea: '新品香水上新', previousId: null, sourceBrief: '原来写的描述' })
     panel.timers.shift()(); await generating; await panel.settle()
     assert.match(panel.text(panel.root), /A晨光窗台.*B暗调静物.*C花园午后/)
     panel.button('用这个').props.onClick(); await panel.settle()
-    assert.equal(panel.studio.brief, '晨光窗台，如图1中的香水瓶居中')
+    assert.equal(panel.studio.brief, '原始需求（最后一句为最新要求）：\n原来写的描述\n新品香水上新\n画面方案：晨光窗台，如图1中的香水瓶居中')
     assert.deepEqual(panel.studio.files.map(file => file.assetId), [11], 'matching reference images stay as they are')
     assert.match(panel.text(panel.root), /已填入画面描述/)
   } finally { await panel.close() }
@@ -122,7 +122,7 @@ test('enter generates plans, but not while an input method is still composing', 
   } finally { await panel.close() }
 })
 
-test('using a record brings back the reference images its description refers to', async () => {
+test('a missing image blocks applying an old plan instead of shifting its image numbers', async () => {
   const record = { id: 5, style: '暗调光影', idea: '', createdAt: new Date().toISOString(), plans,
     images: [{ assetId: 11, name: '瓶身.png', url: '/a.png' }, { assetId: 12, name: '已删除', url: null }] }
   const panel = await mountPanel({ files: [{ file: null, name: '别的图', role: 'SUBJECT', preview: '/x.png', assetId: 99 }] }, { history: [record] })
@@ -131,7 +131,19 @@ test('using a record brings back the reference images its description refers to'
     assert.match(panel.text(panel.root), /暗调光影 · 2 张参考图/)
     assert.match(panel.text(panel.root), /1 张参考图已删除/)
     panel.button('用这个').props.onClick(); await panel.settle()
-    assert.deepEqual(panel.studio.files, [{ file: null, name: '瓶身.png', role: 'SUBJECT', preview: '/a.png', assetId: 11 }])
-    assert.equal(panel.studio.brief, '晨光窗台，如图1中的香水瓶居中')
+    assert.equal(panel.studio.files[0].assetId, 99)
+    assert.match(panel.text(panel.root), /图序号错位/)
+  } finally { await panel.close() }
+})
+
+test('a complete historical plan restores the exact references and preserves the original request', async () => {
+  const record = { id: 5, style: '', idea: '场景美化', createdAt: new Date().toISOString(), plans,
+    images: [{ assetId: 11, name: '大厅.png', url: '/a.png' }] }
+  const panel = await mountPanel({ files: [{ file: null, name: '别的图', role: 'SUBJECT', preview: '/x.png', assetId: 99 }] }, { history: [record] })
+  try {
+    panel.button('晨光窗台').props.onClick(); await panel.settle()
+    panel.button('用这个').props.onClick(); await panel.settle()
+    assert.equal(panel.studio.files[0].assetId, 11)
+    assert.match(panel.studio.brief, /场景美化/)
   } finally { await panel.close() }
 })

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ArrowRight, BarChart3, ChevronLeft, ChevronRight, Coins, Plus, RefreshCw, Store, TicketCheck } from 'lucide-vue-next'
 import { partnerApi, ledgerTypes } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
-import { dateText, groupTodos, membershipState, number, sinceText, todoTypes } from '../../src/domain/partnerOps.js'
+import { dateText, followUpTodos, groupTodos, membershipState, number, sinceText, todoTypes } from '../../src/domain/partnerOps.js'
 import { auth } from '../../src/stores/auth.js'
 import { isOwner, loadPartner, partner } from '../partnerStore.js'
 import TenantDrawer from '../components/TenantDrawer.vue'
@@ -17,6 +17,8 @@ import WelcomeDialog from '../components/WelcomeDialog.vue'
 const owner = computed(() => isOwner())
 const overview = computed(() => partner.overview)
 const workbench = ref(null)
+const dueFollowUps = ref([])
+const followUpError = ref('')
 const filter = ref('')
 const ledger = ref([])
 const total = ref(0)
@@ -24,11 +26,20 @@ const page = ref(0)
 const loading = ref(false)
 const error = ref('')
 const openTenant = ref(null)
+const openTab = ref('overview')
 const pages = computed(() => Math.ceil(total.value / 10))
-const allRows = computed(() => groupTodos(workbench.value?.todos))
-const rows = computed(() => groupTodos(workbench.value?.todos, filter.value))
+// 预约跟进放在工作台待办之后，同一商户合并成一行时用工作台那份更全的商户信息。
+const todos = computed(() => [...(workbench.value?.todos || []), ...followUpTodos(dueFollowUps.value)])
+const allRows = computed(() => groupTodos(todos.value))
+const rows = computed(() => groupTodos(todos.value, filter.value))
 const tabs = computed(() => [{ type: '', label: '全部', count: allRows.value.length },
-  ...Object.entries(todoTypes).map(([type, meta]) => ({ type, label: meta.short, count: workbench.value?.counts?.[type] || 0 }))])
+  ...Object.entries(todoTypes).map(([type, meta]) => ({ type, label: meta.short,
+    count: type === 'FOLLOW_UP' ? dueFollowUps.value.length : workbench.value?.counts?.[type] || 0 }))])
+/** 只因预约跟进出现的商户直接打开「跟进」页签。 */
+function openRow(row) {
+  openTab.value = row.reasons[0].type === 'FOLLOW_UP' ? 'follow' : 'overview'
+  openTenant.value = row.tenant.tenantId
+}
 const quotas = computed(() => (overview.value?.quotas || []).filter(q => q.planName))
 const today = computed(() => new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }))
 const router = useRouter()
@@ -49,6 +60,8 @@ async function load() {
   try {
     const [bench] = await Promise.all([partnerApi.workbench(), loadPartner(true)])
     workbench.value = bench
+    followUpError.value = ''
+    try { dueFollowUps.value = await partnerApi.dueFollowUps() } catch (failure) { dueFollowUps.value = []; followUpError.value = failure.message || '预约跟进暂时无法读取' }
     try { if (!localStorage.getItem(welcomeKey())) welcome.value = true } catch { welcome.value = true }
     if (owner.value) await loadLedger()
   } catch (failure) {
@@ -70,6 +83,7 @@ function fact(todo) {
     case 'EXPIRED': return `${dateText(t.memberUntil)} 已过期`
     case 'LOW_BALANCE': return `余额 ${number(t.creditsAvailable)}，上次充值 ${number(todo.lastTopUpCredits)}`
     case 'NOT_STARTED': return '开通后还没用过 AI 功能'
+    case 'FOLLOW_UP': return Date.parse(todo.at) < Date.now() ? `约在 ${managementDate(todo.at)}，已到时间` : `约在 ${managementDate(todo.at)}`
     default: return `最近一次使用在 ${sinceText(todo.lastUsedAt)}`
   }
 }
@@ -81,7 +95,7 @@ load()
     <header class="pw-head">
       <div>
         <p class="pw-date">{{ today }}</p>
-        <h1>{{ overview?.partner.name ? `${overview.partner.name}，` : '' }}{{ allRows.length ? `今天有 ${allRows.length} 个商户需要跟进` : '今天没有需要跟进的商户' }}</h1>
+        <h1>{{ overview?.partner.name ? `${overview.partner.name}，` : '' }}{{ allRows.length ? `有 ${allRows.length} 个商户待跟进` : '今天没有需要跟进的商户' }}</h1>
       </div>
       <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
     </header>
@@ -98,16 +112,17 @@ load()
             {{ tab.label }}<span>{{ tab.count }}</span>
           </button>
         </nav>
+        <p v-if="followUpError" class="mg-inline-error pw-inline-note" role="alert">{{ followUpError }}，下面只列出工作台待办。</p>
         <div v-if="workbench && !rows.length" class="pw-empty">
           <strong>{{ filter ? '这一类没有商户' : '都处理好了' }}</strong>
-          <p>到期、余额不足、开通没用或 7 天没用的商户会自动出现在这里。</p>
+          <p>预约了跟进、到期、余额不足、开通没用或 7 天没用的商户会自动出现在这里。</p>
         </div>
         <ul v-else class="pw-todos">
           <li v-for="row in rows" :key="row.tenant.tenantId">
-            <button type="button" @click="openTenant = row.tenant.tenantId">
+            <button type="button" @click="openRow(row)">
               <span class="pw-todo-who">
                 <b>{{ row.tenant.tenantName || '商户' }}</b>
-                <small>{{ row.tenant.ownerName || '—' }}{{ owner ? ` · ${row.tenant.bdName ? `BD ${row.tenant.bdName}` : '我直接管'}` : '' }}</small>
+                <small>{{ row.tenant.ownerName || '—' }}{{ owner && !row.tenant.followUpOnly ? ` · ${row.tenant.bdName ? `BD ${row.tenant.bdName}` : '负责人直属'}` : '' }}</small>
               </span>
               <span class="pw-todo-why">
                 <span v-for="r in row.reasons" :key="r.type" class="pw-reason"><i :class="`pw-tag ${todoTypes[r.type].tone}`">{{ todoTypes[r.type].short }}</i>{{ fact(r) }}</span>
@@ -179,7 +194,7 @@ load()
       <footer v-if="pages > 1" class="management-pagination"><span>共 {{ number(total) }} 条</span><div><button class="mg-page-button" type="button" :disabled="page === 0" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ page + 1 }} / {{ pages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= pages" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
 
-    <TenantDrawer :tenant-id="openTenant" @close="openTenant = null" @updated="load" />
+    <TenantDrawer :tenant-id="openTenant" :tab="openTab" @close="openTenant = null" @updated="load" />
     <WelcomeDialog
       :open="welcome" :partner-name="overview?.partner.name || '服务商'" :person-name="auth.user?.name || ''" :owner="owner"
       :todos="allRows.length" :expiring="expiringCount" :tenants="overview?.tenantCount || 0" :balance="overview?.account?.available || 0"

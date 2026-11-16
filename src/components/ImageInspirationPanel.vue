@@ -23,6 +23,7 @@ const result = ref(null)
 const showResults = ref(false)
 const appliedIndex = ref(-1)
 const resultImages = ref([])
+const resultReferences = ref([])
 // 结果页标题用：这批方案当初的一句话、风格、参考图张数和时间。
 const resultInfo = ref(null)
 // 正在看的是灵感记录里的哪一批；刚出的方案为 null。
@@ -96,15 +97,16 @@ const run = async (previousId = null) => {
   error.value = ''
   try { await requireAccount() }
   catch (e) { error.value = e.message; return }
-  if (!studio.value.files.length && !idea.value.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的画面。'; return }
+  if (!studio.value.files.length && !idea.value.trim() && !studio.value.brief?.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的画面。'; return }
   working.value = true
   try {
     // 和生成图片一样：没上传过的参考图先上传，记下素材编号，之后生成图片时不再重复上传。
-    for (const file of planFiles.value) if (!file.assetId) file.assetId = await uploadImageReference(file.file)
-    const body = { imageAssetIds: planFiles.value.map(file => file.assetId), style: styleName.value, idea: idea.value.trim(), previousId }
+    const references = [...planFiles.value]
+    for (const file of references) if (!file.assetId) file.assetId = await uploadImageReference(file.file)
+    const body = { imageAssetIds: references.map(file => file.assetId), style: styleName.value, idea: idea.value.trim(), previousId, sourceBrief: studio.value.brief?.trim() || '' }
     // 网络中断后重试同一份请求沿用原编号，不会重复预占烟火。
     if (JSON.stringify(body) !== signature) { requestKey = `image-inspiration-${crypto.randomUUID()}`; signature = JSON.stringify(body) }
-    const images = planFiles.value.map(file => file.preview)
+    const images = references.map(file => file.preview)
     let batch = await imageInspirationApi.create({ requestKey, ...body })
     refreshBilling()
     batch = await settle(batch)
@@ -113,7 +115,8 @@ const run = async (previousId = null) => {
     if (batch.status === 'FAILED') { error.value = batch.errorMessage || '灵感方案没有完成，烟火已退回，请重试。'; return }
     result.value = batch
     resultImages.value = images
-    resultInfo.value = { idea: body.idea, style: body.style, imageCount: images.length, createdAt: batch.createdAt }
+    resultReferences.value = references.map(file => ({ assetId: file.assetId, name: file.name, url: file.preview }))
+    resultInfo.value = { idea: body.idea, sourceBrief: body.sourceBrief, style: body.style, imageCount: images.length, createdAt: batch.createdAt }
     record.value = null
     appliedIndex.value = -1
     showResults.value = true
@@ -172,12 +175,17 @@ const showRecords = async () => {
 // 「用这个」只填画面描述；记录里的方案按当初的参考图写，左侧图片不同就一起换回来。
 const use = (plan, index) => {
   if (studio.value.locked) return
-  const files = record.value ? inspirationRecordFiles(record.value, studio.value.files) : null
+  let files
+  try { files = inspirationRecordFiles(record.value || { images: resultReferences.value }, studio.value.files) }
+  catch (e) { error.value = e.message; return }
+  const original = [resultInfo.value?.sourceBrief || plan.sourceBrief, resultInfo.value?.idea].filter(Boolean).join('\n')
+  const brief = original ? `原始需求（最后一句为最新要求）：\n${original}\n画面方案：${plan.prompt}` : plan.prompt
+  if (brief.length > 2000) { error.value = '方案超过画面描述的长度限制，请精简后使用。'; return }
   if (files) {
     studio.value.files.forEach(file => { if (file.file) URL.revokeObjectURL(file.preview) })
     studio.value.files = files
   }
-  studio.value.brief = plan.prompt
+  studio.value.brief = brief
   appliedIndex.value = index
 }
 </script>
@@ -234,7 +242,7 @@ const use = (plan, index) => {
           <button type="button" class="ip-primary" :disabled="working" @click="run(result.id)"><RefreshCw :size="15" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在换一批…' : '换一批' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
         </div>
       </header>
-      <p v-if="missingRecordImages" class="ip-status">这批方案用过的 {{ missingRecordImages }} 张参考图已删除，描述里的图号可能对不上，用之前请核对。</p>
+      <p v-if="missingRecordImages" class="ip-status">这批方案用过的 {{ missingRecordImages }} 张参考图已删除，请重新添加素材并生成方案。</p>
       <div class="ip-cards" :class="{ 'is-working': working }">
         <article v-for="(plan, index) in result.plans" :key="index" class="ip-card" :class="{ 'is-applied': appliedIndex === index }">
           <div class="ip-card-title"><span class="ip-letter">{{ videoPlanLetters[index] }}</span><h3>{{ plan.title }}</h3></div>

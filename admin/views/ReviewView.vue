@@ -6,6 +6,7 @@ import { isOverdue, reviewInputError, reviewKindOrder, reviewKinds, waitedLabel 
 import { auditActions, informationCategories, managementDate } from '../../src/domain/platformManagement.js'
 import { accountStatuses, accountTypes, yuan } from '../../src/services/allianceApi.js'
 import { loadReviewQueue, QUEUE_PAGE_SIZE, revealDetail, reviewTrail, submitReview } from '../reviewQueue.js'
+import { hasPlatformPermission } from '../../src/stores/platform.js'
 import { refreshPending } from '../pendingReviews.js'
 
 const route = useRoute()
@@ -30,16 +31,17 @@ let detailGeneration = 0
 let revealTimer
 let clock
 
-const tab = computed(() => reviewKindOrder.includes(route.query.kind) ? route.query.kind : 'all')
+const allowedKinds = computed(() => reviewKindOrder.filter(kind => ['information', 'merchant'].includes(kind) ? hasPlatformPermission('REVIEW') : hasPlatformPermission('REVIEW', 'ALLIANCE')))
+const tab = computed(() => allowedKinds.value.includes(route.query.kind) ? route.query.kind : 'all')
 const tabs = computed(() => [
   { kind: 'all', label: '全部', count: items.value.length },
-  ...reviewKindOrder.map(kind => ({ kind, label: reviewKinds[kind].label, count: items.value.filter(item => item.kind === kind).length })),
+  ...allowedKinds.value.map(kind => ({ kind, label: reviewKinds[kind].label, count: items.value.filter(item => item.kind === kind).length })),
 ])
 const visible = computed(() => tab.value === 'all' ? items.value : items.value.filter(item => item.kind === tab.value))
 const selected = computed(() => visible.value.find(item => item.key === selectedKey.value) || null)
 const rule = computed(() => selected.value ? reviewKinds[selected.value.kind] : null)
 const raw = computed(() => selected.value?.raw)
-const canReveal = computed(() => ['merchant', 'account'].includes(selected.value?.kind))
+const canReveal = computed(() => selected.value?.kind === 'merchant' || selected.value?.kind === 'account' && hasPlatformPermission('ALLIANCE'))
 const accountMismatch = computed(() => selected.value?.kind === 'account' && raw.value.account.accountType === 'CORPORATE' && raw.value.account.accountName !== raw.value.registeredCompanyName)
 const failedLabels = computed(() => failed.value.map(kind => reviewKinds[kind].title).join('、'))
 const moreLabels = computed(() => Object.entries(more.value).map(([kind, total]) => `${reviewKinds[kind].title}共 ${total} 条`).join('，'))
@@ -49,7 +51,7 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const result = await loadReviewQueue()
+    const result = await loadReviewQueue(allowedKinds.value)
     if (attempt !== generation) return
     items.value = result.items
     failed.value = result.failed

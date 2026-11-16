@@ -1,4 +1,4 @@
-/* 服务商后台沿用管理后台的外壳和表格样式，只改品牌色块的文字。 */
+/* 服务商后台沿用管理后台的外壳、品牌图标和表格样式。 */
 @import '../admin/style.css';
 
 .partner-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px; }
@@ -98,6 +98,11 @@
 .partner-segment.small button { padding:3px 10px; font-size:12px; }
 .partner-hbars { list-style:none; margin:0; padding:12px 18px; display:grid; gap:10px; }
 .mg-drawer-body .partner-hbars { padding:0 0 12px; }
+/* 商户详情抽屉的页签：滚动时贴在抽屉顶上 */
+.partner-drawer-tabs { position:sticky; top:0; z-index:2; gap:22px; margin:0 -28px; padding:0 28px; background:#fff; }
+.partner-drawer-tabs > button { min-height:46px; padding:10px 0; }
+.partner-drawer-tabs + .mg-feedback { margin-top:16px; }
+@media(max-width:700px) { .partner-drawer-tabs { margin:0 -20px; padding:0 20px; gap:16px; } }
 .partner-hbars li { display:grid; grid-template-columns:72px 1fr auto; align-items:center; gap:10px; font-size:12px; }
 .partner-hbars i { height:10px; border-radius:0 4px 4px 0; background:var(--mg-soft); }
 .partner-hbars i b { display:block; height:100%; border-radius:0 4px 4px 0; background:var(--mg-accent); }
@@ -143,6 +148,7 @@
 .pw-empty { margin:0; padding:36px 18px; color:var(--mg-muted); font-size:13px; text-align:center; }
 .pw-empty strong { display:block; margin-bottom:4px; color:var(--mg-ink); font-size:14px; }
 .pw-empty p { margin:0; }
+.pw-inline-note { margin:10px 18px 0; }
 .pw-plus { color:var(--mg-accent); }
 .pw-note { margin:0; color:var(--mg-muted); font-size:12px; }
 

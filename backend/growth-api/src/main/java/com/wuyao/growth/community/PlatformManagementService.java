@@ -21,7 +21,7 @@ import java.util.function.Supplier;
 @Service
 @RequiredArgsConstructor
 public class PlatformManagementService {
-    private final PlatformProperties config;
+    private final com.wuyao.growth.backoffice.BackofficeAccess access;
     private final PlatformAccountDirectory directory;
     private final InformationPublicationRepository publications;
     private final MerchantApplicationRepository merchants;
@@ -31,14 +31,14 @@ public class PlatformManagementService {
     private final PlatformTransactionManager transactionManager;
     private final org.springframework.context.ApplicationEventPublisher events;
 
-    public boolean isOperator(AuthPrincipal me) { return me != null && config.getOperatorUserIds().contains(me.userId()); }
+    public boolean isOperator(AuthPrincipal me) { return me != null && access.access(me.userId()).operator(); }
 
     public void requireOperator(AuthPrincipal me) {
-        if (!isOperator(me)) throw BizException.of(ErrorCode.FORBIDDEN, "没有平台运营权限，请联系平台开通");
+        access.requireAny(me == null ? null : me.userId());
     }
 
     public PageResult<PlatformDtos.InformationView> information(AuthPrincipal me, int page, int size, String status, String category, String keyword) {
-        requireOperator(me);
+        access.require(me.userId(), "REVIEW");
         checkPaging(page, size);
         checkFilter(status, Set.of("PENDING_REVIEW", "PUBLISHED", "REJECTED", "OFFLINE", "EXPIRED"));
         checkFilter(category, Set.of("activity", "cooperation", "supply", "notice"));
@@ -54,7 +54,7 @@ public class PlatformManagementService {
     }
 
     public PageResult<PlatformDtos.MerchantView> merchants(AuthPrincipal me, int page, int size, String status, String keyword) {
-        requireOperator(me);
+        access.requireOneOf(me.userId(), "REVIEW", "USERS");
         checkPaging(page, size);
         checkFilter(status, Set.of("PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED"));
         var result = new ArrayList<PlatformDtos.MerchantView>();
@@ -69,7 +69,7 @@ public class PlatformManagementService {
     }
 
     public PageResult<RealNameDtos.AdminView> identities(AuthPrincipal me, int page, int size, String status, String keyword) {
-        requireOperator(me);
+        access.require(me.userId(), "USERS");
         checkPaging(page, size);
         checkFilter(status, Set.of("PENDING_REVIEW", "VERIFIED", "REJECTED"));
         var result = new ArrayList<RealNameDtos.AdminView>();
@@ -84,7 +84,7 @@ public class PlatformManagementService {
     }
 
     public PlatformDtos.Summary summary(AuthPrincipal me) {
-        requireOperator(me);
+        access.require(me.userId(), "REVIEW");
         long[] counts = new long[6];
         for (var scope : directory.scopes()) {
             long[] current = inScope(scope.id(), true, () -> {
@@ -103,7 +103,7 @@ public class PlatformManagementService {
     }
 
     public void reviewInformation(AuthPrincipal me, Long tenantId, Long id, PlatformDtos.ReviewRequest request) {
-        requireOperator(me);
+        access.require(me.userId(), "REVIEW");
         requireNote(request.note());
         inScope(tenantId, false, () -> {
             var value = publications.findByIdAndTenantId(id, tenantId).orElseThrow(() -> missing("信息"));
@@ -131,7 +131,7 @@ public class PlatformManagementService {
     }
 
     public void reviewMerchant(AuthPrincipal me, Long tenantId, Long id, PlatformDtos.MerchantReviewRequest request) {
-        requireOperator(me);
+        access.require(me.userId(), "REVIEW");
         requireNote(request.note());
         inScope(tenantId, false, () -> {
             var value = merchants.findByIdAndTenantId(id, tenantId).orElseThrow(() -> missing("商家"));
@@ -156,7 +156,7 @@ public class PlatformManagementService {
     }
 
     public PlatformDtos.MerchantDetailView revealMerchant(AuthPrincipal me, Long tenantId, Long id, String purpose) {
-        requireOperator(me);
+        access.requireOneOf(me.userId(), "REVIEW", "USERS");
         requireNote(purpose);
         return inScope(tenantId, false, () -> {
             var value = merchants.findByIdAndTenantId(id, tenantId).orElseThrow(() -> missing("商家"));
@@ -166,7 +166,7 @@ public class PlatformManagementService {
     }
 
     public RealNameDtos.DetailView revealIdentity(AuthPrincipal me, Long tenantId, Long id, String purpose) {
-        requireOperator(me);
+        access.require(me.userId(), "USERS");
         requireNote(purpose);
         return inScope(tenantId, false, () -> {
             var value = identities.findByIdAndTenantId(id, tenantId).orElseThrow(() -> missing("实名申请"));

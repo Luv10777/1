@@ -11,8 +11,9 @@ import org.springframework.web.bind.annotation.*;
 /** Operator allowlist is an explicit server setting; a merchant OWNER never receives it implicitly. */
 @RestController @RequestMapping("/api/billing/operations") @RequiredArgsConstructor
 public class BillingOperationsController {
-    private final BillingProperties config;
+    private final com.wuyao.growth.backoffice.BackofficeAccess access;
     private final BillingService service;
+    private final BillingOrderReport orders;
     private final BillingLedgerReport ledger;
     private final BillingRedeemCodeService redeemCodes;
     /** 全平台烟火流水：days 为 1（今天）至 90；type、capability 可选；keyword 按商户名或编号筛选。 */
@@ -67,7 +68,13 @@ public class BillingOperationsController {
         @AuthenticationPrincipal AuthPrincipal me) {
         requireOperator(me); return ApiResponse.ok(TenantContext.runAs(tenantId,()->service.confirmPayment(id,input,me.userId())));
     }
+    @GetMapping("/orders") public ApiResponse<BillingOrderReport.Report> orders(
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,@RequestParam(defaultValue="30") int days,
+        @RequestParam(required=false) String state,@RequestParam(required=false) String kind,@RequestParam(required=false) String paymentMethod,
+        @RequestParam(required=false) String keyword,@AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(orders.list(me.userId(),page,size,days,state,kind,paymentMethod,keyword));
+    }
     private void requireOperator(AuthPrincipal me) {
-        if(!config.getOperatorUserIds().contains(me.userId())) throw BizException.of(ErrorCode.FORBIDDEN,"没有平台运营权限");
+        access.require(me.userId(), "FINANCE");
     }
 }

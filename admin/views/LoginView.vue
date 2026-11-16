@@ -1,10 +1,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Eye, EyeOff, LoaderCircle, ShieldCheck } from 'lucide-vue-next'
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from 'lucide-vue-next'
 import { auth } from '../../src/stores/auth.js'
 import { accountError, passwordError, phoneError, codeError } from '../../src/utils/authValidation.js'
 import { adminDestination } from '../router.js'
+import brandMark from '../../public/favicon.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -67,7 +68,7 @@ async function submit() {
 
 <template>
   <div class="admin-access">
-    <header class="admin-access-header"><span class="admin-brand-mark"><ShieldCheck :size="21" /></span><strong>管理后台</strong><span>内部运营</span></header>
+    <header class="admin-access-header"><img class="admin-brand-mark" :src="brandMark" alt="一方志" width="30" height="30" /><strong>管理后台</strong><span>内部运营</span></header>
     <main class="admin-login" aria-labelledby="admin-login-title">
       <div class="admin-login-kicker"><span />管理员入口</div>
       <h1 id="admin-login-title">登录管理后台</h1>

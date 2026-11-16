@@ -22,7 +22,12 @@ public final class ImageInspirationDtos {
             @NotNull @Size(max = MAX_IMAGES) List<@NotNull @Positive Long> imageAssetIds,
             @Size(max = 40) String style,
             @Size(max = 500) String idea,
-            @Positive Long previousId) {}
+            @Positive Long previousId,
+            @Size(max = 2000) String sourceBrief) {
+        public Create(String requestKey, List<Long> imageAssetIds, String style, String idea, Long previousId) {
+            this(requestKey, imageAssetIds, style, idea, previousId, null);
+        }
+    }
 
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
                        Long previousId, Instant createdAt) {}

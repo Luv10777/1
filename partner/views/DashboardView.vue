@@ -30,7 +30,7 @@ const bars = computed(() => capabilityBars(data.value?.consumedByCapability))
 const segments = computed(() => memberSegments(data.value))
 const segmentTotal = computed(() => segments.value.reduce((sum, s) => sum + s.value, 0))
 const range = computed(() => dashboardRanges.find(r => r.value === days.value)?.label || '')
-const scope = computed(() => !owner.value ? '我名下' : bdFilter.value === '' ? '全部' : bdFilter.value === '0' ? '我直接管的'
+const scope = computed(() => !owner.value ? '名下' : bdFilter.value === '' ? '全部' : bdFilter.value === '0' ? '负责人直属'
   : `BD ${bds().find(b => String(b.userId) === bdFilter.value)?.name || ''}`)
 
 async function load() {
@@ -55,7 +55,7 @@ load()
     <header class="pw-head">
       <div><p class="pw-date">{{ scope }}商户 · {{ range }}</p><h1>经营看板</h1></div>
       <div class="pw-head-tools">
-        <label v-if="owner && bds().length" class="mg-select"><span class="sr-only">范围</span><AppSelect v-model="bdFilter" aria-label="按 BD 查看" @change="load"><option value="">全部商户</option><option value="0">我直接管的</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">BD · {{ b.name || b.uid }}</option></AppSelect></label>
+        <label v-if="owner && bds().length" class="mg-select"><span class="sr-only">范围</span><AppSelect v-model="bdFilter" aria-label="按 BD 查看" @change="load"><option value="">全部商户</option><option value="0">负责人直属</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">BD · {{ b.name || b.uid }}</option></AppSelect></label>
         <div class="partner-segment" role="group" aria-label="时间范围">
           <button v-for="r in dashboardRanges" :key="r.value" type="button" :class="{ active: days === r.value }" :aria-pressed="days === r.value" :disabled="loading" @click="pickRange(r.value)">{{ r.label }}</button>
         </div>

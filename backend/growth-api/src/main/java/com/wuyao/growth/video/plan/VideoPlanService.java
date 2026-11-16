@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** 视频工作台「帮我出方案」：每次出 3 个版本，预占 3 烟火，成功扣除，失败或校验不过退回。 */
+/** 视频工作台「帮我出方案」：每次出 3 个版本，预占 1 烟火，成功扣除，失败或校验不过退回。 */
 @Service
 @RequiredArgsConstructor
 public class VideoPlanService {
@@ -42,6 +42,7 @@ public class VideoPlanService {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VIDEO_PLANNER)) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "出方案模型尚未配置");
         String style = trim(request.style()), idea = trim(request.idea());
+        var constraints = VideoPlanConstraints.resolve(request);
         // 「换一批」固定用上一批的场景，不跟工作台当前的选择走。
         String scene = request.previousPlanId() == null ? VideoScenes.normalize(request.sceneKey())
                 : plans.findById(request.previousPlanId()).map(VideoPlan::getSceneKey).orElse(null);
@@ -51,12 +52,13 @@ public class VideoPlanService {
             var prior = existing.get();
             if (!prior.getImageAssetIds().equals(images) || prior.isReferenceVideo() != request.referenceVideo()
                     || !Objects.equals(prior.getStyle(), style) || !Objects.equals(prior.getSceneKey(), scene)
-                    || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousPlanId(), request.previousPlanId())) {
+                    || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousPlanId(), request.previousPlanId())
+                    || !constraints.equals(storedConstraints(prior))) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的方案，请重新提交");
             }
             return view(prior);
         }
-        if (images.isEmpty() && idea == null) throw BizException.of(ErrorCode.BAD_REQUEST, "请上传参考图或写一句想要的效果");
+        if (images.isEmpty() && idea == null && !constraints.containsKey("sourceBrief")) throw BizException.of(ErrorCode.BAD_REQUEST, "请上传参考图或写一句想要的效果");
         if (images.stream().distinct().count() != images.size()) throw BizException.of(ErrorCode.BAD_REQUEST, "参考图重复");
         billing.requireMembership("VIDEO_PLAN");
         images.forEach(assets::imageReference);
@@ -78,7 +80,10 @@ public class VideoPlanService {
         plan.setBillingReservationId(billing.reserve("video-plan:" + request.requestKey(), "VIDEO_PLAN",
                 BillingService.VIDEO_PLAN_CREDITS, (request.previousPlanId() == null ? "视频方案" : "视频方案换一批") + " · 预占 " + BillingService.VIDEO_PLAN_CREDITS + " 烟火"));
         plans.saveAndFlush(plan);
-        Task task = tasks.submit(VideoPlanGenerateHandler.TYPE, "DEFAULT", Map.of("planId", plan.getId()),
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("planId", plan.getId());
+        if (!constraints.isEmpty()) payload.put("constraints", constraints);
+        Task task = tasks.submit(VideoPlanGenerateHandler.TYPE, "DEFAULT", payload,
                 "video-plan-generate-" + plan.getId(), userId);
         plan.setTaskId(task.getId());
         return view(plan);
@@ -133,6 +138,24 @@ public class VideoPlanService {
         return true;
     }
 
+    /** Persist completed stages under the same task lease, so a later network failure does not restart creative work. */
+    @Transactional
+    public boolean checkpoint(Long id, Task task, Map<String, Object> stages) {
+        var plan = owned(id, task);
+        if (plan == null) return false;
+        plan.setPlans(List.of(Map.of("pipelineVersion", VideoPlanScript.VERSION, "stages", stages)));
+        return true;
+    }
+
+    @Transactional
+    public boolean needsDetails(Long id, Task task, Map<String, Object> details) {
+        var plan = owned(id, task);
+        if (plan == null) return false;
+        markFailed(plan, "请补充：" + details.get("question") + " 本次尚未生成剧本，预占烟火已退回。");
+        plan.setPlans(List.of(Map.of("clarification", details)));
+        return true;
+    }
+
     @Transactional
     public void failed(Long id, Task task, String message) {
         var plan = owned(id, task);
@@ -167,9 +190,24 @@ public class VideoPlanService {
         return plans.findById(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "方案不存在"));
     }
 
+    @SuppressWarnings("unchecked")
     private static VideoPlanDtos.View view(VideoPlan p) {
-        return new VideoPlanDtos.View(p.getId(), p.getStatus(), p.getPlans(), p.getErrorMessage(), p.getPreviousPlanId(), p.getCreatedAt(), p.getSceneKey());
+        Map<String, Object> metadata = p.getPlans() == null || p.getPlans().isEmpty() ? Map.of() : p.getPlans().getFirst();
+        var stages = metadata.get("stages") instanceof Map<?, ?> m ? m : Map.of();
+        String phase = !"GENERATING".equals(p.getStatus()) ? null : stages.containsKey("draft") ? "REVIEW" : stages.containsKey("concept") ? "DRAFT" : "CONCEPT";
+        var clarification = metadata.get("clarification") instanceof Map<?, ?> m ? (Map<String, Object>)m : null;
+        return new VideoPlanDtos.View(p.getId(), p.getStatus(), "SUCCEEDED".equals(p.getStatus()) ? p.getPlans() : List.of(), p.getErrorMessage(),
+                p.getPreviousPlanId(), p.getCreatedAt(), p.getSceneKey(), phase, clarification);
     }
 
     private static String trim(String value) { return value == null || value.isBlank() ? null : value.strip(); }
+
+    private Object storedConstraints(VideoPlan prior) {
+        if (prior.getTaskId() != null) {
+            var payload = taskRepository.findById(prior.getTaskId()).map(Task::getPayload).orElse(Map.of());
+            if (payload.containsKey("constraints")) return payload.get("constraints");
+        }
+        Integer seconds = VideoPlanConstraints.explicitDuration(prior.getIdea());
+        return seconds == null ? Map.of() : Map.of("durationSeconds", seconds);
+    }
 }

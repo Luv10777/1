@@ -25,7 +25,7 @@ const isBd = computed(() => props.member?.role === 'BD')
 const others = computed(() => bds().filter(b => b.userId !== props.member?.userId))
 const target = computed(() => others.value.find(b => String(b.userId) === removal.transferTo))
 const transferOptions = computed(() => [
-  { value: '0', title: '我直接管', detail: '商户回到负责人名下' },
+  { value: '0', title: '负责人直属', detail: '商户回到负责人名下' },
   ...others.value.map(b => ({ value: String(b.userId), title: `BD · ${b.name || b.uid}`, detail: `UID ${b.uid || '—'} · 现有 ${b.tenantCount} 个商户` })),
 ])
 const codes = computed(() => props.member?.codes || { generated: 0, redeemed: 0, unused: 0, voided: 0, renewals: 0 })
@@ -128,7 +128,7 @@ async function remove() {
         <p class="partner-field-label">名下 {{ member.tenantCount }} 个商户转给</p>
         <OptionCards v-model="removal.transferTo" :options="transferOptions" label="商户转给" :disabled="busy || removal.confirming" />
         <ConfirmBox v-if="removal.confirming" danger :busy="busy" confirm-text="确认移除" @confirm="remove" @cancel="removal.confirming = false">
-          <p>移除 BD「{{ member.name || member.uid }}」，他名下的 <b>{{ member.tenantCount }}</b> 个商户转给 <b>{{ target ? `BD ${target.name || target.uid}` : '你直接管' }}</b>。</p>
+          <p>移除 BD「{{ member.name || member.uid }}」，其名下的 <b>{{ member.tenantCount }}</b> 个商户的归属将调整为 <b>{{ target ? `BD ${target.name || target.uid}` : '负责人直属' }}</b>。</p>
         </ConfirmBox>
         <div v-else class="partner-section-actions"><button class="mg-button mg-danger" type="button" :disabled="busy" @click="removal.confirming = true">移除 BD</button></div>
         <p v-if="removal.error" class="mg-inline-error" role="alert">{{ removal.error }}</p>

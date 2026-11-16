@@ -14,7 +14,7 @@ class BillingTopUpTest {
     private final BillingStore store=mock(BillingStore.class);
     private final AlipayGateway alipay=mock(AlipayGateway.class);
     private final BillingProperties config=new BillingProperties();
-    private final BillingService billing=new BillingService(store,config,mock(WechatPayGateway.class),alipay,
+    private final BillingService billing=new BillingService(store,config,mock(com.wuyao.growth.backoffice.BackofficeAccess.class),mock(WechatPayGateway.class),alipay,
         mock(ApplicationEventPublisher.class));
 
     @BeforeEach void setup() {

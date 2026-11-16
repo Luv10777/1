@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { auth } from '../src/stores/auth.js'
 import { loadPlatformAccess, platform } from '../src/stores/platform.js'
+import { canAdminPage } from '../src/domain/adminPermissions.js'
 import LoginView from './views/LoginView.vue'
 import AccessView from './views/AccessView.vue'
 
@@ -20,7 +21,7 @@ const PartnersView = () => import('../src/views/PlatformPartnersView.vue')
 export function adminDestination(raw) {
   if (typeof raw !== 'string') return '/workbench'
   const path = raw.split(/[?#]/)[0]
-  return ['/workbench', '/review', '/information', '/merchants', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral', '/partners'].includes(path) ? raw : '/workbench'
+  return ['/workbench', '/review', '/information', '/merchants', '/users', '/alliance', '/plans', '/credits', '/credit-overview', '/redeem-codes', '/referral', '/partners', '/orders', '/security'].includes(path) ? raw : '/workbench'
 }
 
 export function createAdminRouter(history = createWebHistory()) {
@@ -43,6 +44,8 @@ export function createAdminRouter(history = createWebHistory()) {
       { path: '/users', name: 'admin-users', component: UsersView, meta: { title: '用户管理', admin: true } },
       { path: '/plans', name: 'admin-plans', component: PlansView, meta: { title: '会员套餐', admin: true } },
       { path: '/alliance', name: 'admin-alliance', component: AllianceView, meta: { title: '联盟券', admin: true } },
+      { path: '/orders', name: 'admin-orders', component: () => import('./views/OrdersView.vue'), meta: { title: '订单对账', admin: true } },
+      { path: '/security', name: 'admin-security', component: () => import('./views/SecurityView.vue'), meta: { title: '权限与操作日志', admin: true } },
       { path: '/403', name: 'admin-forbidden', component: AccessView, meta: { title: '未获授权' } },
       { path: '/unavailable', name: 'admin-unavailable', component: AccessView, meta: { title: '连接暂不可用' } },
       { path: '/:pathMatch(.*)*', name: 'admin-not-found', component: AccessView, meta: { title: '页面不存在' } },
@@ -52,7 +55,7 @@ export function createAdminRouter(history = createWebHistory()) {
   instance.beforeEach(async to => {
     if (!to.meta.admin) return true
     if (!auth.isAuthenticated) return { name: 'admin-login', query: { redirect: to.fullPath } }
-    if (await loadPlatformAccess()) return true
+    if (await loadPlatformAccess()) return canAdminPage(to.name, platform.permissions) ? true : { name: 'admin-forbidden' }
     if (!auth.isAuthenticated) return { name: 'admin-login', query: { redirect: to.fullPath } }
     return platform.error
       ? { name: 'admin-unavailable', query: { redirect: to.fullPath } }

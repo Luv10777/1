@@ -5,6 +5,7 @@ import { partnerApi, tenantSources } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
 import { accountSplit, capabilityBars, dateText, defaultSource, distributionSources, membershipState, number, renewedUntil, sinceText, sourceBalance, tenantTimeline, transferError, transferPresets } from '../../src/domain/partnerOps.js'
 import { bds, isOwner, loadPartner, partner } from '../partnerStore.js'
+import MerchantCrm from './MerchantCrm.vue'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 import OptionCards from './OptionCards.vue'
@@ -14,10 +15,16 @@ import CreditSource from './CreditSource.vue'
  * 商户详情抽屉：会员续期、分配烟火（负责人）、调整归属 BD（负责人）、往来记录。
  * 每项操作先填写，再在页内确认改动结果，最后提交。改完通过 updated 把新的商户行交回列表。
  */
-const props = defineProps({ tenantId: { type: Number, default: null } })
+const props = defineProps({ tenantId: { type: Number, default: null }, tab: { type: String, default: 'overview' } })
 const emit = defineEmits(['close', 'updated'])
 
 const owner = computed(() => isOwner())
+// 详情分页签；跟进第一次切过去才加载，之后切走也保留，已填的内容不丢。
+const tabs = computed(() => [{ key: 'overview', label: '概况' }, { key: 'follow', label: '跟进' },
+  { key: 'service', label: owner.value ? '续期与烟火' : '会员续期' }])
+const activeTab = ref('overview')
+const seen = reactive(new Set())
+function pickTab(key) { activeTab.value = key; seen.add(key) }
 const detail = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -35,7 +42,7 @@ const steps = computed(() => {
   const o = detail.value?.onboarding
   if (!o) return []
   return [
-    { done: o.activated, title: '开通会员', hint: o.activated ? '已开通过' : '可以在下方直接续期开通' },
+    { done: o.activated, title: '开通会员', hint: o.activated ? '已开通过' : `可以在「${tabs.value[2].label}」里直接开通` },
     { done: o.stores > 0, title: '建立门店', hint: o.stores > 0 ? `${o.stores} 家门店` : '还没有门店' },
     { done: o.products > 0, title: '上传商品', hint: o.products > 0 ? `${o.products} 个商品` : '还没有商品资料' },
     { done: o.firstUse, title: '完成第一次创作', hint: o.firstUse ? `首次使用 ${dateText(usage.value?.firstUsedAt)}` : '还没用过 AI 功能' },
@@ -52,7 +59,7 @@ const currentBd = computed(() => tenant.value?.bdUserId ? String(tenant.value.bd
 const planOptions = computed(() => quotas.value.map(q => ({ value: q.planCode, title: `${q.planName} · ${q.durationDays} 天`,
   detail: q.remaining < 1 ? '额度已用完' : `还剩 ${number(q.remaining)} 个额度`, disabled: q.remaining < 1 })))
 const bdOptions = computed(() => [
-  { value: '', title: '我直接管', detail: '只有负责人能看到和管理', badge: currentBd.value === '' ? '当前' : '' },
+  { value: '', title: '负责人直属', detail: '只有负责人能看到和管理', badge: currentBd.value === '' ? '当前' : '' },
   ...bds().map(b => ({ value: String(b.userId), title: `BD · ${b.name || b.uid}`, detail: `UID ${b.uid || '—'} · 名下 ${b.tenantCount} 个商户`,
     badge: currentBd.value === String(b.userId) ? '当前' : '' })),
 ])
@@ -74,7 +81,10 @@ async function load() {
     error.value = failure.message || '商户详情暂时无法读取。'
   } finally { loading.value = false }
 }
-watch(() => props.tenantId, id => { detail.value = null; notice.value = ''; if (id) load() }, { immediate: true })
+watch(() => props.tenantId, id => {
+  detail.value = null; notice.value = ''; seen.clear()
+  if (id) { pickTab(tabs.value.some(t => t.key === props.tab) ? props.tab : 'overview'); load() }
+}, { immediate: true })
 
 async function refresh(message) {
   notice.value = message
@@ -125,7 +135,7 @@ async function saveAssign() {
   busy.value = true
   try {
     await partnerApi.assignBd(props.tenantId, assignTarget.value?.userId)
-    await refresh(assignTarget.value ? `已转给 BD「${assignTarget.value.name || assignTarget.value.uid}」` : '已收回由你直接管')
+    await refresh(assignTarget.value ? `已转给 BD「${assignTarget.value.name || assignTarget.value.uid}」` : '已调整为负责人直属')
   } catch (failure) {
     assign.error = failure.message || '调整失败，请稍后再试。'
     assign.confirming = false
@@ -138,99 +148,108 @@ async function saveAssign() {
     <template v-if="tenant" #summary>
       <span :class="['partner-member', state.tone]">{{ state.text }}</span>
       <span>{{ tenant.ownerName || '—' }} · UID {{ tenant.ownerUid || '—' }}</span>
-      <span class="partner-pill" :class="{ bd: tenant.bdUserId }">{{ tenant.bdUserId ? `BD · ${tenant.bdName || '—'}` : '负责人直接管' }}</span>
+      <span class="partner-pill" :class="{ bd: tenant.bdUserId }">{{ tenant.bdUserId ? `BD · ${tenant.bdName || '—'}` : '负责人直属' }}</span>
     </template>
 
     <div v-if="loading && !detail" class="mg-state"><p>正在读取…</p></div>
     <div v-else-if="error" class="mg-state mg-error" role="alert"><p>{{ error }}</p><button class="mg-button" type="button" @click="load"><RefreshCw :size="15" />重新读取</button></div>
     <template v-else-if="tenant">
+      <nav class="management-tabs partner-drawer-tabs" aria-label="商户详情">
+        <button v-for="t in tabs" :key="t.key" type="button" :class="{ active: activeTab === t.key }" :aria-pressed="activeTab === t.key" @click="pickTab(t.key)">{{ t.label }}</button>
+      </nav>
       <div v-if="notice" class="mg-feedback success" role="status"><Check :size="16" />{{ notice }}</div>
 
-      <section class="mg-detail-section">
-        <h3><Store :size="17" />基本信息</h3>
-        <dl class="mg-detail-grid">
-          <div><dt>联系人</dt><dd>{{ tenant.ownerName || '—' }}</dd></div>
-          <div><dt>联系人 UID</dt><dd class="mg-mono">{{ tenant.ownerUid || '—' }}</dd></div>
-          <div><dt>归属方式</dt><dd>{{ tenantSources[tenant.source] || tenant.source }}</dd></div>
-          <div><dt>加入时间</dt><dd>{{ managementDate(tenant.boundAt) }}</dd></div>
-          <div><dt>烟火余额</dt><dd class="mg-mono">{{ tenant.creditsAvailable == null ? '—' : number(tenant.creditsAvailable) }}</dd></div>
-          <div><dt>会员套餐</dt><dd>{{ tenant.memberActive ? tenant.planName || '会员' : state.short }}</dd></div>
-        </dl>
-      </section>
+      <template v-if="activeTab === 'overview'">
+        <section class="mg-detail-section">
+          <h3><Store :size="17" />基本信息</h3>
+          <dl class="mg-detail-grid">
+            <div><dt>联系人</dt><dd>{{ tenant.ownerName || '—' }}</dd></div>
+            <div><dt>联系人 UID</dt><dd class="mg-mono">{{ tenant.ownerUid || '—' }}</dd></div>
+            <div><dt>归属方式</dt><dd>{{ tenantSources[tenant.source] || tenant.source }}</dd></div>
+            <div><dt>加入时间</dt><dd>{{ managementDate(tenant.boundAt) }}</dd></div>
+            <div><dt>烟火余额</dt><dd class="mg-mono">{{ tenant.creditsAvailable == null ? '—' : number(tenant.creditsAvailable) }}</dd></div>
+            <div><dt>会员套餐</dt><dd>{{ tenant.memberActive ? tenant.planName || '会员' : state.short }}</dd></div>
+          </dl>
+        </section>
 
-      <section v-if="usage" class="mg-detail-section" aria-labelledby="usage-title">
-        <h3 id="usage-title"><Activity :size="17" />使用情况（近 {{ usage.days }} 天）</h3>
-        <div class="partner-stats">
-          <div><span>消耗烟火</span><strong>{{ number(usage.consumed) }}</strong></div>
-          <div><span>使用次数</span><strong>{{ number(usage.uses) }}</strong></div>
-          <div><span>最近使用</span><strong class="partner-stat-text">{{ sinceText(usage.lastUsedAt) }}</strong></div>
-          <div :class="{ warn: usage.lowBalance }"><span>{{ usage.lowBalance ? '余额不足' : '当前余额' }}</span><strong>{{ number(tenant.creditsAvailable) }}</strong></div>
-        </div>
-        <ul v-if="usageBars.length" class="partner-hbars">
-          <li v-for="b in usageBars" :key="b.key"><span>{{ b.label }}</span><i><b :style="{ width: Math.max(2, b.ratio * 100) + '%' }" /></i><strong class="mg-mono">{{ number(b.value) }}<small> · {{ number(usage.usesByCapability[b.key]) }} 次</small></strong></li>
-        </ul>
-        <p class="mg-muted">{{ usage.lastTopUpCredits ? `最近一次充值 ${number(usage.lastTopUpCredits)} 烟火（${dateText(usage.lastTopUpAt)}），余额低于它的 10% 时提醒。` : '还没有充值记录。' }}只统计烟火和次数，不显示作品内容。</p>
-      </section>
+        <section v-if="usage" class="mg-detail-section" aria-labelledby="usage-title">
+          <h3 id="usage-title"><Activity :size="17" />使用情况（近 {{ usage.days }} 天）</h3>
+          <div class="partner-stats">
+            <div><span>消耗烟火</span><strong>{{ number(usage.consumed) }}</strong></div>
+            <div><span>使用次数</span><strong>{{ number(usage.uses) }}</strong></div>
+            <div><span>最近使用</span><strong class="partner-stat-text">{{ sinceText(usage.lastUsedAt) }}</strong></div>
+            <div :class="{ warn: usage.lowBalance }"><span>{{ usage.lowBalance ? '余额不足' : '当前余额' }}</span><strong>{{ number(tenant.creditsAvailable) }}</strong></div>
+          </div>
+          <ul v-if="usageBars.length" class="partner-hbars">
+            <li v-for="b in usageBars" :key="b.key"><span>{{ b.label }}</span><i><b :style="{ width: Math.max(2, b.ratio * 100) + '%' }" /></i><strong class="mg-mono">{{ number(b.value) }}<small> · {{ number(usage.usesByCapability[b.key]) }} 次</small></strong></li>
+          </ul>
+          <p class="mg-muted">{{ usage.lastTopUpCredits ? `最近一次充值 ${number(usage.lastTopUpCredits)} 烟火（${dateText(usage.lastTopUpAt)}），余额低于它的 10% 时提醒。` : '还没有充值记录。' }}只统计烟火和次数，不显示作品内容。</p>
+        </section>
 
-      <section v-if="steps.length" class="mg-detail-section">
-        <h3><ListChecks :size="17" />上手进度</h3>
-        <ol class="partner-steps">
-          <li v-for="s in steps" :key="s.title" :class="{ done: s.done }"><span class="partner-step-mark">{{ s.done ? '✓' : '' }}</span><div><b>{{ s.title }}</b><small>{{ s.hint }}</small></div></li>
-        </ol>
-      </section>
+        <section v-if="steps.length" class="mg-detail-section">
+          <h3><ListChecks :size="17" />上手进度</h3>
+          <ol class="partner-steps">
+            <li v-for="s in steps" :key="s.title" :class="{ done: s.done }"><span class="partner-step-mark">{{ s.done ? '✓' : '' }}</span><div><b>{{ s.title }}</b><small>{{ s.hint }}</small></div></li>
+          </ol>
+        </section>
 
-      <section class="mg-detail-section" aria-labelledby="renew-title">
-        <h3 id="renew-title"><RefreshCw :size="17" />会员续期</h3>
-        <p class="mg-muted">扣 1 个激活码额度直接给商户开通，不用商户输入激活码。还没到期的从原到期日往后加。</p>
-        <div v-if="!quotas.length" class="mg-muted">没有可用的激活码额度，请联系{{ owner ? '平台' : '负责人' }}。</div>
-        <template v-else>
-          <p class="partner-field-label">选择套餐</p>
-          <OptionCards v-model="renewal.planCode" :options="planOptions" label="续期套餐" :disabled="busy || renewal.confirming" />
-          <ConfirmBox v-if="renewal.confirming" :busy="busy" confirm-text="确认续期" @confirm="renew" @cancel="renewal.confirming = false">
-            <p>用 1 个「{{ renewQuota.planName }}」额度给「{{ tenant.tenantName }}」续期 {{ renewQuota.durationDays }} 天。</p>
-            <p>到期日：<b>{{ tenant.memberActive ? dateText(tenant.memberUntil) : '未生效' }}</b> → <b>{{ dateText(renewTo) }}</b>；「{{ renewQuota.planName }}」额度剩 {{ renewQuota.remaining - 1 }} 个。</p>
+        <section class="mg-detail-section">
+          <h3><History :size="17" />往来记录</h3>
+          <p v-if="!timeline.length" class="mg-muted">还没有记录。{{ owner ? '' : '烟火分配只有负责人看得到。' }}</p>
+          <ul v-else class="partner-timeline">
+            <li v-for="row in timeline" :key="row.key"><div>{{ row.title }}<small v-if="row.note">{{ row.note }}</small></div><time>{{ managementDate(row.at) }}</time></li>
+          </ul>
+        </section>
+      </template>
+
+      <MerchantCrm v-if="seen.has('follow')" v-show="activeTab === 'follow'" :key="`crm-${tenant.tenantId}`" :tenant-id="tenant.tenantId" @updated="emit('updated', tenant)" />
+
+      <template v-if="activeTab === 'service'">
+        <section class="mg-detail-section" aria-labelledby="renew-title">
+          <h3 id="renew-title"><RefreshCw :size="17" />会员续期</h3>
+          <p class="mg-muted">扣 1 个激活码额度直接给商户开通，不用商户输入激活码。还没到期的从原到期日往后加。</p>
+          <div v-if="!quotas.length" class="mg-muted">没有可用的激活码额度，请联系{{ owner ? '平台' : '负责人' }}。</div>
+          <template v-else>
+            <p class="partner-field-label">选择套餐</p>
+            <OptionCards v-model="renewal.planCode" :options="planOptions" label="续期套餐" :disabled="busy || renewal.confirming" />
+            <ConfirmBox v-if="renewal.confirming" :busy="busy" confirm-text="确认续期" @confirm="renew" @cancel="renewal.confirming = false">
+              <p>用 1 个「{{ renewQuota.planName }}」额度给「{{ tenant.tenantName }}」续期 {{ renewQuota.durationDays }} 天。</p>
+              <p>到期日：<b>{{ tenant.memberActive ? dateText(tenant.memberUntil) : '未生效' }}</b> → <b>{{ dateText(renewTo) }}</b>；「{{ renewQuota.planName }}」额度剩 {{ renewQuota.remaining - 1 }} 个。</p>
+            </ConfirmBox>
+            <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy" @click="askRenew">续期</button></div>
+            <p v-if="renewal.error" class="mg-inline-error" role="alert">{{ renewal.error }}</p>
+          </template>
+        </section>
+
+        <section v-if="owner" class="mg-detail-section" aria-labelledby="transfer-title">
+          <h3 id="transfer-title"><Coins :size="17" />分配烟火</h3>
+          <p class="mg-muted">分出后不能撤回，每一笔都记在「分配记录」里。</p>
+          <CreditSource v-model="transfer.source" :disabled="busy || transfer.confirming" />
+          <label class="partner-field">烟火数<input v-model="transfer.credits" type="number" min="1" max="1000000" step="1" inputmode="numeric" placeholder="例如 2000" :disabled="busy || transfer.confirming" /></label>
+          <div class="partner-presets"><button v-for="value in transferPresets" :key="value" type="button" :class="{ active: Number(transfer.credits) === value }" :disabled="busy || transfer.confirming" @click="transfer.credits = String(value)">{{ number(value) }}</button></div>
+          <label class="partner-field">备注（可选）<input v-model="transfer.note" maxlength="200" placeholder="例如：11 月活动补贴" :disabled="busy || transfer.confirming" /></label>
+          <ConfirmBox v-if="transfer.confirming" :busy="busy" confirm-text="确认分配" @confirm="sendCredits" @cancel="transfer.confirming = false">
+            <p>把 <b>{{ number(transfer.credits) }}</b> 烟火分给「{{ tenant.tenantName }}」。</p>
+            <p>从「{{ distributionSources[transfer.source] }}」扣，{{ distributionSources[transfer.source] }} {{ number(available) }} → <b>{{ number(available - Number(transfer.credits)) }}</b>；商户余额 {{ number(tenant.creditsAvailable) }} → <b>{{ number(Number(tenant.creditsAvailable || 0) + Number(transfer.credits)) }}</b>。</p>
+            <p v-if="transfer.source === 'ACCOUNT'">其中赠送 {{ number(split.gift) }}、充值 {{ number(split.purchased) }}，商户收到的性质不变。分出后不能撤回。</p>
+            <p v-else>商户收到的是充值烟火。分出后不能撤回。</p>
           </ConfirmBox>
-          <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy" @click="askRenew">续期</button></div>
-          <p v-if="renewal.error" class="mg-inline-error" role="alert">{{ renewal.error }}</p>
-        </template>
-      </section>
+          <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy" @click="askTransfer">分配</button></div>
+          <p v-if="transfer.error" class="mg-inline-error" role="alert">{{ transfer.error }}</p>
+        </section>
 
-      <section v-if="owner" class="mg-detail-section" aria-labelledby="transfer-title">
-        <h3 id="transfer-title"><Coins :size="17" />分配烟火</h3>
-        <p class="mg-muted">分出后不能撤回，每一笔都记在「分配记录」里。</p>
-        <CreditSource v-model="transfer.source" :disabled="busy || transfer.confirming" />
-        <label class="partner-field">烟火数<input v-model="transfer.credits" type="number" min="1" max="1000000" step="1" inputmode="numeric" placeholder="例如 2000" :disabled="busy || transfer.confirming" /></label>
-        <div class="partner-presets"><button v-for="value in transferPresets" :key="value" type="button" :class="{ active: Number(transfer.credits) === value }" :disabled="busy || transfer.confirming" @click="transfer.credits = String(value)">{{ number(value) }}</button></div>
-        <label class="partner-field">备注（可选）<input v-model="transfer.note" maxlength="200" placeholder="例如：11 月活动补贴" :disabled="busy || transfer.confirming" /></label>
-        <ConfirmBox v-if="transfer.confirming" :busy="busy" confirm-text="确认分配" @confirm="sendCredits" @cancel="transfer.confirming = false">
-          <p>把 <b>{{ number(transfer.credits) }}</b> 烟火分给「{{ tenant.tenantName }}」。</p>
-          <p>从「{{ distributionSources[transfer.source] }}」扣，{{ distributionSources[transfer.source] }} {{ number(available) }} → <b>{{ number(available - Number(transfer.credits)) }}</b>；商户余额 {{ number(tenant.creditsAvailable) }} → <b>{{ number(Number(tenant.creditsAvailable || 0) + Number(transfer.credits)) }}</b>。</p>
-          <p v-if="transfer.source === 'ACCOUNT'">其中赠送 {{ number(split.gift) }}、充值 {{ number(split.purchased) }}，商户收到的性质不变。分出后不能撤回。</p>
-          <p v-else>商户收到的是充值烟火。分出后不能撤回。</p>
-        </ConfirmBox>
-        <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy" @click="askTransfer">分配</button></div>
-        <p v-if="transfer.error" class="mg-inline-error" role="alert">{{ transfer.error }}</p>
-      </section>
-
-      <section v-if="owner" class="mg-detail-section" aria-labelledby="assign-title">
-        <h3 id="assign-title"><UserRoundCog :size="17" />归属 BD</h3>
-        <p class="mg-muted">BD 只看得到归自己的商户。转给 BD 后，他可以给这个商户续期；烟火仍由你分配。</p>
-        <p class="partner-field-label">归属给</p>
-        <OptionCards v-model="assign.bdUserId" :options="bdOptions" label="归属 BD" :disabled="busy || assign.confirming" />
-        <ConfirmBox v-if="assign.confirming" :busy="busy" confirm-text="确认调整" @confirm="saveAssign" @cancel="assign.confirming = false">
-          <p>「{{ tenant.tenantName }}」：<b>{{ tenant.bdUserId ? `BD「${tenant.bdName}」` : '我直接管' }}</b> → <b>{{ assignTarget ? `BD「${assignTarget.name || assignTarget.uid}」` : '我直接管' }}</b>。</p>
-        </ConfirmBox>
-        <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy || assign.bdUserId === currentBd" @click="askAssign">保存归属</button><span v-if="!bds().length && !tenant.bdUserId" class="mg-muted">还没有 BD，可在「团队」页添加。</span></div>
-        <p v-if="assign.error" class="mg-inline-error" role="alert">{{ assign.error }}</p>
-      </section>
-
-      <section class="mg-detail-section">
-        <h3><History :size="17" />往来记录</h3>
-        <p v-if="!timeline.length" class="mg-muted">还没有记录。{{ owner ? '' : '烟火分配只有负责人看得到。' }}</p>
-        <ul v-else class="partner-timeline">
-          <li v-for="row in timeline" :key="row.key"><div>{{ row.title }}<small v-if="row.note">{{ row.note }}</small></div><time>{{ managementDate(row.at) }}</time></li>
-        </ul>
-      </section>
+        <section v-if="owner" class="mg-detail-section" aria-labelledby="assign-title">
+          <h3 id="assign-title"><UserRoundCog :size="17" />归属 BD</h3>
+          <p class="mg-muted">BD 只看得到归自己的商户。转给 BD 后，他可以给这个商户续期；烟火仍由你分配。</p>
+          <p class="partner-field-label">归属给</p>
+          <OptionCards v-model="assign.bdUserId" :options="bdOptions" label="归属 BD" :disabled="busy || assign.confirming" />
+          <ConfirmBox v-if="assign.confirming" :busy="busy" confirm-text="确认调整" @confirm="saveAssign" @cancel="assign.confirming = false">
+            <p>「{{ tenant.tenantName }}」：<b>{{ tenant.bdUserId ? `BD「${tenant.bdName}」` : '负责人直属' }}</b> → <b>{{ assignTarget ? `BD「${assignTarget.name || assignTarget.uid}」` : '负责人直属' }}</b>。</p>
+          </ConfirmBox>
+          <div v-else class="partner-section-actions"><button class="mg-button mg-primary" type="button" :disabled="busy || assign.bdUserId === currentBd" @click="askAssign">保存归属</button><span v-if="!bds().length && !tenant.bdUserId" class="mg-muted">还没有 BD，可在「团队」页添加。</span></div>
+          <p v-if="assign.error" class="mg-inline-error" role="alert">{{ assign.error }}</p>
+        </section>
+      </template>
     </template>
     <template #actions><button class="mg-button" type="button" :disabled="busy" @click="emit('close')">关闭</button></template>
   </PartnerPanel>

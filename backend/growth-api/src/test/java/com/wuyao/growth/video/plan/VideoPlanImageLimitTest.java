@@ -70,4 +70,15 @@ class VideoPlanImageLimitTest {
         assertThatThrownBy(() -> adapter.invoke(request(31))).isInstanceOf(BizException.class).hasMessageContaining("参考图数量");
         verifyNoInteractions(http);
     }
+
+    @Test @SuppressWarnings("unchecked") void screenplayModelDoesNotChangeTheImageInspirationModel() throws Exception {
+        var config = new VideoPlanProperties(); config.setModel("image-planner"); config.setScriptModel("screenplay-planner");
+        var split = new VideoPlanHttpAdapter(config,new ObjectMapper(),http);
+        byte[] reply = "{\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"content\":\"{\\\"plans\\\":[]}\"}}]}".getBytes(StandardCharsets.UTF_8);
+        when(http.execute(any(ClassicHttpRequest.class),any(HttpClientResponseHandler.class))).thenReturn(reply);
+        var video = request(1);
+        assertThat(split.invoke(video).output()).containsEntry("_model","screenplay-planner");
+        var image = new ProviderRequest(ModelAlias.IMAGE_INSPIRATION_PLANNER,video.tenantId(),video.prompt(),video.options(),"image-inspiration-test");
+        assertThat(split.invoke(image).output()).containsEntry("_model","image-planner");
+    }
 }

@@ -7,6 +7,9 @@ import { useNavigationProgress } from './navigation.js'
 import { platform } from '../src/stores/platform.js'
 import { pendingByRoute, pendingItems, pendingTotal, refreshPending, startPendingPolling, stopPendingPolling } from './pendingReviews.js'
 import CommandPalette from './CommandPalette.vue'
+import { canAdminPage } from '../src/domain/adminPermissions.js'
+import { adminRoles } from '../src/domain/backoffice.js'
+import brandMark from '../public/favicon.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,7 +18,8 @@ const menuOpen = ref(false)
 const signingOut = ref(false)
 const paletteOpen = ref(false)
 const authorized = computed(() => route.meta.admin && auth.isAuthenticated && platform.operator)
-const navigation = [
+const roleLabel = computed(() => platform.roles.map(role => adminRoles[role]).filter(Boolean).join('、') || '平台运营人员')
+const allNavigation = [
   { items: [
     { name: 'admin-home', label: '工作台', description: '今天要处理的事和平台概况', icon: LayoutDashboard },
     { name: 'admin-review', label: '审核中心', description: '信息、入驻、供券、申诉、收款账号', icon: Inbox },
@@ -29,6 +33,7 @@ const navigation = [
     { name: 'admin-alliance', label: '联盟券', description: '供券、申诉、对账与打款', icon: Ticket },
   ] },
   { label: '烟火与计费', items: [
+    { name: 'admin-orders', label: '订单对账', description: '会员、充值和激活码购买订单', icon: FileText },
     { name: 'admin-credit-overview', label: '烟火看板', description: '购买、赠送与商家余额', icon: ChartColumn },
     { name: 'admin-credits', label: '烟火日志', description: '全平台消耗与退回', icon: Flame },
     { name: 'admin-redeem-codes', label: '兑换码', description: '生成激活码、充值或赠送兑换码', icon: TicketCheck },
@@ -36,10 +41,11 @@ const navigation = [
   ] },
   { label: '增长', items: [
     { name: 'admin-referral', label: '邀请返利', description: '返利比例、提现与调整记录', icon: Percent },
-    { name: 'admin-partners', label: '服务商', description: '发烟火、分激活码额度、改商户归属', icon: Handshake },
+    { name: 'admin-partners', label: '服务商', description: '烟火发放、激活码额度与商户归属', icon: Handshake },
   ] },
 ]
-const currentGroup = computed(() => navigation.find(group => group.items.some(item => item.name === route.name))?.label)
+const navigation = computed(() => [...allNavigation, { label: '系统管理', items: [{ name: 'admin-security', label: '权限与日志', description: '管理员角色与操作记录', icon: ShieldCheck }] }].map(group => ({ ...group, items: group.items.filter(item => canAdminPage(item.name, platform.permissions)) })).filter(group => group.items.length))
+const currentGroup = computed(() => navigation.value.find(group => group.items.some(item => item.name === route.name))?.label)
 const noticesOpen = ref(false)
 const closeNotices = event => { if (event.key === 'Escape' || (event.type === 'pointerdown' && !event.target.closest?.('.admin-notices'))) noticesOpen.value = false }
 watch(noticesOpen, open => {
@@ -72,7 +78,7 @@ async function logout() {
     <a class="admin-skip" href="#admin-main">跳到主要内容</a>
     <button v-if="menuOpen" class="admin-menu-backdrop" aria-label="关闭导航" @click="menuOpen = false" />
     <aside class="admin-sidebar">
-      <RouterLink class="admin-brand" :to="{ name: 'admin-home' }"><span class="admin-brand-mark">管</span><span><strong>管理后台</strong><small>平台运营工作台</small></span></RouterLink>
+      <RouterLink class="admin-brand" :to="{ name: 'admin-home' }"><img class="admin-brand-mark" :src="brandMark" alt="一方志" width="30" height="30" /><span><strong>管理后台</strong><small>平台运营工作台</small></span></RouterLink>
       <nav aria-label="后台主导航">
         <div v-for="(group, index) in navigation" :key="group.label || index" class="admin-nav-group">
           <div v-if="group.label" class="admin-nav-label">{{ group.label }}</div>
@@ -86,7 +92,7 @@ async function logout() {
         <div class="admin-progress" :class="{ active: navigating }" aria-hidden="true" />
         <div class="admin-crumb"><button class="admin-menu-toggle" type="button" :aria-expanded="menuOpen" aria-label="切换后台导航" @click="menuOpen = !menuOpen"><component :is="menuOpen ? PanelLeftClose : PanelLeftOpen" :size="20" /></button><template v-if="currentGroup"><span>{{ currentGroup }}</span><span class="admin-topbar-separator">/</span></template><strong>{{ route.meta.title }}</strong></div>
         <button class="admin-search" type="button" aria-label="跳转到页面" @click="paletteOpen = true"><Search :size="16" /><span>跳转到页面…</span><kbd>Ctrl K</kbd></button>
-        <div class="admin-topbar-actions"><div class="admin-notices"><button type="button" class="admin-notices-button" :aria-expanded="noticesOpen" :aria-label="pendingTotal ? `待处理事项 ${pendingTotal} 项` : '待处理事项'" @click="noticesOpen = !noticesOpen; noticesOpen && refreshPending()"><Bell :size="18" /><b v-if="pendingTotal">{{ pendingTotal > 99 ? '99+' : pendingTotal }}</b></button><div v-if="noticesOpen" class="admin-notices-panel"><strong>待处理事项</strong><p v-if="!pendingTotal" class="admin-notices-empty">暂时没有需要审核或处理的内容。</p><RouterLink v-for="item in pendingItems.filter(entry => entry.count)" v-else :key="item.key" :to="{ name: item.route, query: item.kind ? { kind: item.kind } : undefined }" @click="noticesOpen = false"><span>{{ item.label }}</span><b>{{ item.count }}</b><ChevronRight :size="15" /></RouterLink></div></div><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '管').slice(0, 1) }}</span><span>{{ auth.user?.name || '管理员' }}<small>平台管理员</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="15" />{{ signingOut ? '退出中…' : '退出' }}</button></div></div>
+        <div class="admin-topbar-actions"><div class="admin-notices"><button type="button" class="admin-notices-button" :aria-expanded="noticesOpen" :aria-label="pendingTotal ? `待处理事项 ${pendingTotal} 项` : '待处理事项'" @click="noticesOpen = !noticesOpen; noticesOpen && refreshPending()"><Bell :size="18" /><b v-if="pendingTotal">{{ pendingTotal > 99 ? '99+' : pendingTotal }}</b></button><div v-if="noticesOpen" class="admin-notices-panel"><strong>待处理事项</strong><p v-if="!pendingTotal" class="admin-notices-empty">暂时没有需要审核或处理的内容。</p><RouterLink v-for="item in pendingItems.filter(entry => entry.count)" v-else :key="item.key" :to="{ name: item.route, query: item.kind ? { kind: item.kind } : undefined }" @click="noticesOpen = false"><span>{{ item.label }}</span><b>{{ item.count }}</b><ChevronRight :size="15" /></RouterLink></div></div><div class="admin-account"><span class="admin-account-avatar">{{ (auth.user?.name || '管').slice(0, 1) }}</span><span>{{ auth.user?.name || '管理员' }}<small>{{ roleLabel }}</small></span><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="15" />{{ signingOut ? '退出中…' : '退出' }}</button></div></div>
       </header>
       <main id="admin-main" class="admin-main" tabindex="-1"><RouterView v-slot="{ Component, route: page }"><Transition name="ad-page" mode="out-in"><component :is="Component" :key="page.name" /></Transition></RouterView></main>
     </div>

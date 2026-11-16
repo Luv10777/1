@@ -2,14 +2,14 @@ import { reactive, watch } from 'vue'
 import { auth } from './auth'
 import { platformManagementApi } from '../services/platformManagement'
 
-export const platform = reactive({ operator: false, loaded: false, error: '' })
+export const platform = reactive({ operator: false, permissions: [], roles: [], loaded: false, error: '' })
 let generation = 0
 let pending = null
 
 watch(() => [auth.user?.id, auth.tenantId], () => {
   generation++
   pending = null
-  Object.assign(platform, { operator: false, loaded: false, error: '' })
+  Object.assign(platform, { operator: false, permissions: [], roles: [], loaded: false, error: '' })
 }, { flush: 'sync' })
 
 export async function loadPlatformAccess() {
@@ -20,6 +20,8 @@ export async function loadPlatformAccess() {
   pending = platformManagementApi.access().then(result => {
     if (current !== generation) return false
     platform.operator = result?.operator === true
+    platform.permissions = Array.isArray(result?.permissions) ? result.permissions : []
+    platform.roles = Array.isArray(result?.roles) ? result.roles : []
     platform.loaded = true
     platform.error = ''
     return platform.operator
@@ -29,3 +31,5 @@ export async function loadPlatformAccess() {
   }).finally(() => { if (current === generation) pending = null })
   return pending
 }
+
+export const hasPlatformPermission = (...keys) => keys.some(key => platform.permissions.includes(key))

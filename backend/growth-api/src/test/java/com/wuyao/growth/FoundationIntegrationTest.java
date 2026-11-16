@@ -360,19 +360,27 @@ class FoundationIntegrationTest {
         assertThat(code(() -> TenantContext.runAs(tenantB, () -> videoPlans.get(first.id())))).isEqualTo(1404);
         var task = tasks.claim("DEFAULT", 1).getFirst();
         assertThat(task.getType()).isEqualTo("VIDEO_PLAN_GENERATE");
-        var shots = List.of(Map.of("start", 0, "end", 4, "description", "商品特写", "images", List.of(1)),
-                Map.of("start", 4, "end", 10, "description", "镜头缓缓拉远", "images", List.of(1)));
+        var shots = List.of(Map.of("start", 0, "end", 4, "action", "商品特写", "images", List.of(1)),
+                Map.of("start", 4, "end", 10, "action", "镜头缓缓拉远", "images", List.of(1)));
         var plans = List.of("晨光", "窗边", "静物").stream().map(title -> Map.<String, Object>of(
-                "title", title, "idea", "突出补水", "prompt", "如图1中的商品", "ratio", "9:16", "durationSeconds", 10,
+                "title", title, "idea", "突出补水", "concept", title + "中的商品表现", "visualStyle", "自然光与真实材质", "ratio", "9:16", "durationSeconds", 10,
                 "shots", shots, "materials", List.of(Map.of("index", 1, "use", "商品主体")))).toList();
-        when(imageGateway.invokeReal(any())).thenReturn(new ProviderResult(true, "TEST", null, Map.of("plans", plans), null, null));
+        var concepts = List.of("晨光", "窗边", "静物").stream().map(title -> Map.of("title", title, "idea", title + "中的商品表现",
+                "hook", title + "的开场", "development", title + "的推进", "payoff", title + "的结尾")).toList();
+        var reviews = java.util.stream.IntStream.rangeClosed(1,3).mapToObj(i -> Map.of("index", i, "issues", List.of(), "changes", "核对主题、参考图与分镜连续性后保留")).toList();
+        when(imageGateway.invokeReal(any())).thenAnswer(call -> {
+            ProviderRequest sent = call.getArgument(0);
+            var output = sent.idempotencyKey().endsWith("concept") ? Map.<String,Object>of("brief", Map.of("audience", "潜在顾客", "goal", "表现商品", "facts", List.of()), "question", "", "concepts", concepts)
+                    : Map.<String,Object>of("plans", plans, "reviews", reviews);
+            return new ProviderResult(true,"TEST",null,output,null,null);
+        });
         assertThat(TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(task))).containsEntry("status", "SUCCEEDED");
         assertThat(TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(task))).containsEntry("status", "STALE");
         assertThat(TenantContext.runAs(tenantA, () -> videoPlans.get(first.id()).plans())).hasSize(3);
         var sent = ArgumentCaptor.forClass(ProviderRequest.class);
-        verify(imageGateway).invokeReal(sent.capture());
-        assertThat(sent.getValue().alias()).isEqualTo(ModelAlias.VIDEO_PLANNER);
-        assertThat(sent.getValue().idempotencyKey()).isEqualTo("video-plan-" + first.id());
+        verify(imageGateway,times(3)).invokeReal(sent.capture());
+        assertThat(sent.getAllValues()).allMatch(r -> r.alias() == ModelAlias.VIDEO_PLANNER);
+        assertThat(sent.getAllValues()).extracting(ProviderRequest::idempotencyKey).containsExactly("video-plan-" + first.id() + "-v2-concept", "video-plan-" + first.id() + "-v2-draft", "video-plan-" + first.id() + "-v2-review");
         String dataUrl = (String) ((List<?>) sent.getValue().options().get("images")).getFirst();
         assertThat(dataUrl).startsWith("data:image/jpeg;base64,");
         try {
@@ -384,7 +392,7 @@ class FoundationIntegrationTest {
         var again = TenantContext.runAs(tenantA, () -> videoPlans.create(new com.wuyao.growth.video.plan.VideoPlanDtos.Create(
                 "plan-again", List.of(image), false, "高级质感", "突出补水", first.id()), -1L));
         var retry = tasks.claim("DEFAULT", 1).getFirst();
-        when(imageGateway.invokeReal(any())).thenReturn(new ProviderResult(true, "TEST", null, Map.of("plans", List.of()), null, null));
+        doReturn(new ProviderResult(true, "TEST", null, Map.of("plans", List.of()), null, null)).when(imageGateway).invokeReal(any());
         assertThatThrownBy(() -> TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(retry)))
                 .isInstanceOf(NonRetryableTaskException.class).hasMessageContaining("烟火已退回");
         tasks.failPermanently(retry.getId(), retry.getAttempts(), "VIDEO_PLAN_OUTPUT", "test failure");
@@ -393,6 +401,18 @@ class FoundationIntegrationTest {
         assertThat(balance.available()).isEqualTo(before - BillingService.VIDEO_PLAN_CREDITS);
         assertThat(balance.held()).isZero();
         assertThat(owner.queryForObject("select relrowsecurity and relforcerowsecurity from pg_class where oid='public.video_plans'::regclass", Boolean.class)).isTrue();
+
+        var incomplete = TenantContext.runAs(tenantA, () -> videoPlans.create(new com.wuyao.growth.video.plan.VideoPlanDtos.Create(
+                "plan-needs-benefit", List.of(), false, null, "双十一充值活动10天，生成20s宣传片", null), -1L));
+        var questionTask = tasks.claim("DEFAULT",1).getFirst();
+        doReturn(new ProviderResult(true,"TEST",null,Map.of("brief", Map.of("audience","老顾客","goal","宣传充值活动","facts",List.of("活动持续10天")),
+                "question","充值有哪些档位和赠送权益？","concepts",List.of()),null,null)).when(imageGateway).invokeReal(any());
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(questionTask))).containsEntry("status","NEEDS_DETAILS");
+        var questionView = TenantContext.runAs(tenantA, () -> videoPlans.get(incomplete.id()));
+        assertThat(questionView.plans()).isEmpty(); assertThat(questionView.clarification()).containsEntry("question","充值有哪些档位和赠送权益？");
+        assertThat(TenantContext.runAs(tenantA, () -> videoPlanHandler.handle(questionTask))).containsEntry("status","STALE");
+        var afterQuestion = TenantContext.runAs(tenantA, () -> billingService.summary(true,false));
+        assertThat(afterQuestion.available()).isEqualTo(before - BillingService.VIDEO_PLAN_CREDITS); assertThat(afterQuestion.held()).isZero();
     }
 
     private Long videoAnalysisAsset() {

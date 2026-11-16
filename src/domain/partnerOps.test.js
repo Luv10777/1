@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { accountSplit, defaultSource, sourceBalance, groupTodos, memberSegments, percent, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
+import { accountSplit, defaultSource, sourceBalance, followUpTodos, groupTodos, memberSegments, percent, capabilityBars, niceMax, sinceText, codesCsv, lookupVerdict, memberVerdict, membershipState, planBatchTransfer, renewedUntil, runBatchTransfers, tenantTimeline, transferError } from './partnerOps.js'
 
 const now = Date.parse('2026-11-13T00:00:00Z')
 
@@ -86,6 +86,20 @@ test('to-dos merge per tenant, most urgent first, and filter by reason', () => {
   const rows = groupTodos([{ type: 'LOW_BALANCE', tenant: t1 }, { type: 'IDLE', tenant: t3 }, { type: 'EXPIRING', tenant: t1 }, { type: 'EXPIRING', tenant: t2 }])
   assert.deepEqual(rows.map(r => [r.tenant.tenantId, r.reasons.map(x => x.type)]), [[2, ['EXPIRING']], [1, ['EXPIRING', 'LOW_BALANCE']], [3, ['IDLE']]])
   assert.deepEqual(groupTodos([{ type: 'LOW_BALANCE', tenant: t1 }, { type: 'IDLE', tenant: t3 }], 'IDLE').map(r => r.tenant.tenantId), [3])
+})
+
+test('booked follow-ups join the to-do list, keeping the richer tenant row from the workbench', () => {
+  const due = [
+    { tenantId: 1, tenantName: '花间小馆', profile: { contactName: '王老板', nextFollowUpAt: '2026-11-15T05:00:00Z' } },
+    { tenantId: 4, tenantName: '青禾花店', profile: { contactName: '', nextFollowUpAt: '2026-11-18T05:00:00Z' } },
+    { tenantId: 5, tenantName: '没约时间', profile: { nextFollowUpAt: null } },
+  ]
+  const todos = followUpTodos(due)
+  assert.deepEqual(todos.map(t => [t.tenant.tenantId, t.type, t.tenant.ownerName, t.tenant.followUpOnly]), [[1, 'FOLLOW_UP', '王老板', true], [4, 'FOLLOW_UP', null, true]])
+  const rows = groupTodos([{ type: 'IDLE', tenant: { tenantId: 1, ownerName: '王某', bdName: '小林' } }, ...todos])
+  assert.deepEqual(rows.map(r => [r.tenant.tenantId, r.reasons.map(x => x.type)]), [[1, ['FOLLOW_UP', 'IDLE']], [4, ['FOLLOW_UP']]])
+  assert.equal(rows[0].tenant.bdName, '小林')
+  assert.deepEqual(followUpTodos(null), [])
 })
 
 test('member segments split active from expiring and percentages handle zero', () => {

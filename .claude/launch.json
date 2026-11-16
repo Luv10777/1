@@ -4,22 +4,41 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 4173
     },
     {
       "name": "admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:admin"],
+      "runtimeArgs": [
+        "run",
+        "dev:admin"
+      ],
       "port": 4177,
       "url": "http://127.0.0.1:4177"
     },
     {
       "name": "partner",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:partner"],
+      "runtimeArgs": [
+        "run",
+        "dev:partner"
+      ],
       "port": 4178,
       "url": "http://127.0.0.1:4178"
+    },
+    {
+      "name": "frontend-mock",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set VITE_DEV_API_TARGET=http://127.0.0.1:18081&& npm run dev"
+      ],
+      "port": 4173,
+      "url": "http://localhost:4173"
     }
   ]
 }

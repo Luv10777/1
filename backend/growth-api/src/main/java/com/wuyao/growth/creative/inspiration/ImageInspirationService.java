@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** 灵感绘图「灵感方案」：每次出 3 个画面描述，预占 3 烟火，成功扣除，失败或校验不过退回。 */
+/** 灵感绘图「灵感方案」：每次出 3 个画面描述，预占 1 烟火，成功扣除，失败或校验不过退回。 */
 @Service
 @RequiredArgsConstructor
 public class ImageInspirationService {
@@ -43,17 +43,20 @@ public class ImageInspirationService {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.IMAGE_INSPIRATION_PLANNER)) throw BizException.of(ErrorCode.IMAGE_NOT_CONFIGURED, "灵感方案模型尚未配置");
         String style = trim(request.style()), idea = trim(request.idea());
+        String sourceBrief = trim(request.sourceBrief());
         var images = List.copyOf(request.imageAssetIds());
         var existing = inspirations.findByRequestKey(request.requestKey());
         if (existing.isPresent()) {
             var prior = existing.get();
             if (!prior.getImageAssetIds().equals(images) || !Objects.equals(prior.getStyle(), style)
-                    || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousId(), request.previousId())) {
+                    || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousId(), request.previousId())
+                    || !Objects.equals(sourceBrief, prior.getTaskId() == null ? null : taskRepository.findById(prior.getTaskId())
+                        .map(t -> (String) t.getPayload().get("sourceBrief")).orElse(null))) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的方案，请重新提交");
             }
             return view(prior);
         }
-        if (images.isEmpty() && idea == null) throw BizException.of(ErrorCode.BAD_REQUEST, "请添加参考图或写一句想要的画面");
+        if (images.isEmpty() && idea == null && sourceBrief == null) throw BizException.of(ErrorCode.BAD_REQUEST, "请添加参考图或写一句想要的画面");
         if (images.stream().distinct().count() != images.size()) throw BizException.of(ErrorCode.BAD_REQUEST, "参考图重复");
         billing.requireMembership(CAPABILITY);
         images.forEach(assets::imageReference);
@@ -73,7 +76,10 @@ public class ImageInspirationService {
         inspiration.setBillingReservationId(billing.reserve("image-inspiration:" + request.requestKey(), CAPABILITY,
                 BillingService.IMAGE_INSPIRATION_CREDITS, (request.previousId() == null ? "灵感方案" : "灵感方案换一批") + " · 预占 " + BillingService.IMAGE_INSPIRATION_CREDITS + " 烟火"));
         inspirations.saveAndFlush(inspiration);
-        Task task = tasks.submit(ImageInspirationGenerateHandler.TYPE, "DEFAULT", Map.of("inspirationId", inspiration.getId()),
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("inspirationId", inspiration.getId());
+        if (sourceBrief != null) payload.put("sourceBrief", sourceBrief);
+        Task task = tasks.submit(ImageInspirationGenerateHandler.TYPE, "DEFAULT", payload,
                 "image-inspiration-generate-" + inspiration.getId(), userId);
         inspiration.setTaskId(task.getId());
         return view(inspiration);

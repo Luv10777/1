@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 兑换服务商的激活码归属到该服务商（第一次为准），平台可以改归属。用户编号 1 在计费运营名单里。
  */
 @SpringBootTest(properties = {"spring.config.import=", "growth.worker.enabled=false", "logging.level.root=WARN",
-        "growth.voice.sample-storage=minio", "growth.billing.operator-user-ids=1"})
+        "growth.voice.sample-storage=minio", "growth.billing.operator-user-ids=1", "growth.platform.operator-user-ids=1"})
 @AutoConfigureMockMvc
 @Testcontainers
 class PartnerIntegrationTest {
@@ -379,6 +379,62 @@ class PartnerIntegrationTest {
         assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?", Long.class, agency)).isEqualTo(450);
         call(agentA, agency, get("/api/partner/dashboard?days=7"), null).andExpect(jsonPath("$.data.transferred").value(550))
                 .andExpect(jsonPath("$.data.transferredToBds").value(300));
+    }
+
+    @Test void crmPersistsFollowUpsRejectsStaleEditsAndKeepsPartnersIsolated() throws Exception {
+        long a=partner("甲服务商",agentA), b=partner("乙服务商",agentB);
+        call(agentA,agency,post("/api/partner/tenants"),"{\"uid\":"+uid(shopOwner)+"}").andExpect(status().isOk());
+        String profile="{\"contactName\":\"李经理\",\"contactPhone\":\"13800000000\",\"industry\":\"餐饮\",\"region\":\"杭州\",\"stage\":\"ACTIVE\",\"version\":0}";
+        call(agentA,agency,put("/api/partner/tenants/"+shop+"/profile"),profile).andExpect(status().isOk()).andExpect(jsonPath("$.data.version").value(1));
+        call(agentA,agency,put("/api/partner/tenants/"+shop+"/profile"),profile).andExpect(status().isConflict());
+        call(agentB,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isNotFound());
+        String next=java.time.Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
+        String follow="{\"requestKey\":\"follow-0001\",\"channel\":\"WECHAT\",\"content\":\"已完成首次培训，预约回访\",\"stage\":\"ACTIVE\",\"nextFollowUpAt\":\""+next+"\",\"version\":1}";
+        call(agentA,agency,post("/api/partner/tenants/"+shop+"/follow-ups"),follow).andExpect(status().isOk()).andExpect(jsonPath("$.data.followUps.total").value(1)).andExpect(jsonPath("$.data.profile.version").value(2));
+        call(agentA,agency,post("/api/partner/tenants/"+shop+"/follow-ups"),follow).andExpect(status().isOk()).andExpect(jsonPath("$.data.followUps.total").value(1));
+        call(agentA,agency,get("/api/partner/follow-ups/due"),null).andExpect(jsonPath("$.data[0].tenantId").value(shop));
+        call(agentA,agency,post("/api/partner/team"),"{\"uid\":"+uid(bd)+"}").andExpect(status().isOk());
+        call(bd,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isNotFound());
+        call(agentA,agency,put("/api/partner/tenants/"+shop+"/bd"),"{\"bdUserId\":"+bd+"}").andExpect(status().isOk());
+        call(bd,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(status().isOk()).andExpect(jsonPath("$.data.profile.contactName").value("李经理"));
+        platform(put("/api/platform/partners/assignments/"+shop),"{\"partnerId\":"+b+"}").andExpect(status().isOk());
+        call(agentB,agency,get("/api/partner/tenants/"+shop+"/crm"),null).andExpect(jsonPath("$.data.profile.version").value(0)).andExpect(jsonPath("$.data.followUps.total").value(0));
+        assertThat(owner.queryForObject("SELECT count(*) FROM partner_follow_ups WHERE partner_id=?",Long.class,a)).isEqualTo(1);
+    }
+
+    @Test void rolesEnforceFinanceReviewerAndSupportBoundariesAndAuditChanges() throws Exception {
+        platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(shopOwner)+",\"roles\":[\"REVIEWER\"]}").andExpect(status().isOk());
+        platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(cafeOwner)+",\"roles\":[\"FINANCE\"]}").andExpect(status().isOk());
+        platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(bakeryOwner)+",\"roles\":[\"SUPPORT\"]}").andExpect(status().isOk());
+        call(shopOwner,shop,get("/api/platform/information"),null).andExpect(status().isOk());
+        call(shopOwner,shop,get("/api/billing/operations/orders"),null).andExpect(status().isForbidden());
+        call(bakeryOwner,bakery,get("/api/platform/users"),null).andExpect(status().isOk());
+        call(bakeryOwner,bakery,post("/api/platform/users/"+shopOwner+"/credits"),"{\"requestKey\":\"support-gift\",\"credits\":100,\"note\":\"客服赠送测试\"}").andExpect(status().isForbidden());
+        call(cafeOwner,cafe,get("/api/platform/users"),null).andExpect(status().isForbidden());
+        call(cafeOwner,cafe,get("/api/billing/operations/orders"),null).andExpect(status().isOk()).andExpect(jsonPath("$.data.page.total").value(0));
+        call(cafeOwner,cafe,put("/api/platform/security/roles"),"{\"uid\":"+uid(cafeOwner)+",\"roles\":[\"ADMIN\"]}").andExpect(status().isForbidden());
+        platform(get("/api/platform/security/operations"),null).andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(5));
+        platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(shopOwner)+",\"roles\":[]}").andExpect(status().isOk());
+        call(shopOwner,shop,get("/api/platform/information"),null).andExpect(status().isForbidden());
+    }
+
+    @Test void orderReportMergesTenantScopesAndFinanceCanConfirmOnlyVerifiedManualReceipts() throws Exception {
+        platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(cafeOwner)+",\"roles\":[\"FINANCE\"]}").andExpect(status().isOk());
+        String manual=UUID.randomUUID().toString(),expired=UUID.randomUUID().toString(),online=UUID.randomUUID().toString();
+        owner.update("INSERT INTO billing_orders(id,tenant_id,request_key,kind,amount_minor,credits,payment_method,expires_at,created_at) VALUES (?,?,'manual-order','TOPUP',50000,2500,'MANUAL',now()+interval '1 day',now()-interval '1 minute')",manual,shop);
+        owner.update("INSERT INTO billing_orders(id,tenant_id,request_key,kind,amount_minor,credits,payment_method,expires_at,created_at) VALUES (?,?,'expired-order','TOPUP',100000,5000,'MANUAL',now()-interval '1 minute',now()-interval '2 minutes')",expired,bakery);
+        owner.update("INSERT INTO billing_orders(id,tenant_id,request_key,kind,amount_minor,credits,payment_method,expires_at,created_at) VALUES (?,?,'online-order','TOPUP',50000,2500,'WECHAT',now()+interval '1 day',now())",online,cafe);
+        call(cafeOwner,cafe,get("/api/billing/operations/orders?size=1&page=1"),null).andExpect(status().isOk()).andExpect(jsonPath("$.data.page.total").value(3)).andExpect(jsonPath("$.data.page.items[0].id").value(manual)).andExpect(jsonPath("$.data.pendingCount").value(2)).andExpect(jsonPath("$.data.pendingMinor").value(100000));
+        call(cafeOwner,cafe,get("/api/billing/operations/orders?state=EXPIRED"),null).andExpect(jsonPath("$.data.page.total").value(1)).andExpect(jsonPath("$.data.page.items[0].id").value(expired));
+        call(cafeOwner,cafe,get("/api/billing/operations/orders").param("keyword","冰雪时光"),null).andExpect(jsonPath("$.data.page.total").value(1));
+        String receipt="{\"receivedAmountMinor\":50000,\"receiptReference\":\"bank-confirmed-0001\"}";
+        call(cafeOwner,cafe,post("/api/billing/operations/tenants/"+shop+"/orders/"+manual+"/confirm"),receipt).andExpect(status().isOk()).andExpect(jsonPath("$.data.state").value("PAID"));
+        call(cafeOwner,cafe,post("/api/billing/operations/tenants/"+shop+"/orders/"+manual+"/confirm"),receipt).andExpect(status().isOk());
+        call(cafeOwner,cafe,post("/api/billing/operations/tenants/"+cafe+"/orders/"+online+"/confirm"),receipt).andExpect(status().isBadRequest());
+        assertThat(owner.queryForObject("SELECT purchased_available FROM billing_accounts WHERE tenant_id=?",Long.class,shop)).isEqualTo(2500);
+        assertThat(owner.queryForObject("SELECT count(*) FROM billing_ledger WHERE type='PURCHASE'",Long.class)).isEqualTo(1);
+        call(cafeOwner,cafe,get("/api/billing/operations/orders?state=PAID&paymentMethod=MANUAL"),null).andExpect(jsonPath("$.data.paidMinor").value(50000)).andExpect(jsonPath("$.data.page.total").value(1));
+        assertThat(TenantContext.get()).isNull();
     }
 
     private long partner(String name, long admin) throws Exception {

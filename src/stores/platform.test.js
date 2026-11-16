@@ -11,7 +11,8 @@ test('standalone admin routes require explicit operator access and do not exist 
   const vite = await createServer({ server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true, include: [] }, appType: 'custom', plugins: [memoryRouter] })
   const originalFetch = globalThis.fetch
   let operator = false
-  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ code: 200, data: { operator } }) })
+  let permissions = ['REVIEW', 'USERS', 'FINANCE', 'ALLIANCE', 'REFERRAL', 'PARTNERS', 'SECURITY', 'USER_BILLING']
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ code: 200, data: { operator, permissions } }) })
   const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
   try {
     const { default: publicRouter } = await vite.ssrLoadModule('/src/router.js')
@@ -44,6 +45,14 @@ test('standalone admin routes require explicit operator access and do not exist 
     assert.equal(router.currentRoute.value.name, 'admin-users', 'old real-name links open user management, which now shows identities')
     await router.push('/merchants')
     assert.equal(router.currentRoute.value.name, 'admin-merchants')
+    permissions = ['FINANCE']
+    auth.state.user = { id: 9, tenantId: 2 }
+    await router.push('/orders')
+    assert.equal(router.currentRoute.value.name, 'admin-orders')
+    await router.push('/security')
+    assert.equal(router.currentRoute.value.name, 'admin-forbidden', 'finance cannot assign administrator roles')
+    await router.push('/users')
+    assert.equal(router.currentRoute.value.name, 'admin-forbidden', 'finance cannot manage accounts')
     operator = false
     auth.state.user = { id: 8, tenantId: 2, roles: ['staff'] }
     await router.push('/admin/information')

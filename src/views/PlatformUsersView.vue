@@ -7,7 +7,7 @@ import { platformManagementApi as api } from '../services/platformManagement'
 import { activationPlans, planAdminApi } from '../services/planAdminApi'
 import { partnerAdminApi } from '../services/partnerApi'
 import { auth } from '../stores/auth'
-import { loadPlatformAccess, platform } from '../stores/platform'
+import { loadPlatformAccess, platform, hasPlatformPermission } from '../stores/platform'
 import { auditActions, managementDate, userRoles, userStatuses } from '../domain/platformManagement'
 import '../platform-management.css'
 
@@ -137,9 +137,9 @@ function openDetail(item) {
   closeDetail()
   selected.value = item
   loadTrail(item, ++detailVersion)
-  loadPlans()
+  if (hasPlatformPermission('USER_BILLING', 'FINANCE')) loadPlans()
   partnerForm.name = item.tenantName || item.name || ''
-  loadPartners()
+  if (hasPlatformPermission('PARTNERS')) loadPartners()
 }
 // 列每个套餐标识的最新版本，上没上架都算（站内不卖的月卡、季卡、年卡不上架）；没有会员与烟火管理权限时，接口返回 403，提示原因并禁用操作。
 async function loadPlans() {
@@ -344,7 +344,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
                 <p v-else class="mg-muted"><span class="mg-status"><i />未实名</span> 账号本人在设置页完成实名后，会显示在这里。</p>
               </section>
               <section class="mg-detail-section"><h3><UserCheck :size="17" />所属商户的会员</h3><dl class="mg-detail-grid"><div><dt>会员套餐</dt><dd>{{ selected.memberActive ? selected.planName || '会员' : '未开通会员' }}</dd></div><div><dt>到期时间</dt><dd>{{ selected.memberActive ? managementDate(selected.memberUntil) : '—' }}</dd></div><div><dt>烟火余额</dt><dd>{{ Number(selected.creditsAvailable).toLocaleString('zh-CN') }}</dd></div></dl></section>
-              <section class="mg-detail-section" aria-labelledby="user-billing-title">
+              <section v-if="hasPlatformPermission('USER_BILLING')" class="mg-detail-section" aria-labelledby="user-billing-title">
                 <h3 id="user-billing-title"><Flame :size="17" />会员与烟火操作</h3>
                 <p class="mg-muted">会员和烟火按商户计算，操作作用于{{ tenantLabel(selected) }}下的所有账号。赠送的烟火不计入充值收入。</p>
                 <p v-if="plansError" class="mg-inline-error" role="alert">{{ plansError }}</p>
@@ -363,7 +363,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
                 <p v-if="billingError" class="mg-inline-error" role="alert">{{ billingError }}</p>
                 <p v-if="billingDone" class="mg-billing-done" role="status"><Check :size="14" />{{ billingDone }}</p>
               </section>
-              <section class="mg-detail-section" aria-labelledby="user-partner-title">
+              <section v-if="hasPlatformPermission('PARTNERS')" class="mg-detail-section" aria-labelledby="user-partner-title">
                 <h3 id="user-partner-title"><Handshake :size="17" />服务商授权</h3>
                 <p class="mg-muted">授权后，这个账号可以登录 partner.yifangzhi.com，管理名下商户、分配烟火、生成激活码。UID：<span class="mg-mono">{{ selected.uid || '—' }}</span></p>
                 <p v-if="partnersError" class="mg-inline-error" role="alert">{{ partnersError }}</p>

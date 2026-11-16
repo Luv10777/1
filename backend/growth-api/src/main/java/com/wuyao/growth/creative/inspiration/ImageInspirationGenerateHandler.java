@@ -44,10 +44,13 @@ public class ImageInspirationGenerateHandler implements TaskHandler {
             }
             String prompt = ImageInspirationOutput.prompt(images.size(), inspiration.getStyle(), inspiration.getIdea(),
                     service.previousPlans(inspiration.getPreviousId()));
+            String sourceBrief = task.getPayload().get("sourceBrief") instanceof String s ? s : null;
+            if (sourceBrief != null) prompt += "\n左侧已有画面需求：" + sourceBrief + "\n保留未被本次一句话需求修改的明确要求；本次一句话需求是最新要求。";
             var response = gateway.invokeReal(new ProviderRequest(ModelAlias.IMAGE_INSPIRATION_PLANNER, task.getTenantId(), prompt,
                     Map.of("system", ImageInspirationOutput.SYSTEM, "images", images), "image-inspiration-" + id));
             if (!response.succeeded() || response.output() == null) throw new IllegalStateException("灵感方案模型未返回有效结果");
             var result = ImageInspirationOutput.validate(response.output(), images.size());
+            if (sourceBrief != null) result.forEach(p -> p.put("sourceBrief", sourceBrief));
             return Map.of("status", service.completed(id, task, result) ? "SUCCEEDED" : "STALE");
         } catch (NonRetryableTaskException e) {
             log.warn("灵感方案结果校验失败: inspirationId={} code={} reason={}", id, e.errorCode(), e.getMessage());

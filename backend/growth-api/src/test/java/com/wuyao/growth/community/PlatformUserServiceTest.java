@@ -28,13 +28,14 @@ class PlatformUserServiceTest {
     private final AuthPrincipal operator = new AuthPrincipal(1L, 1L, "13800000001", 0);
     private final AuthPrincipal merchant = new AuthPrincipal(5L, 2L, "13800000005", 0);
     private final PlatformManagementService management = mock(PlatformManagementService.class);
+    private final com.wuyao.growth.backoffice.BackofficeAccess access = mock(com.wuyao.growth.backoffice.BackofficeAccess.class);
     private final PlatformProperties config = new PlatformProperties();
     private final PlatformAccountDirectory directory = mock(PlatformAccountDirectory.class);
     private final PlatformManagementAuditRepository audits = mock(PlatformManagementAuditRepository.class);
     private final BillingService billing = mock(BillingService.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final RealNameApplicationRepository identities = mock(RealNameApplicationRepository.class);
-    private final PlatformUserService service = new PlatformUserService(management, config, directory, audits, billing, transactions, identities);
+    private final PlatformUserService service = new PlatformUserService(management, access, directory, audits, billing, transactions, identities);
     private final Instant now = Instant.now();
 
     private RealNameApplication identity(long id, long tenantId, long userId, String status) {
@@ -51,6 +52,8 @@ class PlatformUserServiceTest {
     @BeforeEach
     void setup() {
         config.setOperatorUserIds(List.of(1L));
+        when(access.access(any())).thenAnswer(call -> new com.wuyao.growth.backoffice.BackofficeAccess.Access(config.getOperatorUserIds().contains(call.getArgument(0)), java.util.Set.of(), List.of()));
+        doThrow(BizException.of(ErrorCode.FORBIDDEN,"未授权")).when(access).require(eq(merchant.userId()), anyString());
         when(transactions.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
         doThrow(BizException.of(ErrorCode.FORBIDDEN, "没有平台运营权限")).when(management).requireOperator(merchant);
         when(directory.scopes()).thenReturn(List.of(new PlatformAccountDirectory.Scope(2L, "冰雪时光"), new PlatformAccountDirectory.Scope(3L, "一方小馆")));

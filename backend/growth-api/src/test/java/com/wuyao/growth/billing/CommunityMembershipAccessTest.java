@@ -45,6 +45,10 @@ class CommunityMembershipAccessTest {
             """;
 
     @Autowired MockMvc mvc;
+    @MockitoBean com.wuyao.growth.backoffice.BackofficeAccess backofficeAccess;
+    @MockitoBean com.wuyao.growth.backoffice.BackofficeAudit backofficeAudit;
+    @MockitoBean com.wuyao.growth.iam.service.PlatformAccountDirectory accountDirectory;
+    @MockitoBean com.wuyao.growth.partner.PartnerService partnerService;
     @MockitoBean BillingService billing;
     @MockitoBean CommunityService community;
     @MockitoBean CommerceService commerce;

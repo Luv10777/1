@@ -60,7 +60,8 @@ async function mountPanel(config = { configured: true, credits: 1 }, props = {},
   const find = predicate => [...nodes(root)].find(predicate)
   const button = label => find(node => node.tag === 'button' && text(node).includes(label))
   const idea = value => find(node => node.props?.id === 'vp-idea').props['onUpdate:modelValue'](value)
-  return { videoPlanApi, storage, timers, applied, requests, root, text, button, idea, settle,
+  const answer = value => find(node => node.props?.id === 'vp-answer').props['onUpdate:modelValue'](value)
+  return { videoPlanApi, storage, timers, applied, requests, root, text, button, idea, answer, settle,
     async close() {
       app.unmount(); auth.state.user = null; auth.state.token = null; await vite.close()
       for (const [key, descriptor] of Object.entries(saved)) {
@@ -75,22 +76,49 @@ const plans = ['晨光', '窗边', '静物'].map(title => ({ title, idea: '新�
   prompt: `${title}中的商品展示`, negativePrompt: '画面文字', materials: [],
   shots: [{ start: 0, end: 4, description: '特写' }, { start: 4, end: 12, description: '拉远' }] }))
 
-test('video plans validate inputs, poll, apply with model limits and preserve the previous batch on failure', async () => {
-  const panel = await mountPanel()
+test('a missing activity benefit asks for one answer and preserves the original requirement on resubmission', async () => {
+  const panel = await mountPanel(undefined, { maxDuration: 30, duration: 20, brief: '使用门店参考图' })
   try {
-    await panel.button('生成提示词').props.onClick(); await panel.settle()
+    panel.idea('双十一充值活动持续10天，生成20s宣传视频')
+    panel.videoPlanApi.create = async body => {
+      panel.requests.push(body)
+      return { id: 7, status: 'FAILED', clarification: { question: '充值有哪些赠送权益？', originalIdea: body.idea, sourceBrief: body.sourceBrief } }
+    }
+    await panel.button('生成剧本').props.onClick(); await panel.settle()
+    assert.match(panel.text(panel.root), /充值有哪些赠送权益/)
+    assert.match(panel.text(panel.root), /预占烟火已退回/)
+    assert.equal(panel.storage['video-plan-pending:1'], '7', 'a question can be restored after leaving the page')
+    await panel.button('补充并生成剧本').props.onClick(); await panel.settle()
+    assert.equal(panel.requests.length, 1)
+    panel.answer('充值1000元赠送200元余额'); await panel.settle()
+    panel.videoPlanApi.create = async body => { panel.requests.push(body); return { id: 8, status: 'SUCCEEDED', plans } }
+    await panel.button('补充并生成剧本').props.onClick(); await panel.settle()
+    assert.equal(panel.requests[1].clarificationAnswer, '充值1000元赠送200元余额')
+    assert.equal(panel.requests[1].idea, panel.requests[0].idea)
+    assert.equal(panel.requests[1].durationSeconds, 20)
+    assert.equal(panel.requests[1].sourceBrief, '使用门店参考图')
+    assert.notEqual(panel.requests[1].requestKey, panel.requests[0].requestKey)
+    assert.equal(panel.storage['video-plan-pending:1'], undefined)
+    assert.match(panel.text(panel.root), /A晨光/)
+  } finally { await panel.close() }
+})
+
+test('video plans validate inputs, poll, preserve the goal on apply and keep the previous batch on failure', async () => {
+  const panel = await mountPanel(undefined, { maxDuration: 15 })
+  try {
+    await panel.button('生成剧本').props.onClick(); await panel.settle()
     assert.match(panel.text(panel.root), /请先在左侧添加参考图/)
     assert.equal(panel.requests.length, 0)
     panel.idea('新品上新'); await panel.settle()
     panel.videoPlanApi.get = async () => ({ id: 7, status: 'SUCCEEDED', plans })
-    const generating = panel.button('生成提示词').props.onClick()
+    const generating = panel.button('生成剧本').props.onClick()
     await panel.settle()
     assert.equal(panel.button('正在出方案').props.disabled, true)
     assert.equal(panel.requests[0].idea, '新品上新')
     panel.timers.shift()(); await generating; await panel.settle()
     assert.match(panel.text(panel.root), /A晨光.*B窗边.*C静物/)
     panel.button('用这个').props.onClick(); await panel.settle()
-    assert.deepEqual(panel.applied[0], [{ prompt: '晨光中的商品展示\n避免：画面文字', format: '9:16', duration: 10, shortened: true }, 'A', null, 7])
+    assert.deepEqual(panel.applied[0], [{ prompt: '原始需求（保留未修改的要求，下面最后一句需求为最新要求）：\n新品上新\n晨光中的商品展示', format: '9:16', duration: 12, shortened: false }, 'A', null, 7])
     assert.equal('sceneKey' in panel.requests[0], false)
     assert.match(panel.text(panel.root), /已填入描述框/)
     panel.videoPlanApi.get = async () => ({ id: 8, status: 'FAILED', errorMessage: '校验失败，烟火已退回' })
@@ -109,13 +137,13 @@ test('an ambiguous network failure reuses the request key until a terminal respo
   try {
     panel.idea('新品上新')
     panel.videoPlanApi.create = async body => { panel.requests.push(body); throw new Error('网络中断') }
-    await panel.button('生成提示词').props.onClick(); await panel.settle()
-    await panel.button('生成提示词').props.onClick(); await panel.settle()
+    await panel.button('生成剧本').props.onClick(); await panel.settle()
+    await panel.button('生成剧本').props.onClick(); await panel.settle()
     assert.equal(panel.requests.length, 2)
     assert.equal(panel.requests[0].requestKey, panel.requests[1].requestKey)
     panel.videoPlanApi.create = async body => { panel.requests.push(body); return { id: 7, status: 'FAILED' } }
-    await panel.button('生成提示词').props.onClick(); await panel.settle()
-    await panel.button('生成提示词').props.onClick(); await panel.settle()
+    await panel.button('生成剧本').props.onClick(); await panel.settle()
+    await panel.button('生成剧本').props.onClick(); await panel.settle()
     assert.notEqual(panel.requests[2].requestKey, panel.requests[3].requestKey)
   } finally { await panel.close() }
 })
@@ -123,8 +151,8 @@ test('an ambiguous network failure reuses the request key until a terminal respo
 test('an unconfigured planner stays disabled and explains that merchants can write their own prompt', async () => {
   const panel = await mountPanel({ configured: false, credits: 1 })
   try {
-    assert.equal(panel.button('生成提示词').props.disabled, true)
-    await panel.button('生成提示词').props.onClick()
+    assert.equal(panel.button('生成剧本').props.disabled, true)
+    await panel.button('生成剧本').props.onClick()
     assert.equal(panel.requests.length, 0)
     assert.match(panel.text(panel.root), /出方案暂未开放，可以直接在左侧写描述/)
   } finally { await panel.close() }
@@ -136,7 +164,7 @@ test('a larger video image selection respects the planner limit without changing
   try {
     assert.match(panel.text(panel.root), /方案仅参考前 6 张图片/)
     panel.videoPlanApi.create = async body => { panel.requests.push(body); return { id: 9, status: 'SUCCEEDED', plans } }
-    await panel.button('生成提示词').props.onClick()
+    await panel.button('生成剧本').props.onClick()
     assert.deepEqual(panel.requests[0].imageAssetIds, [1, 2, 3, 4, 5, 6])
     assert.equal(images.length, 30)
   } finally { await panel.close() }
@@ -148,7 +176,7 @@ test('every video reference image goes to the planner, even before its limit has
   try {
     assert.doesNotMatch(panel.text(panel.root), /方案仅参考前/)
     panel.videoPlanApi.create = async body => { panel.requests.push(body); return { id: 9, status: 'SUCCEEDED', plans } }
-    await panel.button('生成提示词').props.onClick()
+    await panel.button('生成剧本').props.onClick()
     assert.equal(panel.requests[0].imageAssetIds.length, 30)
   } finally { await panel.close() }
 })
@@ -159,7 +187,7 @@ test('leaving the page while plans are generating picks the batch up again on re
   try {
     first.idea('新品上新')
     first.videoPlanApi.get = async () => ({ id: 7, status: 'GENERATING' })
-    first.button('生成提示词').props.onClick(); await first.settle()
+    first.button('生成剧本').props.onClick(); await first.settle()
     assert.equal(storage['video-plan-pending:1'], '7')
   } finally { await first.close() }
 
@@ -175,17 +203,37 @@ test('leaving the page while plans are generating picks the batch up again on re
   } finally { await panel.close() }
 })
 
-test('reusing a record from the inspiration list brings back the reference images the prompt refers to', async () => {
+test('reusing a record with a missing image is blocked without shifting the remaining reference indexes', async () => {
   const record = { id: 5, style: '自定义港风', idea: '', createdAt: new Date().toISOString(), plans,
     images: [{ assetId: 11, name: '瓶身.png', url: '/a.png' }, { assetId: 12, name: '已删除', url: null }] }
-  const panel = await mountPanel(undefined, { images: [{ id: 'x', assetId: 99, name: '别的图', url: '/x.png' }] }, { history: [record] })
+  const panel = await mountPanel(undefined, { maxDuration: 15, images: [{ id: 'x', assetId: 99, name: '别的图', url: '/x.png' }] }, { history: [record] })
   try {
     panel.button('晨光').props.onClick(); await panel.settle()
     assert.match(panel.text(panel.root), /1 张参考图已删除/)
     panel.button('用这个').props.onClick(); await panel.settle()
-    assert.deepEqual(panel.applied[0][2], [{ id: 'asset-11', assetId: 11, name: '瓶身.png', url: '/a.png', file: null }])
-    assert.equal(panel.applied[0][3], 5)
+    assert.equal(panel.applied.length, 0)
+    assert.match(panel.text(panel.root), /图序号错位/)
   } finally { await panel.close() }
+})
+
+test('twenty second campaign requirements reach the planner and unsupported models do not start a request', async () => {
+  const idea = '这个是双十一充值活动，开展10天的充值活动，为我这个充值活动生成20s的宣传推广视频'
+  const panel = await mountPanel(undefined, { maxDuration: 30, duration: 10, ratio: '9:16', brief: '用参考人物口播宣传' })
+  try {
+    panel.idea(idea); await panel.settle()
+    panel.videoPlanApi.get = async () => ({ id: 7, status: 'FAILED' })
+    const running = panel.button('生成剧本').props.onClick(); await panel.settle()
+    assert.equal(panel.requests[0].durationSeconds, 20)
+    assert.equal(panel.requests[0].ratio, '9:16')
+    assert.equal(panel.requests[0].sourceBrief, '用参考人物口播宣传')
+    panel.timers.shift()(); await running
+  } finally { await panel.close() }
+  const short = await mountPanel(undefined, { maxDuration: 15 })
+  try {
+    short.idea(idea); await short.button('生成剧本').props.onClick(); await short.settle()
+    assert.equal(short.requests.length, 0)
+    assert.match(short.text(short.root), /不会自动缩短方案/)
+  } finally { await short.close() }
 })
 
 test('plans follow the workbench scene, and opening a record switches the workbench back to its scene', async () => {
@@ -205,7 +253,7 @@ test('plans follow the workbench scene, and opening a record switches the workbe
     panel.button('重选').props.onClick(); await panel.settle()
     panel.idea('新品上新'); await panel.settle()
     panel.videoPlanApi.get = async () => ({ id: 7, status: 'SUCCEEDED', plans, sceneKey: 'ecommerce' })
-    const generating = panel.button('生成提示词').props.onClick()
+    const generating = panel.button('生成剧本').props.onClick()
     await panel.settle()
     assert.equal(panel.requests[0].sceneKey, 'ecommerce')
     panel.timers.shift()(); await generating; await panel.settle()

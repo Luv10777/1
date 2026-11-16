@@ -6,6 +6,7 @@ import { auth } from '../src/stores/auth.js'
 import { useNavigationProgress } from '../admin/navigation.js'
 import { isOwner, partner } from './partnerStore.js'
 import YanhuoIcon from '../src/components/YanhuoIcon.vue'
+import brandMark from '../public/favicon.png'
 
 const number = value => Number(value || 0).toLocaleString('zh-CN')
 
@@ -17,13 +18,20 @@ const menuOpen = ref(false)
 watch(() => route.name, () => { menuOpen.value = false })
 const signingOut = ref(false)
 const authorized = computed(() => route.meta.partner && auth.isAuthenticated && partner.overview)
+// 侧栏分组：日常看的、对商户做的、负责人管团队和烟火的。
 const navigation = computed(() => [
-  { name: 'partner-overview', label: '工作台', description: '今天要跟进的商户、额度与流水', icon: LayoutDashboard },
-  { name: 'partner-dashboard', label: '经营看板', description: '商户使用、烟火和激活码的统计', icon: BarChart3 },
-  { name: 'partner-tenants', label: '名下商户', description: isOwner() ? '按 UID 添加商户，分配烟火、续期' : '按 UID 添加商户、续期', icon: Store },
-  { name: 'partner-codes', label: '激活码', description: '在额度内生成、作废激活码', icon: TicketCheck },
-  ...(isOwner() ? [{ name: 'partner-team', label: '团队', description: '添加 BD，查看各 BD 名下商户', icon: Users },
-    { name: 'partner-distributions', label: '分配记录', description: '分给商户和 BD 的每一笔烟火', icon: Coins }] : []),
+  { label: '概览', items: [
+    { name: 'partner-overview', label: '工作台', description: '今天要跟进的商户、额度与流水', icon: LayoutDashboard },
+    { name: 'partner-dashboard', label: '经营看板', description: '商户使用、烟火和激活码的统计', icon: BarChart3 },
+  ] },
+  { label: '商户', items: [
+    { name: 'partner-tenants', label: '名下商户', description: isOwner() ? '商户管理、烟火分配与会员续期' : '商户管理与会员续期', icon: Store },
+    { name: 'partner-codes', label: '激活码', description: '在额度内生成、作废激活码', icon: TicketCheck },
+  ] },
+  ...(isOwner() ? [{ label: '管理', items: [
+    { name: 'partner-team', label: '团队', description: '添加 BD，查看各 BD 名下商户', icon: Users },
+    { name: 'partner-distributions', label: '分配记录', description: '分给商户和 BD 的每一笔烟火', icon: Coins },
+  ] }] : []),
 ])
 
 async function logout() {
@@ -38,10 +46,11 @@ async function logout() {
     <a class="admin-skip" href="#partner-main">跳到主要内容</a>
     <button v-if="menuOpen" class="admin-menu-backdrop" aria-label="关闭导航" @click="menuOpen = false" />
     <aside class="admin-sidebar">
-      <RouterLink class="admin-brand" :to="{ name: 'partner-overview' }"><span class="admin-brand-mark">服</span><span><strong>{{ partner.overview.partner.name }}</strong><small>一方志服务商后台</small></span></RouterLink>
+      <RouterLink class="admin-brand" :to="{ name: 'partner-overview' }"><img class="admin-brand-mark" :src="brandMark" alt="一方志" width="30" height="30" /><span><strong>{{ partner.overview.partner.name }}</strong><small>一方志服务商后台</small></span></RouterLink>
       <nav aria-label="服务商后台导航">
-        <div class="admin-nav-group">
-          <RouterLink v-for="item in navigation" :key="item.name" :to="{ name: item.name }" :title="item.description" :class="{ active: route.name === item.name }" :aria-current="route.name === item.name ? 'page' : undefined" @click="menuOpen = false"><component :is="item.icon" :size="17" />{{ item.label }}</RouterLink>
+        <div v-for="group in navigation" :key="group.label" class="admin-nav-group">
+          <div class="admin-nav-label">{{ group.label }}</div>
+          <RouterLink v-for="item in group.items" :key="item.name" :to="{ name: item.name }" :title="item.description" :class="{ active: route.name === item.name }" :aria-current="route.name === item.name ? 'page' : undefined" @click="menuOpen = false"><component :is="item.icon" :size="17" />{{ item.label }}</RouterLink>
         </div>
       </nav>
       <div class="admin-sidebar-note"><ShieldCheck :size="15" /><span v-if="isOwner()">只显示你这家服务商的数据<br />烟火和额度由平台发放</span><span v-else>你是 BD，只显示你名下的商户<br />和你生成的激活码</span></div>

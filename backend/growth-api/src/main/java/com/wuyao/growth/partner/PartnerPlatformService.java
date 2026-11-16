@@ -23,7 +23,7 @@ public class PartnerPlatformService {
     private final PartnerService partners;
     private final PlatformAccountDirectory directory;
     private final BillingService billing;
-    private final BillingProperties config;
+    private final com.wuyao.growth.backoffice.BackofficeAccess access;
 
     public List<PartnerDtos.PlatformPartner> list(Long operator) {
         requireOperator(operator);
@@ -144,6 +144,6 @@ public class PartnerPlatformService {
     }
 
     private void requireOperator(Long operator) {
-        if (!config.getOperatorUserIds().contains(operator)) throw BizException.of(ErrorCode.FORBIDDEN, "没有服务商管理权限");
+        access.require(operator, "PARTNERS");
     }
 }

@@ -26,6 +26,7 @@ export function accountSplit(account, credits) {
 
 /** 待办分类：标题、说明和对服务商的建议动作。顺序就是首页的展示顺序。 */
 export const todoTypes = {
+  FOLLOW_UP: { title: '预约跟进', short: '预约跟进', hint: '未来 7 天和已逾期的预约', tone: 'info' },
   EXPIRING: { title: '7 天内到期', short: '即将到期', hint: '提醒续费，或直接用额度续期', tone: 'warn' },
   EXPIRED: { title: '30 天内刚过期', short: '已过期', hint: '会员已停，尽快联系续费', tone: 'alert' },
   LOW_BALANCE: { title: '烟火余额不足', short: '余额不足', hint: '余额不到最近一次充值的 10%', tone: 'warn' },
@@ -50,6 +51,17 @@ export function groupTodos(todos, type = '') {
     .filter(row => !type || row.reasons.some(r => r.type === type))
     .sort((a, b) => order.indexOf(a.reasons[0].type) - order.indexOf(b.reasons[0].type)
       || (a.tenant.memberUntil ? Date.parse(a.tenant.memberUntil) : Infinity) - (b.tenant.memberUntil ? Date.parse(b.tenant.memberUntil) : Infinity))
+}
+
+/**
+ * 预约跟进（商户档案里约好的下次跟进）变成待办，和工作台的其他待办一起按商户合并。
+ * 接口只给商户名和联系人，归属 BD 不知道，用 followUpOnly 标出来，页面上就不显示归属。
+ */
+export function followUpTodos(items) {
+  return (items || []).filter(item => item.profile?.nextFollowUpAt).map(item => ({
+    type: 'FOLLOW_UP', at: item.profile.nextFollowUpAt,
+    tenant: { tenantId: item.tenantId, tenantName: item.tenantName, ownerName: item.profile.contactName || null, followUpOnly: true },
+  }))
 }
 
 /** 会员状态分布：有效（不含即将到期）、7 天内到期、已过期、从未开通；每段带占比，画横向堆叠条用。 */

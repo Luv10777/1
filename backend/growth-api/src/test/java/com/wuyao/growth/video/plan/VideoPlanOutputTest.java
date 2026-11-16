@@ -46,6 +46,34 @@ class VideoPlanOutputTest {
         assertThatThrownBy(() -> VideoPlanOutput.validate(Map.of("text", "抱歉"), 1)).isInstanceOf(NonRetryableTaskException.class);
     }
 
+    @Test void scriptKeepsDialogueCaptionsAndSoundWithoutAddingGenericNegativeInstructions() {
+        String description = "画面：店员迎接顾客，前台活动海报进入画面。".repeat(9)
+                + "台词：双十一充值活动开始啦，活动持续十天！字幕：双十一充值活动·限时十天。声音：音乐渐起，切入体验画面。";
+        var scriptShots = List.<Map<String, Object>>of(
+                Map.of("start", 0, "end", 4, "description", description),
+                Map.of("start", 4, "end", 10, "description", "顾客体验服务；旁白与字幕说明参与方式，音乐收尾。"));
+        var script = plan("十日充值礼", 10, scriptShots);
+        script.put("negativePrompt", "不要文字，不要人物，无字幕");
+        var result = VideoPlanOutput.validate(Map.of("plans", List.of(script, script, script)), 1).getFirst();
+        assertThat(((List<Map<String, Object>>) result.get("shots")).getFirst().get("description")).isEqualTo(description);
+        assertThat(result.get("negativePrompt")).isEqualTo("");
+    }
+
+    @Test void twentySecondRequestRejectsFifteenSecondPlansAndConflictingPromptText() {
+        var fifteenShots = List.<Map<String, Object>>of(Map.of("start", 0, "end", 5, "description", "活动开场"),
+                Map.of("start", 5, "end", 15, "description", "活动内容"));
+        var fifteen = plan("充值活动", 15, fifteenShots); fifteen.put("prompt", "15秒双十一活动推广视频");
+        assertThatThrownBy(() -> VideoPlanOutput.validate(Map.of("plans", List.of(fifteen, fifteen, fifteen)), 1, 20, 30, "9:16"))
+                .isInstanceOf(NonRetryableTaskException.class).hasMessageContaining("时长");
+        var twentyShots = List.<Map<String, Object>>of(Map.of("start", 0, "end", 6, "description", "双十一活动开场"),
+                Map.of("start", 6, "end", 20, "description", "十天活动内容与参与引导"));
+        var twenty = plan("充值活动", 20, twentyShots); twenty.put("prompt", "20秒双十一充值推广视频，活动开展10天");
+        assertThat(VideoPlanOutput.validate(Map.of("plans", List.of(twenty, twenty, twenty)), 1, 20, 30, "9:16")).hasSize(3);
+        twenty.put("prompt", "15秒双十一充值推广视频");
+        assertThatThrownBy(() -> VideoPlanOutput.validate(Map.of("plans", List.of(twenty, twenty, twenty)), 1, 20, 30, "9:16"))
+                .isInstanceOf(NonRetryableTaskException.class).hasMessageContaining("不一致");
+    }
+
     @Test void promptMentionsPreviousBatchForAnotherRound() {
         String text = VideoPlanOutput.prompt(2, true, "高级质感", "突出补水", List.of(Map.of("title", "晨光", "idea", "清晨桌面")), null);
         assertThat(text).contains("2 张参考图", "运镜节奏", "高级质感", "突出补水", "换一批", "晨光：清晨桌面")

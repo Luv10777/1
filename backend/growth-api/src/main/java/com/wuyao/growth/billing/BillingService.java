@@ -33,6 +33,7 @@ public class BillingService {
     public static final long MAX_GRANT_CREDITS = 100_000;
     private final BillingStore store;
     private final BillingProperties config;
+    private final com.wuyao.growth.backoffice.BackofficeAccess backoffice;
     private final WechatPayGateway wechat;
     private final AlipayGateway alipay;
     private final org.springframework.context.ApplicationEventPublisher events;
@@ -149,7 +150,7 @@ public class BillingService {
     /** Only a platform operator may invoke this, after checking an actual receipt. */
     @Transactional
     public BillingDtos.OrderView confirmPayment(String id,BillingDtos.Confirmation input,Long operator) {
-        if(!config.getOperatorUserIds().contains(operator)) throw BizException.of(ErrorCode.FORBIDDEN,"没有收款核销权限");
+        backoffice.require(operator,"FINANCE");
         var a=store.lockAccount(); var o=requireOrder(store.lockOrder(id));
         if(!"MANUAL".equals(o.getPaymentMethod())) throw bad("在线支付订单须以支付平台验证的支付结果入账");
         String receipt="manual:"+input.receiptReference().trim();

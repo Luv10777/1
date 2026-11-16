@@ -4,6 +4,10 @@ const params = values => Object.fromEntries(Object.entries(values || {}).filter(
 
 /** 服务商后台（partner.yifangzhi.com）：只有服务商的登录账号能用，接口只返回自己这一家的数据。 */
 export const partnerApi = {
+  crm: (tenantId, values) => get(`/api/partner/tenants/${encodeURIComponent(tenantId)}/crm`, params(values)),
+  saveProfile: (tenantId, values) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/profile`, values),
+  followUp: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/follow-ups`, values),
+  dueFollowUps: () => get('/api/partner/follow-ups/due'),
   me: () => get('/api/partner/me'),
   workbench: () => get('/api/partner/workbench'),
   dashboard: values => get('/api/partner/dashboard', params(values)),
@@ -43,7 +47,7 @@ export const partnerAdminApi = {
   reassign: (tenantId, partnerId) => put(`/api/platform/partners/assignments/${encodeURIComponent(tenantId)}`, { partnerId: partnerId || null }),
 }
 
-export const tenantSources = { UID: '按 UID 添加', CODE: '兑换激活码', PLATFORM: '平台指定' }
+export const tenantSources = { UID: '手动添加', CODE: '兑换激活码', PLATFORM: '平台指定' }
 export const ledgerTypes = { GRANT: '平台发放', TRANSFER: '分给商户' }
 
 /** UID 是 8 位数字。 */

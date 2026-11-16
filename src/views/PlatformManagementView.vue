@@ -6,7 +6,7 @@ import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui
 import { ArrowDownToLine, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, FileText, LockKeyhole, RefreshCw, Search, Store, X } from 'lucide-vue-next'
 import { platformManagementApi as api } from '../services/platformManagement'
 import { auth } from '../stores/auth'
-import { loadPlatformAccess, platform } from '../stores/platform'
+import { loadPlatformAccess, platform, hasPlatformPermission } from '../stores/platform'
 import { auditActions, informationCategories, managementDate, managementStatuses } from '../domain/platformManagement'
 
 const route = useRoute()
@@ -65,7 +65,7 @@ async function load() {
   }
   const [listResult, summaryResult] = await Promise.allSettled([
     api[section.value]({ page: page.value, size: size.value, keyword: keyword.value.trim(), status: status.value, ...(section.value === 'information' ? { category: category.value } : {}) }),
-    api.summary(),
+    hasPlatformPermission('REVIEW') ? api.summary() : Promise.resolve(null),
   ])
   if (attempt !== version) return
   if (listResult.status === 'fulfilled') {
@@ -190,7 +190,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
               <td><span>{{ section === 'merchants' ? item.contactName : item.merchantName }}</span><small>{{ section === 'merchants' ? item.contactPhoneMasked : item.tenantName }}</small></td>
               <td><span class="mg-status" :class="`mg-${item.status.toLowerCase()}`"><i />{{ managementStatuses[item.status] }}</span></td>
               <td class="mg-time">{{ managementDate(item.publishedAt || item.createdAt) }}</td>
-              <td class="mg-table-action"><button type="button" class="mg-text-button" @click="openDetail(item)">{{ item.status === 'PENDING_REVIEW' ? '去审核' : '查看详情' }}<ChevronRight :size="14" /></button></td>
+              <td class="mg-table-action"><button type="button" class="mg-text-button" @click="openDetail(item)">{{ item.status === 'PENDING_REVIEW' && hasPlatformPermission('REVIEW') ? '去审核' : '查看详情' }}<ChevronRight :size="14" /></button></td>
             </tr>
           </tbody>
         </table>
@@ -221,7 +221,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
                 <button v-if="selected.status === 'PUBLISHED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('OFFLINE')"><ArrowDownToLine :size="15" />{{ busy ? '正在保存…' : '下线信息' }}</button>
                 <button v-if="selected.status === 'OFFLINE' && selected.publishedAt" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('PUBLISHED')">{{ busy ? '正在保存…' : '重新上线' }}</button>
               </template>
-              <template v-else-if="section === 'merchants'">
+              <template v-else-if="section === 'merchants' && hasPlatformPermission('REVIEW')">
                 <button v-if="selected.status === 'PENDING_REVIEW'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('REJECTED')">驳回申请</button>
                 <button v-if="selected.status === 'APPROVED'" class="mg-button mg-danger" type="button" :disabled="busy" @click="review('SUSPENDED')">暂停入驻</button>
                 <button v-if="['PENDING_REVIEW', 'SUSPENDED'].includes(selected.status)" class="mg-button mg-primary" type="button" :disabled="busy" @click="review('APPROVED')">{{ busy ? '正在保存…' : selected.status === 'SUSPENDED' ? '恢复入驻' : '通过入驻' }}</button>

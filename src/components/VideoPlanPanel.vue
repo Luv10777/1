@@ -1,9 +1,9 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Check, ChevronLeft, Film, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import YanhuoIcon from './YanhuoIcon.vue'
 import { refreshBilling, requireAccount } from '../stores/billing'
-import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPlanRecordImages, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
+import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPlanRecordImages, videoPlanRequestedSeconds, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
 import { FREE_SCENE, findVideoScene, videoSceneCover, videoSceneKey, videoSceneName } from '../services/videoScenes'
 import { auth } from '../stores/auth'
@@ -16,6 +16,9 @@ const props = defineProps({
   video: { type: Object, default: null },
   upload: { type: Function, required: true },
   maxDuration: { type: Number, default: 30 },
+  duration: { type: Number, default: 10 },
+  ratio: { type: String, default: 'auto' },
+  brief: { type: String, default: '' },
   ratios: { type: Array, default: () => [] },
   locked: Boolean,
   // 工作台「场景」一栏选的场景；出方案时参考它，「换一批」由服务端沿用上一批的场景。
@@ -32,10 +35,16 @@ const customOpen = ref(false)
 const idea = ref('')
 const working = ref(false)
 const error = ref('')
+const clarification = ref(null)
+const answer = ref('')
+const phase = ref('CONCEPT')
+const phaseLabel = computed(() => ({ CONCEPT: '正在梳理需求与创意', DRAFT: '正在编写完整剧本', REVIEW: '正在审稿和完善剧本' })[phase.value] || '正在准备剧本')
+watch(() => [idea.value, props.brief], () => { clarification.value = null; answer.value = '' }, { flush: 'sync' })
 const result = ref(null)
 const showResults = ref(false)
 const appliedIndex = ref(-1)
 const resultImages = ref([])
+const resultReferences = ref([])
 // 正在看的是灵感记录里的哪一批；刚出的方案为 null。
 const record = ref(null)
 const records = ref([])
@@ -101,38 +110,63 @@ const wait = ms => new Promise(resolve => window.setTimeout(resolve, ms))
 const settle = async plan => {
   rememberPending(plan.id)
   while (!isVideoPlanDone(plan)) {
+    phase.value = plan.phase || 'CONCEPT'
     await wait(2000)
     if (disposed) return null
     plan = await videoPlanApi.get(plan.id)
   }
-  rememberPending(null)
+  rememberPending(plan.clarification?.question ? plan.id : null)
   refreshBilling()
   return plan
+}
+
+const askDetails = plan => {
+  if (!plan.clarification?.question) return false
+  idea.value = plan.clarification.originalIdea || idea.value
+  clarification.value = plan.clarification
+  answer.value = ''
+  if (plan.clarification.style) {
+    customOpen.value = !videoPlanStyles.includes(plan.clarification.style)
+    style.value = customOpen.value ? '' : plan.clarification.style
+    customStyle.value = customOpen.value ? plan.clarification.style : ''
+  }
+  showResults.value = false
+  return true
 }
 
 const run = async (previousPlanId = null) => {
   if (working.value || unavailable.value) return
   error.value = ''
+  if (clarification.value && !answer.value.trim()) { error.value = '请先补充下面的活动信息，再生成剧本。'; return }
   try { await requireAccount() }
   catch (e) { error.value = e.message; return }
-  if (!props.images.length && !idea.value.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的效果。'; return }
+  if (!props.images.length && !idea.value.trim() && !props.brief.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的效果。'; return }
+  const seconds = videoPlanRequestedSeconds(idea.value) ?? videoPlanRequestedSeconds(props.brief) ?? props.duration
+  if (!Number.isInteger(seconds) || seconds < 5 || seconds > props.maxDuration) { error.value = `你要求 ${seconds} 秒，当前模型最长支持 ${props.maxDuration} 秒。请先调整时长或切换模型，不会自动缩短方案。`; return }
   working.value = true
+  phase.value = 'CONCEPT'
   try {
-    const imageAssetIds = await Promise.all(planImages.value.map(entry => props.upload(entry, 'IMAGE')))
+    const references = [...planImages.value]
+    const imageAssetIds = await Promise.all(references.map(entry => props.upload(entry, 'IMAGE')))
     const body = { imageAssetIds, referenceVideo: Boolean(props.video), style: styleText.value, idea: idea.value.trim(), previousPlanId,
+      durationSeconds: seconds, maxDurationSeconds: props.maxDuration, ratio: props.ratio,
+      sourceBrief: clarification.value?.sourceBrief || props.brief.trim(),
+      ...(answer.value.trim() && { clarificationAnswer: answer.value.trim() }),
       ...(videoSceneKey(props.scene) !== FREE_SCENE && { sceneKey: props.scene }) }
     // 网络中断后重试同一份请求沿用原编号，不会重复预占烟火。
     if (JSON.stringify(body) !== signature) { requestKey = `video-plan-${crypto.randomUUID()}`; signature = JSON.stringify(body) }
-    const images = planImages.value.map(entry => entry.url)
+    const images = references.map(entry => entry.url)
     let plan = await videoPlanApi.create({ requestKey, ...body })
     refreshBilling()
     plan = await settle(plan)
     if (!plan) return
     signature = ''
-    if (plan.status === 'FAILED') { error.value = plan.errorMessage || '出方案没有完成，烟火已退回，请重试。'; return }
+    if (plan.status === 'FAILED') { if (!askDetails(plan)) error.value = plan.errorMessage || '出方案没有完成，烟火已退回，请重试。'; return }
+    clarification.value = null
     result.value = plan
     resultImages.value = images
-    resultInfo.value = { idea: body.idea, style: body.style, imageCount: images.length, createdAt: plan.createdAt }
+    resultReferences.value = references.map((entry, index) => ({ assetId: imageAssetIds[index], name: entry.name, url: entry.url }))
+    resultInfo.value = { idea: body.idea, sourceBrief: body.sourceBrief, clarificationAnswer: body.clarificationAnswer, style: body.style, imageCount: images.length, createdAt: plan.createdAt }
     record.value = null
     appliedIndex.value = -1
     showResults.value = true
@@ -163,6 +197,8 @@ const openRecord = item => {
   style.value = customOpen.value ? '' : item.style || ''
   customStyle.value = customOpen.value ? item.style : ''
   idea.value = item.idea || ''
+  clarification.value = null
+  answer.value = item.plans?.[0]?.clarificationAnswer || ''
   // 工作台的场景一起切回这批当时的场景，之后的生成和这批方案用同一个场景。
   emit('scene', videoSceneKey(item.sceneKey))
   showResults.value = true
@@ -174,7 +210,7 @@ const resume = async id => {
   catch { rememberPending(null) } // 方案读不到（例如换了账号）就不再接，灵感记录里仍能找到
   finally { working.value = false }
   if (disposed || !plan) return
-  if (plan.status === 'FAILED') { error.value = plan.errorMessage || '出方案没有完成，烟火已退回，请重试。'; return }
+  if (plan.status === 'FAILED') { if (!askDetails(plan)) error.value = plan.errorMessage || '出方案没有完成，烟火已退回，请重试。'; return }
   await loadRecords()
   const item = records.value.find(entry => entry.id === plan.id)
   if (item && !disposed) openRecord(item)
@@ -196,9 +232,13 @@ const showRecords = async () => {
 
 const use = (plan, index) => {
   if (props.locked) return
-  appliedIndex.value = index
-  const images = record.value ? videoPlanRecordImages(record.value, props.images) : null
-  emit('apply', videoPlanForm(plan, { maxDuration: props.maxDuration, ratios: props.ratios }), videoPlanLetters[index], images, result.value.id)
+  try {
+    const form = videoPlanForm(plan, { maxDuration: props.maxDuration, ratios: props.ratios, idea: resultInfo.value?.idea || '', sourceBrief: resultInfo.value?.sourceBrief || plan.sourceBrief || '' })
+    const images = videoPlanRecordImages(record.value || { images: resultReferences.value }, props.images)
+    emit('apply', form, videoPlanLetters[index], images, result.value.id)
+    appliedIndex.value = index
+    error.value = ''
+  } catch (e) { error.value = e.message }
 }
 </script>
 
@@ -210,7 +250,7 @@ const use = (plan, index) => {
           <span class="ip-context-label">素材</span>
           <span v-for="(entry, index) in planImages.slice(0, 6)" :key="entry.id" class="ip-chip has-thumb"><img v-if="entry.url" :src="entry.url" alt="">图{{ index + 1 }}</span>
           <span v-if="planImages.length > 6" class="ip-chip">+{{ planImages.length - 6 }} 张</span>
-          <span v-if="video" class="ip-chip has-thumb"><span class="ip-chip-icon"><Film :size="15" :stroke-width="1.6" aria-hidden="true" /></span>参考视频 · 只参考运镜</span>
+          <span v-if="video" class="ip-chip has-thumb"><span class="ip-chip-icon"><Film :size="15" :stroke-width="1.6" aria-hidden="true" /></span>参考视频 · 生成时使用</span>
           <span v-if="!planImages.length && !video" class="ip-chip is-empty">还没有素材，在左侧添加商品图效果更好</span>
         </div>
         <p v-if="images.length > planImages.length" class="ip-muted">方案仅参考前 {{ planImages.length }} 张图片，生成视频时仍使用全部素材。</p>
@@ -227,9 +267,14 @@ const use = (plan, index) => {
         </div>
         <label for="vp-idea" class="sr-only">一句话说说想要什么</label>
         <textarea id="vp-idea" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.exact="onIdeaEnter" />
+        <section v-if="clarification" aria-label="补充剧本信息">
+          <p class="ip-status">为了把活动卖点写清楚，需要补充一项信息。本次尚未生成剧本，预占烟火已退回。</p>
+          <label for="vp-answer">{{ clarification.question }}</label>
+          <textarea id="vp-answer" v-model="answer" class="ip-idea" rows="3" maxlength="1000" :disabled="working" placeholder="填写实际活动信息；暂未确定的内容也可以说明" />
+        </section>
         <div class="ip-composer-foot">
           <small>每次出 3 个版本 · 换一批同价 · 失败不扣烟火</small>
-          <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成提示词' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
+          <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : clarification ? '补充并生成剧本' : '生成剧本' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
         </div>
       </div>
       <button v-if="result" type="button" class="ip-link" @click="showResults = true">回到上一批方案</button>
@@ -264,7 +309,7 @@ const use = (plan, index) => {
           <button type="button" class="ip-primary" :disabled="working" @click="run(result.id)"><RefreshCw :size="15" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在换一批…' : '换一批' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
         </div>
       </header>
-      <p v-if="missingRecordImages" class="ip-status">这批方案用过的 {{ missingRecordImages }} 张参考图已删除，提示词里的图号可能对不上，用之前请核对。</p>
+      <p v-if="missingRecordImages" class="ip-status">这批方案用过的 {{ missingRecordImages }} 张参考图已删除，请重新添加素材并生成方案。</p>
       <div class="ip-cards" :class="{ 'is-working': working }">
         <article v-for="(plan, index) in result.plans" :key="index" class="ip-card" :class="{ 'is-applied': appliedIndex === index }">
           <div class="ip-card-title"><span class="ip-letter">{{ videoPlanLetters[index] }}</span><h3>{{ plan.title }}</h3></div>
@@ -276,14 +321,14 @@ const use = (plan, index) => {
           <ol class="ip-shots">
             <li v-for="(shot, shotIndex) in plan.shots" :key="shotIndex"><time>{{ videoPlanSeconds(shot.start) }}–{{ videoPlanSeconds(shot.end) }}s</time><span>{{ shot.description }}</span></li>
           </ol>
-          <details class="ip-prompt"><summary>完整提示词</summary><p>{{ plan.prompt }}</p></details>
+          <details class="ip-prompt"><summary>视频生成指令</summary><p>{{ plan.prompt }}</p></details>
           <button type="button" class="ip-use" :class="{ active: appliedIndex === index }" :disabled="locked" @click="use(plan, index)"><template v-if="appliedIndex === index"><Check :size="15" :stroke-width="2" aria-hidden="true" />已填入描述框</template><template v-else>用这个</template></button>
         </article>
       </div>
       <p class="ip-foot-note">选中的提示词会填进左侧描述框，可以再改字；左侧素材和当初不一样时，会一起换回当初那几张。</p>
     </template>
 
-    <p v-if="working" class="ip-status" role="status">正在看图出方案，通常 1 分钟左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
+    <p v-if="working" class="ip-status" role="status">{{ phaseLabel }}。可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
     <p v-if="unavailable" class="ip-status" role="status">出方案暂未开放，可以直接在左侧写描述。</p>
     <p v-if="error" class="ip-status is-error" role="alert">{{ error }}</p>
   </section>

@@ -2,7 +2,7 @@
 import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, reactive, ref } from 'vue'
 import { Check, ChevronLeft, ChevronRight, Coins, Plus, RefreshCw, Search, X } from 'lucide-vue-next'
-import { partnerApi, tenantSources } from '../../src/services/partnerApi.js'
+import { partnerApi } from '../../src/services/partnerApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
 import { expiryFilters, membershipState, number } from '../../src/domain/partnerOps.js'
 import { bds, isOwner, loadPartner, loadTeam, partner } from '../partnerStore.js'
@@ -71,7 +71,6 @@ async function tenantUpdated(row) {
   if (owner.value) await loadTeam().catch(() => {})
 }
 
-const sourceText = item => tenantSources[item.source] || item.source
 if (owner.value) loadTeam().catch(() => {})
 load()
 </script>
@@ -79,7 +78,7 @@ load()
 <template>
   <div class="management-page">
     <header class="management-heading">
-      <div><h1>{{ owner ? '名下商户' : '我名下的商户' }}</h1><p>点一行查看商户详情，在里面续期{{ owner ? '、分配烟火、调整归属的 BD' : '' }}。<template v-if="owner">可分配烟火：{{ number(available) }}。</template><template v-else>烟火由负责人分配。</template></p></div>
+      <div><h1>名下商户</h1><p>点一行查看商户详情，在里面续期{{ owner ? '、分配烟火、调整归属的 BD' : '' }}。<template v-if="owner">可分配烟火：{{ number(available) }}。</template><template v-else>烟火由负责人分配。</template></p></div>
       <div class="management-heading-actions">
         <button class="mg-button" type="button" :disabled="loading" @click="load"><RefreshCw :size="15" :class="{ 'mg-spinning': loading }" />刷新</button>
         <button class="mg-button mg-primary" type="button" @click="adding = true"><Plus :size="15" />添加商户</button>
@@ -91,7 +90,7 @@ load()
       <form class="management-filters" @submit.prevent="search">
         <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索商户名、联系人或 UID" aria-label="搜索商户" maxlength="60" /></label>
         <label class="mg-select"><span class="sr-only">会员状态</span><AppSelect v-model="expiry" @change="search"><option value="">全部会员状态</option><option v-for="(label, value) in expiryFilters" :key="value" :value="value">{{ label }}</option></AppSelect></label>
-        <label v-if="owner" class="mg-select"><span class="sr-only">BD</span><AppSelect v-model="bdFilter" @change="search"><option value="">全部 BD</option><option value="0">我直接管的</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">{{ b.name || b.uid }}</option></AppSelect></label>
+        <label v-if="owner" class="mg-select"><span class="sr-only">BD</span><AppSelect v-model="bdFilter" @change="search"><option value="">全部 BD</option><option value="0">负责人直属</option><option v-for="b in bds()" :key="b.userId" :value="String(b.userId)">{{ b.name || b.uid }}</option></AppSelect></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
       </form>
       <div v-if="owner && picked.size" class="partner-toolbar">
@@ -100,13 +99,13 @@ load()
         <button class="mg-button mg-primary" type="button" @click="batch = [...picked.values()]"><Coins :size="15" />批量分配烟火</button>
       </div>
       <div v-if="error" class="mg-state mg-error" role="alert"><p>{{ error }}</p><button class="mg-button" type="button" @click="load">重新读取</button></div>
-      <div v-else-if="!records.length && !loading" class="mg-state"><h3>{{ keyword || expiry || bdFilter ? '没有匹配的商户' : '还没有名下商户' }}</h3><p>点右上角「添加商户」按 UID 添加；商户兑换了你生成的激活码也会自动归到你名下。</p></div>
+      <div v-else-if="!records.length && !loading" class="mg-state"><h3>{{ keyword || expiry || bdFilter ? '没有匹配的商户' : '还没有名下商户' }}</h3><p>可通过右上角「添加商户」建立归属；商户兑换本服务商生成的激活码后，符合归属条件时将自动加入。</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
           <thead>
             <tr>
               <th v-if="owner" class="partner-check"><input type="checkbox" :checked="allPicked" aria-label="选择本页全部商户" @change="togglePage" /></th>
-              <th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th v-if="owner">归属</th><th>加入</th>
+              <th>商户</th><th>联系人</th><th>会员</th><th class="code-number">烟火余额</th><th v-if="owner">归属</th><th>加入时间</th>
             </tr>
           </thead>
           <tbody>
@@ -116,8 +115,8 @@ load()
               <td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td>
               <td :class="['partner-member', membershipState(item).tone]"><span>{{ membershipState(item).short }}</span><small v-if="item.memberUntil">{{ item.planName || '会员' }} · {{ managementDate(item.memberUntil).slice(0, 10) }}</small></td>
               <td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td>
-              <td v-if="owner"><span class="partner-pill" :class="{ bd: item.bdUserId }">{{ item.bdUserId ? `BD · ${item.bdName || '—'}` : '我直接管' }}</span></td>
-              <td><span>{{ sourceText(item) }}</span><small>{{ managementDate(item.boundAt) }}</small></td>
+              <td v-if="owner"><span class="partner-pill" :class="{ bd: item.bdUserId }">{{ item.bdUserId ? `BD · ${item.bdName || '—'}` : '负责人直属' }}</span></td>
+              <td>{{ managementDate(item.boundAt) }}</td>
             </tr>
           </tbody>
         </table>

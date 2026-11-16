@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,14 +27,26 @@ public final class VideoPlanDtos {
             @Size(max = 500) String idea,
             @Positive Long previousPlanId,
             // 工作台选的创作场景；「换一批」时服务端改用上一批的场景。
-            @Pattern(regexp = "[a-z_]{1,40}") String sceneKey) {
+            @Pattern(regexp = "[a-z_]{1,40}") String sceneKey,
+            @Min(5) @Max(30) Integer durationSeconds,
+            @Min(5) @Max(30) Integer maxDurationSeconds,
+            @Pattern(regexp = "auto|16:9|4:3|1:1|3:4|9:16|21:9") String ratio,
+            @Size(max = 10000) String sourceBrief,
+            @Size(max = 1000) String clarificationAnswer) {
+        public Create(String requestKey, List<Long> imageAssetIds, boolean referenceVideo, String style, String idea, Long previousPlanId, String sceneKey,
+                      Integer durationSeconds, Integer maxDurationSeconds, String ratio, String sourceBrief) {
+            this(requestKey, imageAssetIds, referenceVideo, style, idea, previousPlanId, sceneKey, durationSeconds, maxDurationSeconds, ratio, sourceBrief, null);
+        }
+        public Create(String requestKey, List<Long> imageAssetIds, boolean referenceVideo, String style, String idea, Long previousPlanId, String sceneKey) {
+            this(requestKey, imageAssetIds, referenceVideo, style, idea, previousPlanId, sceneKey, null, null, null, null, null);
+        }
         public Create(String requestKey, List<Long> imageAssetIds, boolean referenceVideo, String style, String idea, Long previousPlanId) {
-            this(requestKey, imageAssetIds, referenceVideo, style, idea, previousPlanId, null);
+            this(requestKey, imageAssetIds, referenceVideo, style, idea, previousPlanId, null, null, null, null, null, null);
         }
     }
 
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
-                       Long previousPlanId, Instant createdAt, String sceneKey) {}
+                       Long previousPlanId, Instant createdAt, String sceneKey, String phase, Map<String, Object> clarification) {}
 
     /** 灵感记录里的一批方案，带上当初的素材和要求，方便再看或换回这些参考图复用。图片已删除时 url 为空。 */
     public record History(Long id, String style, String idea, boolean referenceVideo, List<Image> images,

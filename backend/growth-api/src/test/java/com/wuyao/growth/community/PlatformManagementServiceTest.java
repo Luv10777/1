@@ -27,8 +27,9 @@ class PlatformManagementServiceTest {
     private final InformationPublicationRepository publications = mock(InformationPublicationRepository.class);
     private final PlatformManagementAuditRepository audits = mock(PlatformManagementAuditRepository.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final com.wuyao.growth.backoffice.BackofficeAccess access = mock(com.wuyao.growth.backoffice.BackofficeAccess.class);
     private final PlatformProperties config = new PlatformProperties();
-    private final PlatformManagementService service = new PlatformManagementService(config,
+    private final PlatformManagementService service = new PlatformManagementService(access,
             mock(PlatformAccountDirectory.class), publications, mock(MerchantApplicationRepository.class),
             mock(RealNameApplicationRepository.class), audits, mock(RealNameCrypto.class), transactions,
             mock(org.springframework.context.ApplicationEventPublisher.class));
@@ -37,6 +38,7 @@ class PlatformManagementServiceTest {
     @BeforeEach
     void setup() {
         config.setOperatorUserIds(List.of(1L));
+        doAnswer(call -> { if (!config.getOperatorUserIds().contains(call.getArgument(0))) throw BizException.of(ErrorCode.FORBIDDEN,"未授权"); return null; }).when(access).require(any(), anyString());
         when(transactions.getTransaction(any())).thenAnswer(call -> new SimpleTransactionStatus());
         value = new InformationPublication();
         value.setId(7L);

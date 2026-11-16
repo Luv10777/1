@@ -1,3 +1,4 @@
+import { hasPlatformPermission } from '../src/stores/platform.js'
 import { computed, reactive } from 'vue'
 import { platformManagementApi } from '../src/services/platformManagement.js'
 import { allianceAdminApi } from '../src/services/allianceApi.js'
@@ -26,22 +27,25 @@ export const pendingTotal = computed(() => pendingItems.value.reduce((sum, item)
 export const pendingByRoute = computed(() => pendingItems.value.reduce((map, item) => ({ ...map, [item.route]: (map[item.route] || 0) + item.count }), {}))
 
 let running = null
+let generation = 0
 export async function refreshPending() {
   if (running) return running
+  const current = generation
   running = (async () => {
     const [summary, alliance, accounts, statements, withdrawals] = await Promise.allSettled([
-      platformManagementApi.summary(),
-      allianceAdminApi.summary(),
-      allianceAdminApi.accounts('PENDING_VERIFY'),
-      allianceAdminApi.statements({ status: 'OBJECTED' }),
-      referralApi.withdrawals({ status: 'PENDING', size: 1 }),
+      hasPlatformPermission('REVIEW') ? platformManagementApi.summary() : Promise.resolve(null),
+      hasPlatformPermission('REVIEW', 'ALLIANCE') ? allianceAdminApi.summary() : Promise.resolve(null),
+      hasPlatformPermission('REVIEW', 'ALLIANCE') ? allianceAdminApi.accounts('PENDING_VERIFY') : Promise.resolve(null),
+      hasPlatformPermission('ALLIANCE') ? allianceAdminApi.statements({ status: 'OBJECTED' }) : Promise.resolve(null),
+      hasPlatformPermission('REFERRAL') ? referralApi.withdrawals({ status: 'PENDING', size: 1 }) : Promise.resolve(null),
     ])
-    if (summary.status === 'fulfilled') Object.assign(pending, { information: summary.value.pendingInformation, merchants: summary.value.pendingMerchants })
-    if (alliance.status === 'fulfilled') Object.assign(pending, { offers: alliance.value.pendingOffers, disputes: alliance.value.openDisputes })
+    if (current !== generation) return
+    if (summary.status === 'fulfilled') Object.assign(pending, { information: summary.value?.pendingInformation ?? null, merchants: summary.value?.pendingMerchants ?? null })
+    if (alliance.status === 'fulfilled') Object.assign(pending, { offers: alliance.value?.pendingOffers ?? null, disputes: alliance.value?.openDisputes ?? null })
     if (accounts.status === 'fulfilled') pending.accounts = Array.isArray(accounts.value) ? accounts.value.length : null
     if (statements.status === 'fulfilled') pending.statements = Array.isArray(statements.value) ? statements.value.length : null
     if (withdrawals.status === 'fulfilled') pending.withdrawals = withdrawals.value?.pendingCount ?? null
-  })().finally(() => { running = null })
+  })().finally(() => { if (current === generation) running = null })
   return running
 }
 
@@ -54,6 +58,9 @@ export function startPendingPolling() {
   document.addEventListener('visibilitychange', onFocus)
 }
 export function stopPendingPolling() {
+  generation++
+  running = null
+  for (const key of Object.keys(pending)) pending[key] = null
   clearInterval(timer)
   timer = null
   document.removeEventListener('visibilitychange', onFocus)

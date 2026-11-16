@@ -44,9 +44,11 @@ public class VideoPlanHttpAdapter implements ProviderAdapter {
                 content.add(Map.of("type", "image_url", "image_url", Map.of("url", url)));
             }
             var body = new LinkedHashMap<String, Object>();
-            body.put("model", config.getModel());
+            String model = request.alias() == ModelAlias.VIDEO_PLANNER && !config.getScriptModel().isBlank() ? config.getScriptModel() : config.getModel();
+            body.put("model", model);
             body.put("stream", false);
-            body.put("max_tokens", config.getMaxTokens());
+            int tokens = request.options().get("maxTokens") instanceof Number n ? n.intValue() : config.getMaxTokens();
+            body.put("max_tokens", Math.max(500, Math.min(tokens, config.getMaxTokens())));
             body.put("response_format", Map.of("type", "json_object"));
             body.put("messages", List.of(Map.of("role", "system", "content", request.options().get("system")),
                     Map.of("role", "user", "content", content)));
@@ -76,7 +78,8 @@ public class VideoPlanHttpAdapter implements ProviderAdapter {
                     .replaceFirst("(?is)^<think>.*?</think>\\s*", "")
                     .replaceFirst("(?is)^```(?:json)?\\s*(.*?)\\s*```$", "$1");
             Map<String, Object> output = json.readValue(text, new TypeReference<>() {});
-            output.put("_model", config.getModel());
+            output.put("_model", model);
+            if (root.path("usage").isObject()) output.put("_usage", json.convertValue(root.get("usage"), Map.class));
             return new ProviderResult(true, code(), null, output, null, null);
         } catch (BizException e) {
             throw e;

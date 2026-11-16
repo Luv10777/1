@@ -19,13 +19,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PlatformManagementController {
     private final PlatformManagementService service;
+    private final com.wuyao.growth.backoffice.BackofficeAccess access;
 
     @ModelAttribute
     void preventCaching(HttpServletResponse response) { response.setHeader("Cache-Control", "no-store"); }
 
     @GetMapping("/access")
-    public ApiResponse<Map<String, Boolean>> access(@AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(Map.of("operator", service.isOperator(me)));
+    public ApiResponse<com.wuyao.growth.backoffice.BackofficeAccess.Access> access(@AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(access.access(me.userId()));
     }
 
     @GetMapping("/summary")
