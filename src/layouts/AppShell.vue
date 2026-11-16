@@ -17,6 +17,7 @@ import { billing, number, refreshBilling } from '../stores/billing'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { selectedStore, selectedStoreId, selectedStoreRecord, stores, storeLoading, storeError, loadStores } from '../stores/merchantContext'
 import { aiCreationHidden, allianceHidden, isHiddenRoute } from '../utils/site'
+import { memberGateState } from '../utils/memberGate'
 
 const route = useRoute()
 let billingTimer
@@ -58,7 +59,9 @@ const memberTier = computed(() => {
   return { label: '已激活', paid: true, until: summary.memberUntil ? new Date(summary.memberUntil).toLocaleDateString('zh-CN') : '' }
 })
 // AI 创作站上未激活的账号只能查看，页面顶部提示去激活；主域名不受影响，套餐页自己有说明。
-const showActivation = computed(() => auth.isAuthenticated && !aiCreationHidden && memberTier.value?.paid === false && route.name !== 'billing')
+// 未开通会员时，除「套餐与权益」「设置」外的模块都显示锁定页（见 utils/memberGate.js）；能进的这两页顶部再提示一次。
+const memberGate = computed(() => memberGateState({ authenticated: auth.isAuthenticated, aiCreationHidden, routeName: route.name, summary: billing.summary, error: billing.error }))
+const showActivation = computed(() => auth.isAuthenticated && !aiCreationHidden && memberTier.value?.paid === false && route.name !== 'billing' && !memberGate.value)
 // 去「套餐与权益」直接打开输入激活码（activate）或购买激活码（buy）弹窗，激活后可回到当前页。
 const billingLink = action => ({ name: 'billing', query: { membership: 'required', [action]: '1', redirect: route.fullPath, module: route.meta.title } })
 const needsStore = computed(() => auth.isAuthenticated && connectedRoute.value && (storeLoading.value || storeError.value || !selectedStoreId.value))
@@ -357,7 +360,26 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
             <RouterLink v-if="billing.summary?.canManage" class="secondary-button compact" :to="billingLink('buy')"><Ticket :size="15" aria-hidden="true" />购买激活码</RouterLink>
           </div>
         </section>
-        <section v-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
+        <section v-if="memberGate === 'loading'" class="member-gate" aria-busy="true"><p class="member-gate-loading" role="status">正在确认账号状态…</p></section>
+        <section v-else-if="memberGate === 'locked'" class="member-gate" aria-labelledby="member-gate-title">
+          <div class="member-gate-card">
+            <span class="member-gate-icon" aria-hidden="true"><LockKeyhole :size="26" :stroke-width="1.75" /></span>
+            <span class="member-gate-chip">未开通会员</span>
+            <h2 id="member-gate-title">{{ route.meta.title ? `开通会员后才能进入「${route.meta.title}」` : '开通会员后才能进入这个模块' }}</h2>
+            <p class="member-gate-lead">账号还没有用激活码开通会员。开通前只能进入<span>「套餐与权益」</span>和<span>「设置」</span>，开通后全部模块和 AI 功能立即可用。</p>
+            <ol class="member-gate-steps">
+              <li><b>1</b><span><strong>获取激活码</strong>{{ billing.summary?.canManage ? '在站内购买月卡或年卡激活码，也可以向服务商获取。' : '请店铺管理员在站内购买，或向服务商获取。' }}</span></li>
+              <li><b>2</b><span><strong>输入激活码</strong>在「套餐与权益」输入 16 位激活码，马上开通。</span></li>
+              <li><b>3</b><span><strong>回来继续</strong>开通后回到{{ route.meta.title ? `「${route.meta.title}」` : '这里' }}即可使用。</span></li>
+            </ol>
+            <div class="member-gate-actions">
+              <RouterLink class="primary-button" :to="billingLink('activate')"><KeyRound :size="16" aria-hidden="true" />输入激活码</RouterLink>
+              <RouterLink v-if="billing.summary?.canManage" class="secondary-button" :to="billingLink('buy')"><Ticket :size="16" aria-hidden="true" />购买激活码</RouterLink>
+            </div>
+            <p class="member-gate-note">激活码不含烟火，开通后使用功能按烟火扣费。</p>
+          </div>
+        </section>
+        <section v-else-if="needsStore" class="store-context-state" :aria-busy="storeLoading">
           <span class="material-symbols-outlined">storefront</span>
           <h2>{{ storeLoading ? '正在加载门店…' : storeError ? '门店暂时无法加载' : auth.isOwner ? '先创建你的第一家门店' : '还没有分配给你的门店' }}</h2>
           <p>{{ storeError || (storeLoading ? '正在获取你有权限访问的门店。' : auth.isOwner ? '创建门店后，即可管理商品、维护知识库并配置实景直播。' : '请联系管理员在“员工管理”里把门店分配给你，分配后刷新即可使用。') }}</p>
@@ -402,6 +424,30 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
   .activation-banner-copy { flex-basis: calc(100% - 50px); }
   .activation-banner-actions { flex-basis: 100%; }
   .activation-banner-actions a { flex: 1; }
+}
+/* 未开通会员的锁定页：占满页面区域，卡片居中；工作台页面也用同一版式。 */
+.page-scroll > .member-gate { display: flex; flex: 1 0 auto; align-items: center; justify-content: center; min-height: 100%; height: auto; padding: 32px 16px; }
+.member-gate-loading { margin: 0; color: var(--ink-muted); font-size: 14px; }
+.member-gate-card { width: min(100%, 560px); padding: 36px 40px 28px; border: 1px solid var(--line); border-radius: 8px; background: var(--night-panel); box-shadow: var(--shadow-paper); text-align: center; }
+.member-gate-icon { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 12px; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); }
+.member-gate-chip { display: inline-block; padding: 2px 8px; border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent); border-radius: 2px; color: var(--color-warning); font-size: 12px; }
+.member-gate-card h2 { margin: 14px 0 8px; font-family: var(--font-serif); font-size: 22px; font-weight: 600; line-height: 1.4; }
+.member-gate-lead { margin: 0 auto; max-width: 440px; color: var(--ink-muted); font-size: 14px; line-height: 1.8; text-wrap: balance; }
+.member-gate-lead span { white-space: nowrap; }
+.member-gate-steps { display: grid; gap: 10px; margin: 24px 0 0; padding: 0; list-style: none; text-align: left; }
+.member-gate-steps li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--color-bg-subtle); }
+.member-gate-steps b { display: grid; flex: 0 0 24px; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); font: 600 12px var(--font-mono); }
+.member-gate-steps span { display: flex; flex-direction: column; gap: 2px; color: var(--ink-muted); font-size: 13px; line-height: 1.7; }
+.member-gate-steps strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+.member-gate-actions { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
+.member-gate-actions a { gap: 8px; min-width: 150px; }
+.member-gate-note { margin: 16px 0 0; color: var(--ink-muted); font-size: 12px; }
+@media (max-width: 640px) {
+  .page-scroll > .member-gate { align-items: flex-start; padding: 8px 0 24px; }
+  .member-gate-card { padding: 28px 18px 22px; }
+  .member-gate-card h2 { font-size: 19px; }
+  .member-gate-actions { flex-direction: column; }
+  .member-gate-actions a { width: 100%; }
 }
 .store-context-state { min-height: 55vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px; text-align: center; }
 .store-context-state > span { font-size: 36px; color: var(--muted, #8d8478); }
