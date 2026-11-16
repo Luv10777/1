@@ -123,7 +123,8 @@ class PartnerIntegrationTest {
                 .andExpect(status().isBadRequest());
         call(agentA, agency, get("/api/partner/codes"), null).andExpect(jsonPath("$.data.total").value(202));
         call(agentA, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.monthCodes").value(202))
-                .andExpect(jsonPath("$.data.plans[0].planCode").value(planCode)).andExpect(jsonPath("$.data.account.available").value(700));
+                // 套餐按价格和 id 排，前面的测试方法也建过同价的月卡，所以只核对本次的套餐在列表里。
+                .andExpect(jsonPath("$.data.plans[?(@.planCode=='" + planCode + "')]").exists()).andExpect(jsonPath("$.data.account.available").value(700));
         String codeA = owner.queryForObject("SELECT code FROM billing_redeem_codes WHERE partner_id=? ORDER BY id LIMIT 1", String.class, a);
 
         // 一方小馆兑换甲的码，归到甲名下；之后再兑换乙的码，会员顺延但归属不变。
