@@ -1,7 +1,7 @@
 <script setup>
 import AppSelect from '../../src/components/AppSelect.vue'
 import { computed, ref } from 'vue'
-import { Check, ChevronLeft, ChevronRight, Download, Plus, RefreshCw, Search, X } from 'lucide-vue-next'
+import { Check, ChevronLeft, ChevronRight, Copy, Download, Plus, RefreshCw, Search, X } from 'lucide-vue-next'
 import { partnerApi } from '../../src/services/partnerApi.js'
 import { formatRedeemCode, redeemCodeStatuses } from '../../src/services/redeemCodeAdminApi.js'
 import { managementDate } from '../../src/domain/platformManagement.js'
@@ -43,6 +43,20 @@ async function load() {
   } finally { loading.value = false }
 }
 function search() { page.value = 0; load() }
+
+// 列表里直接复制没用过的码：按钮上显示「已复制」两秒。
+const copiedId = ref(null)
+let copiedTimer = null
+async function copyCode(item) {
+  try {
+    await navigator.clipboard.writeText(formatRedeemCode(item.code))
+    copiedId.value = item.id
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => { copiedId.value = null }, 2000)
+  } catch {
+    error.value = '浏览器不允许自动复制，请点开这一行手动复制。'
+  }
+}
 function movePage(next) { page.value = next; load() }
 
 function created(codes) {
@@ -104,7 +118,7 @@ load()
           <thead><tr><th>激活码</th><th>套餐</th><th>状态</th><th>兑换商户</th><th>备注</th><th>生成人</th><th>生成时间</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.id" class="partner-row" tabindex="0" @click="openCode = item" @keydown.enter="openCode = item">
-              <td class="mg-mono">{{ formatRedeemCode(item.code) }}</td>
+              <td class="mg-mono"><span class="partner-code-cell">{{ formatRedeemCode(item.code) }}<button v-if="item.status === 'UNUSED'" class="partner-copy" :class="{ done: copiedId === item.id }" type="button" :title="copiedId === item.id ? '已复制' : '复制激活码'" :aria-label="`复制激活码 ${formatRedeemCode(item.code)}`" @click.stop="copyCode(item)" @keydown.enter.stop><component :is="copiedId === item.id ? Check : Copy" :size="14" />{{ copiedId === item.id ? '已复制' : '复制' }}</button></span></td>
               <td>{{ item.planName || '—' }} · {{ item.durationDays ?? '—' }} 天</td>
               <td><span class="partner-pill" :class="{ bd: item.status === 'UNUSED' }">{{ redeemCodeStatuses[item.status] || item.status }}</span></td>
               <td><template v-if="item.redeemedTenantId"><span>{{ item.redeemedTenantName || '—' }}</span><small>{{ managementDate(item.redeemedAt) }}</small></template><template v-else>—</template></td>
