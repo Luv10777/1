@@ -235,6 +235,74 @@ class PartnerIntegrationTest {
         call(staff, agency, get("/api/partner/membership"), null).andExpect(jsonPath("$.data.member").value(true)).andExpect(jsonPath("$.data.role").value("MEMBER"));
     }
 
+    @Test void platformAddsAndRemovesTeamMembersAndSoftDeletesPartners() throws Exception {
+        long a = partner("甲服务商", agentA);
+        String team = "/api/platform/partners/" + a + "/team";
+
+        // 按手机号加：在团队账户里新建员工账号；平台能直接给分配烟火、财务查看和每月上限。
+        String full = "{\"tenants\":true,\"codes\":true,\"distribute\":true,\"finance\":true,\"team\":false}";
+        platform(post(team), "{\"phone\":\"13800005555\",\"name\":\"郑然\",\"permissions\":" + full + ",\"monthlyCap\":800}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.members[1].role").value("MEMBER")).andExpect(jsonPath("$.data.members[1].permissions.finance").value(true))
+                .andExpect(jsonPath("$.data.members[1].monthlyCap").value(800));
+        long byPhone = owner.queryForObject("SELECT id FROM users WHERE phone='13800005555'", Long.class);
+        assertThat(owner.queryForMap("SELECT tenant_id, role FROM users WHERE id=?", byPhone)).containsEntry("tenant_id", agency).containsEntry("role", "STAFF");
+
+        // 按 UID 加：只能加团队账户的员工；别的商户的账号、重复添加、UID 和手机号同时填都不行；只有平台运营能调。
+        long clerk = user(agency, "clerk-a", "店员小林");
+        owner.update("UPDATE users SET role='STAFF' WHERE id=?", clerk);
+        platform(post(team), "{\"uid\":" + uid(shopOwner) + ",\"permissions\":" + MEMBER_PERMS + "}").andExpect(status().isConflict());
+        platform(post(team), "{\"uid\":" + uid(clerk) + ",\"phone\":\"13800006666\",\"name\":\"林\",\"permissions\":" + MEMBER_PERMS + "}")
+                .andExpect(status().isBadRequest());
+        platform(post(team), "{\"phone\":\"13800006666\",\"permissions\":" + MEMBER_PERMS + "}").andExpect(status().isBadRequest());
+        call(agentA, agency, post(team), "{\"uid\":" + uid(clerk) + ",\"permissions\":" + MEMBER_PERMS + "}").andExpect(status().isForbidden());
+        platform(post(team), "{\"uid\":" + uid(clerk) + ",\"permissions\":" + MEMBER_PERMS + "}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.members.length()").value(3));
+        platform(post(team), "{\"uid\":" + uid(clerk) + ",\"permissions\":" + MEMBER_PERMS + "}").andExpect(status().isConflict());
+        call(clerk, agency, get("/api/partner/me"), null).andExpect(jsonPath("$.data.role").value("MEMBER"))
+                .andExpect(jsonPath("$.data.permissions.distribute").value(false));
+
+        // 平台移除成员：和服务商自己移除一样，员工账号一并停用。
+        platform(delete("/api/platform/partners/" + a + "/members/" + byPhone), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.members.length()").value(2));
+        assertThat(owner.queryForObject("SELECT status FROM users WHERE id=?", String.class, byPhone)).isEqualTo("REMOVED");
+
+        // 准备删除：一个按 UID 加的商户、一个兑换激活码归属的商户、一个没兑换的码。
+        call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/codes"), "{\"requestKey\":\"codes-del-0001\",\"planCode\":\"" + planCode + "\",\"quantity\":2}")
+                .andExpect(status().isOk());
+        List<String> codes = owner.queryForList("SELECT code FROM billing_redeem_codes WHERE partner_id=? ORDER BY id", String.class, a);
+        redeem(cafeOwner, cafe, codes.get(0)).andExpect(status().isOk());
+
+        // 还有没到账的分配时不能删；只有平台运营能删。
+        owner.update("""
+                INSERT INTO partner_distributions(partner_id, request_key, source, recipient_type, recipient_tenant_id, credits, gift_credits,
+                    purchased_credits, actor_user_id) VALUES (?, 'pending-del-0001', 'ACCOUNT', 'TENANT', ?, 10, 0, 10, ?)""", a, shop, agentA);
+        platform(delete("/api/platform/partners/" + a), null).andExpect(status().isConflict());
+        owner.update("UPDATE partner_distributions SET status='DONE' WHERE request_key='pending-del-0001'");
+        call(agentA, agency, delete("/api/platform/partners/" + a), null).andExpect(status().isForbidden());
+        platform(delete("/api/platform/partners/" + a), null).andExpect(status().isOk());
+
+        // 删除后：账号移出、商户解除归属、没兑换的码作废（兑换过的不动），记录保留；管理后台和服务商后台都找不到它。
+        assertThat(owner.queryForObject("SELECT status FROM partners WHERE id=?", String.class, a)).isEqualTo("DELETED");
+        assertThat(owner.queryForObject("SELECT count(*) FROM partner_members WHERE partner_id=?", Long.class, a)).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM partner_tenants WHERE partner_id=?", Long.class, a)).isZero();
+        assertThat(owner.queryForObject("SELECT count(*) FROM partner_distributions WHERE partner_id=?", Long.class, a)).isEqualTo(1);
+        assertThat(owner.queryForObject("SELECT redeemed_at IS NOT NULL AND voided_at IS NULL FROM billing_redeem_codes WHERE code=?", Boolean.class, codes.get(0))).isTrue();
+        assertThat(owner.queryForObject("SELECT voided_at IS NOT NULL FROM billing_redeem_codes WHERE code=?", Boolean.class, codes.get(1))).isTrue();
+        redeem(bakeryOwner, bakery, codes.get(1)).andExpect(status().isBadRequest());
+        assertThat(owner.queryForObject("SELECT status FROM users WHERE id=?", String.class, clerk)).isNotEqualTo("REMOVED");
+        platform(get("/api/platform/partners"), null).andExpect(jsonPath("$.data[?(@.partner.id==" + a + ")]").doesNotExist());
+        platform(get("/api/platform/partners/" + a + "/tenants"), null).andExpect(status().isNotFound());
+        platform(delete("/api/platform/partners/" + a), null).andExpect(status().isNotFound());
+        call(agentA, agency, get("/api/partner/membership"), null).andExpect(jsonPath("$.data.member").value(false));
+        call(clerk, agency, get("/api/partner/me"), null).andExpect(status().isForbidden());
+
+        // 释放出来的商户和负责人账号都能进别家。
+        long b = partner("乙服务商", agentB);
+        call(agentB, agencyB, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
+        platform(post("/api/platform/partners/" + b + "/members"), "{\"uid\":" + uid(agentA) + "}").andExpect(status().isOk());
+    }
+
     @Test void workbenchAndDashboardShowUsageWithoutWorksAndFlagLowBalance() throws Exception {
         long a = partner("甲服务商", agentA);
         platform(post("/api/platform/partners/" + a + "/credits"), "{\"requestKey\":\"grant-wb-0001\",\"credits\":5000,\"note\":\"线下打款\"}").andExpect(status().isOk());

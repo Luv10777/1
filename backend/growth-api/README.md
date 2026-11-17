@@ -498,6 +498,8 @@ Service、Repository、迁移及测试；公共层指定主要维护人，接口
 
 | V76 | 灵感绘图「灵感方案」：`image_inspirations`（参考图、绘图风格、一句话、3 个画面描述、预占烟火） | `claude/image-inspiration` |
 
+| V85 | 平台删除服务商（软删除）：`partners.status` 允许 `DELETED` | `feat/platform-partner-delete-and-members` |
+
 下一个可用编号：V77（V68–V76 已在主干或已登记）。
 
 后端检查：

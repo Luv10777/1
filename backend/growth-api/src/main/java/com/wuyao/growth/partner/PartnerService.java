@@ -202,31 +202,36 @@ public class PartnerService {
     public List<PartnerDtos.Member> addMember(Long userId, PartnerDtos.NewMember input) {
         var access = require(userId, PartnerStore.Perms::team, "团队管理");
         var partner = access.partner();
-        Long team = partner.teamTenantId();
-        if (team == null) throw bad("服务商还没有团队账户，请联系平台");
         var perms = input.permissions().perms();
         Long cap = perms.distribute() ? input.monthlyCap() : null;
         checkGrant(access, null, perms, null, cap);
-        String phone = input.phone().trim();
+        joinTeam(partner, staffByPhone(partner, input.phone(), input.name()), perms, cap, userId);
+        return members(partner.id(), true);
+    }
+
+    /** 按手机号找团队账户的员工：没注册过的新建员工账号；已是团队账户员工的直接用；注册了别的商户的不行。 */
+    Long staffByPhone(PartnerStore.Row partner, String rawPhone, String name) {
+        Long team = partner.teamTenantId();
+        if (team == null) throw bad("服务商还没有团队账户，请联系平台");
+        String phone = rawPhone.trim();
         var existing = directory.users().stream().filter(u -> phone.equals(u.phone()) && !"REMOVED".equals(u.status())).findFirst();
-        Long memberId;
-        if (existing.isPresent()) {
-            if (!team.equals(existing.get().tenantId())) throw BizException.of(ErrorCode.CONFLICT, "这个手机号已经注册了其他商户，请换一个手机号");
-            memberId = existing.get().id();
-            if (store.member(partner.id(), memberId).isPresent()) throw BizException.of(ErrorCode.CONFLICT, "他已经是团队成员了");
-        } else {
-            memberId = inScope(team, false, () -> accounts.createStaff(phone, input.name()).id());
-        }
+        if (existing.isEmpty()) return inScope(team, false, () -> accounts.createStaff(phone, name).id());
+        if (!team.equals(existing.get().tenantId())) throw BizException.of(ErrorCode.CONFLICT, "这个手机号已经注册了其他商户，请换一个手机号");
+        if (store.member(partner.id(), existing.get().id()).isPresent()) throw BizException.of(ErrorCode.CONFLICT, "他已经是团队成员了");
+        return existing.get().id();
+    }
+
+    /** 把团队账户的员工加成成员并设好权限。 */
+    void joinTeam(PartnerStore.Row partner, Long memberId, PartnerStore.Perms perms, Long cap, Long actor) {
         tx(false, () -> {
             store.lockPartner(partner.id());
-            store.addMember(partner.id(), memberId, "MEMBER", userId).ifPresent(other -> {
+            store.addMember(partner.id(), memberId, "MEMBER", actor).ifPresent(other -> {
                 throw BizException.of(ErrorCode.CONFLICT, "该账号已是另一家服务商的成员");
             });
             if (store.member(partner.id(), memberId).orElseThrow().owner()) throw BizException.of(ErrorCode.CONFLICT, "该账号已是本服务商的负责人");
             store.setPermissions(partner.id(), memberId, perms, cap);
             return null;
         });
-        return members(partner.id(), true);
     }
 
     /** 改成员的权限、每月分配上限和团队称呼。负责人的权限不能改；不能改自己的权限。 */
@@ -256,13 +261,19 @@ public class PartnerService {
         if (memberId.equals(userId)) throw BizException.of(ErrorCode.FORBIDDEN, "不能移除自己");
         var target = store.member(partner.id(), memberId).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "该账号不是本服务商的成员"));
         if (target.owner()) throw BizException.of(ErrorCode.FORBIDDEN, "负责人只能由平台移除");
+        leaveTeam(partner, target);
+        return members(partner.id(), true);
+    }
+
+    /** 移出服务商。成员是团队账户的员工时一并移除；负责人只移出服务商，他自己的一方志账号不动。 */
+    void leaveTeam(PartnerStore.Row partner, PartnerStore.MemberRow target) {
+        Long memberId = target.userId();
         var user = directory.user(memberId);
-        if (partner.teamTenantId() != null && partner.teamTenantId().equals(user.tenantId()) && AccountService.STAFF.equals(user.role())
+        if (!target.owner() && partner.teamTenantId() != null && partner.teamTenantId().equals(user.tenantId()) && AccountService.STAFF.equals(user.role())
                 && !"REMOVED".equals(user.status())) {
             inScope(partner.teamTenantId(), false, () -> { accounts.removeStaff(memberId); memberships.removeAll(memberId); return null; });
         }
         tx(false, () -> { store.lockPartner(partner.id()); store.removeMember(partner.id(), memberId); return null; });
-        return members(partner.id(), true);
     }
 
     /** 自己在团队里的称呼，第一次进服务商后台时填，之后可以改。 */

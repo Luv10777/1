@@ -147,6 +147,16 @@ public class BillingRedeemCodeService {
         return voidCode(id, operator, partnerId, creator);
     }
 
+    /** 平台删除服务商时，作废它生成、还没兑换也没过期的全部激活码。@return 作废的个数 */
+    @Transactional
+    public int voidUnusedOfPartner(Long partnerId, Long operator) {
+        Instant now = Instant.now();
+        return em.createQuery("""
+                update BillingRedeemCode c set c.voidedAt = :now, c.voidedBy = :operator
+                where c.partnerId = :partner and c.voidedAt is null and c.redeemedAt is null and (c.expiresAt is null or c.expiresAt > :now)""")
+                .setParameter("now", now).setParameter("operator", operator).setParameter("partner", partnerId).executeUpdate();
+    }
+
     private BillingDtos.RedeemCodeView voidCode(Long id, Long operator, Long partnerId, Long creator) {
         var c = em.find(BillingRedeemCode.class, id, LockModeType.PESSIMISTIC_WRITE);
         if (c == null || partnerId != null && !partnerId.equals(c.getPartnerId())

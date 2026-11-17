@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { Check, ChevronLeft, ChevronRight, Plus, RefreshCw, Store, X } from 'lucide-vue-next'
 import { partnerAdminApi as api, ledgerTypes, tenantSources, validUid } from '../services/partnerApi'
 import { managementDate } from '../domain/platformManagement'
+import { defaultPermissions, permissionItems, permissionText } from '../domain/partnerOps'
 import '../platform-management.css'
 
 const number = value => Number(value || 0).toLocaleString('zh-CN')
@@ -25,6 +26,7 @@ const pageCount = paging => Math.ceil(paging.total / 20)
 const createForm = reactive({ open: false, name: '', contact: '', adminUid: '', error: '' })
 const grantForm = reactive({ credits: '', note: '', requestKey: '', error: '' })
 const memberForm = reactive({ uid: '', error: '' })
+const teamForm = reactive({ by: 'phone', phone: '', name: '', uid: '', permissions: defaultPermissions(), monthlyCap: '', error: '' })
 const assignForm = reactive({ uid: '', found: null, partnerId: '', error: '' })
 const renameForm = reactive({ open: false, name: '', contact: '', error: '' })
 
@@ -50,6 +52,7 @@ async function select(id) {
   selectedId.value = id
   Object.assign(grantForm, { credits: '', note: '', requestKey: 'grant-' + crypto.randomUUID(), error: '' })
   Object.assign(memberForm, { uid: '', error: '' })
+  resetTeamForm()
   tenantPaging.page = 0
   ledgerPaging.page = 0
   await loadDetail()
@@ -117,9 +120,49 @@ async function addMember() {
 }
 
 async function removeMember(member) {
-  if (!window.confirm(`移除「${member.name || member.uid}」后，这个账号不能再登录服务商后台。确定移除吗？`)) return
-  try { await run(async () => replace(await api.removeMember(selectedId.value, member.userId)), '登录账号已移除') }
+  const who = member.displayName || member.name || member.uid
+  const effect = member.role === 'OWNER' ? '这个账号不能再登录服务商后台，他自己的一方志账号不受影响' : '他会移出团队，团队账户里的员工账号一并停用（不能再登录一方志、手机号释放）'
+  if (!window.confirm(`移除「${who}」后，${effect}。确定移除吗？`)) return
+  try { await run(async () => replace(await api.removeMember(selectedId.value, member.userId)), '已移除') }
   catch (failure) { memberForm.error = failure.message || '移除失败，请稍后再试。' }
+}
+
+function resetTeamForm() {
+  Object.assign(teamForm, { by: 'phone', phone: '', name: '', uid: '', permissions: defaultPermissions(), monthlyCap: '', error: '' })
+}
+
+async function addTeamMember() {
+  const cap = teamForm.permissions.distribute && String(teamForm.monthlyCap).trim() ? Number(teamForm.monthlyCap) : null
+  teamForm.error = teamForm.by === 'uid'
+    ? (validUid(teamForm.uid) ? '' : 'UID 是 8 位数字。')
+    : !/^1\d{10}$/.test(teamForm.phone.trim()) ? '请填写 11 位手机号。' : !teamForm.name.trim() ? '请填写姓名。' : ''
+  if (!teamForm.error && cap !== null && (!Number.isInteger(cap) || cap < 1 || cap > 100000000)) teamForm.error = '每月上限须为 1 至 100,000,000 的整数，不限就留空。'
+  if (teamForm.error) return
+  const who = teamForm.by === 'uid' ? { uid: Number(teamForm.uid) } : { phone: teamForm.phone.trim(), name: teamForm.name.trim() }
+  try {
+    await run(async () => {
+      replace(await api.addTeamMember(selectedId.value, { ...who, permissions: { ...teamForm.permissions }, monthlyCap: cap }))
+      resetTeamForm()
+    }, '成员已添加')
+  } catch (failure) { teamForm.error = failure.message || '添加失败，请稍后再试。' }
+}
+
+async function removePartner() {
+  const item = selected.value
+  const effects = [
+    `全部 ${item.members.length} 个登录账号移出，不能再进服务商后台`,
+    `${item.tenantCount} 个名下商户解除归属，别家可以再加`,
+    '没兑换的激活码全部作废（已兑换的不受影响）',
+    `团队账户「${item.teamTenantName || '—'}」的烟火不动，发放和分配记录保留`,
+  ]
+  if (!window.confirm(`删除「${item.partner.name}」？\n\n${effects.map(line => '· ' + line).join('\n')}\n\n删除后这里看不到这家服务商，也不能恢复。`)) return
+  try {
+    await run(async () => {
+      await api.remove(item.partner.id)
+      partners.value = partners.value.filter(row => row.partner.id !== item.partner.id)
+      selectedId.value = null
+    }, `「${item.partner.name}」已删除`)
+  } catch (failure) { error.value = failure.message || '删除失败，请稍后再试。' }
 }
 
 function startRename() {
@@ -214,7 +257,7 @@ load()
 
     <template v-if="selected">
       <section class="management-list" aria-labelledby="partner-detail-title">
-        <div class="mg-list-caption"><h2 id="partner-detail-title">{{ selected.partner.name }}</h2><span><button class="mg-text-button" type="button" :disabled="busy" @click="startRename">改名称</button> · <button class="mg-text-button" type="button" :disabled="busy" @click="toggleStatus">{{ selected.partner.status === 'ACTIVE' ? '停用' : '启用' }}</button> · <button class="mg-text-button" type="button" @click="selectedId = null">收起</button></span></div>
+        <div class="mg-list-caption"><h2 id="partner-detail-title">{{ selected.partner.name }}</h2><span><button class="mg-text-button" type="button" :disabled="busy" @click="startRename">改名称</button> · <button class="mg-text-button" type="button" :disabled="busy" @click="toggleStatus">{{ selected.partner.status === 'ACTIVE' ? '停用' : '启用' }}</button> · <button class="mg-text-button partner-danger" type="button" :disabled="busy" @click="removePartner">删除</button> · <button class="mg-text-button" type="button" @click="selectedId = null">收起</button></span></div>
         <form v-if="renameForm.open" class="partner-admin-form partner-admin-inline" @submit.prevent="rename">
           <label>服务商名称<input v-model="renameForm.name" maxlength="80" required /><small>就是服务商后台（wy.yifangzhi.com/partner/）里显示的公司名。</small></label>
           <label>联系方式（可选）<input v-model="renameForm.contact" maxlength="120" /></label>
@@ -232,10 +275,24 @@ load()
           </form>
           <form class="partner-admin-form" @submit.prevent="addMember">
             <h3>登录账号</h3>
-            <ul class="partner-members"><li v-for="member in selected.members" :key="member.userId"><span>{{ partnerRoleNames[member.role] || member.role }} · {{ member.displayName || member.name || '未命名' }} · UID {{ member.uid }}</span><button v-if="member.role === 'OWNER'" class="mg-text-button" type="button" :disabled="busy" @click="removeMember(member)">移除</button></li></ul>
-            <label>添加负责人账号的 UID<input v-model="memberForm.uid" inputmode="numeric" maxlength="8" /><small>成员由服务商在自己的后台按手机号添加，进团队账户当员工。</small></label>
+            <ul class="partner-members"><li v-for="member in selected.members" :key="member.userId"><span>{{ partnerRoleNames[member.role] || member.role }} · {{ member.displayName || member.name || '未命名' }} · UID {{ member.uid }}<small>权限：{{ permissionText(member) }}</small></span><button class="mg-text-button" type="button" :disabled="busy" @click="removeMember(member)">移除</button></li></ul>
+            <label>添加负责人账号的 UID<input v-model="memberForm.uid" inputmode="numeric" maxlength="8" /><small>负责人有全部权限；他的一方志商户就是团队账户。</small></label>
             <p v-if="memberForm.error" class="mg-error" role="alert">{{ memberForm.error }}</p>
             <div><button class="mg-button" type="submit" :disabled="busy">添加</button></div>
+          </form>
+          <form class="partner-admin-form" @submit.prevent="addTeamMember">
+            <h3>添加成员</h3>
+            <p class="mg-muted">成员是团队账户「{{ selected.teamTenantName || '—' }}」的员工，在一方志创作扣团队烟火。</p>
+            <label>添加方式<select v-model="teamForm.by"><option value="phone">按手机号</option><option value="uid">按 UID</option></select></label>
+            <template v-if="teamForm.by === 'phone'">
+              <label>手机号<input v-model="teamForm.phone" inputmode="tel" maxlength="11" /><small>没注册过的在团队账户里新建员工账号；注册了别的商户的号加不进来。</small></label>
+              <label>姓名<input v-model="teamForm.name" maxlength="20" /></label>
+            </template>
+            <label v-else>UID<input v-model="teamForm.uid" inputmode="numeric" maxlength="8" /><small>只能加已经是团队账户员工的账号（例如在一方志员工管理里加过的店员）。</small></label>
+            <fieldset class="partner-perms"><legend>权限</legend><label v-for="item in permissionItems" :key="item.key" :title="item.hint"><input v-model="teamForm.permissions[item.key]" type="checkbox" />{{ item.label }}</label></fieldset>
+            <label v-if="teamForm.permissions.distribute">每月分配上限（可选）<input v-model="teamForm.monthlyCap" type="number" min="1" max="100000000" step="1" placeholder="不填表示不限" /></label>
+            <p v-if="teamForm.error" class="mg-error" role="alert">{{ teamForm.error }}</p>
+            <div><button class="mg-button" type="submit" :disabled="busy">添加成员</button></div>
           </form>
         </div>
       </section>
@@ -294,6 +351,12 @@ load()
 .partner-admin-inline { grid-template-columns: minmax(0, 320px) auto; align-items: end; }
 .partner-members { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
 .partner-members li { display: flex; justify-content: space-between; gap: 12px; }
+.partner-members li small { display: block; margin-top: 2px; }
+.partner-perms { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; border: 0; }
+.partner-perms legend { margin-bottom: 6px; padding: 0; color: var(--mg-muted); font-size: 12px; }
+.partner-perms label { display: inline-flex; align-items: center; gap: 4px; color: var(--mg-ink); font-size: 13px; }
+.partner-perms input { min-height: 0; }
+.partner-danger { color: #c0392b; }
 .code-number { text-align: right; }
 .management-table td > small { display: block; margin-top: 2px; color: var(--mg-muted); font-size: 11px; }
 tr.is-selected td { background: var(--mg-soft); }

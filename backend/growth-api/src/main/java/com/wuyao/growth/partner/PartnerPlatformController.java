@@ -33,6 +33,20 @@ public class PartnerPlatformController {
         return ApiResponse.ok(service.addMember(id, input.uid(), me.userId()));
     }
 
+    /** 加成员：body 填 uid（团队账户的员工）或 phone + name，外加权限。 */
+    @PostMapping("/{id}/team")
+    public ApiResponse<PartnerDtos.PlatformPartner> addTeamMember(@PathVariable Long id, @Valid @RequestBody PartnerDtos.PlatformMember input,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.addTeamMember(id, input, me.userId()));
+    }
+
+    /** 删除服务商（软删除，见 V85）。 */
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
+        service.delete(id, me.userId());
+        return ApiResponse.ok(null);
+    }
+
     @DeleteMapping("/{id}/members/{userId}")
     public ApiResponse<PartnerDtos.PlatformPartner> removeMember(@PathVariable Long id, @PathVariable Long userId, @AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(service.removeMember(id, userId, me.userId()));
