@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { Download } from 'lucide-vue-next'
 import { downloadMedia } from '../services/mediaDownload'
+import { stableUrl } from '../utils/stableUrl'
 
 const props = defineProps({
   isGenerating: Boolean,
@@ -68,7 +69,7 @@ defineEmits(['switch-workspace'])
       <p class="video-render-continue">{{ continueText }}</p>
     </div>
     <div v-else-if="outputUrl && !error" class="video-result-stage">
-      <video class="video-result-player" :src="outputUrl" :style="{ '--video-aspect-ratio': previewAspectRatio }" controls playsinline preload="metadata" aria-label="生成的视频" @loadedmetadata="readVideoDimensions" />
+      <video class="video-result-player" :src="stableUrl(outputUrl)" :style="{ '--video-aspect-ratio': previewAspectRatio }" controls playsinline preload="metadata" aria-label="生成的视频" @loadedmetadata="readVideoDimensions" />
       <div class="video-result-actions">
         <p v-if="downloadError" class="video-download-error" role="alert">{{ downloadError }}</p>
         <button class="video-download-button" type="button" :disabled="downloading" :aria-busy="downloading" @click="downloadVideo">

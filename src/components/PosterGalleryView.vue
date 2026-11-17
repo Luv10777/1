@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
+import { stableUrl } from "../utils/stableUrl";
 import {
   IMAGE_STATUS,
   imageDimensions,
@@ -253,7 +254,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
         <ul v-else class="poster-history-grid">
           <li v-for="entry in studio.history" :key="entry.id" class="poster-history-card">
             <button type="button" class="poster-history-open" :disabled="studio.busy || !!studio.pending" :aria-label="`打开${entry.title || '灵感绘图'}`" @click="studio.openCreation(entry.id)">
-              <img v-if="entry.previewUrl" :src="entry.previewUrl" :alt="`${entry.title || '灵感绘图'}缩略图`" loading="lazy" />
+              <img v-if="entry.previewUrl" :src="stableUrl(entry.previewThumbUrl || entry.previewUrl)" :alt="`${entry.title || '灵感绘图'}缩略图`" loading="lazy" decoding="async" @error="event => { if (entry.previewThumbUrl) { entry.previewThumbUrl = null; event.target.src = stableUrl(entry.previewUrl) } }" />
               <span v-else class="poster-history-placeholder"><img src="/images/brand/yifangzhi-mark.png" alt="" /><span>待成图</span></span>
               <span v-if="entry.status !== 'SUCCEEDED'" class="poster-history-status">{{ IMAGE_STATUS[entry.status] }}</span>
             </button>
@@ -345,7 +346,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
               <figure v-for="item in turn.items" :key="item.id" class="poster-result-item">
                 <div class="poster-result-media" :style="{ aspectRatio: item.width + '/' + item.height }">
                   <button v-if="item.url" type="button" class="poster-image-button" aria-label="放大查看图片" @click="showPreview(item)">
-                    <img :src="item.url" alt="生成的图片" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
+                    <img :src="stableUrl(item.url)" alt="生成的图片" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
                   </button>
                   <div v-else class="poster-result-placeholder"><small>{{ IMAGE_STATUS[item.status] }}</small></div>
                   <div v-if="item.url" class="poster-image-actions">
@@ -399,7 +400,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           <button type="submit" class="poster-conversation-submit" :disabled="studio.busy || !!studio.pending || !studio.configured || !studio.revision.trim()">补充并继续</button>
         </template>
         <template v-else>
-          <img class="poster-dock-thumb" :src="dockImage.url" alt="" />
+          <img class="poster-dock-thumb" :src="stableUrl(dockImage.thumbUrl || dockImage.url)" alt="" />
           <input v-model="editorInstruction" class="poster-dock-input" maxlength="1000" aria-label="补充修改说明" placeholder="继续修改这一轮，例如：背景更清爽，主体不变" />
           <button type="submit" class="poster-conversation-submit is-icon" aria-label="生成这一版" title="生成这一版" :disabled="studio.busy || !!studio.pending || !studio.configured || (!editorOptions.length && !editorInstruction.trim())"><ArrowUp :size="18" :stroke-width="2" aria-hidden="true" /></button>
         </template>
@@ -464,7 +465,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
           >
             <img
               ref="previewImage"
-              :src="preview.url"
+              :src="stableUrl(preview.url)"
               alt="生成的图片"
               :style="imageSize"
               @load="fitPreview"
