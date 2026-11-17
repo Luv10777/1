@@ -1,5 +1,6 @@
 package com.wuyao.growth.video.analysis;
 
+import com.wuyao.growth.common.web.CustomerMessages;
 import com.wuyao.growth.asset.*;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
@@ -289,6 +290,6 @@ public class VideoAnalysisService {
                 .map(frame -> new VideoAnalysisDtos.FrameView(frame.seconds(), storage.presignGet(frame.storageKey(), Duration.ofMinutes(30))))
                 .toList() : List.of();
         return new VideoAnalysisDtos.View(a.getId(), a.getAssetId(), a.getName(), a.getMode(), status, a.getProgress(), a.getReverseNeed(),
-                a.getDurationMs(), a.getWidth(), a.getHeight(), videoUrl, frames, detail ? a.getResult() : null, error, a.getCreatedAt());
+                a.getDurationMs(), a.getWidth(), a.getHeight(), videoUrl, frames, detail ? a.getResult() : null, CustomerMessages.plain(error, "视频分析没有完成，请稍后重试。"), a.getCreatedAt());
     }
 }

@@ -1,5 +1,6 @@
 package com.wuyao.growth.video;
 
+import com.wuyao.growth.common.web.CustomerMessages;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -887,7 +888,7 @@ public class VideoWorkflowService {
         return new VideoDtos.View(workflow.getId(), workflow.getRequestKey(), request.prompt(), request.referenceImageAssetIds(),
                 request.referenceVideoAssetId(), workflow.getModel(), workflow.getRatio(), workflow.getDurationSeconds(),
                 workflow.getResolution(), status, workflow.getStage(), workflow.getProgress(),
-                workflow.getProviderStatus(), workflow.getErrorMessage(), url, workflow.getOutputAssetId(), workflow.getTaskId(), workflow.getCreatedAt(),
+                workflow.getProviderStatus(), CustomerMessages.plain(workflow.getErrorMessage(), "视频没有生成成功，请稍后重试。"), url, workflow.getOutputAssetId(), workflow.getTaskId(), workflow.getCreatedAt(),
                 request.referenceImageAssetIds().stream().map(this::referenceView).toList(),
                 request.referenceVideoAssetId() == null ? null : referenceView(request.referenceVideoAssetId()),
                 workflow.getErrorCode(), plan.stage() != null, plan.stage(), "SUBMIT".equals(plan.stage()), plan.hint(),

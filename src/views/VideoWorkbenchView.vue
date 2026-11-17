@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { AudioLines, ChevronRight, Film, History, ImagePlus, Plus, Sparkles, X } from 'lucide-vue-next'
+import { AudioLines, ChevronRight, CircleAlert, Film, History, ImagePlus, Plus, Sparkles, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import VideoPlanPanel from '../components/VideoPlanPanel.vue'
 import VideoScenePicker from '../components/VideoScenePicker.vue'
@@ -120,7 +120,8 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       </fieldset>
 
       <div class="video-workbench-action vs-footer">
-        <p v-if="notice" class="vs-notice" :class="{ 'is-error': activeConversation?.error }" role="status">{{ notice }}</p>
+        <div v-if="notice && activeConversation?.error" class="vs-failure" role="alert"><CircleAlert :size="18" :stroke-width="1.8" aria-hidden="true" /><div><strong v-if="workflow?.status === 'FAILED'">这次没有生成成功</strong><p>{{ notice }}</p></div></div>
+        <p v-else-if="notice" class="vs-notice" role="status">{{ notice }}</p>
         <button class="vs-generate" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</button>
         <small>先预估烟火，确认后开始生成</small>
         <p v-if="workflow?.chargedCredits != null" class="vs-notice">本次交付消耗 {{ number(workflow.chargedCredits) }} 烟火。</p>
