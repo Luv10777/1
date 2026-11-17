@@ -1,12 +1,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowUp, AudioLines, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
-import ImageInspirationPanel from '../components/ImageInspirationPanel.vue'
-import VideoPlanPanel from '../components/VideoPlanPanel.vue'
+import { ArrowUp, AudioLines, Check, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import { useImageCreation } from '../composables/useImageCreation'
 import { useVideoWorkbench, videoRatioOptions, videoStageLabel } from '../composables/useVideoWorkbench'
+import { useImageInspiration } from '../composables/useImageInspiration'
+import { useVideoPlan } from '../composables/useVideoPlan'
+import { videoPlanLetters, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { IMAGE_QUALITIES, IMAGE_RATIOS, IMAGE_STATUS, imageDimensions, imageStatusLabel, isImageActive } from '../domain/imageCreation'
 import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from '../domain/posterStyles'
 import { FREE_SCENE, videoSceneCover, videoSceneName } from '../services/videoScenes'
@@ -29,6 +30,7 @@ const imageInput = ref(null)
 const videoInputs = { image: ref(null), video: ref(null), audio: ref(null) }
 const threadEnd = ref(null)
 const dock = ref(null)
+const composerInput = ref(null)
 
 // 问候按时段轮换，每分钟看一次时间；名字取账号昵称，没有就只问候。
 const GREETINGS = [
@@ -64,7 +66,26 @@ const video = reactive(useVideoWorkbench({
   },
 }))
 
-// —— 对话里的每一轮：图片按一组版本（第一版的 ID）记，视频按创作记录记 ——
+// —— 灵感方案：和进阶版共用 useImageInspiration / useVideoPlan，只是在对话里一问一答 ——
+const insp = reactive(useImageInspiration({ studio }))
+const vplan = reactive(useVideoPlan(reactive({
+  images: computed(() => video.referenceImages),
+  video: computed(() => video.referenceVideos[0] || null),
+  upload: (...args) => video.uploadAsset(...args),
+  maxDuration: computed(() => video.durationMax),
+  duration: computed(() => video.duration),
+  ratio: computed(() => video.format),
+  brief: computed(() => video.prompt),
+  ratios: videoRatioOptions.map(option => option.value),
+  locked: computed(() => video.isGenerating || Boolean(video.activeConversation?.loading)),
+  scene: computed(() => video.sceneKey),
+  scenes: computed(() => video.scenes),
+}), (event, ...args) => {
+  if (event === 'apply') video.applyPlan(...args)
+  else if (event === 'scene') video.sceneKey = args[0]
+}))
+
+// —— 对话里的每一轮：图片按一组版本（第一版的 ID）记，视频按创作记录记，灵感方案一问一答记一轮 ——
 const turns = ref([])
 const dismissedImages = new Set()
 watch(() => studio.thread, thread => {
@@ -109,6 +130,7 @@ function resetConversation() {
   for (const turn of turns.value) if (turn.kind === 'image') dismissedImages.add(turn.rootId)
   turns.value = []
   panel.value = ''
+  ideaMode.value = false
   studio.resetDraft()
   studio.count = 1
   video.startNewConversation()
@@ -148,10 +170,6 @@ const serviceNotice = computed(() => studio.requiresLogin ? '登录后开始创�
   : studio.capabilityState === 'error' ? `创作服务检查失败：${studio.capabilityError}`
   : !studio.configured ? '图片创作服务暂未接通' : '')
 function changeCount(step) { studio.count = Math.min(MAX_IMAGES, Math.max(1, Number(studio.count) + step)) }
-// 灵感方案里的「去挑选」风格会切 workspaceTab，这里换成打开风格面板。
-watch(() => studio.workspaceTab, tab => { if (tab === 'inspiration' && panel.value === 'plan') panel.value = 'style' })
-// 选了方案、描述填进输入框后收起方案面板。
-watch(() => studio.brief, (value, previous) => { if (panel.value === 'plan' && mode.value === 'image' && value && value !== previous) panel.value = '' })
 
 // —— 视频：场景、输出设置、素材 ——
 const videoModels = computed(() => (video.capabilities.length ? video.capabilities : video.fallbackCapabilities))
@@ -160,36 +178,120 @@ const activeVideoDraft = computed(() => !turns.value.some(entry => entry.kind ==
 function pickVideoFiles(type) { panel.value = ''; videoInputs[type].value?.click() }
 
 // —— 输入框 ——
-const placeholder = computed(() => mode.value === 'image'
+const placeholder = computed(() => ideaMode.value
+  ? (answering.value ? `回答：${vplan.clarification.question}` : mode.value === 'image' ? '一句话说说想要什么，比如：新品香水上新，发小红书，安静高级一点' : '一句话说说想要什么，比如：新品香水上新，发抖音，安静高级一点')
+  : mode.value === 'image'
   ? '描述你想要的画面，比如光线、场景、氛围……'
   : (video.currentScene?.placeholder || '描述你的成片需求，比如拍什么、什么节奏、发在哪……'))
 const ideas = computed(() => mode.value === 'image'
   ? ['新品手冲咖啡上市，做一张小红书封面，清晨窗边的光', '周年店庆海报，国风意境，红金配色，不要文字', '一杯威士忌放在深色石台上，一束侧光打下来']
   : ['新品香水上新，发抖音，安静高级一点', '带大家逛逛我们店，从门口走到吧台，暖色灯光', '周末活动预告，节奏轻快，结尾停在招牌上'])
-const draft = computed({
-  get: () => (mode.value === 'image' ? studio.brief : video.prompt),
-  set: value => { if (mode.value === 'image') studio.brief = value; else video.prompt = value },
-})
-const sendDisabled = computed(() => mode.value === 'image'
-  ? studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending
-  : video.isGenerating || Boolean(video.activeConversation?.loading))
-const sendLabel = computed(() => mode.value === 'image'
-  ? (studio.busy ? '正在提交' : studio.saving ? '正在保存原图' : studio.active ? '正在创作' : '生成图片')
-  : (video.isGenerating ? '正在生成视频' : '预估费用'))
-const sendBusy = computed(() => (mode.value === 'image' ? studio.busy || studio.active : video.isGenerating))
-// 图片按张计费，按钮上直接写这次要花多少烟火；视频要先报价，按钮只放烟火标志。
-const imageCost = computed(() => (mode.value === 'image' ? studio.estimatedCredits : null))
-const sendTitle = computed(() => mode.value === 'image'
-  ? `${studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : ''}成功交付后扣费`
-  : '先预估烟火，确认后才开始生成')
-// 灵感方案第一次打开才挂上（和进阶版一样），之后只是隐藏，出好的方案不会丢。
-const planOpened = ref(false)
-function togglePanel(name) {
-  panel.value = panel.value === name ? '' : name
-  if (panel.value !== 'plan') return
-  planOpened.value = true
-  if (mode.value === 'image') studio.workspaceTab = 'plan'
+// —— 灵感方案模式：输入框改成「一句话说说想要什么」，发出去先出 3 个方向，挑一个再生成 ——
+const ideaMode = ref(false)
+const planEngineOf = kind => (kind === 'image' ? insp : vplan)
+const planEngine = computed(() => planEngineOf(mode.value))
+// 视频方案有时会先问一句（比如活动时间），这时输入框里写的是回答。
+const answering = computed(() => ideaMode.value && mode.value === 'video' && Boolean(vplan.clarification))
+const planNote = ref('')
+function toggleIdeas() {
+  ideaMode.value = !ideaMode.value
+  panel.value = ''
+  planNote.value = ''
+  nextTick(() => composerInput.value?.focus?.())
 }
+const draft = computed({
+  get: () => (ideaMode.value ? (answering.value ? vplan.answer : planEngine.value.idea) : mode.value === 'image' ? studio.brief : video.prompt),
+  set: value => {
+    if (ideaMode.value) { if (answering.value) vplan.answer = value; else planEngine.value.idea = value }
+    else if (mode.value === 'image') studio.brief = value
+    else video.prompt = value
+  },
+})
+const planContext = engine => ({ record: engine.record, references: [...engine.resultReferences], info: { ...engine.resultInfo }, resultId: engine.result?.id })
+const planTurn = (kind, engine) => ({
+  key: `plan:${kind}:${engine.result.id}:${Date.now()}`, kind: 'plan', mode: kind, status: 'done', applied: -1,
+  idea: engine.resultInfo?.idea || '按参考图出方案', style: engine.resultInfo?.style || '',
+  scene: kind === 'video' ? videoSceneName(video.scenes, engine.result.sceneKey) : '',
+  refs: [...engine.resultImages], images: [...engine.resultImages], batch: engine.result, context: planContext(engine),
+})
+let ownPlanRun = false
+async function sendIdea(previousId = null) {
+  const kind = mode.value
+  const engine = planEngineOf(kind)
+  if (engine.working) return
+  const isAnswer = answering.value
+  const text = (isAnswer ? vplan.answer : engine.idea).trim()
+  const refs = kind === 'image' ? studio.files.map(file => file.preview) : video.referenceImages.map(entry => entry.url)
+  const brief = (kind === 'image' ? studio.brief : video.prompt)?.trim()
+  planNote.value = ''
+  if (!previousId && !text && !refs.length && !brief) { planNote.value = isAnswer ? '先回答上面的问题。' : '先说一句想要什么，或者加一张参考图。'; return }
+  const index = turns.value.push({
+    key: `plan:${kind}:${Date.now()}`, kind: 'plan', mode: kind, status: 'thinking', applied: -1, answer: isAnswer,
+    idea: previousId ? '换一批' : text || brief || '按参考图出方案',
+    style: kind === 'image' ? insp.styleName : vplan.styleText,
+    scene: kind === 'video' ? videoSceneName(video.scenes, video.sceneKey) : '',
+    refs: previousId ? [] : refs,
+  }) - 1
+  const turn = turns.value[index]
+  scrollToEnd()
+  const before = engine.result?.id
+  ownPlanRun = true
+  try { await engine.run(previousId) } finally { ownPlanRun = false }
+  if (engine.result && engine.result.id !== before) {
+    Object.assign(turn, { status: 'done', batch: engine.result, images: [...engine.resultImages], context: planContext(engine) })
+    engine.idea = ''
+    if (kind === 'video') vplan.answer = ''
+  } else if (kind === 'video' && vplan.clarification) {
+    Object.assign(turn, { status: 'question', question: vplan.clarification.question })
+  } else {
+    Object.assign(turn, { status: 'failed', error: engine.error || '这次没有出成方案，烟火已退回，可以再试一次。' })
+  }
+  scrollToEnd()
+}
+// 离开页面时还在出的方案、从「之前的方案」打开的记录，出现在对话里。
+for (const kind of ['image', 'video']) {
+  watch(() => planEngineOf(kind).result?.id, id => {
+    if (!id || ownPlanRun || turns.value.some(entry => entry.kind === 'plan' && entry.batch?.id === id)) return
+    turns.value.push(planTurn(kind, planEngineOf(kind)))
+    scrollToEnd()
+  })
+}
+function openPlanRecord(item) {
+  planEngine.value.openRecord(item)
+  ideaMode.value = true
+}
+function usePlan(turn, plan, index) {
+  const engine = planEngineOf(turn.mode)
+  if (mode.value !== turn.mode) mode.value = turn.mode
+  if (!engine.use(plan, index, turn.context)) { turn.useError = engine.error; return }
+  Object.assign(turn, { applied: index, useError: '' })
+  ideaMode.value = false
+  panel.value = ''
+  nextTick(() => composerInput.value?.focus?.())
+}
+function morePlans(turn) {
+  mode.value = turn.mode
+  ideaMode.value = true
+  planEngineOf(turn.mode).idea = turn.context?.info?.idea || ''
+  sendIdea(turn.batch.id)
+}
+const planRecords = computed(() => planEngine.value.records.slice(0, 3))
+const sendDisabled = computed(() => (ideaMode.value ? planEngine.value.working || Boolean(planEngine.value.unavailable)
+  : mode.value === 'image'
+    ? studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending
+    : video.isGenerating || Boolean(video.activeConversation?.loading)))
+const sendLabel = computed(() => (ideaMode.value ? (planEngine.value.working ? '正在出方案' : answering.value ? '回答并出方案' : '出方案')
+  : mode.value === 'image'
+    ? (studio.busy ? '正在提交' : studio.saving ? '正在保存原图' : studio.active ? '正在创作' : '生成图片')
+    : (video.isGenerating ? '正在生成视频' : '预估费用')))
+const sendBusy = computed(() => (ideaMode.value ? planEngine.value.working : mode.value === 'image' ? studio.busy || studio.active : video.isGenerating))
+// 图片按张计费、方案按次计费，按钮旁直接写这次要花多少烟火；视频要先报价。
+const imageCost = computed(() => (ideaMode.value ? planEngine.value.credits : mode.value === 'image' ? studio.estimatedCredits : null))
+const sendTitle = computed(() => (ideaMode.value ? '每次出 3 个方案 · 换一批同价 · 失败不扣烟火'
+  : mode.value === 'image'
+    ? `${studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : ''}成功交付后扣费`
+    : '先预估烟火，确认后才开始生成'))
+function togglePanel(name) { panel.value = panel.value === name ? '' : name }
 function switchMode(next) {
   if (mode.value === next) return
   mode.value = next
@@ -197,6 +299,7 @@ function switchMode(next) {
 }
 function send() {
   panel.value = ''
+  if (ideaMode.value) { sendIdea(); return }
   if (mode.value === 'image') studio.generate()
   else video.generate()
   scrollToEnd()
@@ -283,13 +386,13 @@ function videoTags(item) {
               <p v-if="version.status !== 'SUCCEEDED'" class="ns-status" role="status"><i :class="{ live: isImageActive(version.status) }" />{{ imageStatusLabel(version) }}<template v-if="version.count > 1 && version.completed"> · {{ version.completed }}/{{ version.count }}</template></p>
               <div class="ns-images" :class="imageGridClass(version.count)" :style="{ '--ns-ratio': imageDimensions(version.quality, version.ratio).width + '/' + imageDimensions(version.quality, version.ratio).height }">
                 <template v-if="!version.items.length && (isImageActive(version.status) || version.status === 'NEEDS_INPUT')">
-                  <div v-for="n in version.count" :key="n" class="ns-image is-placeholder"><small>{{ version.status === 'NEEDS_INPUT' ? '等你补充信息' : '生成中' }}</small></div>
+                  <div v-for="n in version.count" :key="n" class="ns-image is-placeholder" :class="{ 'is-working': version.status !== 'NEEDS_INPUT' }"><template v-if="version.status !== 'NEEDS_INPUT'"><span class="ns-brew" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></template><small>{{ version.status === 'NEEDS_INPUT' ? '等你补充信息' : '一方志正在画' }}</small></div>
                 </template>
                 <figure v-for="item in version.items" :key="item.id" class="ns-image-item">
                   <a v-if="item.url" :href="stableUrl(item.url)" target="_blank" rel="noopener" class="ns-image" :style="{ aspectRatio: item.width + '/' + item.height }" aria-label="在新窗口查看原图">
                     <img :src="imageSrc(item)" alt="生成的图片" decoding="async" @load="studio.reportImageVisible(item)" @error="onImageError(item)" />
                   </a>
-                  <div v-else class="ns-image is-placeholder" :style="{ aspectRatio: item.width + '/' + item.height }"><small>{{ IMAGE_STATUS[item.status] }}</small></div>
+                  <div v-else class="ns-image is-placeholder" :class="{ 'is-working': isImageActive(item.status) }" :style="{ aspectRatio: item.width + '/' + item.height }"><template v-if="isImageActive(item.status)"><span class="ns-brew" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></template><small>{{ IMAGE_STATUS[item.status] }}</small></div>
                   <figcaption v-if="item.url || item.error || retryable(item)">
                     <button v-if="item.url" type="button" class="ns-chip is-icon" title="下载" aria-label="下载这张" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="14" aria-hidden="true" /></button>
                     <button v-if="item.url && isLiveImage(turn)" type="button" class="ns-chip" :disabled="studio.locked" @click="studio.regenerate(item)"><RefreshCw :size="13" aria-hidden="true" />再画一张</button>
@@ -317,6 +420,57 @@ function videoTags(item) {
           </template>
         </template>
 
+        <template v-else-if="turn.kind === 'plan'">
+          <div class="ns-user">
+            <div v-if="turn.refs.length" class="ns-user-media">
+              <figure v-for="(url, refIndex) in turn.refs" :key="refIndex" class="ns-media-thumb">
+                <img :src="stableUrl(url)" alt="" loading="lazy" />
+                <figcaption>图{{ refIndex + 1 }}</figcaption>
+              </figure>
+            </div>
+            <div class="ns-bubble is-idea">
+              <span class="ns-bubble-tag"><Sparkles :size="12" :stroke-width="2" aria-hidden="true" />{{ turn.answer ? '补充信息' : '灵感方案' }}</span>
+              <p>{{ turn.idea }}</p>
+            </div>
+            <ul v-if="turn.style || turn.scene" class="ns-tags" aria-label="这次的设置"><li v-if="turn.scene">{{ turn.scene }}</li><li v-if="turn.style">{{ turn.style }}</li></ul>
+          </div>
+          <div class="ns-reply">
+            <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
+            <div v-if="turn.status === 'thinking'" class="ns-thinking" role="status">
+              <span class="ns-typing" aria-hidden="true"><i /><i /><i /></span>
+              <span>{{ turn.mode === 'video' ? vplan.phaseLabel : '正在看图想方案' }}</span>
+            </div>
+            <p v-else-if="turn.status === 'failed'" class="ns-say is-error">{{ turn.error }}</p>
+            <template v-else-if="turn.status === 'question'">
+              <p class="ns-say">{{ turn.question }}</p>
+              <p class="ns-note">在下面的输入框里回答，我再接着写。</p>
+            </template>
+            <template v-else>
+              <p class="ns-say">出了三个方向，挑一个「用这个」，描述会填进输入框，你还能再改。</p>
+              <div class="ns-plans">
+                <article v-for="(plan, planIndex) in turn.batch.plans" :key="planIndex" class="ns-plan-card" :class="{ applied: turn.applied === planIndex }">
+                  <header><span class="ns-plan-letter">{{ videoPlanLetters[planIndex] }}</span><h3>{{ plan.title }}</h3></header>
+                  <p v-if="plan.idea" class="ns-plan-idea">{{ plan.idea }}</p>
+                  <p v-if="turn.mode === 'video'" class="ns-plan-meta">{{ plan.ratio === 'auto' ? '自适应' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots?.length || 0 }} 个镜头</p>
+                  <ul v-if="plan.materials?.length" class="ns-plan-uses">
+                    <li v-for="material in plan.materials" :key="material.index"><img v-if="turn.images?.[material.index - 1]" :src="stableUrl(turn.images[material.index - 1])" alt="" />图{{ material.index }} {{ material.use }}</li>
+                  </ul>
+                  <details class="ns-plan-detail">
+                    <summary>{{ turn.mode === 'video' ? '分镜和生成指令' : '完整画面描述' }}</summary>
+                    <ol v-if="turn.mode === 'video' && plan.shots?.length" class="ns-plan-shots"><li v-for="(shot, shotIndex) in plan.shots" :key="shotIndex"><time>{{ videoPlanSeconds(shot.start) }}–{{ videoPlanSeconds(shot.end) }}s</time><span>{{ shot.description }}</span></li></ol>
+                    <p>{{ plan.prompt }}</p>
+                  </details>
+                  <button type="button" class="ns-plan-use" :class="{ active: turn.applied === planIndex }" @click="usePlan(turn, plan, planIndex)"><Check v-if="turn.applied === planIndex" :size="14" :stroke-width="2.2" aria-hidden="true" />{{ turn.applied === planIndex ? '已填入输入框' : '用这个' }}</button>
+                </article>
+              </div>
+              <p v-if="turn.useError" class="ns-error">{{ turn.useError }}</p>
+              <div class="ns-actions">
+                <button type="button" class="ns-chip" :disabled="planEngineOf(turn.mode).working" @click="morePlans(turn)"><RefreshCw :size="13" aria-hidden="true" />换一批<span class="ns-chip-cost"><YanhuoIcon :size="12" />{{ planEngineOf(turn.mode).credits }}</span></button>
+              </div>
+            </template>
+          </div>
+        </template>
+
         <template v-else-if="conversationOf(turn)">
           <div class="ns-user">
             <div v-if="conversationOf(turn).referenceImages?.length || conversationOf(turn).referenceVideos?.length || conversationOf(turn).referenceAudios?.length" class="ns-user-media">
@@ -342,7 +496,7 @@ function videoTags(item) {
             <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
             <video v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video" :src="`${stableUrl(conversationOf(turn).workflow.outputUrl)}#t=0.1`" controls playsinline preload="metadata" />
             <div v-else-if="conversationOf(turn).submitting || isVideoInProgress(conversationOf(turn).workflow)" class="ns-card ns-progress" role="status">
-              <div><strong>{{ videoStageLabel(conversationOf(turn)) }}</strong><small>通常要几分钟，可以先离开，回来会接着显示</small></div>
+              <div class="ns-progress-head"><span class="ns-brew is-small" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><div><strong>{{ videoStageLabel(conversationOf(turn)) }}</strong><small>通常要几分钟，可以先离开，回来会接着显示</small></div></div>
               <span class="ns-bar" aria-hidden="true"><i /></span>
               <button v-if="turn.convId === video.activeConversationId && conversationOf(turn).workflow?.id && !conversationOf(turn).submitting" type="button" class="ns-link is-danger" @click="video.cancelVideo">取消生成，退回未消耗烟火</button>
             </div>
@@ -381,21 +535,24 @@ function videoTags(item) {
 
       <template v-if="studio.optimistic">
         <div class="ns-user"><div class="ns-bubble"><p>{{ studio.optimisticBrief || '参考图已收到' }}</p></div></div>
-        <div class="ns-reply"><div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div><p class="ns-status" role="status"><i class="live" />一方志正在编排画面…</p></div>
+        <div class="ns-reply"><div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div><div class="ns-images is-single" :style="{ '--ns-ratio': studio.dimensions.width + '/' + studio.dimensions.height }"><div class="ns-image is-placeholder is-working" role="status"><span class="ns-brew" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><small>一方志正在编排画面</small></div></div></div>
       </template>
       <span ref="threadEnd" />
     </div>
 
     <div ref="dock" class="ns-dock">
-      <form class="ns-composer" @submit.prevent="send">
+      <form class="ns-composer" :class="{ 'is-ideas': ideaMode }" @submit.prevent="send">
         <div class="ns-composer-top">
           <div class="ns-modes" :class="`is-${mode}`" role="group" aria-label="做图片还是视频">
             <span class="ns-modes-thumb" aria-hidden="true" />
             <button type="button" :aria-pressed="mode === 'image'" :class="{ active: mode === 'image' }" @click="switchMode('image')"><ImagePlus :size="16" :stroke-width="1.6" aria-hidden="true" />图片</button>
             <button type="button" :aria-pressed="mode === 'video'" :class="{ active: mode === 'video' }" @click="switchMode('video')"><Film :size="16" :stroke-width="1.6" aria-hidden="true" />视频</button>
           </div>
-          <button type="button" class="ns-idea-button" :aria-expanded="panel === 'plan'" @click="togglePanel('plan')"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案</button>
+          <button type="button" class="ns-idea-button" :class="{ active: ideaMode }" :aria-pressed="ideaMode" @click="toggleIdeas"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案<X v-if="ideaMode" :size="13" :stroke-width="2" aria-hidden="true" /></button>
         </div>
+        <Transition name="ns-swap">
+          <p v-if="ideaMode" class="ns-idea-hint">{{ answering ? '一方志想先确认一件事，回答后接着写方案。' : '说一句想要什么，一方志先出 3 个方向给你挑，挑中的再去生成。' }}</p>
+        </Transition>
 
         <div v-if="mode === 'image' && studio.files.length" class="ns-attachments" aria-label="参考图">
           <div v-for="(file, index) in studio.files" :key="file.preview" class="ns-attachment">
@@ -419,19 +576,19 @@ function videoTags(item) {
           </div>
         </div>
 
-        <label for="ns-input" class="sr-only">{{ mode === 'image' ? '画面描述' : '描述你的成片需求' }}</label>
-        <textarea id="ns-input" v-model="draft" class="ns-input" :rows="started ? 1 : 3" maxlength="2000" :placeholder="placeholder" :disabled="mode === 'image' ? studio.locked : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
+        <label for="ns-input" class="sr-only">{{ ideaMode ? '想要什么' : mode === 'image' ? '画面描述' : '描述你的成片需求' }}</label>
+        <textarea id="ns-input" ref="composerInput" v-model="draft" class="ns-input" :rows="started ? 1 : 3" maxlength="2000" :placeholder="placeholder" :disabled="ideaMode ? planEngine.working : mode === 'image' ? studio.locked : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
 
         <div class="ns-toolbar">
           <button v-if="mode === 'image'" type="button" class="ns-icon" :disabled="studio.locked || studio.files.length >= 6" aria-label="添加参考图，最多 6 张" title="添加参考图，最多 6 张" @click="imageInput?.click()"><Paperclip :size="18" :stroke-width="1.6" aria-hidden="true" /></button>
           <button v-else type="button" class="ns-icon" :aria-expanded="panel === 'attach'" aria-label="添加参考图片、参考视频或音色" title="添加参考图片、参考视频或音色" @click="togglePanel('attach')"><Paperclip :size="18" :stroke-width="1.6" aria-hidden="true" /></button>
           <span class="ns-divider" aria-hidden="true" />
           <Transition name="ns-swap" mode="out-in">
-            <div :key="mode" class="ns-tools">
+            <div :key="`${mode}-${ideaMode}`" class="ns-tools">
               <template v-if="mode === 'image'">
                 <button type="button" class="ns-tool" :class="{ open: panel === 'style' }" :aria-expanded="panel === 'style'" @click="togglePanel('style')"><img v-if="currentStyle.image" :src="currentStyle.image" alt="" :class="{ mark: currentStyle.mark }" />{{ currentStyle.name }}</button>
-                <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ studio.ratio }} · {{ studio.quality }}</button>
-                <div class="ns-count" role="group" aria-label="一次生成几张">
+                <button v-if="!ideaMode" type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ studio.ratio }} · {{ studio.quality }}</button>
+                <div v-if="!ideaMode" class="ns-count" role="group" aria-label="一次生成几张">
                   <button type="button" aria-label="少一张" :disabled="studio.locked || studio.count <= 1" @click="changeCount(-1)"><Minus :size="13" :stroke-width="2" aria-hidden="true" /></button>
                   <span aria-live="polite"><strong>{{ studio.count }}</strong> 张</span>
                   <button type="button" aria-label="多一张" :disabled="studio.locked || studio.count >= MAX_IMAGES" @click="changeCount(1)"><Plus :size="13" :stroke-width="2" aria-hidden="true" /></button>
@@ -439,13 +596,14 @@ function videoTags(item) {
               </template>
               <template v-else>
                 <button v-if="video.currentScene" type="button" class="ns-tool" :class="{ open: panel === 'scene' }" :aria-expanded="panel === 'scene'" @click="togglePanel('scene')"><img v-if="videoSceneCover(video.sceneKey)" :src="videoSceneCover(video.sceneKey)" alt="" />{{ video.currentScene.name }}</button>
-                <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ video.currentCapability.label }} · {{ videoRatioOptions.find(option => option.value === video.format)?.label }} · {{ video.duration }} 秒 · {{ video.resolution }}</button>
+                <button v-if="ideaMode" type="button" class="ns-tool" :class="{ open: panel === 'planStyle' }" :aria-expanded="panel === 'planStyle'" @click="togglePanel('planStyle')"><Sparkles :size="15" aria-hidden="true" />{{ vplan.styleText || '风格不限' }}</button>
+                <button v-else type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ video.currentCapability.label }} · {{ videoRatioOptions.find(option => option.value === video.format)?.label }} · {{ video.duration }} 秒 · {{ video.resolution }}</button>
               </template>
             </div>
           </Transition>
           <span class="ns-cost" :title="sendTitle">
             <YanhuoIcon :size="16" />
-            <strong>{{ imageCost != null ? number(imageCost) : mode === 'video' ? '报价后扣' : '—' }}</strong>
+            <strong>{{ imageCost != null ? number(imageCost) : mode === 'video' ? '报价后扣' : '—' }}</strong><small v-if="ideaMode">/ 次</small>
           </span>
           <button type="submit" class="ns-send" :class="{ busy: sendBusy }" :disabled="sendDisabled" :title="sendTitle" :aria-label="sendLabel">
             <span v-if="sendBusy" class="ns-spinner" aria-hidden="true" />
@@ -464,6 +622,11 @@ function videoTags(item) {
         <button v-else-if="studio.capabilityState === 'error'" type="button" class="ns-link" @click="studio.loadCapabilities">重试</button>
       </p>
       <p v-if="mode === 'image' && studio.pending" class="ns-composer-note" role="status">上次提交尚未确认，可以恢复原请求。<button type="button" class="ns-link" :disabled="studio.busy" @click="studio.generate">恢复提交</button></p>
+      <p v-if="ideaMode && (planNote || planEngine.unavailable)" class="ns-composer-note ns-error" role="status">{{ planNote || '灵感方案暂未开放，可以直接写描述生成。' }}</p>
+      <div v-if="ideaMode && planRecords.length && !panel" class="ns-plan-records" aria-label="之前的方案">
+        <small>之前的方案</small>
+        <button v-for="item in planRecords" :key="item.id" type="button" :disabled="planEngine.working" @click="openPlanRecord(item)">{{ item.idea || item.plans?.[0]?.title || '按参考图出的方案' }}</button>
+      </div>
       <p v-if="mode === 'video' && activeVideoDraft && video.notice" class="ns-composer-note" :class="{ 'ns-error': video.activeConversation?.error }" role="status">{{ video.notice }}</p>
 
       <section v-if="panel === 'style'" class="ns-panel" aria-label="风格">
@@ -514,26 +677,13 @@ function videoTags(item) {
         </div>
       </section>
 
-      <section v-if="planOpened" v-show="panel === 'plan'" class="ns-panel ns-plan" aria-label="灵感方案">
-        <header><h2>灵感方案</h2><button type="button" class="ns-icon" aria-label="收起灵感方案" @click="panel = ''"><X :size="16" aria-hidden="true" /></button></header>
-        <ImageInspirationPanel v-if="mode === 'image'" :studio="studio" />
-        <VideoPlanPanel
-          v-else
-          :images="video.referenceImages"
-          :video="video.referenceVideos[0]"
-          :upload="video.uploadAsset"
-          :max-duration="video.durationMax"
-          :duration="video.duration"
-          :ratio="video.format"
-          :brief="video.prompt"
-          :ratios="videoRatioOptions.map(option => option.value)"
-          :locked="video.isGenerating || Boolean(video.activeConversation?.loading)"
-          :scene="video.sceneKey"
-          :scenes="video.scenes"
-          @apply="(...args) => { video.applyPlan(...args); panel = '' }"
-          @scene="key => { video.sceneKey = key }"
-          @pick-scene="panel = 'scene'"
-        />
+      <section v-else-if="panel === 'planStyle'" class="ns-panel" aria-label="方案风格">
+        <header><h2>方案风格</h2><small>可以不选，三个方案各自搭配</small></header>
+        <div class="ns-segmented" role="group" aria-label="方案风格">
+          <button v-for="option in videoPlanStyles" :key="option" type="button" :aria-pressed="!vplan.customOpen && vplan.style === option" :class="{ active: !vplan.customOpen && vplan.style === option }" @click="vplan.pickStyle(option)">{{ option }}</button>
+          <button type="button" :aria-pressed="vplan.customOpen" :class="{ active: vplan.customOpen }" @click="vplan.openCustom()">自己填</button>
+        </div>
+        <label v-if="vplan.customOpen" class="ns-field"><span class="sr-only">自己填写风格</span><input v-model="vplan.customStyle" maxlength="20" placeholder="例如：复古港风、清冷极简" /></label>
       </section>
 
       <section v-if="!started && !panel" class="ns-ideas" aria-label="试试这样说">

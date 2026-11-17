@@ -20,7 +20,12 @@ test('novice studio drives the poster and video workflows from one composer', as
   globalThis.ShadowRoot = class {}
   globalThis.sessionStorage = memoryStorage()
   globalThis.localStorage = memoryStorage()
-  const creations = [], quotes = [], submissions = []
+  const creations = [], quotes = [], submissions = [], ideas = []
+  let releasePlan = null
+  const planBatch = { id: 5, status: 'SUCCEEDED', createdAt: '2026-11-17T10:00:00Z', plans: [
+    { title: '暖光手冲', idea: '清晨窗边的暖光', prompt: '暖光下的手冲咖啡，木质桌面' },
+    { title: '极简白', idea: '大面积留白', prompt: '白底极简的咖啡杯' },
+    { title: '街角', idea: '城市街角的氛围', prompt: '街角咖啡馆外摆' }] }
   const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
   const creation = { id: 11, workflow: 'POSTER', parentId: null, status: 'SUCCEEDED', brief: '一杯手冲咖啡', ratio: '3:4', quality: '2K', count: 1, style: '电影质感',
     references: [{ assetId: 9, role: 'SUBJECT', name: '咖啡.png', url: '/reference.png' }],
@@ -32,6 +37,9 @@ test('novice studio drives the poster and video workflows from one composer', as
     if (url.startsWith('/api/image-creations?')) return response({ items: [], totalPages: 0 })
     if (url === '/api/image-creations' && method === 'POST') { creations.push(JSON.parse(options.body)); return response(creation) }
     if (url === '/api/image-creations/11/thread') return response([creation])
+    if (url === '/api/image/inspirations/config' || url === '/api/video/plans/config') return response({ configured: true, credits: 1, maxImages: 6 })
+    if (url.startsWith('/api/image/inspirations?') || url.startsWith('/api/video/plans?')) return response({ items: [], totalPages: 0 })
+    if (url === '/api/image/inspirations' && method === 'POST') { ideas.push(JSON.parse(options.body)); return new Promise(resolve => { releasePlan = () => resolve(response(planBatch)) }) }
     if (url === '/api/video/capabilities') return response([])
     if (url === '/api/video/scenes') return response([{ key: 'free', name: '自由创作', summary: '', icon: 'edit_note' }, { key: 'ecommerce', name: '电商带货', summary: '商品主图视频、带货短视频', icon: 'shopping_bag' }])
     if (url.startsWith('/api/video/workflows?')) return response({ items: [], totalPages: 0 })
@@ -67,7 +75,7 @@ test('novice studio drives the poster and video workflows from one composer', as
   const { default: Studio } = await vite.ssrLoadModule('/src/views/NoviceStudioView.vue')
   const renderer = createRenderer({
     createElement: tag => ({ tag, props: {}, children: [], style: {}, classList: { add() {}, remove() {} }, getRootNode: () => ({ activeElement: null }), addEventListener() {}, removeEventListener() {} }),
-    createText: text => ({ text, children: [] }), createComment: text => ({ text, children: [] }),
+    createText: text => ({ text, children: [] }), createComment: () => ({ text: '', children: [] }),
     setText: (node, text) => { node.text = text }, setElementText: (node, text) => { node.text = text; node.children = [] },
     patchProp: (node, key, previous, value) => { node.props[key] = value },
     insert(node, parent, anchor) {
@@ -90,12 +98,27 @@ test('novice studio drives the poster and video workflows from one composer', as
   const input = () => find(node => node.props?.id === 'ns-input')
   // 过渡用了 requestAnimationFrame（这里是 setTimeout），多等几帧让切换完成。
   const settle = async () => { for (let i = 0; i < 4; i++) { await new Promise(resolve => setTimeout(resolve, 5)); await nextTick() } }
-  const submit = async () => { find(node => node.tag === 'form' && node.props.class === 'ns-composer').props.onSubmit({ preventDefault() {} }); await settle() }
+  const submit = async () => { find(node => node.tag === 'form' && String(node.props.class).split(' ').includes('ns-composer')).props.onSubmit({ preventDefault() {} }); await settle() }
   try {
     app.mount(root); await settle()
     assert.match(text(root), /^(早上好|上午好|中午好|下午好|傍晚好|晚上好|夜深了)/, 'the headline greets by time of day')
     const cost = () => text(find(node => node.props?.class === 'ns-cost'))
     assert.equal(cost(), '2', 'the cost of one image sits next to the send button')
+
+    // 灵感方案：在对话里一问一答，等的时候三个点在跳，出了方案「用这个」填进输入框。
+    button('灵感方案').props.onClick(); await settle()
+    assert.match(cost(), /^1/, 'a plan request shows its own price')
+    input().props['onUpdate:modelValue']('新品咖啡，安静高级'); await settle()
+    await submit()
+    assert.equal(ideas.length, 1)
+    assert.equal(ideas[0].idea, '新品咖啡，安静高级')
+    assert.ok(find(node => node.props?.class === 'ns-typing'), 'three dots hop while the plans are being written')
+    releasePlan(); await settle()
+    assert.ok(!find(node => node.props?.class === 'ns-typing'))
+    assert.match(text(root), /暖光手冲.*极简白.*街角/s, 'the three plans are a reply in the conversation')
+    button('用这个').props.onClick(); await settle()
+    assert.match(input().value, /画面方案：暖光下的手冲咖啡/, 'the chosen plan fills the composer')
+    assert.equal(cost(), '2', 'back to generating images after a plan is chosen')
 
     // 图片：选风格、写描述、生成，结果作为一轮对话出现。
     button('帮我搭配').props.onClick(); await settle()
