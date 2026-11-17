@@ -72,7 +72,8 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
     parentNode: node => node.parent, nextSibling: node => node.parent?.children[node.parent.children.indexOf(node) + 1],
   })
   const root = { children: [] }, app = renderer.createApp(Workbench)
-  app.provide(routeLocationKey, { query: {} })
+  // 画面比例没有默认值，这里从链接带入 9:16（和视频反推跳过来一样）。
+  app.provide(routeLocationKey, { query: { ratio: '9:16' } })
   app.provide(routerKey, { currentRoute: { value: { path: '/video/workbench' } }, push() {} })
   app.component('RouterLink', { render: () => null })
   const nodes = function* (node) { yield node; for (const child of node.children) yield* nodes(child) }

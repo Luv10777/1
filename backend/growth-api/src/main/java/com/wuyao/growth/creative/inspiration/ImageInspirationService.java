@@ -1,5 +1,6 @@
 package com.wuyao.growth.creative.inspiration;
 
+import com.wuyao.growth.common.web.CustomerMessages;
 import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
@@ -169,7 +170,7 @@ public class ImageInspirationService {
     }
 
     private static ImageInspirationDtos.View view(ImageInspiration p) {
-        return new ImageInspirationDtos.View(p.getId(), p.getStatus(), p.getPlans(), p.getErrorMessage(), p.getPreviousId(), p.getCreatedAt());
+        return new ImageInspirationDtos.View(p.getId(), p.getStatus(), p.getPlans(), CustomerMessages.plain(p.getErrorMessage(), "这次没有出成方案，请稍后重试。"), p.getPreviousId(), p.getCreatedAt());
     }
 
     private static String trim(String value) { return value == null || value.isBlank() ? null : value.strip(); }

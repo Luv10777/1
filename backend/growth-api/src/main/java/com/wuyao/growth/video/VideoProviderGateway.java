@@ -140,7 +140,8 @@ public class VideoProviderGateway {
         }
         body.put("content", content);
         body.put("duration", request.durationSeconds());
-        if (!"auto".equals(request.ratio())) body.put("ratio", request.ratio());
+        // 「自适应」要明确传 adaptive：不传时中转站会补一个上游不认的比例，任务在查询时才报 InvalidParam。
+        body.put("ratio", "auto".equals(request.ratio()) ? "adaptive" : request.ratio());
         body.put("resolution", request.resolution().toLowerCase(Locale.ROOT));
         return body;
     }

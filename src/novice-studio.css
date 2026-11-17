@@ -81,6 +81,8 @@
 .ns-note { margin: 0; color: var(--ns-muted); font-size: 13px; line-height: 1.7; }
 .ns-error { margin: 0; color: var(--color-error); font-size: 13px; line-height: 1.7; }
 .ns-error .ns-link { margin-left: 8px; }
+/* 对话里的失败原因：淡红底的提示条，正文用常规颜色，不再是整段红字 */
+.ns-reply .ns-error { box-sizing: border-box; max-width: min(100%, 440px); padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--color-error) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-error) 16%, transparent); color: color-mix(in srgb, var(--color-error) 70%, var(--ns-ink)); overflow-wrap: anywhere; }
 
 /* —— 输入框 —— */
 .ns-dock { display: flex; flex-direction: column; gap: 12px; }
@@ -121,6 +123,8 @@
 .ns-divider { width: 1px; height: 18px; margin: 0 2px; background: var(--ns-line); }
 .ns-tool { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; max-width: 100%; padding: 0 12px 0 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .ns-tool:hover, .ns-tool.open { background: var(--ns-soft); }
+.ns-tool.needs-pick { color: var(--color-accent-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent); }
+.ns-setting.needs-pick > span { color: var(--color-accent-text); }
 .ns-tool img { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px var(--ns-line); }
 .ns-tool img.mark, .ns-tile img.mark { padding: 3px; box-sizing: border-box; background: #fff; object-fit: contain; }
 /* 张数：减号、数字、加号，一次最多 6 张。 */

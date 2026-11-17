@@ -47,7 +47,7 @@ export function videoPlanForm(plan, { maxDuration = 30, ratios = [], idea = '', 
     : [original && `原始需求（保留未修改的要求，下面最后一句需求为最新要求）：\n${original}`, plan.prompt.trim()].filter(Boolean).join('\n')
   return {
     prompt,
-    format: ratios.includes(plan.ratio) ? plan.ratio : 'auto',
+    format: ratios.includes(plan.ratio) ? plan.ratio : '',
     duration,
     shortened: false,
   }

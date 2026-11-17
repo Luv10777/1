@@ -1,5 +1,6 @@
 package com.wuyao.growth.creative.image;
 
+import com.wuyao.growth.common.web.CustomerMessages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.common.gateway.*;
@@ -736,7 +737,7 @@ public class ImageCreationService {
        && tasks.statusByIdempotencyKey("image-download-"+i.getId()+"-"+i.getGeneration())==TaskStatus.FAILED;
      if(downloadFailed) status="FAILED";
      return new ImageDtos.ItemView(i.getId(),i.getOrdinal(),i.getSpec().role(),i.getSpec().headline(),i.getSpec().caption(),
-       status,status.equals("INTERRUPTED")?Objects.toString(i.getError(),"执行中断，可恢复原任务"):downloadFailed?"图片保存失败，临时预览链接可能过期":i.getError(),url,
+       status,status.equals("INTERRUPTED")?Objects.toString(i.getError(),"执行中断，可恢复原任务"):downloadFailed?"图片保存失败，临时预览链接可能过期":CustomerMessages.plain(i.getError(),"这张图没有生成成功，可以重试。"),url,
        i.getActualWidth()==null?d.width():i.getActualWidth(),
        i.getActualHeight()==null?d.height():i.getActualHeight(),i.getTaskId(),i.isSimilarityWarning(),
        providerUrl,i.getPersistedAt()!=null,downloadFailed,i.getGeneration(),i.getPreviewedAt(),
@@ -753,7 +754,7 @@ public class ImageCreationService {
    }
    return new ImageDtos.View(c.getId(),c.getParentId(),c.getRequest().workflow(),c.getRequest().brief(),
      c.getRequest().quality(),c.getRequest().ratio(),state,c.getPlan()==null?"":c.getPlan().summary(),
-     c.getPlan()==null?"":c.getPlan().question(),state.equals("INTERRUPTED")?"规划任务中断，可恢复重试":c.getError(),
+     c.getPlan()==null?"":c.getPlan().question(),state.equals("INTERRUPTED")?"规划任务中断，可恢复重试":CustomerMessages.plain(c.getError(),"这次创作没有完成，可以重试。"),
      done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId(),referenceViews(c));
  }
 }

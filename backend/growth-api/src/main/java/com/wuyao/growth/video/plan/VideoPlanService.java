@@ -1,5 +1,6 @@
 package com.wuyao.growth.video.plan;
 
+import com.wuyao.growth.common.web.CustomerMessages;
 import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
@@ -196,7 +197,7 @@ public class VideoPlanService {
         var stages = metadata.get("stages") instanceof Map<?, ?> m ? m : Map.of();
         String phase = !"GENERATING".equals(p.getStatus()) ? null : stages.containsKey("draft") ? "REVIEW" : stages.containsKey("concept") ? "DRAFT" : "CONCEPT";
         var clarification = metadata.get("clarification") instanceof Map<?, ?> m ? (Map<String, Object>)m : null;
-        return new VideoPlanDtos.View(p.getId(), p.getStatus(), "SUCCEEDED".equals(p.getStatus()) ? p.getPlans() : List.of(), p.getErrorMessage(),
+        return new VideoPlanDtos.View(p.getId(), p.getStatus(), "SUCCEEDED".equals(p.getStatus()) ? p.getPlans() : List.of(), CustomerMessages.plain(p.getErrorMessage(), "这次没有出成方案，请稍后重试。"),
                 p.getPreviousPlanId(), p.getCreatedAt(), p.getSceneKey(), phase, clarification);
     }
 
