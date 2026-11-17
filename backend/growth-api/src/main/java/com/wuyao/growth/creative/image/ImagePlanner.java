@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 public class ImagePlanner {
  private final AiGateway gateway;
  private final ObjectMapper json;
- public static final String POSTER_VERSION="drawing-quality-intent-first-v2";
+ public static final String POSTER_VERSION="drawing-quality-intent-first-v3";
  public static final String PRODUCT_SET_VERSION="product-set-intent-first-v5";
  static String version(String workflow) {return "POSTER".equals(workflow)?POSTER_VERSION:PRODUCT_SET_VERSION;}
  static String system(String workflow) {
@@ -53,6 +53,7 @@ public class ImagePlanner {
  参考图默认角色：SUBJECT 是人物、动物、物体或场景的内容依据，保留用户未要求修改的身份和视觉特征；STYLE 只借鉴媒介、笔触、色彩和光线，不复制其主体或文字；LAYOUT 参考空间关系；BACKGROUND 参考环境。具体修改和跨图组合由 understanding 决定，用户要求修改或删除的元素不再列为保留项。
  posterContext.previousPoster 是上一张图片的编辑依据，不假定它必有海报文字。换版默认保持原来的明确主体与内容，understanding 明确要求修改或删除的内容除外。LAYOUT 改变构图与空间关系；SCENE 改变场景与光线；MESSAGE 改变视觉叙事或表达重点，不必生成新文案。recentPostersToAvoid 只供减少无意重复，用户要求沿用构图时沿用，不借用历史中的事实。
  不编造真实价格、折扣、认证、功效或人物身份。明确的虚构世界和想象画面可以创作，不声称它们是现实记录。普通题材、无商品图或未填写营销信息均能直接创作；只有用户要求本身存在无法解决的关键矛盾才提出一个简短 question。
+ request.count 是本次要出的张数，items 数量必须正好等于它。多于 1 张时，每张都满足用户的同一需求，但彼此在构图、景别、视角、主体姿态或场景安排上有清楚可辨的差别，不要只换颜色或做细微改动；用户已指定的主体、文字、画风与限制在每张里保持一致。
  visualDirection 用简短标签说明媒介、画面概念、焦点、构图、配色、光线、材质与质量控制。每个 item.prompt 是一段连贯、具体、没有冲突的最终提示词，按“实际任务与主体 → 场景和动作 → 构图 → 媒介 → 光线与配色 → 材质与细节 → 明确保留、修改和限制 → 文字（仅在需要时）”组织。镜头或技术词只有能说明画面效果时使用；不强制英文、不翻译准确中文文案。items 数量等于请求 count。
  输出 JSON: {"summary":"...","question":"","visualDirection":"Medium: ...; Concept: ...; Focal point: ...; Composition: ...; Palette: ...; Lighting: ...; Materials: ...; Quality controls: ...","items":[{"role":"...","shotType":"...","focalPoint":"...","materialLanguage":"...","cameraLanguage":"...","mustPreserve":["..."],"mustAvoid":["..."],"prompt":"...","headline":"","caption":""}]}。非摄影媒介的 cameraLanguage 可以留空；shotType 可用 illustration、portrait、landscape、concept、graphic 或适合用户需求的短标签。
   """;

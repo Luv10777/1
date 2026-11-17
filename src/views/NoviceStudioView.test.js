@@ -20,6 +20,7 @@ test('novice studio drives the poster and video workflows from one composer', as
   const creations = [], quotes = [], submissions = []
   const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
   const creation = { id: 11, workflow: 'POSTER', parentId: null, status: 'SUCCEEDED', brief: '一杯手冲咖啡', ratio: '3:4', quality: '2K', count: 1, style: '电影质感',
+    references: [{ assetId: 9, role: 'SUBJECT', name: '咖啡.png', url: '/reference.png' }],
     items: [{ id: 1, ordinal: 0, generation: 1, status: 'SUCCEEDED', url: '/generated.png', width: 1536, height: 2048, persisted: true, previewedAt: 'now' }] }
   globalThis.fetch = async (url, options = {}) => {
     const method = options.method || 'GET'
@@ -87,18 +88,27 @@ test('novice studio drives the poster and video workflows from one composer', as
   try {
     app.mount(root); await settle()
     assert.match(text(root), /今天，想创作点什么？/)
-    assert.match(text(root), /每张 2 烟火/)
+    assert.match(text(button('生成')), /生成\s*2/, 'the send button shows the cost of one image')
 
     // 图片：选风格、写描述、生成，结果作为一轮对话出现。
     button('帮我搭配').props.onClick(); await settle()
     button('电影质感').props.onClick(); await settle()
     input().props['onUpdate:modelValue']('一杯手冲咖啡'); await settle()
+    const more = find(node => node.props?.['aria-label'] === '多一张')
+    for (let i = 0; i < 6; i++) { more.props.onClick(); await settle() }
+    assert.equal(more.props.disabled, true, 'at most 6 images per request')
+    find(node => node.props?.['aria-label'] === '少一张').props.onClick(); await settle()
+    find(node => node.props?.['aria-label'] === '少一张').props.onClick(); await settle()
+    find(node => node.props?.['aria-label'] === '少一张').props.onClick(); await settle()
+    assert.match(text(button('生成')), /生成\s*6/, 'the cost follows the image count')
     await submit()
     assert.equal(creations.length, 1)
     assert.equal(creations[0].workflow, 'POSTER')
     assert.equal(creations[0].brief, '一杯手冲咖啡')
     assert.equal(creations[0].style, '电影质感')
     assert.equal(creations[0].ratio, '3:4')
+    assert.equal(creations[0].count, 3)
+    assert.ok(find(node => node.tag === 'img' && node.props.src === '/reference.png'), 'the reference image is shown with the message')
     assert.ok(find(node => node.tag === 'img' && node.props.src === '/generated.png'), 'the generated image is shown in the thread')
     assert.equal(route.query.creation, '11')
     assert.ok(events.includes('novice-recents-changed'))

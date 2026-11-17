@@ -73,7 +73,6 @@ public class ImageCreationService {
          return view(old.get());
        }
    requireConfigured(req);
-   if(req.workflow().equals("POSTER") && req.count()!=1) throw bad("灵感绘图每次生成 1 张");
    if(req.brief().isBlank() && req.references().isEmpty()) throw bad("描述想画的内容，或上传参考图片");
    if(req.workflow().equals("PRODUCT_SET") && req.references().stream().noneMatch(r->r.role().equals("SUBJECT")))
      throw bad("产品套图需要至少一张商品照片");
@@ -715,6 +714,12 @@ public class ImageCreationService {
    if(taskId!=null && tasks.statusForTenant(taskId)==TaskStatus.FAILED)return "INTERRUPTED";
    return state;
  }
+ /** 记录里带上当初的参考图，回看对话时能看到用过哪些素材；素材删了也照常返回，只是没有链接。 */
+ private List<ImageDtos.ReferenceView> referenceViews(ImageCreation c) {
+   return c.getRequest().references().stream().map(r->assets.imagePreview(r.assetId())
+       .map(p->new ImageDtos.ReferenceView(p.id(),r.role(),p.name(),p.url()))
+       .orElse(new ImageDtos.ReferenceView(r.assetId(),r.role(),"参考图已不可用",null))).toList();
+ }
  private ImageDtos.View view(ImageCreation c) {
    var d=ImageQuality.dimensions(c.getRequest().quality(),c.getRequest().ratio());
    var list=items.findByCreationIdOrderByOrdinal(c.getId());
@@ -745,6 +750,6 @@ public class ImageCreationService {
    return new ImageDtos.View(c.getId(),c.getParentId(),c.getRequest().workflow(),c.getRequest().brief(),
      c.getRequest().quality(),c.getRequest().ratio(),state,c.getPlan()==null?"":c.getPlan().summary(),
      c.getPlan()==null?"":c.getPlan().question(),state.equals("INTERRUPTED")?"规划任务中断，可恢复重试":c.getError(),
-     done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId());
+     done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId(),referenceViews(c));
  }
 }

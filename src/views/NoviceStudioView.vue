@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowUp, AudioLines, Download, Film, ImagePlus, Paperclip, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
+import { ArrowUp, AudioLines, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
 import ImageInspirationPanel from '../components/ImageInspirationPanel.vue'
 import VideoPlanPanel from '../components/VideoPlanPanel.vue'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
@@ -17,6 +17,8 @@ import '../novice-studio.css'
 
 // 新手版对话页：灵感绘图和视频创作原样搬进一个输入框，功能、计费和接口都不变，只换外壳。
 // 图片走 useImageCreation('POSTER')，视频走 useVideoWorkbench()，和进阶版共用同一套逻辑。
+// 同一个对话里随时可以在图片和视频之间切换，每条消息下面只标这次的设置，不标「图片/视频」。
+const MAX_IMAGES = 6
 const route = useRoute()
 const router = useRouter()
 const mode = ref(route.query.mode === 'video' ? 'video' : 'image')
@@ -69,7 +71,6 @@ watch(() => {
 // 报价出来、视频出片时滚到底，确认按钮和成片不会被输入框挡住。
 watch(() => [Boolean(video.quoted), video.outputUrl], ([quoted, output]) => { if (quoted || output) scrollToEnd() })
 const conversationOf = turn => video.conversations.find(item => item.id === turn.convId)
-const materialsOf = item => (item.referenceImages?.length || 0) + (item.referenceVideos?.length || 0) + (item.referenceAudios?.length || 0)
 const started = computed(() => turns.value.length > 0 || studio.optimistic)
 
 async function scrollToEnd() {
@@ -87,6 +88,7 @@ function resetConversation() {
   turns.value = []
   panel.value = ''
   studio.resetDraft()
+  studio.count = 1
   video.startNewConversation()
 }
 async function openFromQuery() {
@@ -112,7 +114,7 @@ async function openFromQuery() {
 watch(() => [route.query.open, route.query.new], openFromQuery)
 onMounted(openFromQuery)
 
-// —— 图片：风格、比例画质、参考图 ——
+// —— 图片：风格、比例画质、张数、参考图 ——
 const moment = upcomingMoment()
 const seasonalStyle = SEASONAL_PREFIX + moment.name
 const styleTiles = [{ name: '帮我搭配', image: '/images/brand/yifangzhi-mark.png', fit: '按画面需求自动匹配', mark: true }, ...POSTER_STYLES]
@@ -123,6 +125,7 @@ const serviceNotice = computed(() => studio.requiresLogin ? '登录后开始创�
   : studio.capabilityState === 'checking' ? '正在检查创作服务…'
   : studio.capabilityState === 'error' ? `创作服务检查失败：${studio.capabilityError}`
   : !studio.configured ? '图片创作服务暂未接通' : '')
+function changeCount(step) { studio.count = Math.min(MAX_IMAGES, Math.max(1, Number(studio.count) + step)) }
 // 灵感方案里的「去挑选」风格会切 workspaceTab，这里换成打开风格面板。
 watch(() => studio.workspaceTab, tab => { if (tab === 'inspiration' && panel.value === 'plan') panel.value = 'style' })
 // 选了方案、描述填进输入框后收起方案面板。
@@ -131,9 +134,8 @@ watch(() => studio.brief, (value, previous) => { if (panel.value === 'plan' && m
 // —— 视频：场景、输出设置、素材 ——
 const videoModels = computed(() => (video.capabilities.length ? video.capabilities : video.fallbackCapabilities))
 const sceneTiles = computed(() => video.scenes.map(scene => ({ ...scene, cover: videoSceneCover(scene.key) })))
-const materialCount = computed(() => video.referenceImages.length + video.referenceVideos.length + video.referenceAudios.length)
 const activeVideoDraft = computed(() => !turns.value.some(entry => entry.kind === 'video' && entry.convId === video.activeConversationId))
-function pickVideoFiles(type) { videoInputs[type].value?.click() }
+function pickVideoFiles(type) { panel.value = ''; videoInputs[type].value?.click() }
 
 // —— 输入框 ——
 const placeholder = computed(() => mode.value === 'image'
@@ -150,11 +152,13 @@ const sendDisabled = computed(() => mode.value === 'image'
   ? studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending
   : video.isGenerating || Boolean(video.activeConversation?.loading))
 const sendLabel = computed(() => mode.value === 'image'
-  ? (studio.busy ? '正在提交…' : studio.saving ? '正在保存原图…' : studio.active ? '创作中…' : '生成')
-  : (video.isGenerating ? '正在生成视频…' : '预估费用'))
-const costHint = computed(() => mode.value === 'image'
-  ? `${studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火 · ` : ''}成功交付后扣费`
-  : '先预估烟火，确认后开始生成')
+  ? (studio.busy ? '正在提交' : studio.saving ? '正在保存' : studio.active ? '创作中' : '生成')
+  : (video.isGenerating ? '生成中' : '预估费用'))
+// 图片按张计费，按钮上直接写这次要花多少烟火；视频要先报价，按钮只放烟火标志。
+const imageCost = computed(() => (mode.value === 'image' ? studio.estimatedCredits : null))
+const sendTitle = computed(() => mode.value === 'image'
+  ? `${studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : ''}成功交付后扣费`
+  : '先预估烟火，确认后才开始生成')
 // 灵感方案第一次打开才挂上（和进阶版一样），之后只是隐藏，出好的方案不会丢。
 const planOpened = ref(false)
 function togglePanel(name) {
@@ -178,12 +182,23 @@ function onKeydown(event) {
   if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); if (!sendDisabled.value) send() }
 }
 
-// —— 结果里的操作 ——
+// —— 对话里的消息：素材、设置标签、长文折叠 ——
+const ROLE_LABELS = { SUBJECT: '主体', STYLE: '风格', LAYOUT: '构图', BACKGROUND: '背景' }
+const expanded = ref(new Set())
+const isLong = text => (text || '').length > 120 || (text || '').split('\n').length > 3
+function toggleExpanded(key) {
+  const next = new Set(expanded.value)
+  next[next.has(key) ? 'delete' : 'add'](key)
+  expanded.value = next
+}
 const revisingRoot = ref(null)
 const retryable = item => ['FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN'].includes(item.status)
 const isLiveImage = turn => turn.versions.at(-1)?.id === studio.current?.id
 const turnPrompt = version => (!version.parentId ? version.brief || '这次绘图创作' : version.brief?.split('\n本次修改：').at(-1) || '继续修改图片')
-const versionMeta = version => [version.style && version.style !== '帮我搭配' ? version.style : '', version.ratio, version.quality].filter(Boolean).join(' · ')
+const imageTags = (version, index) => [version.ratio, version.quality, version.count > 1 ? `${version.count} 张` : '', index ? `第 ${index + 1} 版` : ''].filter(Boolean)
+// 修改出的新版本沿用第一版的参考图，只在第一条消息上展示。
+const imageRefs = (version, index) => (index ? [] : version.references || [])
+const imageGridClass = count => (count > 1 ? (count > 4 ? 'is-many' : 'is-few') : 'is-single')
 function startRevision(turn) { revisingRoot.value = turn.rootId; studio.revision = '' }
 function submitRevision() {
   if (!studio.revision.trim()) return
@@ -191,7 +206,7 @@ function submitRevision() {
   revisingRoot.value = null
   scrollToEnd()
 }
-function videoMeta(item) {
+function videoTags(item) {
   const ratio = videoRatioOptions.find(option => option.value === (item.workflow?.ratio || item.format))?.label
   return [
     videoSceneName(video.scenes, item.sceneKey),
@@ -199,7 +214,7 @@ function videoMeta(item) {
     ratio,
     `${item.workflow?.durationSeconds || item.duration} 秒`,
     item.workflow?.resolution || item.resolution,
-  ].filter(Boolean).join(' · ')
+  ].filter(Boolean)
 }
 </script>
 
@@ -216,13 +231,23 @@ function videoMeta(item) {
         <template v-if="turn.kind === 'image'">
           <template v-for="(version, index) in turn.versions" :key="version.id">
             <div class="ns-user">
-              <small>图片<template v-if="versionMeta(version)"> · {{ versionMeta(version) }}</template><template v-if="index"> · 第 {{ index + 1 }} 版</template></small>
-              <p class="ns-bubble">{{ turnPrompt(version) }}</p>
+              <div v-if="imageRefs(version, index).length" class="ns-user-media">
+                <figure v-for="reference in imageRefs(version, index)" :key="reference.assetId" class="ns-media-thumb">
+                  <img v-if="reference.url" :src="reference.url" :alt="reference.name" loading="lazy" />
+                  <span v-else class="ns-media-missing">已删除</span>
+                  <figcaption>{{ ROLE_LABELS[reference.role] || '参考' }}</figcaption>
+                </figure>
+              </div>
+              <div class="ns-bubble" :class="{ 'is-clamped': isLong(turnPrompt(version)) && !expanded.has(version.id) }">
+                <p>{{ turnPrompt(version) }}</p>
+                <button v-if="isLong(turnPrompt(version))" type="button" class="ns-more" @click="toggleExpanded(version.id)">{{ expanded.has(version.id) ? '收起' : '展开全部' }}</button>
+              </div>
+              <ul class="ns-tags" aria-label="这次的设置"><li v-for="tag in imageTags(version, index)" :key="tag">{{ tag }}</li></ul>
             </div>
             <div class="ns-reply">
               <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
-              <p v-if="version.status !== 'SUCCEEDED'" class="ns-status" role="status"><i :class="{ live: isImageActive(version.status) }" />{{ imageStatusLabel(version) }}</p>
-              <div class="ns-images" :style="{ '--ns-ratio': imageDimensions(version.quality, version.ratio).width + '/' + imageDimensions(version.quality, version.ratio).height }">
+              <p v-if="version.status !== 'SUCCEEDED'" class="ns-status" role="status"><i :class="{ live: isImageActive(version.status) }" />{{ imageStatusLabel(version) }}<template v-if="version.count > 1 && version.completed"> · {{ version.completed }}/{{ version.count }}</template></p>
+              <div class="ns-images" :class="imageGridClass(version.count)" :style="{ '--ns-ratio': imageDimensions(version.quality, version.ratio).width + '/' + imageDimensions(version.quality, version.ratio).height }">
                 <template v-if="!version.items.length && (isImageActive(version.status) || version.status === 'NEEDS_INPUT')">
                   <div v-for="n in version.count" :key="n" class="ns-image is-placeholder"><small>{{ version.status === 'NEEDS_INPUT' ? '等你补充信息' : '生成中' }}</small></div>
                 </template>
@@ -232,8 +257,8 @@ function videoMeta(item) {
                   </a>
                   <div v-else class="ns-image is-placeholder" :style="{ aspectRatio: item.width + '/' + item.height }"><small>{{ IMAGE_STATUS[item.status] }}</small></div>
                   <figcaption v-if="item.url || item.error || retryable(item)">
-                    <button v-if="item.url" type="button" class="ns-chip" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="14" aria-hidden="true" />下载</button>
-                    <button v-if="item.url && isLiveImage(turn)" type="button" class="ns-chip" :disabled="studio.locked" @click="studio.regenerate(item)"><RefreshCw :size="14" aria-hidden="true" />再画一张</button>
+                    <button v-if="item.url" type="button" class="ns-chip is-icon" title="下载" aria-label="下载这张" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="14" aria-hidden="true" /></button>
+                    <button v-if="item.url && isLiveImage(turn)" type="button" class="ns-chip" :disabled="studio.locked" @click="studio.regenerate(item)"><RefreshCw :size="13" aria-hidden="true" />再画一张</button>
                     <span v-if="item.error" class="ns-error">{{ item.error }}</span>
                     <button v-if="retryable(item) && isLiveImage(turn)" type="button" class="ns-chip" :disabled="studio.busy || !!studio.pending" @click="studio.retry(item)">{{ item.status === 'FAILED' ? '重新生成这张' : item.status === 'UPSTREAM_UNKNOWN' ? '核对后重新生成' : '恢复这张' }}</button>
                   </figcaption>
@@ -260,8 +285,24 @@ function videoMeta(item) {
 
         <template v-else-if="conversationOf(turn)">
           <div class="ns-user">
-            <small>视频 · {{ videoMeta(conversationOf(turn)) }}<template v-if="materialsOf(conversationOf(turn))"> · 素材 {{ materialsOf(conversationOf(turn)) }} 个</template></small>
-            <p class="ns-bubble">{{ conversationOf(turn).workflow?.prompt || conversationOf(turn).prompt }}</p>
+            <div v-if="conversationOf(turn).referenceImages?.length || conversationOf(turn).referenceVideos?.length || conversationOf(turn).referenceAudios?.length" class="ns-user-media">
+              <figure v-for="asset in conversationOf(turn).referenceImages || []" :key="asset.id" class="ns-media-thumb">
+                <img v-if="asset.url" :src="asset.url" :alt="asset.name" loading="lazy" />
+                <span v-else class="ns-media-missing">已删除</span>
+                <figcaption>图片</figcaption>
+              </figure>
+              <figure v-for="asset in conversationOf(turn).referenceVideos || []" :key="asset.id" class="ns-media-thumb is-file" :title="asset.name">
+                <Film :size="18" :stroke-width="1.6" aria-hidden="true" /><figcaption>视频</figcaption>
+              </figure>
+              <figure v-for="asset in conversationOf(turn).referenceAudios || []" :key="asset.id" class="ns-media-thumb is-file" :title="asset.name">
+                <AudioLines :size="18" :stroke-width="1.6" aria-hidden="true" /><figcaption>音色</figcaption>
+              </figure>
+            </div>
+            <div class="ns-bubble" :class="{ 'is-clamped': isLong(conversationOf(turn).workflow?.prompt || conversationOf(turn).prompt) && !expanded.has(turn.key) }">
+              <p>{{ conversationOf(turn).workflow?.prompt || conversationOf(turn).prompt }}</p>
+              <button v-if="isLong(conversationOf(turn).workflow?.prompt || conversationOf(turn).prompt)" type="button" class="ns-more" @click="toggleExpanded(turn.key)">{{ expanded.has(turn.key) ? '收起' : '展开全部' }}</button>
+            </div>
+            <ul class="ns-tags" aria-label="这次的设置"><li v-for="tag in videoTags(conversationOf(turn))" :key="tag">{{ tag }}</li></ul>
           </div>
           <div class="ns-reply">
             <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
@@ -272,7 +313,7 @@ function videoMeta(item) {
               <button v-if="turn.convId === video.activeConversationId && conversationOf(turn).workflow?.id && !conversationOf(turn).submitting" type="button" class="ns-link is-danger" @click="video.cancelVideo">取消生成，退回未消耗烟火</button>
             </div>
             <p v-if="conversationOf(turn).notice" class="ns-note" :class="{ 'ns-error': conversationOf(turn).error }">{{ conversationOf(turn).notice }}</p>
-            <p v-if="conversationOf(turn).workflow?.chargedCredits != null" class="ns-note">本次交付消耗 {{ number(conversationOf(turn).workflow.chargedCredits) }} 烟火。</p>
+            <p v-if="conversationOf(turn).workflow?.chargedCredits != null" class="ns-spent"><YanhuoIcon :size="14" />本次消耗 {{ number(conversationOf(turn).workflow.chargedCredits) }}</p>
             <button v-if="turn.convId === video.activeConversationId && conversationOf(turn).workflow?.retryable" type="button" class="ns-chip" :disabled="conversationOf(turn).submitting" @click="video.retryVideo">预估恢复费用</button>
 
             <section v-if="turn.convId === video.activeConversationId && video.quoted" class="ns-card ns-quote" aria-labelledby="ns-quote-title">
@@ -305,7 +346,7 @@ function videoMeta(item) {
       </template>
 
       <template v-if="studio.optimistic">
-        <div class="ns-user"><small>图片</small><p class="ns-bubble">{{ studio.optimisticBrief || '参考图已收到' }}</p></div>
+        <div class="ns-user"><div class="ns-bubble"><p>{{ studio.optimisticBrief || '参考图已收到' }}</p></div></div>
         <div class="ns-reply"><div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div><p class="ns-status" role="status"><i class="live" />一方志正在编排画面…</p></div>
       </template>
       <span ref="threadEnd" />
@@ -321,24 +362,30 @@ function videoMeta(item) {
           <button type="button" class="ns-idea-button" :aria-expanded="panel === 'plan'" @click="togglePanel('plan')"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案</button>
         </div>
 
-        <div v-if="mode === 'image' && studio.files.length" class="ns-attachments">
+        <div v-if="mode === 'image' && studio.files.length" class="ns-attachments" aria-label="参考图">
           <div v-for="(file, index) in studio.files" :key="file.preview" class="ns-attachment">
             <img :src="file.preview" :alt="file.name" />
-            <span role="group" :aria-label="`${file.name}的参考用途`" class="ns-roles">
-              <button type="button" :aria-pressed="file.role === 'SUBJECT'" :class="{ active: file.role === 'SUBJECT' }" :disabled="studio.locked" @click="studio.files[index].role = 'SUBJECT'">主体</button>
-              <button type="button" :aria-pressed="file.role === 'STYLE'" :class="{ active: file.role === 'STYLE' }" :disabled="studio.locked" @click="studio.files[index].role = 'STYLE'">风格</button>
-            </span>
-            <button type="button" class="ns-remove" :aria-label="`移除 ${file.name}`" :disabled="studio.locked" @click="studio.removeFile(index)"><X :size="12" :stroke-width="2.4" aria-hidden="true" /></button>
+            <button type="button" class="ns-role" :aria-label="`${file.name}：用作${file.role === 'STYLE' ? '风格' : '主体'}，点击切换`" :disabled="studio.locked" @click="studio.files[index].role = file.role === 'STYLE' ? 'SUBJECT' : 'STYLE'">{{ file.role === 'STYLE' ? '风格' : '主体' }}</button>
+            <button type="button" class="ns-remove" :aria-label="`移除 ${file.name}`" :disabled="studio.locked" @click="studio.removeFile(index)"><X :size="11" :stroke-width="2.6" aria-hidden="true" /></button>
           </div>
         </div>
-        <div v-if="mode === 'video' && materialCount" class="ns-attachments">
-          <span v-for="asset in video.referenceImages" :key="asset.id" class="ns-attachment is-file"><img v-if="asset.url" :src="asset.url" :alt="asset.name" /><span>{{ asset.name }}</span><button type="button" class="ns-remove" aria-label="删除参考图" @click="video.removeMaterial('image', asset)"><X :size="12" :stroke-width="2.4" aria-hidden="true" /></button></span>
-          <span v-for="asset in video.referenceVideos" :key="asset.id" class="ns-attachment is-file"><Film :size="16" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" class="ns-remove" aria-label="删除参考视频" @click="video.removeMaterial('video', asset)"><X :size="12" :stroke-width="2.4" aria-hidden="true" /></button></span>
-          <span v-for="asset in video.referenceAudios" :key="asset.id" class="ns-attachment is-file"><AudioLines :size="16" aria-hidden="true" /><span>{{ asset.name }}</span><button type="button" class="ns-remove" aria-label="删除音色" @click="video.removeMaterial('audio', asset)"><X :size="12" :stroke-width="2.4" aria-hidden="true" /></button></span>
+        <div v-if="mode === 'video' && (video.referenceImages.length || video.referenceVideos.length || video.referenceAudios.length)" class="ns-attachments" aria-label="参考素材">
+          <div v-for="asset in video.referenceImages" :key="asset.id" class="ns-attachment" :title="asset.name">
+            <img v-if="asset.url" :src="asset.url" :alt="asset.name" /><span class="ns-role is-static">图片</span>
+            <button type="button" class="ns-remove" aria-label="删除参考图" @click="video.removeMaterial('image', asset)"><X :size="11" :stroke-width="2.6" aria-hidden="true" /></button>
+          </div>
+          <div v-for="asset in video.referenceVideos" :key="asset.id" class="ns-attachment is-file" :title="asset.name">
+            <Film :size="18" :stroke-width="1.6" aria-hidden="true" /><span class="ns-role is-static">视频</span>
+            <button type="button" class="ns-remove" aria-label="删除参考视频" @click="video.removeMaterial('video', asset)"><X :size="11" :stroke-width="2.6" aria-hidden="true" /></button>
+          </div>
+          <div v-for="asset in video.referenceAudios" :key="asset.id" class="ns-attachment is-file" :title="asset.name">
+            <AudioLines :size="18" :stroke-width="1.6" aria-hidden="true" /><span class="ns-role is-static">音色</span>
+            <button type="button" class="ns-remove" aria-label="删除音色" @click="video.removeMaterial('audio', asset)"><X :size="11" :stroke-width="2.6" aria-hidden="true" /></button>
+          </div>
         </div>
 
         <label for="ns-input" class="sr-only">{{ mode === 'image' ? '画面描述' : '描述你的成片需求' }}</label>
-        <textarea id="ns-input" v-model="draft" class="ns-input" rows="3" maxlength="2000" :placeholder="placeholder" :disabled="mode === 'image' ? studio.locked : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
+        <textarea id="ns-input" v-model="draft" class="ns-input" :rows="started ? 1 : 3" maxlength="2000" :placeholder="placeholder" :disabled="mode === 'image' ? studio.locked : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
 
         <div class="ns-toolbar">
           <button v-if="mode === 'image'" type="button" class="ns-icon" :disabled="studio.locked || studio.files.length >= 6" aria-label="添加参考图，最多 6 张" title="添加参考图，最多 6 张" @click="imageInput?.click()"><Paperclip :size="18" :stroke-width="1.6" aria-hidden="true" /></button>
@@ -347,13 +394,22 @@ function videoMeta(item) {
           <template v-if="mode === 'image'">
             <button type="button" class="ns-tool" :class="{ open: panel === 'style' }" :aria-expanded="panel === 'style'" @click="togglePanel('style')"><img v-if="currentStyle.image" :src="currentStyle.image" alt="" :class="{ mark: currentStyle.mark }" />{{ currentStyle.name }}</button>
             <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ studio.ratio }} · {{ studio.quality }}</button>
+            <div class="ns-count" role="group" aria-label="一次生成几张">
+              <button type="button" aria-label="少一张" :disabled="studio.locked || studio.count <= 1" @click="changeCount(-1)"><Minus :size="13" :stroke-width="2" aria-hidden="true" /></button>
+              <span aria-live="polite"><strong>{{ studio.count }}</strong> 张</span>
+              <button type="button" aria-label="多一张" :disabled="studio.locked || studio.count >= MAX_IMAGES" @click="changeCount(1)"><Plus :size="13" :stroke-width="2" aria-hidden="true" /></button>
+            </div>
           </template>
           <template v-else>
             <button v-if="video.currentScene" type="button" class="ns-tool" :class="{ open: panel === 'scene' }" :aria-expanded="panel === 'scene'" @click="togglePanel('scene')"><img v-if="videoSceneCover(video.sceneKey)" :src="videoSceneCover(video.sceneKey)" alt="" />{{ video.currentScene.name }}</button>
             <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ video.currentCapability.label }} · {{ videoRatioOptions.find(option => option.value === video.format)?.label }} · {{ video.duration }} 秒 · {{ video.resolution }}</button>
           </template>
-          <span class="ns-cost">{{ costHint }}</span>
-          <button type="submit" class="ns-send" :disabled="sendDisabled">{{ sendLabel }}<span aria-hidden="true"><ArrowUp :size="15" :stroke-width="2.2" /></span></button>
+          <button type="submit" class="ns-send" :class="{ 'is-video': mode === 'video' }" :disabled="sendDisabled" :title="sendTitle">
+            <span class="ns-send-label">{{ sendLabel }}</span>
+            <span v-if="imageCost != null" class="ns-send-cost" :aria-label="`消耗 ${imageCost} 烟火`"><YanhuoIcon :size="15" />{{ number(imageCost) }}</span>
+            <span v-else-if="mode === 'video'" class="ns-send-cost" aria-hidden="true"><YanhuoIcon :size="15" /></span>
+            <span class="ns-send-arrow" aria-hidden="true"><ArrowUp :size="16" :stroke-width="2.2" /></span>
+          </button>
         </div>
         <input ref="imageInput" class="sr-only" type="file" accept="image/jpeg,image/png" multiple :disabled="studio.locked" @change="studio.addFiles" />
         <input :ref="el => (videoInputs.image.value = el)" class="sr-only" type="file" accept="image/*" multiple @change="video.handleMaterialChange('image', $event)" />
@@ -393,10 +449,11 @@ function videoMeta(item) {
       </section>
 
       <section v-else-if="panel === 'output'" class="ns-panel" aria-label="输出设置">
-        <header><h2>输出设置</h2></header>
+        <header><h2>输出设置</h2><small>{{ sendTitle }}</small></header>
         <template v-if="mode === 'image'">
           <div class="ns-setting"><span>比例</span><div class="ns-segmented" role="group" aria-label="图片比例"><button v-for="ratio in IMAGE_RATIOS" :key="ratio" type="button" :aria-pressed="studio.ratio === ratio" :class="{ active: studio.ratio === ratio }" :disabled="studio.locked || !studio.supportsRatio(ratio)" @click="studio.ratio = ratio">{{ ratio }}</button></div></div>
           <div class="ns-setting"><span>画质</span><div class="ns-segmented" role="group" aria-label="输出画质"><button v-for="quality in IMAGE_QUALITIES" :key="quality" type="button" :aria-pressed="studio.quality === quality" :class="{ active: studio.quality === quality }" :disabled="studio.locked || !studio.supportsQuality(quality)" :title="studio.supportsQuality(quality) ? undefined : '当前比例不支持该画质'" @click="studio.quality = quality">{{ quality }}</button></div></div>
+          <div class="ns-setting"><span>张数</span><div class="ns-segmented" role="group" aria-label="一次生成几张"><button v-for="n in MAX_IMAGES" :key="n" type="button" :aria-pressed="studio.count === n" :class="{ active: studio.count === n }" :disabled="studio.locked" @click="studio.count = n">{{ n }} 张</button></div></div>
         </template>
         <template v-else>
           <div class="ns-setting"><span>模型</span><div class="ns-segmented" role="group" aria-label="视频模型"><button v-for="model in videoModels" :key="model.id" type="button" :aria-pressed="video.selectedModel === model.id" :class="{ active: video.selectedModel === model.id }" @click="video.selectModel(model.id)">{{ model.label }}</button></div></div>

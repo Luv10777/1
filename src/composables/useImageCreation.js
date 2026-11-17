@@ -52,7 +52,8 @@ export function useImageCreation(workflow) {
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
   // 单价以服务端账单摘要为准；未读到时为 null，页面不显示具体数字。
   const imageCredits = computed(() => billing.summary?.imageCredits ?? null)
-  const estimatedCredits = computed(() => imageCredits.value == null ? null : (product.value ? Number(count.value) : 1) * imageCredits.value)
+  // 灵感绘图默认 1 张；新手版对话页可以一次选 1–6 张，进阶版的灵感绘图不改张数。
+  const estimatedCredits = computed(() => imageCredits.value == null ? null : Number(count.value) * imageCredits.value)
   const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
   const requiresLogin = computed(() => !auth.isAuthenticated)
   const supportsRatio = value => {
@@ -229,7 +230,7 @@ export function useImageCreation(workflow) {
         await deliver({ kind: 'create', data: {
           requestKey: crypto.randomUUID(), workflow: workflow, brief: submittedBrief,
           references: submittedFiles.map(f => ({ assetId: f.assetId, role: f.role })),
-          ratio: ratio.value, quality: quality.value, count: product.value ? Number(count.value) : 1,
+          ratio: ratio.value, quality: quality.value, count: Number(count.value),
           platform: platform.value, imageType: imageType.value,
           purpose: product.value ? purpose.value : '', style: style.value,
         } })
