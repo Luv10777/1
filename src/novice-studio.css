@@ -1,0 +1,151 @@
+/* 新手版对话页：一个居中的输入框，结果按对话往下排。颜色全部取自全站变量，深色模式照常。 */
+.ns-page { --ns-ink: var(--color-primary); --ns-surface: var(--color-bg-surface); --ns-soft: var(--color-bg-subtle); --ns-line: var(--line, var(--color-border-subtle)); --ns-muted: var(--ink-muted, var(--color-text-muted)); display: flex; flex-direction: column; gap: 28px; width: 100%; max-width: 860px; margin: 0 auto; padding: 48px 0 24px; color: var(--ink, var(--color-primary)); }
+.ns-page.is-started { gap: 0; padding-top: 8px; min-height: 100%; }
+
+.ns-hero { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.ns-eyebrow { margin: 0; color: var(--ns-muted); font-size: 12px; letter-spacing: .4em; }
+.ns-hero h1 { margin: 0; font: 600 clamp(30px, 4vw, 44px)/1.3 var(--font-serif); letter-spacing: .04em; }
+.ns-hero p:last-child { margin: 0; color: var(--ns-muted); font-size: 15px; }
+
+/* 对话 */
+.ns-thread { display: flex; flex: 1; flex-direction: column; gap: 22px; padding: 16px 0 28px; }
+.ns-user { display: grid; justify-items: end; gap: 6px; align-self: flex-end; max-width: min(76%, 620px); }
+.ns-user small { color: var(--ns-muted); font-size: 12px; text-align: right; }
+.ns-bubble { margin: 0; padding: 12px 18px; border-radius: 18px 18px 6px 18px; background: var(--ns-ink); color: var(--ns-surface); font-size: 15px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ns-reply { display: grid; gap: 12px; justify-items: start; margin-bottom: 14px; }
+.ns-reply-head { display: flex; align-items: center; gap: 10px; }
+.ns-reply-head img { width: 28px; height: 28px; padding: 4px; box-sizing: border-box; border-radius: 50%; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); object-fit: contain; }
+.ns-reply-head strong { font: 600 14px var(--font-serif); letter-spacing: .1em; }
+.ns-status { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--ns-muted); font-size: 13px; }
+.ns-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--ns-muted); }
+.ns-status i.live { background: var(--color-accent); animation: ns-pulse 1.2s ease-in-out infinite; }
+@keyframes ns-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .ns-status i.live { animation: none; } }
+.ns-images { display: flex; flex-wrap: wrap; gap: 12px; justify-self: stretch; }
+.ns-image-item { display: grid; gap: 8px; width: min(320px, 100%); margin: 0; }
+.ns-image { display: grid; place-items: center; width: min(320px, 100%); overflow: hidden; border-radius: 16px; background: var(--ns-soft); box-shadow: 0 0 0 1px var(--ns-line), 0 24px 48px -28px rgb(15 23 42 / 40%); }
+.ns-image.is-placeholder { aspect-ratio: var(--ns-ratio, 3 / 4); color: var(--ns-muted); font-size: 12px; }
+.ns-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ns-image-item figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ns-video { width: min(360px, 100%); max-height: 70vh; border-radius: 16px; background: #000; box-shadow: 0 24px 48px -28px rgb(15 23 42 / 45%); }
+.ns-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ns-revise { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: min(100%, 560px); }
+.ns-revise input { flex: 1 1 260px; min-height: 40px; padding: 0 14px; border: 1px solid var(--ns-line); border-radius: 20px; background: var(--ns-surface); color: inherit; font: inherit; }
+.ns-card { display: grid; gap: 12px; width: min(100%, 440px); box-sizing: border-box; padding: 18px 20px; border-radius: 16px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line), 0 16px 40px -26px rgb(15 23 42 / 35%); }
+.ns-progress > div { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ns-progress strong { font-weight: 500; }
+.ns-progress small { color: var(--ns-muted); font-size: 12px; }
+.ns-bar { position: relative; height: 4px; overflow: hidden; border-radius: 2px; background: var(--ns-soft); }
+.ns-bar i { position: absolute; inset: 0 auto 0 0; width: 35%; border-radius: 2px; background: var(--color-accent); animation: ns-slide 1.6s ease-in-out infinite; }
+@keyframes ns-slide { from { left: -35%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .ns-bar i { animation: none; left: 0; } }
+.ns-quote h3 { margin: 0; font: 600 17px var(--font-serif); letter-spacing: .04em; }
+.ns-quote-item { margin: 0; color: var(--ns-muted); font-size: 13px; }
+.ns-quote-amount { display: flex; align-items: center; gap: 6px; margin: 0; font: 600 28px var(--font-mono); font-variant-numeric: tabular-nums; }
+.ns-quote dl { display: grid; margin: 0; font-size: 13px; }
+.ns-quote dl div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--ns-line); }
+.ns-quote dt { color: var(--ns-muted); }
+.ns-quote dd { margin: 0; text-align: right; }
+.ns-quote-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+/* 小按钮、提示 */
+.ns-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.ns-chip:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--line-strong, var(--ns-muted)); }
+.ns-chip.is-dark, .ns-primary { background: var(--ns-ink); box-shadow: none; color: var(--ns-surface); }
+.ns-primary { min-height: 42px; padding: 0 20px; border: 0; border-radius: 21px; font: inherit; font-weight: 500; cursor: pointer; }
+.ns-chip:disabled, .ns-primary:disabled, .ns-send:disabled, .ns-link:disabled { cursor: not-allowed; opacity: .5; }
+.ns-link { padding: 0; border: 0; background: none; color: var(--color-accent-text); font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; }
+.ns-link.is-danger { justify-self: start; color: var(--color-error); }
+.ns-note { margin: 0; color: var(--ns-muted); font-size: 13px; line-height: 1.7; }
+.ns-error { margin: 0; color: var(--color-error); font-size: 13px; line-height: 1.7; }
+.ns-error .ns-link { margin-left: 8px; }
+
+/* 输入框 */
+.ns-dock { display: flex; flex-direction: column; gap: 14px; }
+/* 外层滚动区底部有 28px 内边距，吸底时往下多贴 28px，免得对话内容从输入框下面露出来。 */
+.ns-page.is-started .ns-dock { position: sticky; bottom: -28px; z-index: 5; padding: 12px 0 44px; background: linear-gradient(to bottom, transparent, var(--night, var(--color-bg-canvas)) 24px); }
+.ns-page.is-started .ns-dock > :not(.ns-composer) { order: -1; }
+.ns-composer { display: flex; flex-direction: column; border-radius: 24px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line), 0 2px 4px rgb(15 23 42 / 3%), 0 28px 60px -30px rgb(15 23 42 / 32%); }
+.ns-composer:focus-within { box-shadow: 0 0 0 1px var(--line-strong, var(--ns-muted)), 0 2px 4px rgb(15 23 42 / 3%), 0 28px 60px -30px rgb(15 23 42 / 32%); }
+.ns-composer-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 20px 0; }
+.ns-modes { display: flex; gap: 4px; }
+.ns-modes button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent; color: var(--ns-muted); font: inherit; font-size: 14px; cursor: pointer; }
+.ns-modes button.active { background: var(--ns-ink); color: var(--ns-surface); font-weight: 500; }
+.ns-idea-button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: color-mix(in srgb, var(--color-accent) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent); color: var(--color-accent-text); font: inherit; font-size: 13px; cursor: pointer; }
+.ns-idea-button[aria-expanded='true'] { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.ns-attachments { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 20px 0; }
+.ns-attachment { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 5px; border-radius: 12px; background: var(--ns-soft); font-size: 12px; }
+.ns-attachment img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
+.ns-attachment.is-file { max-width: 220px; min-height: 32px; padding-right: 30px; }
+.ns-attachment.is-file img { width: 26px; height: 26px; border-radius: 5px; }
+.ns-attachment.is-file > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ns-roles { display: flex; gap: 2px; padding: 2px; border-radius: 6px; background: color-mix(in srgb, var(--ns-muted) 14%, transparent); }
+.ns-roles button { min-height: 22px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--ns-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.ns-roles button.active { background: var(--ns-surface); color: inherit; }
+.ns-remove { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ns-ink); color: var(--ns-surface); cursor: pointer; }
+.ns-attachment.is-file .ns-remove { position: static; margin-left: auto; flex: none; }
+.ns-input { min-height: 84px; margin: 12px 20px 6px; padding: 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; line-height: 1.75; resize: none; }
+.ns-page.is-started .ns-input { min-height: 52px; font-size: 16px; }
+.ns-input::placeholder { color: var(--ns-muted); opacity: .8; }
+.ns-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 10px 12px 12px 14px; border-top: 1px solid var(--ns-line); }
+.ns-icon { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.ns-icon:hover:not(:disabled), .ns-icon[aria-expanded='true'] { background: var(--ns-soft); }
+.ns-icon:disabled { cursor: not-allowed; opacity: .4; }
+.ns-divider { width: 1px; height: 18px; margin: 0 4px; background: var(--ns-line); }
+.ns-tool { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; max-width: 100%; padding: 0 12px 0 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.ns-tool:hover, .ns-tool.open { background: var(--ns-soft); }
+.ns-tool img { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px var(--ns-line); }
+.ns-tool img.mark, .ns-tile img.mark { padding: 3px; box-sizing: border-box; background: #fff; object-fit: contain; }
+.ns-cost { margin-left: auto; padding-right: 6px; color: var(--ns-muted); font-size: 12px; }
+.ns-send { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 7px 0 20px; border: 0; border-radius: 22px; background: var(--ns-ink); color: var(--ns-surface); font: inherit; font-size: 14px; font-weight: 500; letter-spacing: .04em; cursor: pointer; }
+.ns-send > span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); }
+.ns-composer-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0 8px; color: var(--ns-muted); font-size: 13px; }
+
+/* 风格、场景、输出设置、素材、灵感方案 */
+.ns-panel { display: grid; gap: 14px; padding: 18px; border-radius: 18px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); }
+.ns-page.is-started .ns-panel { max-height: min(56vh, 560px); overflow-y: auto; box-shadow: 0 0 0 1px var(--ns-line), 0 20px 50px -24px rgb(15 23 42 / 35%); }
+.ns-panel > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.ns-panel h2 { margin: 0; font: 600 16px var(--font-serif); letter-spacing: .06em; }
+.ns-panel header small { color: var(--ns-muted); font-size: 12px; }
+.ns-plan > header { align-items: center; }
+.ns-tiles { display: grid; gap: 14px; }
+.ns-tiles.is-styles { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+.ns-tiles.is-scenes { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.ns-tile { display: grid; align-content: start; gap: 6px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.ns-tile img, .ns-tile-blank, .ns-seasonal-art { display: block; width: 100%; aspect-ratio: 4 / 5; border-radius: 12px; background: var(--ns-soft); box-shadow: 0 0 0 1px var(--ns-line); object-fit: cover; transition: box-shadow .15s; }
+.ns-tiles.is-scenes .ns-tile img, .ns-tiles.is-scenes .ns-tile-blank { aspect-ratio: 16 / 10; }
+.ns-tile-blank { display: grid; place-items: center; color: var(--ns-muted); font-size: 28px; }
+.ns-tile img.mark { padding: 24%; }
+.ns-tile small { color: var(--ns-muted); font-size: 12px; line-height: 1.45; }
+.ns-tile.selected img, .ns-tile.selected .ns-tile-blank, .ns-tile.selected .ns-seasonal-art { box-shadow: 0 0 0 3px var(--ns-surface), 0 0 0 5px var(--ns-ink); }
+.ns-tile.selected > span:not(.ns-seasonal-art):not(.ns-tile-blank) { font-weight: 600; }
+.ns-tile:disabled { cursor: not-allowed; opacity: .55; }
+.ns-seasonal-art { display: grid; place-content: center; gap: 2px; text-align: center; background: color-mix(in srgb, var(--color-accent) 10%, var(--ns-surface)); }
+.ns-seasonal-art strong { font: 600 18px var(--font-serif); color: var(--color-accent-text); }
+.ns-seasonal-art small { font-size: 11px; }
+.ns-setting { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; }
+.ns-setting > span, .ns-setting > label { flex: 0 0 64px; color: var(--ns-muted); }
+.ns-setting input[type='range'] { flex: 1 1 200px; accent-color: var(--color-accent); }
+.ns-segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.ns-segmented button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 16px; background: var(--ns-soft); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.ns-segmented button.active { background: var(--ns-ink); color: var(--ns-surface); }
+.ns-segmented button:disabled { cursor: not-allowed; opacity: .4; }
+.ns-attach-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ns-attach-option { display: grid; justify-items: start; gap: 4px; padding: 14px; border: 1px dashed var(--ns-line); border-radius: 12px; background: var(--ns-soft); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.ns-attach-option small { color: var(--ns-muted); font-size: 12px; }
+
+/* 试试这样说 */
+.ns-ideas { display: grid; gap: 2px; }
+.ns-ideas small { padding: 0 12px 6px; color: var(--ns-muted); font-size: 12px; letter-spacing: .12em; }
+.ns-ideas button { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.ns-ideas button:hover { background: var(--ns-soft); }
+.ns-idea-arrow { flex: none; color: var(--color-accent-text); transform: rotate(45deg); }
+
+@media (max-width: 640px) {
+  .ns-page { padding-top: 20px; }
+  .ns-user { max-width: 92%; }
+  .ns-cost { display: none; }
+  .ns-composer-top, .ns-attachments { padding-inline: 14px; }
+  .ns-input { margin-inline: 14px; font-size: 16px; }
+  .ns-send { margin-left: auto; }
+}

@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import IdentityPrompt from '../components/IdentityPrompt.vue'
 import { identityMissing } from '../stores/identity'
 import { auth } from '../stores/auth'
-import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket, Briefcase } from 'lucide-vue-next'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket, Briefcase, SquarePen, LayoutGrid, Wallet, ArrowUpRight } from 'lucide-vue-next'
 import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
 import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { billing, number, refreshBilling } from '../stores/billing'
@@ -20,6 +20,8 @@ import { aiCreationHidden, allianceHidden, isHiddenRoute } from '../utils/site'
 import { memberGateState } from '../utils/memberGate'
 import { inDesktop } from '../utils/desktop'
 import { partnerApi } from '../services/partnerApi'
+import NoviceRecents from '../components/NoviceRecents.vue'
+import { uiMode } from '../stores/uiMode'
 
 const route = useRoute()
 let billingTimer
@@ -261,6 +263,17 @@ const closeMenu = () => { menuOpen.value = false }
 // 清掉会话后返回可直接浏览的功能首页。
 const loginLocation = computed(() => ({ name: 'login', query: { redirect: route.fullPath } }))
 const logout = async () => { logoutConfirm.value = false; await auth.logout(); router.push('/image/create') }
+// 新手版 / 进阶版：只换侧栏和入口，不是权限。主域名不做 AI 创作，没有新手版。
+watch(() => [auth.tenantId, auth.user?.id], ([tenantId, userId]) => uiMode.setAccount(userId ? `${tenantId}:${userId}` : ''), { immediate: true })
+const novice = computed(() => !aiCreationHidden && auth.isAuthenticated && uiMode.current.value === 'novice')
+function switchMode(mode) {
+  if (uiMode.current.value === mode) return
+  uiMode.set(mode)
+  closeMenu()
+  if (mode === 'novice') router.push({ name: 'studio' })
+  else if (route.name === 'studio') router.push('/image/create')
+}
+function startNewChat() { closeMenu(); router.push({ name: 'studio', query: { new: String(Date.now()) } }) }
 </script>
 
 <template>
@@ -268,7 +281,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
     <div class="mobile-scrim" :class="{ 'is-visible': menuOpen }" @click="closeMenu" />
     <aside class="sidebar paper-sidebar" :class="{ 'is-open': menuOpen, 'is-collapsed': collapsed }">
       <div class="brand-lockup paper-brand">
-        <RouterLink to="/image/create" class="brand-link" aria-label="一方志内容工具"><span class="brand-mark seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="brand-copy"><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
+        <RouterLink :to="novice ? '/studio' : '/image/create'" class="brand-link" aria-label="一方志内容工具"><span class="brand-mark seal-mark"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="brand-copy"><strong>一方志</strong><small>为每一方商家立传</small></span></RouterLink>
         <button class="sidebar-collapse" type="button" :aria-label="collapsed ? '展开侧栏' : '收起侧栏'" :title="collapsed ? '展开侧栏' : '收起侧栏'" :aria-expanded="!collapsed" @click="collapsed = !collapsed"><component :is="collapsed ? ChevronsRight : ChevronsLeft" :size="16" :stroke-width="1.75" aria-hidden="true" /></button>
         <button class="icon-button sidebar-close" aria-label="关闭导航" @click="closeMenu">×</button>
       </div>
@@ -283,7 +296,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
           </AppSelect>
         </template>
       </div>
-      <nav class="primary-nav paper-nav" aria-label="主导航">
+      <nav v-if="!novice" class="primary-nav paper-nav" aria-label="主导航">
         <div
           v-for="group in navGroups"
           :key="group.key"
@@ -338,6 +351,15 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
           </template>
         </div>
       </nav>
+      <nav v-else class="primary-nav paper-nav novice-nav" aria-label="主导航">
+        <button type="button" class="novice-new" title="新对话" @click="startNewChat"><SquarePen :size="17" :stroke-width="1.7" aria-hidden="true" /><span class="nav-group-label">新对话</span></button>
+        <NoviceRecents v-if="!collapsed" @open="closeMenu" />
+        <div class="novice-links">
+          <RouterLink to="/works" class="novice-link" :class="{ active: isActive('works') }" title="我的作品" @click="closeMenu"><LayoutGrid :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">我的作品</span></RouterLink>
+          <RouterLink to="/billing" class="novice-link" :class="{ active: isActive('billing') }" title="账户与充值" @click="closeMenu"><Wallet :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">账户与充值</span></RouterLink>
+          <button type="button" class="novice-link novice-pro" title="切换到进阶版" @click="switchMode('pro')"><ArrowUpRight :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">直播、文案等更多功能在进阶版</span></button>
+        </div>
+      </nav>
 
       <div class="sidebar-footer paper-sidebar-footer">
         <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>未激活</template></small><strong>{{ userName }}<RouterLink v-if="identityMissing()" class="identity-flag" :to="{ name: 'settings', hash: '#identity' }" @click="closeMenu">未实名</RouterLink></strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
@@ -353,6 +375,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
             <RouterLink v-if="auth.isAuthenticated && !aiCreationHidden" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
+            <div v-if="auth.isAuthenticated && !aiCreationHidden" class="mode-switch" role="group" aria-label="切换版式"><button type="button" :aria-pressed="novice" :class="{ active: novice }" @click="switchMode('novice')">新手<span class="mode-suffix">版</span></button><button type="button" :aria-pressed="!novice" :class="{ active: !novice }" @click="switchMode('pro')">进阶<span class="mode-suffix">版</span></button></div>
             <a v-if="showPartnerEntry" href="/partner/" target="_blank" rel="noopener" class="topbar-entry topbar-entry-primary" :title="`进入「${partnerMembership.partnerName || '服务商'}」的服务商后台`"><Briefcase :size="15" aria-hidden="true" />服务商后台</a>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink v-if="!allianceHidden" to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
@@ -404,7 +427,7 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
         <SiteFooter v-if="route.matched.length" />
       </div>
       <StoreFormModal v-if="storeModalOpen" @close="storeModalOpen = false" />
-      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink v-if="!aiCreationHidden" to="/image/create" :class="{ active: String(route.name).startsWith('image-create') }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink v-if="!aiCreationHidden" to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink v-if="!allianceHidden" to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink v-if="!aiCreationHidden" to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink v-if="!allianceHidden" to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>好物</small></RouterLink></nav>
+      <nav class="mobile-bottom-nav" aria-label="移动端快捷导航"><RouterLink v-if="!aiCreationHidden" :to="novice ? '/studio' : '/image/create'" :class="{ active: String(route.name).startsWith('image-create') || route.name === 'studio' }"><span class="material-symbols-outlined" aria-hidden="true">edit_note</span><small>创作</small></RouterLink><RouterLink v-if="!aiCreationHidden && !novice" to="/digital-human" :class="{ active: route.name === 'digital-human' }"><span class="material-symbols-outlined" aria-hidden="true">live_tv</span><small>直播</small></RouterLink><RouterLink v-if="!allianceHidden" to="/information" class="mobile-bottom-primary" aria-label="信息发布"><FilePenLine :size="21" aria-hidden="true" /></RouterLink><RouterLink v-if="!aiCreationHidden" to="/works" :class="{ active: route.name === 'works' }"><span class="material-symbols-outlined" aria-hidden="true">folder</span><small>作品库</small></RouterLink><RouterLink v-if="!allianceHidden" to="/merchant-alliance" :class="{ active: route.name === 'merchant-alliance' }"><Store :size="21" aria-hidden="true" /><small>好物</small></RouterLink></nav>
     </main>
   </div>
 </template>
@@ -497,4 +520,22 @@ const logout = async () => { logoutConfirm.value = false; await auth.logout(); r
 @media (max-width: 860px) { .topbar .header-store { display: none; } }
 @media (max-width: 860px) { .paper-main .page-scroll.page-scroll-workspace { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } }
 @media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 12px; } .topbar-entry svg { display: none; } }
+/* 新手版 / 进阶版切换：两段式开关，跟余额、通知放在一起。 */
+.mode-switch { display: inline-flex; flex: none; padding: 2px; border: 1px solid var(--line); border-radius: 16px; background: var(--color-bg-subtle); }
+.mode-switch button { min-height: 28px; padding: 0 12px; border: 0; border-radius: 14px; background: transparent; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.mode-switch button.active { background: var(--color-bg-surface); box-shadow: 0 1px 2px rgb(15 23 42 / 12%); color: var(--ink); font-weight: 600; }
+/* 手机上顶栏放不下，切换只写「新手 / 进阶」。 */
+@media (max-width: 640px) { .mode-switch button { padding: 0 8px; } .mode-suffix { display: none; } }
+/* 新手版侧栏：新对话、最近记录、作品和账户。 */
+.novice-nav { display: flex; flex-direction: column; gap: 14px; padding: 4px 12px 12px; }
+.novice-new { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 14px; border: 0; border-radius: 10px; background: var(--color-bg-surface); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgb(15 23 42 / 6%); color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.novice-new:hover { box-shadow: 0 0 0 1px var(--line-strong), 0 1px 2px rgb(15 23 42 / 6%); }
+.novice-links { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--line); }
+.novice-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; text-decoration: none; cursor: pointer; }
+.novice-link:hover, .novice-link.active { background: var(--color-bg-subtle); }
+.novice-link.active { color: var(--color-accent-text); font-weight: 600; }
+.novice-pro { color: var(--ink-muted); font-size: 13px; }
+.paper-sidebar.is-collapsed .novice-nav { padding: 4px 8px; }
+.paper-sidebar.is-collapsed .novice-new, .paper-sidebar.is-collapsed .novice-link { justify-content: center; padding: 0; }
+.paper-sidebar.is-collapsed .novice-nav .nav-group-label { display: none; }
 </style>
