@@ -105,7 +105,7 @@ public class ImageRenderHandler implements TaskHandler {
        if(encoded.length()>44*1024*1024)throw new IllegalArgumentException("生成图片过大");
        byte[] bytes=Base64.getDecoder().decode(encoded);
        var source=renderer.decode(bytes);
-       raw=base+"/background.png";storage.put(raw,renderer.png(source),"image/png");
+       raw=base+"/background.png";storage.put(raw,renderer.png(source),"image/png");renderer.storeThumbnail(storage,raw,source);
        log.info("图片原图保存完成: itemId={} elapsedMs={}",id,(System.nanoTime()-providerStarted)/1_000_000);
      } else if(!status.equals("FAILED") && !directUrl && (response.providerJobId()==null||response.providerJobId().isBlank()))
        throw new IllegalArgumentException("图片服务未在单次响应中返回最终图片 URL 或内容");

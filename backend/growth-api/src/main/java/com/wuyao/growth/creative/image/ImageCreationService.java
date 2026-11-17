@@ -180,9 +180,10 @@ public class ImageCreationService {
    return PageResult.of(result,result.stream().map(c->{
      var latest=latestVersion(c);
      var v=view(latest);
-     String previewUrl=v.items().stream().map(ImageDtos.ItemView::url).filter(Objects::nonNull).findFirst().orElse(null);
+     var preview=v.items().stream().filter(i->i.url()!=null).findFirst();
      return new ImageDtos.History(latest.getId(),latest.getRequest().workflow(),title(c),latest.getRequest().brief(),
-       latest.getRequest().quality(),c.getCreatedAt(),v.status(),v.completed(),v.count(),previewUrl);
+       latest.getRequest().quality(),c.getCreatedAt(),v.status(),v.completed(),v.count(),
+       preview.map(ImageDtos.ItemView::url).orElse(null),preview.map(ImageDtos.ItemView::thumbUrl).orElse(null));
    }).toList());
  }
  private ImageCreation latestVersion(ImageCreation creation) {
@@ -207,7 +208,8 @@ public class ImageCreationService {
      return new ImageDtos.Work(i.getId(),c.getId(),c.getRequest().workflow(),title(root(c)),
        storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30)),c.getRequest().quality(),
        i.getActualWidth()==null?d.width():i.getActualWidth(),
-       i.getActualHeight()==null?d.height():i.getActualHeight(),i.getCreatedAt());
+       i.getActualHeight()==null?d.height():i.getActualHeight(),i.getCreatedAt(),
+       storage.presignGet(ImageRenderer.thumbnailKey(i.getOutputKey()),Duration.ofMinutes(30)));
    }).toList());
  }
  @Transactional
@@ -737,7 +739,9 @@ public class ImageCreationService {
        status,status.equals("INTERRUPTED")?Objects.toString(i.getError(),"执行中断，可恢复原任务"):downloadFailed?"图片保存失败，临时预览链接可能过期":i.getError(),url,
        i.getActualWidth()==null?d.width():i.getActualWidth(),
        i.getActualHeight()==null?d.height():i.getActualHeight(),i.getTaskId(),i.isSimilarityWarning(),
-       providerUrl,i.getPersistedAt()!=null,downloadFailed,i.getGeneration(),i.getPreviewedAt());
+       providerUrl,i.getPersistedAt()!=null,downloadFailed,i.getGeneration(),i.getPreviewedAt(),
+       // 小图在保存原图时顺带生成；更早的图没有小图，前端加载失败会退回原图。
+       i.getOutputKey()==null?null:storage.presignGet(ImageRenderer.thumbnailKey(i.getOutputKey()),Duration.ofMinutes(30)));
    }).toList();
    int done=(int)views.stream().filter(i->i.status().equals("SUCCEEDED")).count();
    String state=effective(c.getStatus(),c.getTaskId());

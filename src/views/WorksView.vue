@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { imageApi } from '../services/imageCreation'
+import { stableUrl } from '../utils/stableUrl'
 import { videoApi } from '../services/videoWorkflow'
 import { downloadMedia } from '../services/mediaDownload'
 import { ArrowUpRight, Check, Clock3, Download, Edit3, Image as ImageIcon, LayoutGrid, List, Play, Plus, Search, X } from 'lucide-vue-next'
@@ -57,6 +58,8 @@ function mapImage(row) {
     createdAt: row.createdAt,
     tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '灵感绘图', row.quality],
     url: row.url,
+    // 列表用小图，详情和下载用原图；更早的图没有小图时换回原图。
+    thumb: row.thumbUrl || row.url,
     quality: row.quality,
     dimensions: row.width && row.height ? `${row.width} × ${row.height} px` : '未记录尺寸',
     workflow: row.workflow,
@@ -208,8 +211,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
         @keydown.enter.self="selectedWork = work"
       >
         <div class="work-thumb">
-          <img v-if="work.type === 'image'" class="work-media" :src="work.url" :alt="work.title" loading="lazy" />
-          <video v-else class="work-media" :src="work.url" :aria-label="work.title" muted playsinline preload="metadata" />
+          <img v-if="work.type === 'image'" class="work-media" :src="stableUrl(work.thumb)" :alt="work.title" loading="lazy" decoding="async" @error="work.thumb = work.url" />
+          <video v-else class="work-media" :src="`${stableUrl(work.url)}#t=0.1`" :aria-label="work.title" muted playsinline preload="metadata" />
           <span v-if="work.type === 'video'" class="video-play-icon" aria-hidden="true"><Play :size="20" fill="currentColor" /></span>
           <div class="thumb-overlay">
             <button class="download-button" type="button" :aria-label="downloadingWorks.has(work.id) ? '正在下载' : `下载${work.typeLabel}`" :title="`下载${work.typeLabel}`" :disabled="downloadingWorks.has(work.id)" :aria-busy="downloadingWorks.has(work.id)" @click.stop="downloadWork(work)">
@@ -252,8 +255,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
           </header>
           <div class="generation-detail">
             <div class="detail-media">
-              <img v-if="selectedWork.type === 'image'" :src="selectedWork.url" :alt="selectedWork.title" />
-              <video v-else :src="selectedWork.url" controls playsinline preload="metadata" />
+              <img v-if="selectedWork.type === 'image'" :src="stableUrl(selectedWork.url)" :alt="selectedWork.title" />
+              <video v-else :src="stableUrl(selectedWork.url)" controls playsinline preload="metadata" />
             </div>
             <p v-if="selectedWork.type === 'video' && selectedWork.prompt" class="detail-prompt">{{ selectedWork.prompt }}</p>
             <div class="parameter-grid">

@@ -36,7 +36,7 @@ public final class ImageDtos {
     public record ItemView(Long id, int ordinal, String role, String headline, String caption,
                            String status, String error, String url, int width, int height, Long taskId,
                            boolean similarityWarning, String providerImageUrl, boolean persisted,
-                           boolean downloadFailed, int generation, Instant previewedAt) {}
+                           boolean downloadFailed, int generation, Instant previewedAt, String thumbUrl) {}
     public record PreviewLoaded(@Min(0) int generation) {}
     public record View(Long id, Long parentId, String workflow, String brief, String quality,
                        String ratio, String status, String summary, String question, String error,
@@ -44,9 +44,9 @@ public final class ImageDtos {
                        List<ReferenceView> references) {}
     public record ReferenceView(Long assetId, String role, String name, String url) {}
     public record History(Long id, String workflow, String title, String brief, String quality, Instant createdAt,
-                          String status, int completed, int count, String previewUrl) {}
+                          String status, int completed, int count, String previewUrl, String previewThumbUrl) {}
     public record Work(Long id, Long creationId, String workflow, String title,
-                       String url, String quality, int width, int height, Instant createdAt) {}
+                       String url, String quality, int width, int height, Instant createdAt, String thumbUrl) {}
     public record Dimensions(int width, int height) {}
     public record Understanding(String summary, String question, List<String> mustChange,
                                 List<String> mustPreserve, List<String> mustAvoid) {}

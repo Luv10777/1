@@ -6,6 +6,7 @@ import { imageApi } from '../services/imageCreation'
 import { get } from '../utils/request'
 import { videoConversationTitle } from '../services/videoConversations'
 import { NOVICE_RECENTS_CHANGED } from '../stores/uiMode'
+import { stableUrl } from '../utils/stableUrl'
 
 // 新手版侧栏的「最近」：灵感绘图和视频创作各自的记录按时间合在一起。
 // 默认只放最近 3 条（缩略图都是原图，少放几张也省流量）；点「查看全部」就地展开，按天分组、在侧栏里滚动，可以往前翻。
@@ -22,7 +23,9 @@ const loaded = ref(false)
 const loadingMore = ref(false)
 const expanded = ref(false)
 
-const imageEntry = entry => ({ key: `image:${entry.id}`, kind: 'image', title: entry.title || entry.brief || '绘图创作', at: Date.parse(entry.createdAt) || 0, thumb: entry.previewUrl || '' })
+// 图片优先用小图（长边 640）；更早的图没有小图，加载失败时换回原图。
+const imageEntry = entry => ({ key: `image:${entry.id}`, kind: 'image', title: entry.title || entry.brief || '绘图创作', at: Date.parse(entry.createdAt) || 0, thumb: entry.previewThumbUrl || entry.previewUrl || '', full: entry.previewUrl || '' })
+const thumbFailed = item => { if (item.full && item.thumb !== item.full) item.thumb = item.full }
 const videoEntry = entry => ({ key: `video:${entry.id}`, kind: 'video', title: videoConversationTitle(entry.prompt), at: Date.parse(entry.createdAt) || 0, thumb: entry.outputUrl || '' })
 
 async function fetchPage(kind, page) {
@@ -97,8 +100,8 @@ onBeforeUnmount(() => window.removeEventListener(NOVICE_RECENTS_CHANGED, load))
             @click="emit('open')"
           >
             <span class="novice-recent-thumb" aria-hidden="true">
-              <img v-if="item.kind === 'image' && item.thumb" :src="item.thumb" alt="" loading="lazy" decoding="async" />
-              <video v-else-if="item.kind === 'video' && item.thumb" :src="`${item.thumb}#t=0.1`" muted playsinline preload="metadata" />
+              <img v-if="item.kind === 'image' && item.thumb" :src="stableUrl(item.thumb)" alt="" loading="lazy" decoding="async" @error="thumbFailed(item)" />
+              <video v-else-if="item.kind === 'video' && item.thumb" :src="`${stableUrl(item.thumb)}#t=0.1`" muted playsinline preload="metadata" />
               <ImageIcon v-else-if="item.kind === 'image'" :size="15" :stroke-width="1.6" />
               <Film v-else :size="15" :stroke-width="1.6" />
               <i v-if="item.kind === 'video' && item.thumb"><Play :size="9" fill="currentColor" :stroke-width="0" /></i>

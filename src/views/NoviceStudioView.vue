@@ -14,6 +14,7 @@ import { isVideoInProgress, videoModelLabel } from '../services/videoConversatio
 import { billing, dateTime, number } from '../stores/billing'
 import { NOVICE_RECENTS_CHANGED } from '../stores/uiMode'
 import { auth } from '../stores/auth'
+import { stableUrl } from '../utils/stableUrl'
 import '../novice-studio.css'
 
 // 新手版对话页：灵感绘图和视频创作原样搬进一个输入框，功能、计费和接口都不变，只换外壳。
@@ -213,6 +214,14 @@ function toggleExpanded(key) {
   next[next.has(key) ? 'delete' : 'add'](key)
   expanded.value = next
 }
+// 对话里显示小图（长边 640），点开看原图；更早的图没有小图，加载失败就退回原图。
+// 所有签名链接都经过 stableUrl，同一个文件在有效期内用同一个地址，浏览器才能缓存。
+const missingThumbs = ref(new Set())
+const imageSrc = item => stableUrl(item.thumbUrl && !missingThumbs.value.has(item.id) ? item.thumbUrl : item.url)
+function onImageError(item) {
+  if (item.thumbUrl && !missingThumbs.value.has(item.id)) { missingThumbs.value = new Set(missingThumbs.value).add(item.id); return }
+  studio.imageLoadFailed(item)
+}
 const revisingRoot = ref(null)
 const retryable = item => ['FAILED', 'INTERRUPTED', 'UPSTREAM_UNKNOWN'].includes(item.status)
 const isLiveImage = turn => turn.versions.at(-1)?.id === studio.current?.id
@@ -258,7 +267,7 @@ function videoTags(item) {
             <div class="ns-user">
               <div v-if="imageRefs(version, index).length" class="ns-user-media">
                 <figure v-for="reference in imageRefs(version, index)" :key="reference.assetId" class="ns-media-thumb">
-                  <img v-if="reference.url" :src="reference.url" :alt="reference.name" loading="lazy" />
+                  <img v-if="reference.url" :src="stableUrl(reference.url)" :alt="reference.name" loading="lazy" />
                   <span v-else class="ns-media-missing">已删除</span>
                   <figcaption>{{ ROLE_LABELS[reference.role] || '参考' }}</figcaption>
                 </figure>
@@ -277,8 +286,8 @@ function videoTags(item) {
                   <div v-for="n in version.count" :key="n" class="ns-image is-placeholder"><small>{{ version.status === 'NEEDS_INPUT' ? '等你补充信息' : '生成中' }}</small></div>
                 </template>
                 <figure v-for="item in version.items" :key="item.id" class="ns-image-item">
-                  <a v-if="item.url" :href="item.url" target="_blank" rel="noopener" class="ns-image" :style="{ aspectRatio: item.width + '/' + item.height }" aria-label="在新窗口查看大图">
-                    <img :src="item.url" alt="生成的图片" @load="studio.reportImageVisible(item)" @error="studio.imageLoadFailed(item)" />
+                  <a v-if="item.url" :href="stableUrl(item.url)" target="_blank" rel="noopener" class="ns-image" :style="{ aspectRatio: item.width + '/' + item.height }" aria-label="在新窗口查看原图">
+                    <img :src="imageSrc(item)" alt="生成的图片" decoding="async" @load="studio.reportImageVisible(item)" @error="onImageError(item)" />
                   </a>
                   <div v-else class="ns-image is-placeholder" :style="{ aspectRatio: item.width + '/' + item.height }"><small>{{ IMAGE_STATUS[item.status] }}</small></div>
                   <figcaption v-if="item.url || item.error || retryable(item)">
@@ -312,7 +321,7 @@ function videoTags(item) {
           <div class="ns-user">
             <div v-if="conversationOf(turn).referenceImages?.length || conversationOf(turn).referenceVideos?.length || conversationOf(turn).referenceAudios?.length" class="ns-user-media">
               <figure v-for="asset in conversationOf(turn).referenceImages || []" :key="asset.id" class="ns-media-thumb">
-                <img v-if="asset.url" :src="asset.url" :alt="asset.name" loading="lazy" />
+                <img v-if="asset.url" :src="stableUrl(asset.url)" :alt="asset.name" loading="lazy" />
                 <span v-else class="ns-media-missing">已删除</span>
                 <figcaption>图片</figcaption>
               </figure>
@@ -331,7 +340,7 @@ function videoTags(item) {
           </div>
           <div class="ns-reply">
             <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
-            <video v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video" :src="`${conversationOf(turn).workflow.outputUrl}#t=0.1`" controls playsinline preload="metadata" />
+            <video v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video" :src="`${stableUrl(conversationOf(turn).workflow.outputUrl)}#t=0.1`" controls playsinline preload="metadata" />
             <div v-else-if="conversationOf(turn).submitting || isVideoInProgress(conversationOf(turn).workflow)" class="ns-card ns-progress" role="status">
               <div><strong>{{ videoStageLabel(conversationOf(turn)) }}</strong><small>通常要几分钟，可以先离开，回来会接着显示</small></div>
               <span class="ns-bar" aria-hidden="true"><i /></span>

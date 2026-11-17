@@ -55,6 +55,7 @@ public class ImageDownloadHandler implements TaskHandler {
             if ((bytes == null || bytes.length == 0) && streamed != null) bytes = streamed;
             if (bytes == null || bytes.length == 0) throw new IllegalStateException("对象存储写入后无法读取图片");
             var image = renderer.decode(bytes);
+            renderer.storeThumbnail(storage, targetKey, image);
             var item = service.itemSnapshot(itemId);
             var creation = service.snapshot(item.getCreationId());
             String imageHash = "POSTER".equals(creation.getRequest().workflow())
