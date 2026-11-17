@@ -9,10 +9,13 @@ import { createServer } from 'vite'
 const memoryStorage = () => { const values = new Map(); return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key) } }
 
 test('novice studio drives the poster and video workflows from one composer', async () => {
-  const saved = Object.fromEntries(['window', 'document', 'Document', 'ShadowRoot', 'fetch', 'sessionStorage', 'localStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  const saved = Object.fromEntries(['window', 'document', 'Document', 'ShadowRoot', 'fetch', 'sessionStorage', 'localStorage', 'requestAnimationFrame'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   const events = []
-  globalThis.window = { history: { state: {} }, setTimeout, clearTimeout, dispatchEvent: event => events.push(event.type), addEventListener() {}, removeEventListener() {} }
-  globalThis.document = {}
+  // <Transition> 需要的最少 DOM：类名、动画帧和计算样式（时长都是 0，切换立即完成）。
+  const noTransition = { transitionDelay: '0s', transitionDuration: '0s', animationDelay: '0s', animationDuration: '0s' }
+  globalThis.window = { history: { state: {} }, setTimeout, clearTimeout, dispatchEvent: event => events.push(event.type), addEventListener() {}, removeEventListener() {}, getComputedStyle: () => noTransition }
+  globalThis.requestAnimationFrame = callback => setTimeout(callback, 0)
+  globalThis.document = { body: { offsetHeight: 0 } }
   globalThis.Document = class {}
   globalThis.ShadowRoot = class {}
   globalThis.sessionStorage = memoryStorage()
@@ -48,8 +51,10 @@ test('novice studio drives the poster and video workflows from one composer', as
     plugins: [{ name: 'novice-studio-interaction',
       load(id) {
         if (id.endsWith('.css')) return ''
+        // 动效不在这里测：<Transition> 换成直接渲染内容的组件，切换立即生效。
         if (id.endsWith('/NoviceStudioView.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
           { id: 'novice-studio-test', inlineTemplate: true }).content
+          .replace(/Transition as _Transition,?\s*/, '') + '\nfunction _Transition(_, { slots }) { return slots.default?.() }\n'
         if (id.endsWith('.vue')) return 'export default { render() { return null } }'
       },
     }],
@@ -61,7 +66,7 @@ test('novice studio drives the poster and video workflows from one composer', as
   await (await vite.ssrLoadModule('/src/stores/billing.js')).refreshBilling()
   const { default: Studio } = await vite.ssrLoadModule('/src/views/NoviceStudioView.vue')
   const renderer = createRenderer({
-    createElement: tag => ({ tag, props: {}, children: [], style: {}, getRootNode: () => ({ activeElement: null }), addEventListener() {}, removeEventListener() {} }),
+    createElement: tag => ({ tag, props: {}, children: [], style: {}, classList: { add() {}, remove() {} }, getRootNode: () => ({ activeElement: null }), addEventListener() {}, removeEventListener() {} }),
     createText: text => ({ text, children: [] }), createComment: text => ({ text, children: [] }),
     setText: (node, text) => { node.text = text }, setElementText: (node, text) => { node.text = text; node.children = [] },
     patchProp: (node, key, previous, value) => { node.props[key] = value },
@@ -83,12 +88,14 @@ test('novice studio drives the poster and video workflows from one composer', as
   const find = predicate => [...nodes(root)].find(predicate)
   const button = label => find(node => node.tag === 'button' && text(node).includes(label))
   const input = () => find(node => node.props?.id === 'ns-input')
-  const settle = async () => { for (let i = 0; i < 4; i++) { await new Promise(resolve => setImmediate(resolve)); await nextTick() } }
+  // 过渡用了 requestAnimationFrame（这里是 setTimeout），多等几帧让切换完成。
+  const settle = async () => { for (let i = 0; i < 4; i++) { await new Promise(resolve => setTimeout(resolve, 5)); await nextTick() } }
   const submit = async () => { find(node => node.tag === 'form' && node.props.class === 'ns-composer').props.onSubmit({ preventDefault() {} }); await settle() }
   try {
     app.mount(root); await settle()
-    assert.match(text(root), /今天，想创作点什么？/)
-    assert.match(text(button('生成')), /生成\s*2/, 'the send button shows the cost of one image')
+    assert.match(text(root), /^(早上好|上午好|中午好|下午好|傍晚好|晚上好|夜深了)/, 'the headline greets by time of day')
+    const cost = () => text(find(node => node.props?.class === 'ns-cost'))
+    assert.equal(cost(), '2', 'the cost of one image sits next to the send button')
 
     // 图片：选风格、写描述、生成，结果作为一轮对话出现。
     button('帮我搭配').props.onClick(); await settle()
@@ -100,7 +107,7 @@ test('novice studio drives the poster and video workflows from one composer', as
     find(node => node.props?.['aria-label'] === '少一张').props.onClick(); await settle()
     find(node => node.props?.['aria-label'] === '少一张').props.onClick(); await settle()
     find(node => node.props?.['aria-label'] === '少一张').props.onClick(); await settle()
-    assert.match(text(button('生成')), /生成\s*6/, 'the cost follows the image count')
+    assert.equal(cost(), '6', 'the cost follows the image count')
     await submit()
     assert.equal(creations.length, 1)
     assert.equal(creations[0].workflow, 'POSTER')
@@ -127,11 +134,13 @@ test('novice studio drives the poster and video workflows from one composer', as
     button('确认费用，开始生成').props.onClick(); await settle()
     assert.equal(submissions.length, 1)
     assert.equal(submissions[0].quoteId, 'quote-1')
-    assert.ok(find(node => node.tag === 'video' && node.props.src === '/output.mp4'), 'the finished video is shown in the thread')
+    assert.ok(find(node => node.tag === 'video' && node.props.src === '/output.mp4#t=0.1'), 'the finished video is shown in the thread')
     assert.equal(input().value, '', 'the composer is ready for the next request')
     assert.match(text(root), /一杯手冲咖啡/, 'the earlier image turn stays in the conversation')
   } finally {
-    app.unmount(); auth.state.user = null; auth.state.token = null
+    await settle()
+    app.unmount()
+    await settle(); auth.state.user = null; auth.state.token = null
     await vite.close()
     for (const [key, descriptor] of Object.entries(saved)) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }
   }

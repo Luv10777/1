@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowUp, AudioLines, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
 import ImageInspirationPanel from '../components/ImageInspirationPanel.vue'
@@ -13,6 +13,7 @@ import { FREE_SCENE, videoSceneCover, videoSceneName } from '../services/videoSc
 import { isVideoInProgress, videoModelLabel } from '../services/videoConversations'
 import { billing, dateTime, number } from '../stores/billing'
 import { NOVICE_RECENTS_CHANGED } from '../stores/uiMode'
+import { auth } from '../stores/auth'
 import '../novice-studio.css'
 
 // 新手版对话页：灵感绘图和视频创作原样搬进一个输入框，功能、计费和接口都不变，只换外壳。
@@ -27,6 +28,26 @@ const imageInput = ref(null)
 const videoInputs = { image: ref(null), video: ref(null), audio: ref(null) }
 const threadEnd = ref(null)
 const dock = ref(null)
+
+// 问候按时段轮换，每分钟看一次时间；名字取账号昵称，没有就只问候。
+const GREETINGS = [
+  { until: 5, title: '夜深了', lines: ['还在忙店里的事？做完这一张早点休息。', '安静的时候，最适合想想下周要发什么。'] },
+  { until: 8, title: '早上好', lines: ['新的一天，先给店里做张开门图？', '早起的这一会儿，把今天要发的先备好。'] },
+  { until: 11, title: '上午好', lines: ['趁上午人少，把这周要发的图先做出来。', '说一句想推什么，剩下的交给一方志。'] },
+  { until: 13, title: '中午好', lines: ['午市正忙，一句话交给一方志就行。', '忙完这一阵，回来看看出好的图。'] },
+  { until: 17, title: '下午好', lines: ['下午茶的时间，适合做一组新品图。', '把今天的好看瞬间，做成一条短视频。'] },
+  { until: 19, title: '傍晚好', lines: ['晚市之前，发条短视频热热场？', '天色正好，给门店拍组氛围图吧。'] },
+  { until: 23, title: '晚上好', lines: ['收工前，把明天要发的内容准备好。', '今天的店里故事，值得留一张图。'] },
+  { until: 24, title: '夜深了', lines: ['还在忙店里的事？做完这一张早点休息。', '安静的时候，最适合想想下周要发什么。'] },
+]
+const now = ref(new Date())
+const clock = setInterval(() => { now.value = new Date() }, 60000)
+onBeforeUnmount(() => clearInterval(clock))
+const greeting = computed(() => {
+  const period = GREETINGS.find(entry => now.value.getHours() < entry.until)
+  const name = auth.user?.name && !/^用户\d{4}$/.test(auth.user.name) ? auth.user.name : ''
+  return { title: name ? `${period.title}，${name}` : period.title, line: period.lines[now.value.getDate() % period.lines.length] }
+})
 
 const announce = () => window.dispatchEvent(new Event(NOVICE_RECENTS_CHANGED))
 const studio = useImageCreation('POSTER')
@@ -152,8 +173,9 @@ const sendDisabled = computed(() => mode.value === 'image'
   ? studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending
   : video.isGenerating || Boolean(video.activeConversation?.loading))
 const sendLabel = computed(() => mode.value === 'image'
-  ? (studio.busy ? '正在提交' : studio.saving ? '正在保存' : studio.active ? '创作中' : '生成')
-  : (video.isGenerating ? '生成中' : '预估费用'))
+  ? (studio.busy ? '正在提交' : studio.saving ? '正在保存原图' : studio.active ? '正在创作' : '生成图片')
+  : (video.isGenerating ? '正在生成视频' : '预估费用'))
+const sendBusy = computed(() => (mode.value === 'image' ? studio.busy || studio.active : video.isGenerating))
 // 图片按张计费，按钮上直接写这次要花多少烟火；视频要先报价，按钮只放烟火标志。
 const imageCost = computed(() => (mode.value === 'image' ? studio.estimatedCredits : null))
 const sendTitle = computed(() => mode.value === 'image'
@@ -221,9 +243,12 @@ function videoTags(item) {
 <template>
   <div class="ns-page" :class="{ 'is-started': started }">
     <section v-if="!started" class="ns-hero">
-      <p class="ns-eyebrow">一 方 志 · 创 作</p>
-      <h1>今天，想创作点什么？</h1>
-      <p>说一句话就够了。没想好，就让一方志先给你三个方案。</p>
+      <Transition name="ns-greet" mode="out-in" appear>
+        <div :key="greeting.title" class="ns-greeting">
+          <h1>{{ greeting.title }}</h1>
+          <p>{{ greeting.line }}</p>
+        </div>
+      </Transition>
     </section>
 
     <div v-else class="ns-thread" aria-live="polite">
@@ -306,7 +331,7 @@ function videoTags(item) {
           </div>
           <div class="ns-reply">
             <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
-            <video v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video" :src="conversationOf(turn).workflow.outputUrl" controls playsinline preload="metadata" />
+            <video v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video" :src="`${conversationOf(turn).workflow.outputUrl}#t=0.1`" controls playsinline preload="metadata" />
             <div v-else-if="conversationOf(turn).submitting || isVideoInProgress(conversationOf(turn).workflow)" class="ns-card ns-progress" role="status">
               <div><strong>{{ videoStageLabel(conversationOf(turn)) }}</strong><small>通常要几分钟，可以先离开，回来会接着显示</small></div>
               <span class="ns-bar" aria-hidden="true"><i /></span>
@@ -355,7 +380,8 @@ function videoTags(item) {
     <div ref="dock" class="ns-dock">
       <form class="ns-composer" @submit.prevent="send">
         <div class="ns-composer-top">
-          <div class="ns-modes" role="group" aria-label="做图片还是视频">
+          <div class="ns-modes" :class="`is-${mode}`" role="group" aria-label="做图片还是视频">
+            <span class="ns-modes-thumb" aria-hidden="true" />
             <button type="button" :aria-pressed="mode === 'image'" :class="{ active: mode === 'image' }" @click="switchMode('image')"><ImagePlus :size="16" :stroke-width="1.6" aria-hidden="true" />图片</button>
             <button type="button" :aria-pressed="mode === 'video'" :class="{ active: mode === 'video' }" @click="switchMode('video')"><Film :size="16" :stroke-width="1.6" aria-hidden="true" />视频</button>
           </div>
@@ -391,24 +417,30 @@ function videoTags(item) {
           <button v-if="mode === 'image'" type="button" class="ns-icon" :disabled="studio.locked || studio.files.length >= 6" aria-label="添加参考图，最多 6 张" title="添加参考图，最多 6 张" @click="imageInput?.click()"><Paperclip :size="18" :stroke-width="1.6" aria-hidden="true" /></button>
           <button v-else type="button" class="ns-icon" :aria-expanded="panel === 'attach'" aria-label="添加参考图片、参考视频或音色" title="添加参考图片、参考视频或音色" @click="togglePanel('attach')"><Paperclip :size="18" :stroke-width="1.6" aria-hidden="true" /></button>
           <span class="ns-divider" aria-hidden="true" />
-          <template v-if="mode === 'image'">
-            <button type="button" class="ns-tool" :class="{ open: panel === 'style' }" :aria-expanded="panel === 'style'" @click="togglePanel('style')"><img v-if="currentStyle.image" :src="currentStyle.image" alt="" :class="{ mark: currentStyle.mark }" />{{ currentStyle.name }}</button>
-            <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ studio.ratio }} · {{ studio.quality }}</button>
-            <div class="ns-count" role="group" aria-label="一次生成几张">
-              <button type="button" aria-label="少一张" :disabled="studio.locked || studio.count <= 1" @click="changeCount(-1)"><Minus :size="13" :stroke-width="2" aria-hidden="true" /></button>
-              <span aria-live="polite"><strong>{{ studio.count }}</strong> 张</span>
-              <button type="button" aria-label="多一张" :disabled="studio.locked || studio.count >= MAX_IMAGES" @click="changeCount(1)"><Plus :size="13" :stroke-width="2" aria-hidden="true" /></button>
+          <Transition name="ns-swap" mode="out-in">
+            <div :key="mode" class="ns-tools">
+              <template v-if="mode === 'image'">
+                <button type="button" class="ns-tool" :class="{ open: panel === 'style' }" :aria-expanded="panel === 'style'" @click="togglePanel('style')"><img v-if="currentStyle.image" :src="currentStyle.image" alt="" :class="{ mark: currentStyle.mark }" />{{ currentStyle.name }}</button>
+                <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ studio.ratio }} · {{ studio.quality }}</button>
+                <div class="ns-count" role="group" aria-label="一次生成几张">
+                  <button type="button" aria-label="少一张" :disabled="studio.locked || studio.count <= 1" @click="changeCount(-1)"><Minus :size="13" :stroke-width="2" aria-hidden="true" /></button>
+                  <span aria-live="polite"><strong>{{ studio.count }}</strong> 张</span>
+                  <button type="button" aria-label="多一张" :disabled="studio.locked || studio.count >= MAX_IMAGES" @click="changeCount(1)"><Plus :size="13" :stroke-width="2" aria-hidden="true" /></button>
+                </div>
+              </template>
+              <template v-else>
+                <button v-if="video.currentScene" type="button" class="ns-tool" :class="{ open: panel === 'scene' }" :aria-expanded="panel === 'scene'" @click="togglePanel('scene')"><img v-if="videoSceneCover(video.sceneKey)" :src="videoSceneCover(video.sceneKey)" alt="" />{{ video.currentScene.name }}</button>
+                <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ video.currentCapability.label }} · {{ videoRatioOptions.find(option => option.value === video.format)?.label }} · {{ video.duration }} 秒 · {{ video.resolution }}</button>
+              </template>
             </div>
-          </template>
-          <template v-else>
-            <button v-if="video.currentScene" type="button" class="ns-tool" :class="{ open: panel === 'scene' }" :aria-expanded="panel === 'scene'" @click="togglePanel('scene')"><img v-if="videoSceneCover(video.sceneKey)" :src="videoSceneCover(video.sceneKey)" alt="" />{{ video.currentScene.name }}</button>
-            <button type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ video.currentCapability.label }} · {{ videoRatioOptions.find(option => option.value === video.format)?.label }} · {{ video.duration }} 秒 · {{ video.resolution }}</button>
-          </template>
-          <button type="submit" class="ns-send" :class="{ 'is-video': mode === 'video' }" :disabled="sendDisabled" :title="sendTitle">
-            <span class="ns-send-label">{{ sendLabel }}</span>
-            <span v-if="imageCost != null" class="ns-send-cost" :aria-label="`消耗 ${imageCost} 烟火`"><YanhuoIcon :size="15" />{{ number(imageCost) }}</span>
-            <span v-else-if="mode === 'video'" class="ns-send-cost" aria-hidden="true"><YanhuoIcon :size="15" /></span>
-            <span class="ns-send-arrow" aria-hidden="true"><ArrowUp :size="16" :stroke-width="2.2" /></span>
+          </Transition>
+          <span class="ns-cost" :title="sendTitle">
+            <YanhuoIcon :size="16" />
+            <strong>{{ imageCost != null ? number(imageCost) : mode === 'video' ? '报价后扣' : '—' }}</strong>
+          </span>
+          <button type="submit" class="ns-send" :class="{ busy: sendBusy }" :disabled="sendDisabled" :title="sendTitle" :aria-label="sendLabel">
+            <span v-if="sendBusy" class="ns-spinner" aria-hidden="true" />
+            <ArrowUp v-else :size="18" :stroke-width="2.2" aria-hidden="true" />
           </button>
         </div>
         <input ref="imageInput" class="sr-only" type="file" accept="image/jpeg,image/png" multiple :disabled="studio.locked" @change="studio.addFiles" />
