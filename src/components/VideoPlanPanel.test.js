@@ -49,7 +49,7 @@ async function mountPanel(config = { configured: true, credits: 1 }, props = {},
     },
   })
   const root = { children: [] }
-  const app = renderer.createApp(Panel, { upload: async entry => entry.assetId, maxDuration: 10, ratios: ['auto', '9:16'],
+  const app = renderer.createApp(Panel, { upload: async entry => entry.assetId, maxDuration: 10, ratios: ['9:16'],
     onApply: (...args) => applied.push(args), ...props })
   app.component('RouterLink', { render: () => null })
   app.mount(root)

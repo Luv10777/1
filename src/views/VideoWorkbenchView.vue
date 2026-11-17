@@ -21,7 +21,8 @@ const audioInput = ref(null)
 const historyOpen = ref(false)
 const rightTab = ref('preview')
 const canvas = ref(null)
-const settingsOpen = ref(false)
+// 还没选画面比例时默认展开，让商家一眼看到要选。
+const settingsOpen = ref(true)
 const router = useRouter()
 const isMorphing = ref(false)
 const quoteDialog = ref(null)
@@ -108,10 +109,10 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
         </section>
 
         <section class="vs-settings">
-          <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="video-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ currentCapability.label }} · {{ ratioOptions.find(option => option.value === format)?.label }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
+          <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="video-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small v-if="!format" class="vs-pick">请选择画面比例</small><small v-else>{{ currentCapability.label }} · {{ format }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
           <div v-show="settingsOpen" id="video-settings" class="vs-settings-body">
             <div class="vs-segmented vs-models" role="group" aria-label="视频模型"><button v-for="model in (capabilities.length ? capabilities : fallbackCapabilities)" :key="model.id" type="button" :aria-pressed="selectedModel === model.id" :class="{ active: selectedModel === model.id }" @click="selectModel(model.id)">{{ model.label }}<span v-if="videoModelBadge(model.id)" class="vs-model-badge">{{ videoModelBadge(model.id) }}</span></button></div>
-            <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="format" class="vs-row-select" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
+            <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="format" class="vs-row-select" :class="{ 'vs-needs-pick': !format }" aria-label="选择画面比例"><option value="" disabled>请选择</option><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
             <div class="vs-setting-row vs-duration"><label for="video-duration">视频时长</label><strong>{{ duration }} 秒</strong><input id="video-duration" v-model.number="duration" class="vs-range" type="range" min="5" :max="durationMax" step="1"></div>
             <div class="vs-setting-row"><span>分辨率</span><div class="vs-segmented" role="group" aria-label="分辨率"><button v-for="item in availableResolutions" :key="item" type="button" :aria-pressed="resolution === item" :class="{ active: resolution === item }" @click="resolution = item">{{ item }}</button></div></div>
             <small class="vs-setting-note">{{ currentCapability.label }} 可用素材：{{ materialLimitLabel }}</small>
@@ -122,7 +123,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       <div class="video-workbench-action vs-footer">
         <div v-if="notice && activeConversation?.error" class="vs-failure" role="alert"><CircleAlert :size="18" :stroke-width="1.8" aria-hidden="true" /><div><strong v-if="workflow?.status === 'FAILED'">这次没有生成成功</strong><p>{{ notice }}</p></div></div>
         <p v-else-if="notice" class="vs-notice" role="status">{{ notice }}</p>
-        <button class="vs-generate" type="button" :disabled="isGenerating || activeConversation?.loading" @click="generate">{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</button>
+        <button class="vs-generate" type="button" :disabled="isGenerating || activeConversation?.loading" @click="format ? generate() : (settingsOpen = true, generate())">{{ isGenerating ? '正在生成视频…' : '预估费用并生成' }}</button>
         <small>先预估烟火，确认后开始生成</small>
         <p v-if="workflow?.chargedCredits != null" class="vs-notice">本次交付消耗 {{ number(workflow.chargedCredits) }} 烟火。</p>
         <button v-if="workflow?.retryable" class="generation-billing-link" type="button" :disabled="activeConversation?.submitting" @click="retryVideo">预估恢复费用</button>

@@ -132,7 +132,7 @@ export function useVideoPlan(props, emit) {
       const references = [...planImages.value]
       const imageAssetIds = await Promise.all(references.map(entry => props.upload(entry, 'IMAGE')))
       const body = { imageAssetIds, referenceVideo: Boolean(props.video), style: styleText.value, idea: idea.value.trim(), previousPlanId,
-        durationSeconds: seconds, maxDurationSeconds: props.maxDuration, ratio: props.ratio,
+        durationSeconds: seconds, maxDurationSeconds: props.maxDuration, ratio: props.ratio || 'auto',
         sourceBrief: clarification.value?.sourceBrief || props.brief.trim(),
         ...(answer.value.trim() && { clarificationAnswer: answer.value.trim() }),
         ...(videoSceneKey(props.scene) !== FREE_SCENE && { sceneKey: props.scene }) }

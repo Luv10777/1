@@ -5,7 +5,7 @@ import { isVideoPlanDone, videoPlanForm, videoPlanRecordImages, videoPlanRequest
 const plan = { prompt: ' 如图1中的香水瓶，9:16 竖屏 12 秒 ', negativePrompt: '画面文字', ratio: '9:16', durationSeconds: 12 }
 
 test('using a historical plan fills its script without appending generic negative instructions', () => {
-  assert.deepEqual(videoPlanForm(plan, { maxDuration: 15, ratios: ['auto', '9:16'] }),
+  assert.deepEqual(videoPlanForm(plan, { maxDuration: 15, ratios: ['9:16'] }),
     { prompt: '如图1中的香水瓶，9:16 竖屏 12 秒', format: '9:16', duration: 12, shortened: false })
 })
 
@@ -18,9 +18,9 @@ test('a reviewed script uses its compiled instructions without duplicating the o
 
 test('a plan longer than the model allows is blocked rather than keeping a contradictory timeline', () => {
   assert.throws(() => videoPlanForm({ ...plan, durationSeconds: 15 }, { maxDuration: 10 }), /不能直接截短分镜/)
-  const form = videoPlanForm({ ...plan, negativePrompt: '', ratio: '2:1' }, { maxDuration: 15, ratios: ['auto'] })
+  const form = videoPlanForm({ ...plan, negativePrompt: '', ratio: '2:1' }, { maxDuration: 15, ratios: ['9:16'] })
   assert.equal(form.prompt, '如图1中的香水瓶，9:16 竖屏 12 秒')
-  assert.equal(form.format, 'auto')
+  assert.equal(form.format, '', 'a plan without a usable ratio leaves the choice to the merchant')
   assert.equal(form.duration, 12)
   assert.equal(form.shortened, false)
 })

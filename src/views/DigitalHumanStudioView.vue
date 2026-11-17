@@ -27,7 +27,7 @@ const voiceFile = ref(null)
 const extraVoices = ref([])
 const script = ref('')
 const duration = ref(10)
-const ratio = ref('auto')
+const ratio = ref('')
 const selectedModel = ref('SEEDANCE_2_5')
 const resolution = ref('720p')
 const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, quoted, quoting, estimate, confirmQuote, closeQuote, open: openWorkflow, reset: resetPreview } = useDigitalHumanVideo()
@@ -35,7 +35,8 @@ const priceDialog = ref(null)
 watch(quoted, async value => { await nextTick(); if (value) priceDialog.value?.showModal(); else priceDialog.value?.close() })
 const notice = ref('')
 const showAllAvatars = ref(false)
-const settingsOpen = ref(false)
+// 还没选画面比例时默认展开，让商家一眼看到要选。
+const settingsOpen = ref(true)
 const router = useRouter()
 
 const inspirations = [
@@ -57,7 +58,6 @@ const digitalHumanAvatars = [
   { id: 'avatar-9', label: '9号数字人', name: 'Emma', image: '/images/digital-human/avatar-9.png' },
 ]
 const ratioOptions = [
-  { value: 'auto', label: '自适应' },
   { value: '16:9', label: '16:9' },
   { value: '4:3', label: '4:3' },
   { value: '1:1', label: '1:1' },
@@ -143,6 +143,7 @@ const removeExtraVoice = index => { revokeBlob(extraVoices.value[index]); extraV
 const generate = async () => {
   if (isGenerating.value) return
   notice.value = ''
+  if (!ratio.value) { settingsOpen.value = true; notice.value = '请先选择画面比例：发抖音、小红书、视频号选 9:16 竖屏，电脑或横屏播放选 16:9。'; return }
   try {
     await requireAccount()
     if (isGenerating.value || quoting.value) return
@@ -255,10 +256,10 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
             <textarea id="dh-script" v-model="script" class="vs-textarea" rows="2" maxlength="500" placeholder="输入视频文案或商品描述，例如：今天给大家分享一款适合敏感肌的春日精华，轻薄好吸收，换季也能保持水润光泽。" />
           </section>
           <section class="vs-settings">
-            <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="dh-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ currentModel.label }} · {{ ratioOptions.find(option => option.value === ratio)?.label }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
+            <button type="button" class="vs-settings-toggle" :aria-expanded="settingsOpen" aria-controls="dh-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small v-if="!ratio" class="vs-pick">请选择画面比例</small><small v-else>{{ currentModel.label }} · {{ ratio }} · {{ duration }} 秒 · {{ resolution }}</small><ChevronRight :size="15" class="vs-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
             <div v-show="settingsOpen" id="dh-settings" class="vs-settings-body">
               <div class="vs-segmented vs-models" role="group" aria-label="视频模型"><button v-for="model in videoModels" :key="model.id" type="button" :aria-pressed="selectedModel === model.id" :class="{ active: selectedModel === model.id }" @click="selectModel(model.id)">{{ model.label }}<span v-if="videoModelBadge(model.id)" class="vs-model-badge">{{ videoModelBadge(model.id) }}</span></button></div>
-              <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="ratio" class="vs-row-select" aria-label="选择画面比例"><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
+              <label class="vs-setting-row"><span>画面比例</span><AppSelect v-model="ratio" class="vs-row-select" :class="{ 'vs-needs-pick': !ratio }" aria-label="选择画面比例"><option value="" disabled>请选择</option><option v-for="option in ratioOptions" :key="option.value" :value="option.value">{{ option.label }}</option></AppSelect></label>
               <div class="vs-setting-row vs-duration"><label for="dh-duration">视频时长</label><strong>{{ duration }} 秒</strong><input id="dh-duration" v-model.number="duration" class="vs-range" type="range" min="5" :max="currentModel.maxDurationSeconds" step="1"></div>
               <div class="vs-setting-row"><span>分辨率</span><div class="vs-segmented" role="group" aria-label="分辨率"><button v-for="item in availableResolutions" :key="item" type="button" :aria-pressed="resolution === item" :class="{ active: resolution === item }" @click="resolution = item">{{ item }}</button></div></div>
               <small class="vs-setting-note">{{ currentModel.label }} 可用素材：{{ materialLimitLabel }}</small>

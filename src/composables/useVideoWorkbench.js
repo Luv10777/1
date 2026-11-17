@@ -8,8 +8,8 @@ import { auth } from '../stores/auth'
 import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
 import { FREE_SCENE, fetchVideoScenes, findVideoScene, videoSceneFields } from '../services/videoScenes'
 
+// 不再提供「自适应」：模型按参考图自己猜比例，常常和商家要发的平台对不上；改成默认不选，生成前引导选择。
 export const videoRatioOptions = [
-  { value: 'auto', label: '自适应' },
   { value: '16:9', label: '16:9' },
   { value: '4:3', label: '4:3' },
   { value: '1:1', label: '1:1' },
@@ -28,7 +28,7 @@ export const videoStageLabel = item => item?.submitting ? '正在提交创作' :
 export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
   const route = useRoute()
   const prompt = ref('')
-  const format = ref('auto')
+  const format = ref('')
   const duration = ref(10)
   const resolution = ref('720p')
   const selectedModel = ref('SEEDANCE_2_5')
@@ -74,7 +74,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     sceneKey.value = form.sceneKey || FREE_SCENE
     planId.value = form.planId ?? null
     prompt.value = form.prompt
-    format.value = form.format
+    format.value = videoRatioOptions.some(option => option.value === form.format) ? form.format : ''
     duration.value = form.duration
     resolution.value = form.resolution
     selectedModel.value = form.selectedModel
@@ -106,7 +106,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
       id: newConversationId(),
       title: '新的视频创作',
       prompt: '',
-      format: 'auto',
+      format: '',
       duration: 10,
       resolution: '720p',
       selectedModel: 'SEEDANCE_2_5',
@@ -282,6 +282,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     catch (error) { activeConversation.value.notice = error.message; return }
     if (disposed || isGenerating.value) return
     if (!prompt.value.trim()) { activeConversation.value.notice = '请先描述你的成片需求。'; return }
+    if (!format.value) { activeConversation.value.notice = '请先选择画面比例：发抖音、小红书、视频号选 9:16 竖屏，电脑或横屏播放选 16:9。'; return }
     const form = readForm()
     if (activeConversation.value?.workflow) createConversation(form)
     saveActiveConversation()
@@ -374,7 +375,8 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     if (images) referenceImages.value = images
     prompt.value = form.prompt
     planId.value = batchId ?? null
-    format.value = form.format
+    // 方案没定比例时保留你已经选的。
+    if (form.format) format.value = form.format
     duration.value = form.duration
     saveActiveConversation()
     activeConversation.value.error = false

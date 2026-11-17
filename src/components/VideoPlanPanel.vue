@@ -16,7 +16,7 @@ const props = defineProps({
   upload: { type: Function, required: true },
   maxDuration: { type: Number, default: 30 },
   duration: { type: Number, default: 10 },
-  ratio: { type: String, default: 'auto' },
+  ratio: { type: String, default: '' },
   brief: { type: String, default: '' },
   ratios: { type: Array, default: () => [] },
   locked: Boolean,
@@ -113,7 +113,7 @@ const showRecords = async () => {
         <article v-for="(plan, index) in result.plans" :key="index" class="ip-card" :class="{ 'is-applied': appliedIndex === index }">
           <div class="ip-card-title"><span class="ip-letter">{{ videoPlanLetters[index] }}</span><h3>{{ plan.title }}</h3></div>
           <p v-if="plan.idea" class="ip-card-idea">{{ plan.idea }}</p>
-          <p class="ip-card-meta">{{ plan.ratio === 'auto' ? '自适应' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots.length }} 个镜头</p>
+          <p class="ip-card-meta">{{ plan.ratio === 'auto' ? '比例自选' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots.length }} 个镜头</p>
           <ul v-if="plan.materials.length" class="ip-uses">
             <li v-for="item in plan.materials" :key="item.index" :class="{ 'no-thumb': !resultImages[item.index - 1] }"><img v-if="resultImages[item.index - 1]" :src="resultImages[item.index - 1]" alt="">图{{ item.index }} {{ item.use }}</li>
           </ul>

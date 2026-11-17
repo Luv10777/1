@@ -301,7 +301,7 @@ function send() {
   panel.value = ''
   if (ideaMode.value) { sendIdea(); return }
   if (mode.value === 'image') studio.generate()
-  else video.generate()
+  else { if (!video.format) panel.value = 'output'; video.generate() }
   scrollToEnd()
 }
 function onKeydown(event) {
@@ -341,7 +341,8 @@ function submitRevision() {
   scrollToEnd()
 }
 function videoTags(item) {
-  const ratio = videoRatioOptions.find(option => option.value === (item.workflow?.ratio || item.format))?.label
+  const value = item.workflow?.ratio || item.format
+  const ratio = value === 'auto' ? '自适应' : value
   return [
     videoSceneName(video.scenes, item.sceneKey),
     videoModelLabel(item.workflow?.model || item.selectedModel),
@@ -451,7 +452,7 @@ function videoTags(item) {
                 <article v-for="(plan, planIndex) in turn.batch.plans" :key="planIndex" class="ns-plan-card" :class="{ applied: turn.applied === planIndex }">
                   <header><span class="ns-plan-letter">{{ videoPlanLetters[planIndex] }}</span><h3>{{ plan.title }}</h3></header>
                   <p v-if="plan.idea" class="ns-plan-idea">{{ plan.idea }}</p>
-                  <p v-if="turn.mode === 'video'" class="ns-plan-meta">{{ plan.ratio === 'auto' ? '自适应' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots?.length || 0 }} 个镜头</p>
+                  <p v-if="turn.mode === 'video'" class="ns-plan-meta">{{ plan.ratio === 'auto' ? '比例自选' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots?.length || 0 }} 个镜头</p>
                   <ul v-if="plan.materials?.length" class="ns-plan-uses">
                     <li v-for="material in plan.materials" :key="material.index"><img v-if="turn.images?.[material.index - 1]" :src="stableUrl(turn.images[material.index - 1])" alt="" />图{{ material.index }} {{ material.use }}</li>
                   </ul>
@@ -597,7 +598,7 @@ function videoTags(item) {
               <template v-else>
                 <button v-if="video.currentScene" type="button" class="ns-tool" :class="{ open: panel === 'scene' }" :aria-expanded="panel === 'scene'" @click="togglePanel('scene')"><img v-if="videoSceneCover(video.sceneKey)" :src="videoSceneCover(video.sceneKey)" alt="" />{{ video.currentScene.name }}</button>
                 <button v-if="ideaMode" type="button" class="ns-tool" :class="{ open: panel === 'planStyle' }" :aria-expanded="panel === 'planStyle'" @click="togglePanel('planStyle')"><Sparkles :size="15" aria-hidden="true" />{{ vplan.styleText || '风格不限' }}</button>
-                <button v-else type="button" class="ns-tool" :class="{ open: panel === 'output' }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" />{{ video.currentCapability.label }} · {{ videoRatioOptions.find(option => option.value === video.format)?.label }} · {{ video.duration }} 秒 · {{ video.resolution }}</button>
+                <button v-else type="button" class="ns-tool" :class="{ open: panel === 'output', 'needs-pick': !video.format }" :aria-expanded="panel === 'output'" @click="togglePanel('output')"><SlidersHorizontal :size="15" aria-hidden="true" /><template v-if="video.format">{{ video.currentCapability.label }} · {{ video.format }} · {{ video.duration }} 秒 · {{ video.resolution }}</template><template v-else>选择画面比例</template></button>
               </template>
             </div>
           </Transition>
@@ -661,7 +662,7 @@ function videoTags(item) {
         </template>
         <template v-else>
           <div class="ns-setting"><span>模型</span><div class="ns-segmented" role="group" aria-label="视频模型"><button v-for="model in videoModels" :key="model.id" type="button" :aria-pressed="video.selectedModel === model.id" :class="{ active: video.selectedModel === model.id }" @click="video.selectModel(model.id)">{{ model.label }}</button></div></div>
-          <div class="ns-setting"><span>画面比例</span><div class="ns-segmented" role="group" aria-label="画面比例"><button v-for="option in videoRatioOptions" :key="option.value" type="button" :aria-pressed="video.format === option.value" :class="{ active: video.format === option.value }" @click="video.format = option.value">{{ option.label }}</button></div></div>
+          <div class="ns-setting" :class="{ 'needs-pick': !video.format }"><span>画面比例{{ video.format ? '' : ' · 请选一个' }}</span><div class="ns-segmented" role="group" aria-label="画面比例"><button v-for="option in videoRatioOptions" :key="option.value" type="button" :aria-pressed="video.format === option.value" :class="{ active: video.format === option.value }" @click="video.format = option.value">{{ option.label }}</button></div></div>
           <div class="ns-setting"><label for="ns-duration">视频时长</label><input id="ns-duration" v-model.number="video.duration" type="range" min="5" :max="video.durationMax" step="1" /><strong>{{ video.duration }} 秒</strong></div>
           <div class="ns-setting"><span>分辨率</span><div class="ns-segmented" role="group" aria-label="分辨率"><button v-for="item in video.availableResolutions" :key="item" type="button" :aria-pressed="video.resolution === item" :class="{ active: video.resolution === item }" @click="video.resolution = item">{{ item }}</button></div></div>
           <p class="ns-note">{{ video.currentCapability.label }} 可用素材：{{ video.materialLimitLabel }}</p>
