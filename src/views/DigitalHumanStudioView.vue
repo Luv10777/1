@@ -2,7 +2,7 @@
 import AppSelect from '../components/AppSelect.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { AudioLines, ChevronRight, Film, History, ImagePlus, Plus, UserRound, X } from 'lucide-vue-next'
+import { AudioLines, ChevronRight, CircleAlert, Film, History, ImagePlus, Plus, UserRound, X } from 'lucide-vue-next'
 import VideoPreviewPanel from '../components/VideoPreviewPanel.vue'
 import '../video-studio.css'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
@@ -266,7 +266,8 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           </section>
         </fieldset>
         <div class="dh-form-footer vs-footer">
-          <p v-if="notice || videoNotice" class="vs-notice" :class="{ 'is-error': videoError }" role="status">{{ notice || videoNotice }}</p>
+          <div v-if="videoError && !notice" class="vs-failure" role="alert"><CircleAlert :size="18" :stroke-width="1.8" aria-hidden="true" /><div><strong v-if="workflow?.status === 'FAILED'">这次没有生成成功</strong><p>{{ videoNotice }}</p></div></div>
+          <p v-else-if="notice || videoNotice" class="vs-notice" role="status">{{ notice || videoNotice }}</p>
           <button class="vs-generate" type="button" :disabled="isGenerating || quoting" @click="generate">{{ isGenerating ? '正在生成…' : quoting ? '正在预估费用…' : '预估费用并生成' }}</button>
           <small>先预估烟火，确认后开始生成</small>
         </div>

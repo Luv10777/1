@@ -255,14 +255,14 @@ class VideoProviderGatewayTest {
     }
 
     @Test
-    void volcengineTextOnlyRequestOmitsAutomaticRatioAndDoesNotNeedAssets() {
+    void volcengineTextOnlyRequestSendsAdaptiveRatioAndDoesNotNeedAssets() {
         var assets = mock(AssetService.class);
         var body = new ObjectMapper().valueToTree(volcengineGateway(assets, mock(HttpClient.class))
                 .buildSubmitRequest(new VideoDtos.Create("request-1", "商品旋转", List.of(), null,
                         "SEEDANCE_2_0_MINI", "auto", 5, "480p")));
         assertThat(body.path("content").size()).isEqualTo(1);
         assertThat(body.path("content").get(0).path("type").asText()).isEqualTo("text");
-        assertThat(body.has("ratio")).isFalse();
+        assertThat(body.path("ratio").asText()).isEqualTo("adaptive");
         verifyNoInteractions(assets);
     }
 
