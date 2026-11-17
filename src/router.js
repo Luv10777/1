@@ -18,6 +18,7 @@ import WorksView from './views/WorksView.vue'
 import ImageCreateView from './views/ImageCreateView.vue'
 import VideoCreateView from './views/VideoCreateView.vue'
 import VideoWorkbenchView from './views/VideoWorkbenchView.vue'
+const NoviceStudioView = () => import('./views/NoviceStudioView.vue')
 import VideoAnalyzeView from './views/VideoAnalyzeView.vue'
 const CopyHomeView = () => import('./views/CopyHomeView.vue')
 const CopyCreateView = () => import('./views/CopyCreateView.vue')
@@ -77,6 +78,7 @@ const routes = [
   { path: '/image/create/poster', name: 'image-create-poster', component: ImageCreateView, meta: { guest: true, title: '灵感绘图', description: '把想象画出来，创作人物、风景、插画与任何创意画面。', navGroup: 'content' } },
   { path: '/image/create/product-set', name: 'image-create-product-set', component: ImageCreateView, meta: { guest: true, title: '产品套图', icon: '▦', description: '围绕同一件商品生成一组有秩序的画面。', navGroup: 'content' } },
   { path: '/video/create', name: 'video-create', component: VideoCreateView, meta: { guest: true, title: '视频创作', icon: '▶', description: '把脚本、商品信息和品牌资产组合成短视频草稿。' } },
+  { path: '/studio', name: 'studio', component: NoviceStudioView, meta: { guest: true, title: '创作', description: '新手版：在一个对话框里做图片和视频。' } },
   { path: '/video/workbench', name: 'video-workbench', component: VideoWorkbenchView, meta: { guest: true, title: '视频工作台', icon: 'movie_edit', description: '从一句话开始，把脚本、商品素材和品牌规则编排成可发布的短视频。' } },
   { path: '/batch', name: 'batch', component: PlaceholderView, meta: { title: '批量内容生产', icon: '▦', description: '一次配置，多平台批量生成内容任务。' } },
   { path: '/digital-human', name: 'digital-human', component: LiveStudioView, meta: { guest: true, title: '实景直播', icon: '◎', description: '手机拍真实场景开播，系统负责话术、声音克隆与弹幕自动回复。' } },

@@ -7,7 +7,7 @@ const HIDDEN_ROUTES = new Set([
   'creative', 'chat', 'batch',
   'copy', 'copy-create',
   'image-create', 'image-create-poster', 'image-create-product-set',
-  'video-create', 'video-workbench', 'video-analyze',
+  'video-create', 'video-workbench', 'video-analyze', 'studio',
   'digital-human', 'digital-human-history', 'digital-human-studio',
   'works', 'tasks',
   'knowledge', 'referral',
