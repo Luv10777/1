@@ -315,10 +315,13 @@ public class VideoWorkflowService {
     @Transactional(readOnly = true)
     public PageResult<VideoDtos.History> history(int page, int size) {
         var result = workflows.findAllByOrderByIdDesc(PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size))));
+        // 已完成的带上成片链接，新手版侧栏和创作记录能显示首帧；签名在本地算，不额外访问存储。
         return PageResult.of(result, result.getContent().stream().map(w -> new VideoDtos.History(
                 w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(), w.getDurationSeconds(),
-                w.getResolution(), w.getStatus(), w.getCreatedAt(), null, null, null, null,
-                VideoScenes.normalize(w.getRequest().sceneKey()))).toList());
+                w.getResolution(), w.getStatus(), w.getCreatedAt(),
+                "SUCCEEDED".equals(w.getStatus()) && w.getOutputStorageKey() != null
+                        ? storage.presignGet(w.getOutputStorageKey(), Duration.ofMinutes(30)) : null,
+                null, null, null, VideoScenes.normalize(w.getRequest().sceneKey()))).toList());
     }
 
     @Transactional(readOnly = true)

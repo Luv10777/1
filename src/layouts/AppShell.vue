@@ -10,7 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import IdentityPrompt from '../components/IdentityPrompt.vue'
 import { identityMissing } from '../stores/identity'
 import { auth } from '../stores/auth'
-import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket, Briefcase, SquarePen, LayoutGrid, Wallet, ArrowUpRight } from 'lucide-vue-next'
+import { Store, FilePenLine, UserRound, ChevronDown, ChevronsUpDown, LogOut, Bell, ChevronsLeft, ChevronsRight, KeyRound, LockKeyhole, Ticket, Briefcase, SquarePen, LayoutGrid, Wallet, Layers, ChevronRight } from 'lucide-vue-next'
 import { NOTICES_CHANGED, noticeApi } from '../services/noticeApi'
 import { useMerchantApproval } from '../composables/useMerchantApproval'
 import { billing, number, refreshBilling } from '../stores/billing'
@@ -296,70 +296,72 @@ function startNewChat() { closeMenu(); router.push({ name: 'studio', query: { ne
           </AppSelect>
         </template>
       </div>
-      <nav v-if="!novice" class="primary-nav paper-nav" aria-label="主导航">
-        <div
-          v-for="group in navGroups"
-          :key="group.key"
-          class="nav-group"
-          :class="{ 'has-active-item': isGroupActive(group) }"
-        >
-          <RouterLink
-            v-if="group.path"
-            :to="group.path"
-            :aria-label="group.label"
-            :title="group.label"
-            class="nav-group-trigger nav-group-direct"
-            @click="closeMenu"
+      <Transition name="nav-swap" mode="out-in">
+        <nav v-if="!novice" class="primary-nav paper-nav" aria-label="主导航">
+          <div
+            v-for="group in navGroups"
+            :key="group.key"
+            class="nav-group"
+            :class="{ 'has-active-item': isGroupActive(group) }"
           >
-            <span class="material-symbols-outlined nav-group-icon" aria-hidden="true">{{ navIcons[group.key] || 'folder' }}</span>
-            <span class="nav-group-label">{{ group.label }}</span>
-          </RouterLink>
-          <template v-else>
-            <button
-              class="nav-group-trigger"
-              type="button"
-              :aria-expanded="!collapsed && isGroupExpanded(group.key)"
+            <RouterLink
+              v-if="group.path"
+              :to="group.path"
               :aria-label="group.label"
               :title="group.label"
-              :aria-controls="`nav-group-${group.key}`"
-              @click="toggleGroup(group.key)"
+              class="nav-group-trigger nav-group-direct"
+              @click="closeMenu"
             >
               <span class="material-symbols-outlined nav-group-icon" aria-hidden="true">{{ navIcons[group.key] || 'folder' }}</span>
               <span class="nav-group-label">{{ group.label }}</span>
-              <ChevronDown :size="15" class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true" />
-            </button>
-            <div
-              v-show="!collapsed && isGroupExpanded(group.key)"
-              :id="`nav-group-${group.key}`"
-              class="nav-group-items"
-              :class="{ expanded: isGroupExpanded(group.key) }"
-              :aria-hidden="collapsed || !isGroupExpanded(group.key)"
-            >
-              <div class="nav-group-items-inner">
-                <RouterLink
-                  v-for="item in group.items.filter(canSee)"
-                  :key="item.name"
-                  :to="item.path"
-                  class="nav-item paper-nav-item"
-                  :class="{ active: isActive(item.name) }"
-                  @click="closeMenu"
-                >
-                  <span class="nav-item-label">{{ item.label }}</span>
-                </RouterLink>
+            </RouterLink>
+            <template v-else>
+              <button
+                class="nav-group-trigger"
+                type="button"
+                :aria-expanded="!collapsed && isGroupExpanded(group.key)"
+                :aria-label="group.label"
+                :title="group.label"
+                :aria-controls="`nav-group-${group.key}`"
+                @click="toggleGroup(group.key)"
+              >
+                <span class="material-symbols-outlined nav-group-icon" aria-hidden="true">{{ navIcons[group.key] || 'folder' }}</span>
+                <span class="nav-group-label">{{ group.label }}</span>
+                <ChevronDown :size="15" class="nav-group-chevron" :class="{ expanded: isGroupExpanded(group.key) }" aria-hidden="true" />
+              </button>
+              <div
+                v-show="!collapsed && isGroupExpanded(group.key)"
+                :id="`nav-group-${group.key}`"
+                class="nav-group-items"
+                :class="{ expanded: isGroupExpanded(group.key) }"
+                :aria-hidden="collapsed || !isGroupExpanded(group.key)"
+              >
+                <div class="nav-group-items-inner">
+                  <RouterLink
+                    v-for="item in group.items.filter(canSee)"
+                    :key="item.name"
+                    :to="item.path"
+                    class="nav-item paper-nav-item"
+                    :class="{ active: isActive(item.name) }"
+                    @click="closeMenu"
+                  >
+                    <span class="nav-item-label">{{ item.label }}</span>
+                  </RouterLink>
+                </div>
               </div>
-            </div>
-          </template>
-        </div>
-      </nav>
-      <nav v-else class="primary-nav paper-nav novice-nav" aria-label="主导航">
-        <button type="button" class="novice-new" title="新对话" @click="startNewChat"><span class="novice-new-icon" aria-hidden="true"><SquarePen :size="15" :stroke-width="2" /></span><span class="nav-group-label">新对话</span></button>
-        <NoviceRecents v-if="!collapsed" @open="closeMenu" />
-        <div class="novice-links">
-          <RouterLink to="/works" class="novice-link" :class="{ active: isActive('works') }" title="我的作品" @click="closeMenu"><LayoutGrid :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">我的作品</span></RouterLink>
-          <RouterLink to="/billing" class="novice-link" :class="{ active: isActive('billing') }" title="账户与充值" @click="closeMenu"><Wallet :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">账户与充值</span></RouterLink>
-          <button type="button" class="novice-link novice-pro" title="切换到进阶版" @click="switchMode('pro')"><ArrowUpRight :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">直播、文案等更多功能在进阶版</span></button>
-        </div>
-      </nav>
+            </template>
+          </div>
+        </nav>
+        <nav v-else class="primary-nav paper-nav novice-nav" aria-label="主导航">
+          <button type="button" class="novice-new" title="新对话" @click="startNewChat"><SquarePen :size="16" :stroke-width="1.8" aria-hidden="true" /><span class="nav-group-label">新对话</span></button>
+          <NoviceRecents v-if="!collapsed" @open="closeMenu" />
+          <div class="novice-links">
+            <RouterLink to="/works" class="novice-link" :class="{ active: isActive('works') }" title="我的作品" @click="closeMenu"><LayoutGrid :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">我的作品</span></RouterLink>
+            <RouterLink to="/billing" class="novice-link" :class="{ active: isActive('billing') }" title="账户与充值" @click="closeMenu"><Wallet :size="17" :stroke-width="1.6" aria-hidden="true" /><span class="nav-group-label">账户与充值</span></RouterLink>
+            <button type="button" class="novice-pro" title="切换到进阶版" @click="switchMode('pro')"><span class="novice-pro-icon" aria-hidden="true"><Layers :size="16" :stroke-width="1.7" /></span><span class="novice-pro-copy"><strong>进阶版</strong><small>直播、文案等完整功能</small></span><ChevronRight class="novice-pro-chevron" :size="15" :stroke-width="1.8" aria-hidden="true" /></button>
+          </div>
+        </nav>
+      </Transition>
 
       <div class="sidebar-footer paper-sidebar-footer">
         <div v-if="auth.isAuthenticated" class="account-wrap"><div class="account-button"><UserAvatar :src="auth.user?.avatarUrl" :name="userName" @load-error="auth.refreshAvatar" /><span class="account-copy"><small v-if="memberTier" class="account-plan"><template v-if="memberTier.paid"><b>{{ memberTier.label }}</b>{{ memberTier.until ? ' · ' + memberTier.until + ' 到期' : '' }}</template><template v-else>未激活</template></small><strong>{{ userName }}<RouterLink v-if="identityMissing()" class="identity-flag" :to="{ name: 'settings', hash: '#identity' }" @click="closeMenu">未实名</RouterLink></strong></span><button type="button" class="account-logout" aria-label="退出登录" title="退出登录" @click="logoutConfirm = true"><LogOut :size="16" :stroke-width="1.75" aria-hidden="true" /></button></div></div>
@@ -375,7 +377,7 @@ function startNewChat() { closeMenu(); router.push({ name: 'studio', query: { ne
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
             <RouterLink v-if="auth.isAuthenticated && !aiCreationHidden" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
-            <div v-if="auth.isAuthenticated && !aiCreationHidden" class="mode-switch" role="group" aria-label="切换版式"><button type="button" :aria-pressed="novice" :class="{ active: novice }" @click="switchMode('novice')">新手<span class="mode-suffix">版</span></button><button type="button" :aria-pressed="!novice" :class="{ active: !novice }" @click="switchMode('pro')">进阶<span class="mode-suffix">版</span></button></div>
+            <div v-if="auth.isAuthenticated && !aiCreationHidden" class="mode-switch" :class="{ 'is-pro': !novice }" role="group" aria-label="切换版式"><span class="mode-switch-thumb" aria-hidden="true" /><button type="button" :aria-pressed="novice" :class="{ active: novice }" @click="switchMode('novice')">新手<span class="mode-suffix">版</span></button><button type="button" :aria-pressed="!novice" :class="{ active: !novice }" @click="switchMode('pro')">进阶<span class="mode-suffix">版</span></button></div>
             <a v-if="showPartnerEntry" href="/partner/" target="_blank" rel="noopener" class="topbar-entry topbar-entry-primary" :title="`进入「${partnerMembership.partnerName || '服务商'}」的服务商后台`"><Briefcase :size="15" aria-hidden="true" />服务商后台</a>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
             <RouterLink v-if="!allianceHidden" to="/merchant-alliance" class="topbar-entry" :class="{ 'is-current': route.name === 'merchant-alliance' }"><Store :size="15" aria-hidden="true" />商城好物</RouterLink>
@@ -521,24 +523,44 @@ function startNewChat() { closeMenu(); router.push({ name: 'studio', query: { ne
 @media (max-width: 860px) { .paper-main .page-scroll.page-scroll-workspace { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } }
 @media (max-width: 640px) { .topbar-entry { padding: 6px 8px; font-size: 12px; } .topbar-entry svg { display: none; } }
 /* 新手版 / 进阶版切换：两段式开关，跟余额、通知放在一起。 */
-.mode-switch { display: inline-flex; flex: none; padding: 2px; border: 1px solid var(--line); border-radius: 16px; background: var(--color-bg-subtle); }
-.mode-switch button { min-height: 28px; padding: 0 12px; border: 0; border-radius: 14px; background: transparent; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.mode-switch button.active { background: var(--color-bg-surface); box-shadow: 0 1px 2px rgb(15 23 42 / 12%); color: var(--ink); font-weight: 600; }
-/* 手机上顶栏放不下，切换只写「新手 / 进阶」。 */
+.mode-switch { position: relative; display: inline-grid; flex: none; grid-template-columns: 1fr 1fr; padding: 2px; border: 1px solid var(--line); border-radius: 16px; background: var(--color-bg-subtle); isolation: isolate; }
+/* 白色滑块带一点弹性地滑到另一边，和对话页的图片 / 视频切换同一种手感。 */
+.mode-switch-thumb { position: absolute; z-index: -1; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px); border-radius: 14px; background: var(--color-bg-surface); box-shadow: 0 1px 2px rgb(15 23 42 / 12%), 0 4px 10px -6px rgb(15 23 42 / 30%); transition: transform .5s cubic-bezier(.34, 1.36, .5, 1); }
+.mode-switch.is-pro .mode-switch-thumb { transform: translateX(100%); }
+.mode-switch button { min-height: 28px; padding: 0 12px; border: 0; border-radius: 14px; background: transparent; color: var(--ink-muted); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; transition: color .3s ease; }
+.mode-switch button.active { color: var(--ink); font-weight: 600; }
 @media (max-width: 640px) { .mode-switch button { padding: 0 8px; } .mode-suffix { display: none; } }
 /* 新手版侧栏：新对话、最近记录、作品和账户。 */
 .novice-nav { display: flex; flex: 1 1 auto; flex-direction: column; gap: 16px; min-height: 0; padding: 6px 12px 12px; overflow: hidden; }
-/* 新对话：墨色胶囊 + 青色圆标，和对话页的发送按钮同一套语言。 */
-.novice-new { display: flex; flex: none; align-items: center; gap: 12px; min-height: 46px; padding: 0 16px 0 7px; border: 0; border-radius: 23px; background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 84%, var(--color-bg-surface)), var(--color-primary)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%), 0 10px 22px -14px color-mix(in srgb, var(--color-primary) 80%, transparent); color: var(--color-bg-surface); font: inherit; font-size: 14px; font-weight: 600; letter-spacing: .1em; cursor: pointer; transition: transform .15s, box-shadow .15s; }
-.novice-new:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 16%), 0 14px 26px -14px color-mix(in srgb, var(--color-primary) 85%, transparent); }
-.novice-new-icon { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--color-accent) 70%, #fff), var(--color-accent) 70%); color: var(--color-on-accent); box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%); }
+/* 新对话：白底细边的安静按钮，悬停时边线加深、图标转一下。 */
+.novice-new { display: flex; flex: none; align-items: center; gap: 10px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--color-bg-surface); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgb(15 23 42 / 4%); color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: box-shadow .2s ease, background .2s ease; }
+.novice-new svg { color: var(--color-accent-text); transition: transform .4s cubic-bezier(.34, 1.56, .64, 1); }
+.novice-new:hover { box-shadow: 0 0 0 1px var(--line-strong), 0 6px 16px -10px rgb(15 23 42 / 35%); }
+.novice-new:hover svg { transform: rotate(-12deg) scale(1.08); }
+.novice-new:active { background: var(--color-bg-subtle); }
 .novice-links { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--line); }
 .novice-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; text-decoration: none; cursor: pointer; }
 .novice-link:hover, .novice-link.active { background: var(--color-bg-subtle); }
 .novice-link.active { color: var(--color-accent-text); font-weight: 600; }
-.novice-pro { color: var(--ink-muted); font-size: 13px; }
+/* 进阶版入口：一张小卡片，图标块 + 两行说明 + 右箭头。 */
+.novice-pro { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 10px; border: 0; border-radius: 12px; background: var(--color-bg-surface); box-shadow: 0 0 0 1px var(--line); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: box-shadow .2s ease; }
+.novice-pro:hover { box-shadow: 0 0 0 1px var(--line-strong), 0 6px 16px -10px rgb(15 23 42 / 35%); }
+.novice-pro-icon { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent-text); }
+.novice-pro-copy { display: grid; flex: 1; gap: 1px; min-width: 0; }
+.novice-pro-copy strong { font-size: 13px; font-weight: 600; }
+.novice-pro-copy small { overflow: hidden; color: var(--ink-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.novice-pro-chevron { flex: none; color: var(--ink-muted); transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+.novice-pro:hover .novice-pro-chevron { transform: translateX(3px); }
+/* 新手版 / 进阶版切换时，侧栏内容淡出再淡入。 */
+.nav-swap-enter-active { transition: opacity .35s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
+.nav-swap-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.nav-swap-enter-from { opacity: 0; transform: translateX(-10px); }
+.nav-swap-leave-to { opacity: 0; transform: translateX(6px); }
+@media (prefers-reduced-motion: reduce) { .mode-switch-thumb, .novice-new svg, .novice-pro-chevron, .nav-swap-enter-active, .nav-swap-leave-active { transition: none; } }
 .paper-sidebar.is-collapsed .novice-nav { padding: 4px 8px; }
 .paper-sidebar.is-collapsed .novice-new, .paper-sidebar.is-collapsed .novice-link { justify-content: center; padding: 0; }
-.paper-sidebar.is-collapsed .novice-new { width: 46px; align-self: center; }
+.paper-sidebar.is-collapsed .novice-new { width: 40px; align-self: center; }
+.paper-sidebar.is-collapsed .novice-pro { justify-content: center; padding: 6px; }
+.paper-sidebar.is-collapsed .novice-pro-copy, .paper-sidebar.is-collapsed .novice-pro-chevron { display: none; }
 .paper-sidebar.is-collapsed .novice-nav .nav-group-label { display: none; }
 </style>
