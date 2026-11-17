@@ -274,6 +274,9 @@ function switchMode(mode) {
   else if (route.name === 'studio') router.push('/image/create')
 }
 function startNewChat() { closeMenu(); router.push({ name: 'studio', query: { new: String(Date.now()) } }) }
+// 新手版没有进阶版的创作入口页：登录后默认跳的「图片创作」、首页等落到这里时，直接换成对话页。
+const NOVICE_LANDINGS = new Set(['image-create', 'video-create', 'creative'])
+watch(() => [novice.value, route.name], ([isNovice, name]) => { if (isNovice && NOVICE_LANDINGS.has(name)) router.replace({ name: 'studio' }) }, { immediate: true })
 </script>
 
 <template>
