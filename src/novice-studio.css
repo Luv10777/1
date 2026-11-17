@@ -1,5 +1,5 @@
 /* 新手版对话页：一个居中的输入框，结果按对话往下排。颜色全部取自全站变量，深色模式照常。 */
-.ns-page { --ns-ink: var(--color-primary); --ns-surface: var(--color-bg-surface); --ns-soft: var(--color-bg-subtle); --ns-line: var(--line, var(--color-border-subtle)); --ns-muted: var(--ink-muted, var(--color-text-muted)); display: flex; flex-direction: column; gap: 28px; width: 100%; max-width: 860px; margin: 0 auto; padding: 48px 0 24px; color: var(--ink, var(--color-primary)); }
+.ns-page { --ns-ink: var(--color-primary); --ns-surface: var(--color-bg-surface); --ns-soft: var(--color-bg-subtle); --ns-line: var(--line, var(--color-border-subtle)); --ns-muted: var(--ink-muted, var(--color-text-muted)); --ns-width: 820px; display: flex; flex-direction: column; gap: 28px; width: 100%; max-width: var(--ns-width); margin: 0 auto; padding: 48px 0 24px; color: var(--ink, var(--color-primary)); }
 .ns-page.is-started { gap: 0; padding-top: 8px; min-height: 100%; }
 
 .ns-hero { display: grid; justify-items: center; gap: 14px; text-align: center; }
@@ -7,12 +7,23 @@
 .ns-hero h1 { margin: 0; font: 600 clamp(30px, 4vw, 44px)/1.3 var(--font-serif); letter-spacing: .04em; }
 .ns-hero p:last-child { margin: 0; color: var(--ns-muted); font-size: 15px; }
 
-/* 对话 */
-.ns-thread { display: flex; flex: 1; flex-direction: column; gap: 22px; padding: 16px 0 28px; }
-.ns-user { display: grid; justify-items: end; gap: 6px; align-self: flex-end; max-width: min(76%, 620px); }
-.ns-user small { color: var(--ns-muted); font-size: 12px; text-align: right; }
-.ns-bubble { margin: 0; padding: 12px 18px; border-radius: 18px 18px 6px 18px; background: var(--ns-ink); color: var(--ns-surface); font-size: 15px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ns-reply { display: grid; gap: 12px; justify-items: start; margin-bottom: 14px; }
+/* —— 对话 —— */
+.ns-thread { display: flex; flex: 1; flex-direction: column; gap: 26px; padding: 20px 0 32px; }
+.ns-user { display: grid; justify-items: end; gap: 8px; align-self: flex-end; max-width: min(78%, 640px); }
+.ns-user-media { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.ns-media-thumb { position: relative; display: grid; place-items: center; width: 64px; height: 64px; margin: 0; overflow: hidden; border-radius: 12px; background: var(--ns-soft); box-shadow: 0 0 0 1px var(--ns-line); color: var(--ns-muted); }
+.ns-media-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ns-media-thumb figcaption { position: absolute; right: 4px; bottom: 4px; padding: 0 5px; border-radius: 4px; background: rgb(15 23 42 / 62%); color: #fff; font-size: 10px; line-height: 16px; }
+.ns-media-thumb.is-file { place-content: center; gap: 2px; }
+.ns-media-thumb.is-file figcaption { position: static; background: none; color: inherit; }
+.ns-media-missing { font-size: 11px; }
+.ns-bubble { display: grid; gap: 6px; padding: 12px 16px; border-radius: 18px 18px 6px 18px; background: color-mix(in srgb, var(--ns-ink) 6%, var(--ns-surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ns-ink) 8%, transparent); }
+.ns-bubble p { margin: 0; font-size: 15px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ns-bubble.is-clamped p { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.ns-more { justify-self: end; padding: 0; border: 0; background: none; color: var(--color-accent-text); font: inherit; font-size: 12px; cursor: pointer; }
+.ns-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ns-tags li { padding: 0 8px; border-radius: 10px; background: var(--ns-soft); color: var(--ns-muted); font-size: 11px; line-height: 20px; }
+.ns-reply { display: grid; gap: 12px; justify-items: start; margin-bottom: 10px; }
 .ns-reply-head { display: flex; align-items: center; gap: 10px; }
 .ns-reply-head img { width: 28px; height: 28px; padding: 4px; box-sizing: border-box; border-radius: 50%; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); object-fit: contain; }
 .ns-reply-head strong { font: 600 14px var(--font-serif); letter-spacing: .1em; }
@@ -21,12 +32,16 @@
 .ns-status i.live { background: var(--color-accent); animation: ns-pulse 1.2s ease-in-out infinite; }
 @keyframes ns-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .ns-status i.live { animation: none; } }
-.ns-images { display: flex; flex-wrap: wrap; gap: 12px; justify-self: stretch; }
-.ns-image-item { display: grid; gap: 8px; width: min(320px, 100%); margin: 0; }
-.ns-image { display: grid; place-items: center; width: min(320px, 100%); overflow: hidden; border-radius: 16px; background: var(--ns-soft); box-shadow: 0 0 0 1px var(--ns-line), 0 24px 48px -28px rgb(15 23 42 / 40%); }
+/* 出图：1 张大图；2–4 张两列；5–6 张三列。 */
+.ns-images { display: grid; gap: 12px; justify-self: stretch; }
+.ns-images.is-single { grid-template-columns: minmax(0, 320px); }
+.ns-images.is-few { grid-template-columns: repeat(2, minmax(0, 260px)); }
+.ns-images.is-many { grid-template-columns: repeat(3, minmax(0, 220px)); }
+.ns-image-item { display: grid; gap: 8px; min-width: 0; margin: 0; }
+.ns-image { display: grid; place-items: center; width: 100%; overflow: hidden; border-radius: 16px; background: var(--ns-soft); box-shadow: 0 0 0 1px var(--ns-line), 0 24px 48px -30px rgb(15 23 42 / 45%); }
 .ns-image.is-placeholder { aspect-ratio: var(--ns-ratio, 3 / 4); color: var(--ns-muted); font-size: 12px; }
 .ns-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.ns-image-item figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ns-image-item figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ns-video { width: min(360px, 100%); max-height: 70vh; border-radius: 16px; background: #000; box-shadow: 0 24px 48px -28px rgb(15 23 42 / 45%); }
 .ns-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .ns-revise { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: min(100%, 560px); }
@@ -39,6 +54,7 @@
 .ns-bar i { position: absolute; inset: 0 auto 0 0; width: 35%; border-radius: 2px; background: var(--color-accent); animation: ns-slide 1.6s ease-in-out infinite; }
 @keyframes ns-slide { from { left: -35%; } to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .ns-bar i { animation: none; left: 0; } }
+.ns-spent { display: inline-flex; align-items: center; gap: 2px; margin: 0; color: var(--ns-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .ns-quote h3 { margin: 0; font: 600 17px var(--font-serif); letter-spacing: .04em; }
 .ns-quote-item { margin: 0; color: var(--ns-muted); font-size: 13px; }
 .ns-quote-amount { display: flex; align-items: center; gap: 6px; margin: 0; font: 600 28px var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -49,61 +65,71 @@
 .ns-quote-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
 /* 小按钮、提示 */
-.ns-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.ns-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 0; border-radius: 16px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.ns-chip.is-icon { width: 32px; padding: 0; }
 .ns-chip:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--line-strong, var(--ns-muted)); }
 .ns-chip.is-dark, .ns-primary { background: var(--ns-ink); box-shadow: none; color: var(--ns-surface); }
 .ns-primary { min-height: 42px; padding: 0 20px; border: 0; border-radius: 21px; font: inherit; font-weight: 500; cursor: pointer; }
-.ns-chip:disabled, .ns-primary:disabled, .ns-send:disabled, .ns-link:disabled { cursor: not-allowed; opacity: .5; }
+.ns-chip:disabled, .ns-primary:disabled, .ns-link:disabled { cursor: not-allowed; opacity: .5; }
 .ns-link { padding: 0; border: 0; background: none; color: var(--color-accent-text); font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; }
 .ns-link.is-danger { justify-self: start; color: var(--color-error); }
 .ns-note { margin: 0; color: var(--ns-muted); font-size: 13px; line-height: 1.7; }
 .ns-error { margin: 0; color: var(--color-error); font-size: 13px; line-height: 1.7; }
 .ns-error .ns-link { margin-left: 8px; }
 
-/* 输入框 */
-.ns-dock { display: flex; flex-direction: column; gap: 14px; }
+/* —— 输入框 —— */
+.ns-dock { display: flex; flex-direction: column; gap: 12px; }
 /* 外层滚动区底部有 28px 内边距，吸底时往下多贴 28px，免得对话内容从输入框下面露出来。 */
-.ns-page.is-started .ns-dock { position: sticky; bottom: -28px; z-index: 5; padding: 12px 0 44px; background: linear-gradient(to bottom, transparent, var(--night, var(--color-bg-canvas)) 24px); }
+.ns-page.is-started .ns-dock { position: sticky; bottom: -28px; z-index: 5; padding: 18px 0 42px; background: linear-gradient(to bottom, transparent, var(--night, var(--color-bg-canvas)) 18px); }
 .ns-page.is-started .ns-dock > :not(.ns-composer) { order: -1; }
 .ns-composer { display: flex; flex-direction: column; border-radius: 24px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line), 0 2px 4px rgb(15 23 42 / 3%), 0 28px 60px -30px rgb(15 23 42 / 32%); }
 .ns-composer:focus-within { box-shadow: 0 0 0 1px var(--line-strong, var(--ns-muted)), 0 2px 4px rgb(15 23 42 / 3%), 0 28px 60px -30px rgb(15 23 42 / 32%); }
-.ns-composer-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 20px 0; }
-.ns-modes { display: flex; gap: 4px; }
-.ns-modes button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: transparent; color: var(--ns-muted); font: inherit; font-size: 14px; cursor: pointer; }
-.ns-modes button.active { background: var(--ns-ink); color: var(--ns-surface); font-weight: 500; }
-.ns-idea-button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 17px; background: color-mix(in srgb, var(--color-accent) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent); color: var(--color-accent-text); font: inherit; font-size: 13px; cursor: pointer; }
+.ns-composer-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px 0; }
+.ns-modes { display: flex; gap: 2px; padding: 3px; border-radius: 18px; background: var(--ns-soft); }
+.ns-modes button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 14px; border: 0; border-radius: 15px; background: transparent; color: var(--ns-muted); font: inherit; font-size: 13px; cursor: pointer; }
+.ns-modes button.active { background: var(--ns-surface); box-shadow: 0 1px 2px rgb(15 23 42 / 12%), 0 0 0 1px var(--ns-line); color: inherit; font-weight: 600; }
+.ns-idea-button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 14px; border: 0; border-radius: 16px; background: color-mix(in srgb, var(--color-accent) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent); color: var(--color-accent-text); font: inherit; font-size: 13px; cursor: pointer; }
 .ns-idea-button[aria-expanded='true'] { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
-.ns-attachments { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 20px 0; }
-.ns-attachment { position: relative; display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 5px; border-radius: 12px; background: var(--ns-soft); font-size: 12px; }
-.ns-attachment img { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
-.ns-attachment.is-file { max-width: 220px; min-height: 32px; padding-right: 30px; }
-.ns-attachment.is-file img { width: 26px; height: 26px; border-radius: 5px; }
-.ns-attachment.is-file > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ns-roles { display: flex; gap: 2px; padding: 2px; border-radius: 6px; background: color-mix(in srgb, var(--ns-muted) 14%, transparent); }
-.ns-roles button { min-height: 22px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--ns-muted); font: inherit; font-size: 12px; cursor: pointer; }
-.ns-roles button.active { background: var(--ns-surface); color: inherit; }
-.ns-remove { position: absolute; top: -6px; right: -6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: var(--ns-ink); color: var(--ns-surface); cursor: pointer; }
-.ns-attachment.is-file .ns-remove { position: static; margin-left: auto; flex: none; }
-.ns-input { min-height: 84px; margin: 12px 20px 6px; padding: 0; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; line-height: 1.75; resize: none; }
-.ns-page.is-started .ns-input { min-height: 52px; font-size: 16px; }
+/* 参考素材：一排缩略图，左下角标用途，点角标切换主体 / 风格。 */
+.ns-attachments { display: flex; gap: 10px; padding: 12px 18px 2px; overflow-x: auto; scrollbar-width: thin; }
+.ns-attachment { position: relative; display: grid; flex: none; place-items: center; width: 56px; height: 56px; border-radius: 12px; background: var(--ns-soft); box-shadow: 0 0 0 1px var(--ns-line); color: var(--ns-muted); }
+.ns-attachment img { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; }
+.ns-role { position: absolute; left: 3px; bottom: 3px; min-height: 16px; padding: 0 5px; border: 0; border-radius: 4px; background: rgb(15 23 42 / 68%); color: #fff; font: inherit; font-size: 10px; line-height: 16px; cursor: pointer; }
+.ns-role.is-static { cursor: default; }
+.ns-remove { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 2px solid var(--ns-surface); border-radius: 50%; background: var(--ns-ink); color: var(--ns-surface); cursor: pointer; }
+.ns-input { field-sizing: content; min-height: 84px; max-height: 200px; margin: 12px 18px 4px; padding: 0; border: 0; outline: none; overflow-y: auto; background: transparent; color: inherit; font: inherit; font-size: 16px; line-height: 1.75; resize: none; }
+.ns-page.is-started .ns-input { min-height: 28px; max-height: 112px; font-size: 15px; }
 .ns-input::placeholder { color: var(--ns-muted); opacity: .8; }
-.ns-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 10px 12px 12px 14px; border-top: 1px solid var(--ns-line); }
-.ns-icon { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.ns-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 10px 10px 12px; border-top: 1px solid var(--ns-line); }
+.ns-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 .ns-icon:hover:not(:disabled), .ns-icon[aria-expanded='true'] { background: var(--ns-soft); }
 .ns-icon:disabled { cursor: not-allowed; opacity: .4; }
-.ns-divider { width: 1px; height: 18px; margin: 0 4px; background: var(--ns-line); }
+.ns-divider { width: 1px; height: 18px; margin: 0 2px; background: var(--ns-line); }
 .ns-tool { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; max-width: 100%; padding: 0 12px 0 8px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .ns-tool:hover, .ns-tool.open { background: var(--ns-soft); }
 .ns-tool img { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px var(--ns-line); }
 .ns-tool img.mark, .ns-tile img.mark { padding: 3px; box-sizing: border-box; background: #fff; object-fit: contain; }
-.ns-cost { margin-left: auto; padding-right: 6px; color: var(--ns-muted); font-size: 12px; }
-.ns-send { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 7px 0 20px; border: 0; border-radius: 22px; background: var(--ns-ink); color: var(--ns-surface); font: inherit; font-size: 14px; font-weight: 500; letter-spacing: .04em; cursor: pointer; }
-.ns-send > span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--color-accent); color: var(--color-on-accent); }
+/* 张数：减号、数字、加号，一次最多 6 张。 */
+.ns-count { display: inline-flex; align-items: center; gap: 2px; min-height: 34px; padding: 0 3px; border-radius: 10px; background: var(--ns-soft); font-size: 13px; }
+.ns-count button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.ns-count button:hover:not(:disabled) { background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); }
+.ns-count button:disabled { cursor: not-allowed; opacity: .35; }
+.ns-count span { min-width: 40px; color: var(--ns-muted); text-align: center; }
+.ns-count strong { color: var(--ink, var(--ns-ink)); font: 600 14px var(--font-mono); font-variant-numeric: tabular-nums; }
+/* 发送：墨色胶囊，中间是这次要花的烟火，右边青色圆钮。 */
+.ns-send { position: relative; display: inline-flex; align-items: center; gap: 10px; min-height: 46px; margin-left: auto; padding: 0 6px 0 22px; border: 0; border-radius: 23px; background: linear-gradient(180deg, color-mix(in srgb, var(--ns-ink) 84%, var(--ns-surface)), var(--ns-ink)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%), 0 10px 24px -12px color-mix(in srgb, var(--ns-ink) 70%, transparent); color: var(--ns-surface); font: inherit; font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: transform .15s, box-shadow .15s; }
+.ns-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 16%), 0 14px 28px -12px color-mix(in srgb, var(--ns-ink) 75%, transparent); }
+.ns-send:active:not(:disabled) { transform: translateY(0); }
+.ns-send:disabled { cursor: not-allowed; opacity: .55; }
+.ns-send-cost { display: inline-flex; align-items: center; gap: 1px; padding: 3px 9px 3px 6px; border-radius: 12px; background: color-mix(in srgb, var(--ns-surface) 14%, transparent); font: 600 13px var(--font-mono); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.ns-send.is-video .ns-send-cost { padding: 3px 4px; }
+.ns-send.is-video .ns-send-cost .yanhuo-coin, .ns-spent .yanhuo-coin { margin-right: 0; }
+.ns-send-arrow { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--color-accent) 70%, #fff), var(--color-accent) 70%); color: var(--color-on-accent); box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%); }
 .ns-composer-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0 8px; color: var(--ns-muted); font-size: 13px; }
 
 /* 风格、场景、输出设置、素材、灵感方案 */
 .ns-panel { display: grid; gap: 14px; padding: 18px; border-radius: 18px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line); }
-.ns-page.is-started .ns-panel { max-height: min(56vh, 560px); overflow-y: auto; box-shadow: 0 0 0 1px var(--ns-line), 0 20px 50px -24px rgb(15 23 42 / 35%); }
+.ns-page.is-started .ns-panel { max-height: min(52vh, 520px); overflow-y: auto; box-shadow: 0 0 0 1px var(--ns-line), 0 20px 50px -24px rgb(15 23 42 / 35%); }
 .ns-panel > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
 .ns-panel h2 { margin: 0; font: 600 16px var(--font-serif); letter-spacing: .06em; }
 .ns-panel header small { color: var(--ns-muted); font-size: 12px; }
@@ -144,8 +170,8 @@
 @media (max-width: 640px) {
   .ns-page { padding-top: 20px; }
   .ns-user { max-width: 92%; }
-  .ns-cost { display: none; }
+  .ns-images.is-few, .ns-images.is-many { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ns-composer-top, .ns-attachments { padding-inline: 14px; }
-  .ns-input { margin-inline: 14px; font-size: 16px; }
-  .ns-send { margin-left: auto; }
+  .ns-input { margin-inline: 14px; }
+  .ns-send { padding-left: 16px; }
 }

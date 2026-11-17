@@ -40,7 +40,9 @@ public final class ImageDtos {
     public record PreviewLoaded(@Min(0) int generation) {}
     public record View(Long id, Long parentId, String workflow, String brief, String quality,
                        String ratio, String status, String summary, String question, String error,
-                       int completed, int count, List<ItemView> items, Instant createdAt, Long taskId) {}
+                       int completed, int count, List<ItemView> items, Instant createdAt, Long taskId,
+                       List<ReferenceView> references) {}
+    public record ReferenceView(Long assetId, String role, String name, String url) {}
     public record History(Long id, String workflow, String title, String brief, String quality, Instant createdAt,
                           String status, int completed, int count, String previewUrl) {}
     public record Work(Long id, Long creationId, String workflow, String title,
