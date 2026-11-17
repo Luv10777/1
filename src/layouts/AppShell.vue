@@ -538,7 +538,7 @@ function startNewChat() { closeMenu(); router.push({ name: 'studio', query: { ne
 .novice-new:hover { box-shadow: 0 0 0 1px var(--line-strong), 0 6px 16px -10px rgb(15 23 42 / 35%); }
 .novice-new:hover svg { transform: rotate(-12deg) scale(1.08); }
 .novice-new:active { background: var(--color-bg-subtle); }
-.novice-links { display: flex; flex-direction: column; gap: 2px; padding-top: 12px; border-top: 1px solid var(--line); }
+.novice-links { display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
 .novice-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; text-decoration: none; cursor: pointer; }
 .novice-link:hover, .novice-link.active { background: var(--color-bg-subtle); }
 .novice-link.active { color: var(--color-accent-text); font-weight: 600; }
