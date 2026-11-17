@@ -40,7 +40,11 @@ export const partnerAdminApi = {
   list: () => get('/api/platform/partners'),
   create: values => post('/api/platform/partners', values),
   addMember: (id, uid) => post(`/api/platform/partners/${encodeURIComponent(id)}/members`, { uid: Number(uid) }),
+  /** { uid } 或 { phone, name }，外加 { permissions, monthlyCap }：把人加成服务商成员。 */
+  addTeamMember: (id, values) => post(`/api/platform/partners/${encodeURIComponent(id)}/team`, values),
   removeMember: (id, userId) => del(`/api/platform/partners/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`),
+  /** 软删除：作废没兑换的激活码、移出全部账号、名下商户解除归属；记录保留。 */
+  remove: id => del(`/api/platform/partners/${encodeURIComponent(id)}`),
   rename: (id, values) => put(`/api/platform/partners/${encodeURIComponent(id)}`, values),
   setStatus: (id, status) => post(`/api/platform/partners/${encodeURIComponent(id)}/status`, { status }),
   grant: (id, values) => post(`/api/platform/partners/${encodeURIComponent(id)}/credits`, values),

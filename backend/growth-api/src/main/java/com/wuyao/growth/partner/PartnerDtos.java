@@ -112,6 +112,9 @@ public final class PartnerDtos {
     /** 改成员：权限、每月分配上限（空表示不限）、团队称呼（空表示不改）。 */
     public record UpdateMember(@NotNull @Valid Permissions permissions, @Positive @Max(100000000) Long monthlyCap,
                                @Size(max=20) String displayName) {}
+    /** 平台加成员：填 uid（已是团队账户员工的账号）或 phone + name（同服务商自己按手机号加）其中一种。 */
+    public record PlatformMember(@Min(10000000) @Max(99999999) Long uid, @Size(max=20) String phone, @Size(max=20) String name,
+                                 @NotNull @Valid Permissions permissions, @Positive @Max(100000000) Long monthlyCap) {}
     public record DisplayName(@NotBlank @Size(max=20) String displayName) {}
 
     /** teamTenantName 是团队账户（负责人的一方志商户）的名字。 */

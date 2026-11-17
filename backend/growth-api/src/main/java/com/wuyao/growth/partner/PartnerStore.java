@@ -66,17 +66,18 @@ class PartnerStore {
         return partner.flatMap(p -> member(p.id(), userId).map(m -> new Access(p, m)));
     }
 
+    /** 已删除的服务商（V85）查不到，平台和服务商后台都当它不存在。 */
     @Transactional(readOnly = true)
     public Optional<Row> partner(Long id) {
-        return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p WHERE p.id = :id", Map.of("id", id)).stream().findFirst();
+        return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p WHERE p.id = :id AND p.status <> 'DELETED'", Map.of("id", id)).stream().findFirst();
     }
 
     @Transactional(readOnly = true)
-    public List<Row> partners() { return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p ORDER BY p.id DESC", Map.of()); }
+    public List<Row> partners() { return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p WHERE p.status <> 'DELETED' ORDER BY p.id DESC", Map.of()); }
 
     @Transactional
     public Row lockPartner(Long id) {
-        return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p WHERE p.id = :id FOR UPDATE", Map.of("id", id)).stream().findFirst()
+        return rows("SELECT " + PARTNER_COLUMNS + " FROM partners p WHERE p.id = :id AND p.status <> 'DELETED' FOR UPDATE", Map.of("id", id)).stream().findFirst()
                 .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "服务商不存在"));
     }
 
@@ -169,6 +170,24 @@ class PartnerStore {
     public int removeMember(Long partnerId, Long userId) {
         return em.createNativeQuery("DELETE FROM partner_members WHERE partner_id = :partner AND user_id = :user")
                 .setParameter("partner", partnerId).setParameter("user", userId).executeUpdate();
+    }
+
+    /**
+     * 软删除：标记 DELETED，移出全部登录账号（可以再加入别家），名下商户解除归属。流水、分配、跟进和激活码记录都保留。
+     * 调用方先锁服务商、作废没兑换的激活码，再调这里，这样作废前刚兑换出来的归属也会一起解除。
+     */
+    @Transactional
+    public void delete(Long partnerId) {
+        em.createNativeQuery("UPDATE partners SET status = 'DELETED', updated_at = now() WHERE id = :id").setParameter("id", partnerId).executeUpdate();
+        em.createNativeQuery("DELETE FROM partner_members WHERE partner_id = :id").setParameter("id", partnerId).executeUpdate();
+        em.createNativeQuery("DELETE FROM partner_tenants WHERE partner_id = :id").setParameter("id", partnerId).executeUpdate();
+    }
+
+    /** 还没到账的分配笔数（团队账户已扣、商户还没收到）。 */
+    @Transactional(readOnly = true)
+    public long pendingDistributions(Long partnerId) {
+        return num(em.createNativeQuery("SELECT count(*) FROM partner_distributions WHERE partner_id = :id AND status = 'PENDING'")
+                .setParameter("id", partnerId).getSingleResult());
     }
 
     private static final String BINDING_COLUMNS = "tenant_id, partner_id, source, bound_at, changed_by";
