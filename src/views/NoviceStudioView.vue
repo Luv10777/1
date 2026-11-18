@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowUp, AudioLines, Check, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
 import { useImageCreation } from '../composables/useImageCreation'
 import { useVideoWorkbench, videoRatioOptions, videoStageLabel } from '../composables/useVideoWorkbench'
 import { useImageInspiration } from '../composables/useImageInspiration'
@@ -515,11 +516,12 @@ function videoTags(item) {
                   <div><dt>实际模型</dt><dd>{{ video.quoted.quote.providerModel }}</dd></div>
                   <div><dt>预估用量</dt><dd>{{ number(video.quoted.quote.estimatedTokens) }} 视频 Token</dd></div>
                   <div><dt>费率核验</dt><dd>{{ dateTime(video.quoted.quote.verifiedAt) }}</dd></div>
-                  <div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div>
+                  <div v-if="video.quoted.retryId || !billing.summary?.generationTeam"><dt>{{ video.generationWallet === 'TEAM' ? '团队可用烟火' : '可用烟火' }}</dt><dd>{{ billing.error ? '暂不可读' : number(video.walletBalance) }}</dd></div>
                 </dl>
-                <p v-if="billing.summary && billing.summary.available < video.quoted.quote.credits" class="ns-error">烟火不足，请先充值。</p>
+                <GenerationWalletPicker v-if="!video.quoted.retryId" v-model="video.generationWallet" :disabled="video.quoteBusy" />
+                <p v-if="billing.summary && video.walletBalance < video.quoted.quote.credits" class="ns-error">所选余额的烟火不足。</p>
                 <div class="ns-quote-actions">
-                  <button type="button" class="ns-primary" :disabled="video.quoteBusy || !!billing.error || (billing.summary?.available || 0) < video.quoted.quote.credits" @click="video.confirmQuote">{{ video.quoteBusy ? '正在提交…' : '确认费用，开始生成' }}</button>
+                  <button type="button" class="ns-primary" :disabled="video.quoteBusy || !!billing.error || video.walletBalance < video.quoted.quote.credits" @click="video.confirmQuote">{{ video.quoteBusy ? '正在提交…' : '确认费用，开始生成' }}</button>
                   <button type="button" class="ns-link" :disabled="video.quoteBusy" @click="video.closeQuote">先不做</button>
                 </div>
               </template>
@@ -527,7 +529,7 @@ function videoTags(item) {
                 <p class="ns-error">{{ video.quoted.quote.message }}</p>
                 <button type="button" class="ns-link" @click="video.closeQuote">知道了</button>
               </template>
-              <RouterLink v-if="(billing.summary?.available || 0) < video.quoted.quote.credits" class="ns-link" to="/billing" @click="video.closeQuote">前往套餐与充值</RouterLink>
+              <RouterLink v-if="video.generationWallet === 'PERSONAL' && video.walletBalance < video.quoted.quote.credits" class="ns-link" to="/billing" @click="video.closeQuote">前往套餐与充值</RouterLink>
               <p v-if="video.quoteError" class="ns-error" role="alert">{{ video.quoteError }}</p>
             </section>
           </div>
@@ -551,6 +553,7 @@ function videoTags(item) {
           </div>
           <button type="button" class="ns-idea-button" :class="{ active: ideaMode }" :aria-pressed="ideaMode" @click="toggleIdeas"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案<X v-if="ideaMode" :size="13" :stroke-width="2" aria-hidden="true" /></button>
         </div>
+        <GenerationWalletPicker v-if="mode === 'image' && !ideaMode" v-model="studio.generationWallet" :disabled="studio.busy || !!studio.pending" />
         <Transition name="ns-swap">
           <p v-if="ideaMode" class="ns-idea-hint">{{ answering ? '一方志想先确认一件事，回答后接着写方案。' : '说一句想要什么，一方志先出 3 个方向给你挑，挑中的再去生成。' }}</p>
         </Transition>

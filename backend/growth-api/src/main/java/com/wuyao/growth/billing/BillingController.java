@@ -18,7 +18,7 @@ public class BillingController {
     private final BillingRedeemCodeService redeemCodes;
     @GetMapping("/summary")
     public ApiResponse<BillingDtos.Summary> summary(@AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.summary(owner(me),config.getOperatorUserIds().contains(me.userId())));
+        return ApiResponse.ok(service.summary(owner(me),config.getOperatorUserIds().contains(me.userId()),me.userId()));
     }
     @GetMapping("/plans") public ApiResponse<List<BillingDtos.PlanSnapshot>> plans() { return ApiResponse.ok(service.plans()); }
     @GetMapping("/ledger") public ApiResponse<BillingDtos.History<BillingDtos.LedgerView>> ledger(

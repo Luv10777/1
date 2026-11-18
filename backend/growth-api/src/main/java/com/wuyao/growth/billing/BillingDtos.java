@@ -13,7 +13,18 @@ public final class BillingDtos {
                           int liveCreditsPerHour, long available,
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
                           Instant memberUntil, PlanSnapshot plan, boolean canManage, boolean operator,
-                          PaymentInstructions payment, String paymentMethod) {}
+                          PaymentInstructions payment, String paymentMethod, GenerationTeam generationTeam) {
+        public Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits,
+                       int liveCreditsPerHour, long available, long giftAvailable, long purchasedAvailable,
+                       long held, boolean memberActive, Instant memberUntil, PlanSnapshot plan, boolean canManage,
+                       boolean operator, PaymentInstructions payment, String paymentMethod) {
+            this(currencyName, creditsPerYuan, imageCredits, videoAnalysisCredits, liveCreditsPerHour, available,
+                    giftAvailable, purchasedAvailable, held, memberActive, memberUntil, plan, canManage, operator,
+                    payment, paymentMethod, null);
+        }
+    }
+    public record GenerationTeam(String name, long available) {}
+    public enum GenerationWallet { PERSONAL, TEAM }
     public record PaymentInstructions(boolean available, String recipient, String account, String bank,
                                       String instructions, String qrCodeUrl) {}
     public record TopUp(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,

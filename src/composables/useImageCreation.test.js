@@ -7,16 +7,33 @@ import { createServer } from 'vite'
 test('image creation reads capabilities for members and lets guests browse without private requests', async () => {
   const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
   const originalFetch = globalThis.fetch
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
+  const pending = new Map()
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: {
+    getItem: key => pending.get(key) ?? null,
+    setItem: (key, value) => pending.set(key, value),
+    removeItem: key => pending.delete(key),
+  } })
   let capabilityRequests = 0
   let apiRequests = 0
+  const submissions = []
   let auth
   try {
     ;({ auth } = await vite.ssrLoadModule('/src/stores/auth.js'))
     auth.state.user = { id: 1, tenantId: 7 }
     auth.state.token = { accessToken: 'test-only' }
     const { useImageCreation } = await vite.ssrLoadModule('/src/composables/useImageCreation.js')
-    globalThis.fetch = async url => {
+    globalThis.fetch = async (url, options) => {
       apiRequests++
+      const creation = { id: 42, workflow: 'POSTER', status: 'SUCCEEDED', items: [] }
+      if (url.startsWith('/api/image-creations?') && options.method === 'POST') {
+        submissions.push(url)
+        return { ok: true, json: async () => ({ code: 200, data: creation }) }
+      }
+      if (url.endsWith('/42/thread')) return { ok: true, json: async () => ({ code: 200, data: [creation] }) }
+      if (url === '/api/billing/summary') return { ok: true, json: async () => ({ code: 200, data: {
+        available: 500, generationTeam: { name: '服务商', available: 2200 },
+      } }) }
       if (String(url).endsWith('/capabilities')) {
         capabilityRequests++
         return { ok: true, json: async () => ({ code: 200, data: {
@@ -55,6 +72,14 @@ test('image creation reads capabilities for members and lets guests browse witho
     assert.equal(capabilityRequests, 1)
     assert.equal(studio.capabilityState, 'ready')
     assert.equal(studio.configured, true)
+    assert.equal(studio.generationWallet, 'PERSONAL')
+    studio.generationWallet = 'TEAM'
+    studio.brief = '一张测试图片'
+    studio.generate()
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(studio.error, '')
+    assert.deepEqual(submissions, ['/api/image-creations?wallet=TEAM'])
+    assert.equal(studio.current.id, 42)
     app.unmount()
     auth.state.user = null; auth.state.token = null
     const beforeGuest = apiRequests
@@ -70,6 +95,8 @@ test('image creation reads capabilities for members and lets guests browse witho
   } finally {
     if (auth) { auth.state.user = null; auth.state.token = null }
     globalThis.fetch = originalFetch
+    if (originalStorage) Object.defineProperty(globalThis, 'sessionStorage', originalStorage)
+    else delete globalThis.sessionStorage
     await vite.close()
   }
 })

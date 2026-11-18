@@ -8,19 +8,23 @@ import { createServer } from 'vite'
 
 test('workbench uploads, model changes, draft recall and quotes preserve the supported materials', async () => {
   const saved = Object.fromEntries(['window', 'document', 'Document', 'ShadowRoot', 'fetch'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
-  globalThis.window = { history: { state: {} }, setTimeout, clearTimeout }
+  globalThis.window = { history: { state: {} }, setTimeout, clearTimeout, matchMedia: () => ({ matches: false }) }
   globalThis.document = {}
   globalThis.Document = class {}
   globalThis.ShadowRoot = class {}
-  const quotes = [], uploads = [], pendingVideos = []
+  const quotes = [], uploads = [], pendingVideos = [], submissions = []
   let videosReady = false
   const response = data => ({ ok: true, status: 200, json: async () => ({ code: 200, data }) })
   globalThis.fetch = async (url, options = {}) => {
     if (options.method === 'PUT') return { ok: true }
     if (url === '/api/video/capabilities') return response([])
     if (url === '/api/video/scenes') return response([{ key: 'free', name: '自由创作', summary: '', icon: 'edit_note' }])
-    if (url.startsWith('/api/video/workflows')) return response({ items: [], totalPages: 0 })
-    if (url === '/api/billing/summary') return response({ memberActive: true, available: 100, plan: { videoEnabled: true } })
+    if (url.startsWith('/api/video/workflows')) {
+      if (options.method !== 'POST') return response({ items: [], totalPages: 0 })
+      submissions.push({ url, body: JSON.parse(options.body) })
+      return response({ id: 8, status: 'SUCCEEDED', ...submissions.at(-1).body })
+    }
+    if (url === '/api/billing/summary') return response({ memberActive: true, available: 100, generationTeam: { name: '服务商', available: 2200 }, plan: { videoEnabled: true } })
     if (url === '/api/assets/upload-url') {
       const body = JSON.parse(options.body), assetId = uploads.length + 1
       uploads.push({ ...body, assetId })
@@ -37,7 +41,7 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
     if (url === '/api/video/quote') {
       quotes.push(JSON.parse(options.body))
       if (quotes.length === 1) return { ok: false, status: 503, json: async () => ({ code: 500, message: '测试费用预估暂时失败' }) }
-      return response({ available: false, message: '本地测试报价' })
+      return response({ available: true, credits: 120, quoteId: 'wallet-quote', message: '本地测试报价' })
     }
     throw new Error(`Unexpected request: ${url}`)
   }
@@ -48,8 +52,8 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
         if (id.endsWith('.css')) return ''
         if (id.endsWith('/VideoPreviewPanel.vue')) return "import { h } from 'vue'; export default { inheritAttrs: false, setup(_, { slots }) { return () => h('div', slots.default?.()) } }"
         if (id.endsWith('/VideoPlanPanel.vue')) return 'export default { inheritAttrs: false, setup(_, { attrs }) { globalThis.videoPlanUpload = attrs.upload; return () => null } }'
-        if (id.endsWith('/VideoWorkbenchView.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
-          { id: 'video-materials-test', inlineTemplate: true }).content
+        if (id.endsWith('/VideoWorkbenchView.vue') || id.endsWith('/GenerationWalletPicker.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
+          { id, inlineTemplate: true }).content
         if (id.endsWith('.vue')) return 'export default { render() { return null } }'
       },
     }],
@@ -136,6 +140,15 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
     assert.equal(quotes[0].referenceAudioAssetIds.length, 3)
     assert.deepEqual(quotes[0].referenceVideoAssetIds, uploads.filter(entry => entry.type === 'VIDEO').map(entry => entry.assetId))
     assert.deepEqual(quotes[0].referenceAudioAssetIds, uploads.filter(entry => entry.type === 'AUDIO').map(entry => entry.assetId))
+    const confirm = button('确认费用，开始生成')
+    assert.match(text(button('个人余额')), /100 烟火/)
+    assert.equal(button('个人余额').props['aria-pressed'], true)
+    assert.equal(confirm.props.disabled, true, 'do not combine the two balances')
+    assert.match(text(button('团队余额')), /2,200 烟火/)
+    button('团队余额').props.onClick(); await settle()
+    assert.equal(confirm.props.disabled, false)
+    await confirm.props.onClick(); await settle()
+    assert.deepEqual(submissions, [{ url: '/api/video/workflows?wallet=TEAM', body: { ...quotes[1], quoteId: 'wallet-quote' } }])
     // 「帮我出方案」只传素材和类型，不属于任何一条创作记录。
     const planImage = { id: 'plan-image', name: 'plan.png', file: new File(['fixture'], 'plan.png', { type: 'image/png' }) }
     assert.equal(await globalThis.videoPlanUpload(planImage, 'IMAGE'), uploads.length)

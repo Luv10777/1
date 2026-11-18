@@ -37,17 +37,23 @@ public class BillingService {
     private final WechatPayGateway wechat;
     private final AlipayGateway alipay;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final TeamGenerationWallet teamWallet;
     /** Generation writers use one account-first lock order, including cancellation and retries. */
     @Transactional
     public void lockForGeneration() { store.lockAccount(); }
 
     @Transactional(readOnly=true)
     public BillingDtos.Summary summary(boolean canManage,boolean operator) {
+        return summary(canManage,operator,null);
+    }
+
+    @Transactional(readOnly=true)
+    public BillingDtos.Summary summary(boolean canManage,boolean operator,Long viewer) {
         var a=store.account();
         return new BillingDtos.Summary("烟火",CREDITS_PER_YUAN,IMAGE_CREDITS,VIDEO_ANALYSIS_CREDITS,LIVE_CREDITS_PER_HOUR,
             a==null?0:a.available(),a==null?0:a.getGiftAvailable(),a==null?0:a.getPurchasedAvailable(),
             a==null?0:a.getHeld(),a!=null&&a.active(Instant.now()),a==null?null:a.getMemberUntil(),
-            a==null?null:a.getPlanSnapshot(),canManage,operator,payment(),config.getPaymentMethod());
+            a==null?null:a.getPlanSnapshot(),canManage,operator,payment(),config.getPaymentMethod(),teamWallet.summary(viewer));
     }
     @Transactional(readOnly=true)
     public List<BillingDtos.PlanSnapshot> plans() { return store.plans(false).stream().map(BillingPlan::snapshot).toList(); }
@@ -380,60 +386,84 @@ public class BillingService {
 
     @Transactional
     public String reserve(String requestKey,String capability,long amount,String description) {
+        return reserve(requestKey,capability,amount,description,null);
+    }
+
+    @Transactional
+    public String reserve(String requestKey,String capability,long amount,String description,BillingDtos.GenerationWallet wallet) {
         if(amount<=0) throw bad("预占烟火必须大于零");
         var a=store.lockAccount();
         var existing=store.reservationByKey(requestKey);
+        boolean team=wallet==BillingDtos.GenerationWallet.TEAM;
         if(existing.isPresent()) {
-            if(!capability.equals(existing.get().getCapability())||amount!=existing.get().getInitialAmount()) throw bad("预占标识已被用于不同的创作费用");
-            return existing.get().getId();
+            var prior=existing.get();
+            if(!capability.equals(prior.getCapability())||amount!=prior.getInitialAmount()||team!=(prior.getPayerTenantId()!=null))
+                throw bad("预占标识已被用于不同的创作费用");
+            return prior.getId();
         }
         requireEntitlement(a,capability);
         var r=new BillingReservation(); r.setTenantId(TenantContext.require()); r.setRequestKey(requestKey);
         r.setCreatedBy(currentUserId());
+        if(team) {
+            if(!"IMAGE".equals(capability)&&!"VIDEO".equals(capability)) throw bad("团队余额仅支持生成图片或视频");
+            r.setPayerTenantId(teamWallet.requireOwnerWallet(r.getCreatedBy()));
+        }
         r.setCapability(capability); r.setInitialAmount(amount); store.save(r);
-        hold(a,r,amount,"reserve:"+requestKey,description);
+        hold(payer(a,r),r,amount,"reserve:"+requestKey,description);
         return r.getId();
     }
     @Transactional
     public void reserveMore(String reservationId,long amount,String eventKey,String description) {
         var a=store.lockAccount(); var r=requireReservation(store.reservation(reservationId));
-        if(store.eventExists(eventKey)) return;
-        requireEntitlement(a,r.getCapability()); hold(a,r,amount,eventKey,description);
+        if(reservationEventExists(r,eventKey)) return;
+        requireEntitlement(a,r.getCapability());
+        if(r.getPayerTenantId()!=null && r.getPayerTenantId()!=teamWallet.requireOwnerWallet(currentUserId()))
+            throw BizException.of(ErrorCode.FORBIDDEN,"当前账号无权继续使用原任务的团队余额");
+        hold(payer(a,r),r,amount,eventKey,description);
     }
     @Transactional
     public void capture(String reservationId,long amount,String eventKey,String description) {
         var a=store.lockAccount(); var r=requireReservation(store.reservation(reservationId));
-        if(store.eventExists(eventKey)) return;
+        if(reservationEventExists(r,eventKey)) return;
         if(amount<=0||amount>r.remaining()) throw bad("扣费超出本次预占烟火");
+        a=payer(a,r);
         long gift=Math.min(r.getGiftHeld(),amount);
         r.setGiftHeld(r.getGiftHeld()-gift); r.setPurchasedHeld(r.getPurchasedHeld()-(amount-gift));
         r.setCaptured(Math.addExact(r.getCaptured(),amount)); a.setHeld(a.getHeld()-amount);
-        ledger(a,eventKey,"CAPTURE",description,0,0,-amount,null,reservationId);
+        reservationLedger(a,r,eventKey,"CAPTURE",description,0,0,-amount);
     }
     @Transactional
     public void release(String reservationId,String eventKey,String description) {
         var a=store.lockAccount(); var r=requireReservation(store.reservation(reservationId));
-        if(store.eventExists(eventKey)||r.remaining()==0) return;
+        if(r.remaining()==0||reservationEventExists(r,eventKey)) return;
+        a=payer(a,r);
         long gift=r.getGiftHeld(),purchased=r.getPurchasedHeld();
         a.setGiftAvailable(Math.addExact(a.getGiftAvailable(),gift));
         a.setPurchasedAvailable(Math.addExact(a.getPurchasedAvailable(),purchased)); a.setHeld(a.getHeld()-gift-purchased);
         r.setGiftHeld(0); r.setPurchasedHeld(0);
-        ledger(a,eventKey,"RELEASE",description,gift,purchased,-gift-purchased,null,reservationId);
+        reservationLedger(a,r,eventKey,"RELEASE",description,gift,purchased,-gift-purchased);
     }
     @Transactional
     public long remaining(String reservationId) {
         var r=store.reservationSnapshot(reservationId); return r==null?0:r.remaining();
     }
+    @Transactional(readOnly=true)
+    public BillingDtos.GenerationWallet generationWallet(String reservationId) {
+        var reservation=reservationId==null?null:store.reservationSnapshot(reservationId);
+        return reservation!=null&&reservation.getPayerTenantId()!=null
+                ? BillingDtos.GenerationWallet.TEAM : BillingDtos.GenerationWallet.PERSONAL;
+    }
     @Transactional
     public void releaseAmount(String reservationId,long amount,String eventKey,String description) {
         var a=store.lockAccount(); var r=requireReservation(store.reservation(reservationId));
-        if(store.eventExists(eventKey)||r.remaining()==0) return;
+        if(r.remaining()==0||reservationEventExists(r,eventKey)) return;
         if(amount<=0||amount>r.remaining()) throw bad("释放烟火超出本次预占");
+        a=payer(a,r);
         // Return purchased credits first; the remaining held credits still consume gifts first.
         long purchased=Math.min(r.getPurchasedHeld(),amount),gift=amount-purchased;
         r.setPurchasedHeld(r.getPurchasedHeld()-purchased); r.setGiftHeld(r.getGiftHeld()-gift);
         a.setPurchasedAvailable(a.getPurchasedAvailable()+purchased); a.setGiftAvailable(a.getGiftAvailable()+gift); a.setHeld(a.getHeld()-amount);
-        ledger(a,eventKey,"RELEASE",description,gift,purchased,-amount,null,reservationId);
+        reservationLedger(a,r,eventKey,"RELEASE",description,gift,purchased,-amount);
     }
     @Transactional
     public void requireMembership(String capability) { requireEntitlement(store.lockAccount(),capability); }
@@ -467,7 +497,17 @@ public class BillingService {
         a.setGiftAvailable(a.getGiftAvailable()-gift); a.setPurchasedAvailable(a.getPurchasedAvailable()-purchased);
         a.setHeld(Math.addExact(a.getHeld(),amount));
         r.setGiftHeld(Math.addExact(r.getGiftHeld(),gift)); r.setPurchasedHeld(Math.addExact(r.getPurchasedHeld(),purchased));
-        ledger(a,eventKey,"RESERVE",description,-gift,-purchased,amount,null,r.getId());
+        reservationLedger(a,r,eventKey,"RESERVE",description,-gift,-purchased,amount);
+    }
+    private BillingAccount payer(BillingAccount workspace,BillingReservation reservation) {
+        return reservation.getPayerTenantId()==null ? workspace : teamWallet.account(reservation.getPayerTenantId(),true);
+    }
+    private boolean reservationEventExists(BillingReservation reservation,String key) {
+        return reservation.getPayerTenantId()==null ? store.eventExists(key) : teamWallet.eventExists(reservation,key);
+    }
+    private void reservationLedger(BillingAccount a,BillingReservation reservation,String key,String type,String description,long gift,long purchased,long held) {
+        if(reservation.getPayerTenantId()==null) ledger(a,key,type,description,gift,purchased,held,null,reservation.getId());
+        else teamWallet.post(a,reservation,key,type,description,gift,purchased,held);
     }
     private void ledger(BillingAccount a,String key,String type,String description,long gift,long purchased,long held,String order,String reservation) {
         ledger(a,key,type,description,gift,purchased,held,order,reservation,currentUserId());

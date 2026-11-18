@@ -2,7 +2,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { get, post } from '../utils/request'
 import { videoModels, isVideoInProgress, videoConversationTitle, videoCompletionNotice, snapshotVideoForm, videoFormFromWorkflow } from '../services/videoConversations'
-import { refreshBilling, requireAccount } from '../stores/billing'
+import { generationBalance, refreshBilling, requireAccount } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote, uploadVideoReference } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
 import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
@@ -48,6 +48,8 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
   const historyPage = ref(0)
   const historyHasMore = ref(false)
   const quoted = ref(null)
+  const generationWallet = ref('PERSONAL')
+  const walletBalance = computed(() => generationBalance(generationWallet.value))
   const quoteError = ref('')
   const quoteBusy = ref(false)
   let quoteTarget = null
@@ -312,6 +314,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
       if (item.payloadSignature !== signature) { item.requestKey = `video-${crypto.randomUUID()}`; item.payloadSignature = signature }
       const request = { requestKey: item.requestKey, ...payload }
       const quote = await getVideoQuote(request)
+      generationWallet.value = 'PERSONAL'
       quoted.value = { quote, request }
       quoteTarget = item
       quoteError.value = ''
@@ -339,7 +342,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     try {
       const result = quoted.value.retryId
         ? await post('/api/video/workflows/' + quoted.value.retryId + '/retry', { taskId: quoted.value.taskId, quoteId: quote.quoteId })
-        : await submitVideoQuote(request, quote.quoteId)
+        : await submitVideoQuote(request, quote.quoteId, generationWallet.value)
       updateWorkflow(item, result)
       if (activeConversationId.value === item.id) { applyForm(item); onSubmitted?.(item) }
       if (isVideoInProgress(result)) schedulePoll(item)
@@ -357,6 +360,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     item.submitting = true
     try {
       const quote = await get('/api/video/workflows/' + item.workflow.id + '/retry-quote')
+      generationWallet.value = item.workflow.billingWallet || 'PERSONAL'
       quoted.value = { quote, retryId: item.workflow.id, taskId: item.workflow.taskId, request: { model: item.workflow.model, resolution: item.workflow.resolution, durationSeconds: item.workflow.durationSeconds } }
       quoteTarget = item; quoteError.value = ''; await refreshBilling(); await nextTick(); onQuote?.(item)
     } catch (e) { item.notice = e.message || '恢复费用暂时无法预估'; item.error = true }
@@ -397,7 +401,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
   return {
     prompt, format, duration, resolution, selectedModel, referenceImages, referenceVideos, referenceAudios, scenes, sceneKey, planId,
     capabilities, fallbackCapabilities, conversations, activeConversationId, historyLoading, historyError, historyPage, historyHasMore,
-    quoted, quoteError, quoteBusy, currentCapability, durationMax, availableResolutions, materialLimits, materialLimitLabel,
+    quoted, quoteError, quoteBusy, generationWallet, walletBalance, currentCapability, durationMax, availableResolutions, materialLimits, materialLimitLabel,
     activeConversation, workflow, isGenerating, notice, outputUrl, stageLabel, currentScene, historyRunning,
     conversationStatus, statusTone, selectConversation, startNewConversation, openWorkflow, loadHistory, selectModel,
     addMaterialFiles, handleMaterialChange, handleMaterialDrop, removeMaterial, uploadAsset,

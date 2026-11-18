@@ -1,7 +1,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { isVideoInProgress, videoCompletionNotice } from '../services/videoConversations'
 import { getVideoQuote, videoApi, uploadVideoReference } from '../services/videoWorkflow'
-import { refreshBilling } from '../stores/billing'
+import { generationBalance, refreshBilling } from '../stores/billing'
 
 export function useDigitalHumanVideo() {
   const workflow = ref(null)
@@ -10,6 +10,8 @@ export function useDigitalHumanVideo() {
   const submittedForm = ref(null)
   const error = ref('')
   const quoted = ref(null)
+  const generationWallet = ref('PERSONAL')
+  const walletBalance = computed(() => generationBalance(generationWallet.value))
   const quoting = ref(false)
   let quotedInput = null
   const isGenerating = computed(() => submitting.value || isVideoInProgress(workflow.value))
@@ -55,7 +57,10 @@ export function useDigitalHumanVideo() {
       if (!requestKey || payloadSignature !== signature || workflow.value) requestKey = `video-${crypto.randomUUID()}`
       payloadSignature = signature
       const result = await getVideoQuote({ requestKey, ...payload })
-      if (!disposed) { quoted.value = { quote: result, requestKey, signature }; quotedInput = input }
+      if (!disposed) {
+        generationWallet.value = 'PERSONAL'
+        quoted.value = { quote: result, requestKey, signature }; quotedInput = input
+      }
       return result
     } catch (failure) { if (!disposed) error.value = failure.message || '费用暂时无法预估' }
     finally { quoting.value = false }
@@ -82,7 +87,7 @@ export function useDigitalHumanVideo() {
       if (approval.signature !== signature) throw new Error('配置已变化，请重新预估费用')
       requestKey = approval.requestKey
       payloadSignature = signature
-      const result = await videoApi.create({ requestKey, ...payload, quoteId: approval.quote.quoteId })
+      const result = await videoApi.create({ requestKey, ...payload, quoteId: approval.quote.quoteId }, approval.wallet)
       if (disposed) return
       updateWorkflow(result)
       if (isVideoInProgress(result)) schedulePoll()
@@ -94,7 +99,7 @@ export function useDigitalHumanVideo() {
   }
   const confirmQuote = async () => {
     if (!quoted.value?.quote.available || !quotedInput) return
-    await start(quotedInput, quoted.value)
+    await start(quotedInput, { ...quoted.value, wallet: generationWallet.value })
     if (workflow.value) quoted.value = null
   }
   const closeQuote = () => { if (!submitting.value) { quoted.value = null; quotedInput = null } }
@@ -116,5 +121,5 @@ export function useDigitalHumanVideo() {
     error.value = ''
   }
   onBeforeUnmount(() => { disposed = true; window.clearTimeout(timer) })
-  return { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice, error, start, quoted, quoting, estimate, confirmQuote, closeQuote, open, reset }
+  return { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice, error, start, quoted, quoting, estimate, confirmQuote, closeQuote, open, reset, generationWallet, walletBalance }
 }

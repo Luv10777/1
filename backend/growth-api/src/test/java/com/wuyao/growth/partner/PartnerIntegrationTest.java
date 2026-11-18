@@ -2,8 +2,10 @@ package com.wuyao.growth.partner;
 
 import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
+import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.security.JwtService;
 import com.wuyao.growth.common.tenant.TenantContext;
+import com.wuyao.growth.common.web.BizException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,11 +14,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -54,6 +61,7 @@ class PartnerIntegrationTest {
     @Autowired BillingService billing;
     @Autowired JwtService jwt;
     @Autowired MockMvc mvc;
+    @Autowired PlatformTransactionManager transactions;
     JdbcTemplate owner;
     long ops, agency, agencyB, shop, cafe, bakery, operator, agentA, agentB, shopOwner, cafeOwner, bakeryOwner;
     String planCode;
@@ -82,6 +90,68 @@ class PartnerIntegrationTest {
         assertThat(uids).hasSize(6).doesNotHaveDuplicates().allSatisfy(uid -> assertThat(uid).isBetween(10_000_000L, 99_999_999L));
         mvc.perform(get("/api/auth/me").header("Authorization", bearer(shopOwner, shop)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.uid").value(uid(shopOwner)));
+    }
+
+    @Test void aSecondOwnerCanPayForCreativeWorkFromEitherWallet() throws Exception {
+        long partner = partner("甲服务商", agentA);
+        platform(post("/api/platform/partners/" + partner + "/credits"),
+                "{\"requestKey\":\"grant-owner-wallet\",\"credits\":2200,\"note\":\"团队充值\"}").andExpect(status().isOk());
+        call(agentA, agency, post("/api/partner/tenants"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
+        call(shopOwner, shop, get("/api/billing/summary"), null).andExpect(jsonPath("$.data.generationTeam").doesNotExist());
+        platform(post("/api/platform/partners/" + partner + "/members"), "{\"uid\":" + uid(shopOwner) + "}").andExpect(status().isOk());
+        Long plan = owner.queryForObject("SELECT id FROM billing_plans WHERE code=?", Long.class, planCode);
+        TenantContext.runAs(shop, () -> {
+            billing.grantMembership(plan, "owner-wallet-membership", operator);
+            return billing.grantCredits(500, "owner-wallet-gift", operator);
+        });
+        call(shopOwner, shop, get("/api/billing/summary"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(500))
+                .andExpect(jsonPath("$.data.generationTeam.name").value("甲服务商"))
+                .andExpect(jsonPath("$.data.generationTeam.available").value(2200));
+        call(agentA, agency, get("/api/billing/summary"), null).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.generationTeam").doesNotExist());
+
+        var previous = SecurityContextHolder.getContext();
+        var context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(new AuthPrincipal(shopOwner, shop, "", 0), null, List.of()));
+        String teamReservation;
+        try {
+            SecurityContextHolder.setContext(context);
+            teamReservation = TenantContext.runAs(shop, () -> {
+                String image = billing.reserve("owner-local-image", "IMAGE", 12, "图片");
+                billing.capture(image, 12, "owner-local-image-delivered", "交付");
+                assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+                    billing.reserve("owner-team-rollback", "VIDEO", 50, "视频", BillingDtos.GenerationWallet.TEAM);
+                    throw new IllegalStateException("测试回滚");
+                })).hasMessage("测试回滚");
+                String video = billing.reserve("owner-team-video", "VIDEO", 100, "视频", BillingDtos.GenerationWallet.TEAM);
+                assertThat(billing.reserve("owner-team-video", "VIDEO", 100, "视频", BillingDtos.GenerationWallet.TEAM)).isEqualTo(video);
+                billing.capture(video, 60, "owner-team-video-delivered", "交付");
+                billing.capture(video, 60, "owner-team-video-delivered", "交付");
+                return video;
+            });
+        } finally {
+            SecurityContextHolder.setContext(previous);
+        }
+
+        platform(delete("/api/platform/partners/" + partner + "/members/" + shopOwner), null).andExpect(status().isOk());
+        try {
+            SecurityContextHolder.setContext(context);
+            TenantContext.runAs(shop, () -> assertThatThrownBy(() -> billing.reserve("no-owner-role", "IMAGE", 1, "图片", BillingDtos.GenerationWallet.TEAM))
+                    .isInstanceOf(BizException.class).hasMessageContaining("没有可用的服务商团队余额"));
+        } finally {
+            SecurityContextHolder.setContext(previous);
+        }
+        TenantContext.runAs(shop, () -> {
+            billing.release(teamReservation, "owner-team-video-release", "退回");
+            return null;
+        });
+        assertThat(owner.queryForMap("SELECT gift_available, held FROM billing_accounts WHERE tenant_id=?", shop))
+                .containsEntry("gift_available", 488L).containsEntry("held", 0L);
+        assertThat(owner.queryForMap("SELECT purchased_available, held FROM billing_accounts WHERE tenant_id=?", agency))
+                .containsEntry("purchased_available", 2140L).containsEntry("held", 0L);
+        assertThat(owner.queryForList("SELECT type FROM billing_ledger WHERE tenant_id=? AND reservation_id=? AND actor_user_id=? AND generation_capability='VIDEO' ORDER BY id",
+                String.class, agency, teamReservation, shopOwner)).containsExactly("RESERVE", "CAPTURE", "RELEASE");
     }
 
     @Test void grantsLandInTheTeamAccountAndCodesAreUnlimited() throws Exception {
