@@ -53,6 +53,10 @@ export async function requireAccount() {
   return account
 }
 
+export function generationBalance(wallet) {
+  return (wallet === 'TEAM' ? billing.summary?.generationTeam?.available : billing.summary?.available) ?? 0
+}
+
 export const billingApi = {
   topUp: data => post('/api/billing/orders/topup', data),
   subscribe: data => post('/api/billing/orders/subscription', data),

@@ -11,6 +11,7 @@ public class BillingReservation {
     private Long createdBy;
     @Id @Column(length=36) private String id = UUID.randomUUID().toString();
     private Long tenantId;
+    private Long payerTenantId;
     @Column(length=120) private String requestKey;
     @Column(length=20) private String capability;
     private long giftHeld;

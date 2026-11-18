@@ -1,5 +1,6 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import ImageWorkspaceSwitch from '../components/ImageWorkspaceSwitch.vue'
 import ImageCreationWorkspace from '../components/ImageCreationWorkspace.vue'
@@ -135,6 +136,7 @@ watch([selectedPlatform, imageType], () => {
       <footer class="product-control-footer">
         <p v-if="studio.error" class="creation-item-error" role="alert">{{ studio.error }}</p>
         <p v-if="serviceNotice" class="product-demo-note" role="status">{{ serviceNotice }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p>
+        <GenerationWalletPicker v-model="studio.generationWallet" :disabled="studio.busy || !!studio.pending" />
         <button type="submit" class="product-generate" :disabled="studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.saving ? '正在保存原图…' : studio.active ? '创作中…' : '立即生成' }}</button>
         <p v-if="studio.imageCredits != null" class="generation-billing-note">预占 {{ studio.estimatedCredits }} 烟火，未交付部分退回</p>
       </footer>

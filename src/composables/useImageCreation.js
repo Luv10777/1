@@ -35,6 +35,7 @@ export function useImageCreation(workflow) {
   const editHeadline = ref('')
   const editCaption = ref('')
   const pending = ref(null)
+  const generationWallet = ref('PERSONAL')
   const lastPrompt = ref('')
   const optimistic = ref(false)
   const optimisticBrief = ref('')
@@ -182,11 +183,12 @@ export function useImageCreation(workflow) {
     workspaceTab.value = 'result'
     persistPending(operation)
     let result
-    if (operation.kind === 'create') result = await imageApi.create(operation.data)
-    if (operation.kind === 'revision') result = await imageApi.revision(operation.id, operation.data)
-    if (operation.kind === 'answer') result = await imageApi.answer(operation.id, operation.data)
-    if (operation.kind === 'text') result = await imageApi.text(operation.id, operation.itemId, operation.data)
-    if (operation.kind === 'regenerate') result = await imageApi.regenerate(operation.id, operation.itemId, operation.data)
+    const { data, id, itemId, wallet } = operation
+    if (operation.kind === 'create') result = await imageApi.create(data, wallet)
+    if (operation.kind === 'revision') result = await imageApi.revision(id, data, wallet)
+    if (operation.kind === 'answer') result = await imageApi.answer(id, data, wallet)
+    if (operation.kind === 'text') result = await imageApi.text(id, itemId, data, wallet)
+    if (operation.kind === 'regenerate') result = await imageApi.regenerate(id, itemId, data, wallet)
     persistPending(null)
     if (!alive) return
     previewTracking.add(result.id)
@@ -194,6 +196,7 @@ export function useImageCreation(workflow) {
     await openCreation(result.id)
     await refreshHistory()
   }
+  function submit(operation) { return deliver({ ...operation, wallet: generationWallet.value }) }
   async function run(action, creation = false) {
     if (busy.value) return
     busy.value = true; error.value = ''
@@ -227,7 +230,7 @@ export function useImageCreation(workflow) {
       }
       try {
         for (const file of submittedFiles) if (!file.assetId) file.assetId = await uploadImageReference(file.file)
-        await deliver({ kind: 'create', data: {
+        await submit({ kind: 'create', data: {
           requestKey: crypto.randomUUID(), workflow: workflow, brief: submittedBrief,
           references: submittedFiles.map(f => ({ assetId: f.assetId, role: f.role })),
           ratio: ratio.value, quality: quality.value, count: Number(count.value),
@@ -250,7 +253,7 @@ export function useImageCreation(workflow) {
   }
   function revise() {
     if (!revision.value.trim()) return
-    run(() => deliver({ kind: current.value.status === 'NEEDS_INPUT' ? 'answer' : 'revision', id: current.value.id,
+    run(() => submit({ kind: current.value.status === 'NEEDS_INPUT' ? 'answer' : 'revision', id: current.value.id,
       data: { requestKey: crypto.randomUUID(), instruction: revision.value.trim() } }), true)
   }
   function revisePoster(item, changes) {
@@ -264,7 +267,7 @@ export function useImageCreation(workflow) {
     if (changes.options?.includes('MESSAGE')) instructions.push('换一种画面表达，调整视觉重点与叙事角度。')
     if (changes.instruction?.trim()) instructions.push(changes.instruction.trim())
     if (!instructions.length) return
-    run(() => deliver({ kind: 'revision', id: current.value.id, data: {
+    run(() => submit({ kind: 'revision', id: current.value.id, data: {
       requestKey: crypto.randomUUID(), instruction: instructions.join('\n'), variation: changes.options?.find(option => ['LAYOUT', 'SCENE', 'MESSAGE'].includes(option)) || null,
     } }), true)
   }
@@ -284,7 +287,7 @@ export function useImageCreation(workflow) {
   }
   function editText(item) { textEdit.value = item; editHeadline.value = item.headline; editCaption.value = item.caption }
   function saveText() {
-    run(() => deliver({ kind: 'text', id: current.value.id, itemId: textEdit.value.id,
+    run(() => submit({ kind: 'text', id: current.value.id, itemId: textEdit.value.id,
       data: { requestKey: crypto.randomUUID(), headline: editHeadline.value, caption: editCaption.value } }), true)
   }
   function download(item) {
@@ -292,7 +295,7 @@ export function useImageCreation(workflow) {
     run(() => downloadImage(latestItem(item).url, '一方志-' + current.value.id + '-' + (item.ordinal + 1) + '.png'))
   }
   function regenerate(item, variation = null) {
-    run(() => deliver({ kind: 'regenerate', id: current.value.id, itemId: item.id,
+    run(() => submit({ kind: 'regenerate', id: current.value.id, itemId: item.id,
       data: { requestKey: crypto.randomUUID(), variation } }), true)
   }
   async function loadCapabilities() {
@@ -310,9 +313,13 @@ export function useImageCreation(workflow) {
   }
   onMounted(async () => {
     if (!auth.isAuthenticated) return
+    refreshBilling()
     try {
       const saved = sessionStorage.getItem(pendingKey)
-      if (saved) pending.value = JSON.parse(saved)
+      if (saved) {
+        pending.value = JSON.parse(saved)
+        if (pending.value?.wallet === 'TEAM') generationWallet.value = 'TEAM'
+      }
     } catch { /* A malformed pending draft should not block service checks. */ }
     await loadCapabilities()
     if (!alive) return
@@ -321,6 +328,7 @@ export function useImageCreation(workflow) {
   })
   watch(() => route.query.creation, id => { if (id && String(current.value?.id) !== String(id)) load(id) })
   watch(ratio, syncHighestQuality)
+  watch(() => [auth.user?.id, auth.tenantId], () => { generationWallet.value = 'PERSONAL' })
   onBeforeUnmount(() => {
     alive = false; refreshSequence++; clearTimeout(pollTimer)
     files.value.forEach(f => { if (f.file) URL.revokeObjectURL(f.preview) })
@@ -344,6 +352,6 @@ export function useImageCreation(workflow) {
     refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
     reportImageVisible, imageLoadFailed,
-    supportsQuality, loadCapabilities, billing, imageCredits, estimatedCredits, requiresLogin,
+    supportsQuality, loadCapabilities, billing, imageCredits, estimatedCredits, requiresLogin, generationWallet,
   })
 }

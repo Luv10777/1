@@ -1,4 +1,5 @@
 package com.wuyao.growth.creative.image;
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.*;
 import jakarta.validation.Valid;
@@ -12,8 +13,9 @@ import java.util.Map;
 public class ImageCreationController {
  private final ImageCreationService service;
  @GetMapping("/capabilities") public ApiResponse<Map<String,Object>> capabilities(){return ApiResponse.ok(service.capabilities());}
- @PostMapping public ApiResponse<ImageDtos.View> create(@Valid @RequestBody ImageDtos.Create req,@AuthenticationPrincipal AuthPrincipal me) {
-   return ApiResponse.ok(service.create(req,me.userId()));
+ @PostMapping public ApiResponse<ImageDtos.View> create(@Valid @RequestBody ImageDtos.Create req,@AuthenticationPrincipal AuthPrincipal me,
+     @RequestParam(required=false) GenerationWallet wallet) {
+   return ApiResponse.ok(service.create(req,me.userId(),wallet));
  }
  @GetMapping("/{id}") public ApiResponse<ImageDtos.View> get(@PathVariable Long id){return ApiResponse.ok(service.get(id));}
  @PostMapping("/{id}/items/{itemId}/preview-loaded") public ApiResponse<Boolean> previewLoaded(
@@ -35,12 +37,12 @@ public class ImageCreationController {
    return ApiResponse.ok(service.works(page,size,me.userId()));
  }
  @PostMapping("/{id}/revisions") public ApiResponse<ImageDtos.View> revise(@PathVariable Long id,
-   @Valid @RequestBody ImageDtos.Revision req,@AuthenticationPrincipal AuthPrincipal me) {
-   return ApiResponse.ok(service.revise(id,req,me.userId()));
+   @Valid @RequestBody ImageDtos.Revision req,@AuthenticationPrincipal AuthPrincipal me,@RequestParam(required=false) GenerationWallet wallet) {
+   return ApiResponse.ok(service.revise(id,req,me.userId(),wallet));
  }
  @PostMapping("/{id}/answers") public ApiResponse<ImageDtos.View> answer(@PathVariable Long id,
-   @Valid @RequestBody ImageDtos.Revision req,@AuthenticationPrincipal AuthPrincipal me) {
-   return ApiResponse.ok(service.revise(id,req,me.userId()));
+   @Valid @RequestBody ImageDtos.Revision req,@AuthenticationPrincipal AuthPrincipal me,@RequestParam(required=false) GenerationWallet wallet) {
+   return ApiResponse.ok(service.revise(id,req,me.userId(),wallet));
  }
  public record Retry(@NotNull Long taskId) {}
  public record Regenerate(@jakarta.validation.constraints.NotBlank
@@ -48,8 +50,8 @@ public class ImageCreationController {
    @jakarta.validation.constraints.Pattern(regexp="LAYOUT|SCENE|MESSAGE") String variation) {}
  @PostMapping("/{id}/items/{itemId}/regenerate") public ApiResponse<ImageDtos.View> regenerate(
    @PathVariable Long id,@PathVariable Long itemId,@Valid @RequestBody Regenerate req,
-   @AuthenticationPrincipal AuthPrincipal me){
-   return ApiResponse.ok(service.regenerate(id,itemId,req.requestKey(),req.variation(),me.userId()));
+   @AuthenticationPrincipal AuthPrincipal me,@RequestParam(required=false) GenerationWallet wallet){
+   return ApiResponse.ok(service.regenerate(id,itemId,req.requestKey(),req.variation(),me.userId(),wallet));
  }
  @PostMapping("/{id}/retry") public ApiResponse<ImageDtos.View> retryPlan(@PathVariable Long id,
    @Valid @RequestBody Retry req,@AuthenticationPrincipal AuthPrincipal me){
@@ -60,7 +62,7 @@ public class ImageCreationController {
    return ApiResponse.ok(service.retry(id,itemId,req.taskId(),me.userId()));
  }
  @PostMapping("/{id}/items/{itemId}/text") public ApiResponse<ImageDtos.View> text(@PathVariable Long id,@PathVariable Long itemId,
-   @Valid @RequestBody ImageDtos.TextEdit req,@AuthenticationPrincipal AuthPrincipal me){
-   return ApiResponse.ok(service.editText(id,itemId,req,me.userId()));
+   @Valid @RequestBody ImageDtos.TextEdit req,@AuthenticationPrincipal AuthPrincipal me,@RequestParam(required=false) GenerationWallet wallet){
+   return ApiResponse.ok(service.editText(id,itemId,req,me.userId(),wallet));
  }
 }

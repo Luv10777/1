@@ -128,5 +128,6 @@ public final class VideoDtos {
             List<Reference> referenceVideos,
             List<Reference> referenceAudios,
             String sceneKey,
-            Long planId) {}
+             Long planId,
+             com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {}
 }

@@ -1,10 +1,11 @@
 import { get, post, put, request } from '../utils/request'
 import { validateImageFile } from '../domain/imageCreation'
+import { generationWalletPath } from '../domain/billing.js'
 export { downloadMedia as downloadImage } from './mediaDownload'
 const root = '/api/image-creations'
 export const imageApi = {
   capabilities: () => request(root + '/capabilities', { method: 'GET', signal: AbortSignal.timeout(10000) }),
-  create: data => post(root, data),
+  create: (data, wallet) => post(generationWalletPath(root, wallet), data),
   get: id => get(root + '/' + id),
   previewLoaded: (id, item) => post(root + '/' + id + '/items/' + item.id + '/preview-loaded', { generation: item.generation }),
   cancel: id => post(root + '/' + id + '/cancel', {}),
@@ -12,12 +13,12 @@ export const imageApi = {
   rename: (id, title) => put(root + '/' + id + '/title', { title }),
   history: (workflow, page = 0) => get(root, { workflow, page, size: 20 }),
   works: (page = 0) => get(root + '/works', { page, size: 20 }),
-  revision: (id, data) => post(root + '/' + id + '/revisions', data),
-  answer: (id, data) => post(root + '/' + id + '/answers', data),
+  revision: (id, data, wallet) => post(generationWalletPath(root + '/' + id + '/revisions', wallet), data),
+  answer: (id, data, wallet) => post(generationWalletPath(root + '/' + id + '/answers', wallet), data),
   retry: (id, item) => post(root + '/' + id + (item ? '/items/' + item.id : '') + '/retry', { taskId: item?.taskId }),
   retryPlan: (id, taskId) => post(root + '/' + id + '/retry', { taskId }),
-  text: (id, itemId, data) => post(root + '/' + id + '/items/' + itemId + '/text', data),
-  regenerate: (id, itemId, data) => post(root + '/' + id + '/items/' + itemId + '/regenerate', data),
+  text: (id, itemId, data, wallet) => post(generationWalletPath(root + '/' + id + '/items/' + itemId + '/text', wallet), data),
+  regenerate: (id, itemId, data, wallet) => post(generationWalletPath(root + '/' + id + '/items/' + itemId + '/regenerate', wallet), data),
 }
 export const assetApi = {
   images: (page = 0) => get('/api/assets', { page, size: 100 }),

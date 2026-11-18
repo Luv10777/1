@@ -1,5 +1,6 @@
 package com.wuyao.growth.video;
 
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.common.web.PageResult;
@@ -30,8 +31,9 @@ public class VideoController {
 
     @PostMapping("/workflows")
     public ApiResponse<VideoDtos.View> create(@Valid @RequestBody VideoDtos.Create request,
-                                              @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.create(request, me.userId()));
+                                              @AuthenticationPrincipal AuthPrincipal me,
+                                              @RequestParam(required=false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.create(request, me.userId(), wallet));
     }
 
     @GetMapping("/workflows/{id}")

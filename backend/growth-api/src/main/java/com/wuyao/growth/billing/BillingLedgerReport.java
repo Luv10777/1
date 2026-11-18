@@ -178,7 +178,7 @@ public class BillingLedgerReport {
                     .setParameter("tenant", tenantId).getSingleResult();
             @SuppressWarnings("unchecked")
             List<Object[]> rows = em.createNativeQuery("""
-                    SELECT to_char(l.created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD'), COALESCE(r.capability, 'OTHER'),
+                    SELECT to_char(l.created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD'), COALESCE(r.capability, l.generation_capability, 'OTHER'),
                            COALESCE(SUM(-l.held_delta), 0), COUNT(DISTINCT l.reservation_id)
                     FROM billing_ledger l
                     LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id
@@ -226,16 +226,16 @@ public class BillingLedgerReport {
     @SuppressWarnings("unchecked")
     private List<Object[]> rows(Long tenantId, Instant since, String type, String capability) {
         return em.createNativeQuery(TaskUsageStore.REPORT + """
-                SELECT l.id, l.actor_user_id, l.type, r.capability, l.description,
+                SELECT l.id, l.actor_user_id, l.type, COALESCE(r.capability, l.generation_capability), l.description,
                        l.gift_delta + l.purchased_delta, l.held_delta, l.available_after, l.created_at,
-                       COALESCE(u.model,CASE r.capability WHEN 'IMAGE' THEN '一方志Image'
+                       COALESCE(u.model,CASE COALESCE(r.capability, l.generation_capability) WHEN 'IMAGE' THEN '一方志Image'
                            WHEN 'VIDEO_ANALYSIS' THEN '一方志反推' WHEN 'VIDEO_PLAN' THEN '一方志提示词' WHEN 'IMAGE_INSPIRATION' THEN '一方志提示词' WHEN 'COPY' THEN '一方志文案' END),
                        u.elapsed_millis, u.status, u.preview_elapsed_millis
                 FROM billing_ledger l
                 LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id
                 LEFT JOIN logs u ON u.reservation_id = l.reservation_id
                 WHERE l.tenant_id = :tenant AND l.created_at >= :since
-                  AND (:type = '' OR l.type = :type) AND (:capability = '' OR r.capability = :capability)
+                  AND (:type = '' OR l.type = :type) AND (:capability = '' OR COALESCE(r.capability, l.generation_capability) = :capability)
                 ORDER BY l.id DESC LIMIT :limit""")
                 .setParameter("tenant", tenantId).setParameter("since", Timestamp.from(since))
                 .setParameter("type", blank(type) ? "" : type).setParameter("capability", blank(capability) ? "" : capability)
@@ -246,13 +246,13 @@ public class BillingLedgerReport {
     @SuppressWarnings("unchecked")
     private List<Object[]> totals(Long tenantId, Instant since, Instant today) {
         return em.createNativeQuery("""
-                SELECT l.type, r.capability,
+                SELECT l.type, COALESCE(r.capability, l.generation_capability),
                        COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' THEN -l.held_delta ELSE l.gift_delta + l.purchased_delta END), 0),
                        COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' AND l.created_at >= :today THEN -l.held_delta ELSE 0 END), 0)
                 FROM billing_ledger l
                 LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id
                 WHERE l.tenant_id = :tenant AND l.created_at >= :since AND l.type IN ('CAPTURE', 'RELEASE', 'PURCHASE', 'GRANT')
-                GROUP BY l.type, r.capability""")
+                GROUP BY 1, 2""")
                 .setParameter("tenant", tenantId).setParameter("since", Timestamp.from(since))
                 .setParameter("today", Timestamp.from(today)).getResultList();
     }
@@ -261,7 +261,7 @@ public class BillingLedgerReport {
     @SuppressWarnings("unchecked")
     private List<Object[]> dailyTotals(Long tenantId, Instant since) {
         return em.createNativeQuery("""
-                SELECT (l.created_at AT TIME ZONE 'Asia/Shanghai')::date, l.type, r.capability,
+                SELECT (l.created_at AT TIME ZONE 'Asia/Shanghai')::date, l.type, COALESCE(r.capability, l.generation_capability),
                        COALESCE(SUM(CASE WHEN l.type = 'CAPTURE' THEN -l.held_delta ELSE l.gift_delta + l.purchased_delta END), 0)
                 FROM billing_ledger l
                 LEFT JOIN billing_reservations r ON r.id = l.reservation_id AND r.tenant_id = l.tenant_id

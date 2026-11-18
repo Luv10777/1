@@ -1,5 +1,6 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AudioLines, ChevronRight, CircleAlert, Film, History, ImagePlus, Plus, Sparkles, X } from 'lucide-vue-next'
@@ -38,7 +39,7 @@ const openRightTab = async (tab) => {
 const {
   prompt, format, duration, resolution, selectedModel, referenceImages, referenceVideos, referenceAudios, scenes, sceneKey,
   capabilities, fallbackCapabilities, conversations, activeConversationId, historyLoading, historyError, historyPage, historyHasMore,
-  quoted, quoteError, quoteBusy, currentCapability, durationMax, availableResolutions, materialLimits, materialLimitLabel,
+  quoted, quoteError, quoteBusy, generationWallet, walletBalance, currentCapability, durationMax, availableResolutions, materialLimits, materialLimitLabel,
   activeConversation, workflow, isGenerating, notice, outputUrl, stageLabel, currentScene, historyRunning,
   conversationStatus, statusTone, loadHistory, selectModel, handleMaterialChange, handleMaterialDrop, removeMaterial, uploadAsset,
   generate, closeQuote, confirmQuote, retryVideo, cancelVideo, applyPlan, ...video
@@ -205,7 +206,32 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
     </VideoPreviewPanel>
     <VideoScenePicker ref="scenePicker" v-model="sceneKey" :scenes="scenes" />
     <dialog ref="quoteDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="video-price-title" @cancel.prevent="closeQuote">
-      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32"><h2 id="video-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button></header><p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><dl class="video-price-details"><div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div><div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div><div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div><div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div></dl><p v-if="billing.summary && billing.summary.available < quoted.quote.credits" class="yanhuo-alert">烟火不足，请先充值。</p><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink v-if="(billing.summary?.available || 0) < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink><p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p></template>
+      <template v-if="quoted">
+        <header>
+          <img src="/images/brand/yifangzhi-mark.png" alt="" width="32" height="32">
+          <h2 id="video-price-title">确认视频费用</h2>
+          <button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="quoteBusy" @click="closeQuote">×</button>
+        </header>
+        <p class="yanhuo-payment-item">{{ videoModelLabel(quoted.request.model) }} · {{ quoted.request.resolution }} · {{ quoted.request.durationSeconds }} 秒</p>
+        <template v-if="quoted.quote.available">
+          <p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p>
+          <p class="yanhuo-note">{{ quoted.quote.message }}</p>
+          <dl class="video-price-details">
+            <div><dt>实际模型</dt><dd>{{ quoted.quote.providerModel }}</dd></div>
+            <div><dt>预估用量</dt><dd>{{ number(quoted.quote.estimatedTokens) }} 视频 Token</dd></div>
+            <div><dt>费率核验</dt><dd>{{ dateTime(quoted.quote.verifiedAt) }}</dd></div>
+            <div v-if="quoted.retryId || !billing.summary?.generationTeam">
+              <dt>{{ generationWallet === 'TEAM' ? '团队可用烟火' : '可用烟火' }}</dt><dd>{{ billing.error ? '暂不可读' : number(walletBalance) }}</dd>
+            </div>
+          </dl>
+          <GenerationWalletPicker v-if="!quoted.retryId" v-model="generationWallet" :disabled="quoteBusy" />
+          <p v-if="billing.summary && walletBalance < quoted.quote.credits" class="yanhuo-alert">所选余额的烟火不足。</p>
+          <button class="yanhuo-primary" type="button" :disabled="quoteBusy || !!billing.error || walletBalance < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button>
+        </template>
+        <p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p>
+        <RouterLink v-if="generationWallet === 'PERSONAL' && walletBalance < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink>
+        <p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p>
+      </template>
     </dialog>
   </div>
 </template>
