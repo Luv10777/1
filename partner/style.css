@@ -289,6 +289,10 @@
 .partner-home:hover { border-color:var(--mg-accent); }
 .admin-account .partner-account-name { gap:10px; margin:0; padding:0; border:0; color:inherit; font-size:inherit; text-align:left; cursor:pointer; }
 .admin-account .partner-account-name:hover { color:var(--mg-accent); }
+.partner-account-name small,.partner-sign-out { white-space:nowrap; }
+@media(max-width:540px) {
+  .partner-account-uid { display:none; }
+}
 /* 成员权限勾选 */
 .partner-perms { display:grid; gap:8px; margin:12px 0 0; padding:0; border:0; }
 .partner-perms > label:not(.partner-field) { display:grid; grid-template-columns:18px 1fr; gap:10px; align-items:start; padding:10px 12px; border:1px solid var(--mg-line); border-radius:8px; cursor:pointer; }

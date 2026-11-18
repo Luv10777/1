@@ -23,7 +23,7 @@ const close = () => { if (!props.busy) emit('close') }
     <div :class="modal ? 'partner-modal-position' : 'mg-drawer-position'">
       <DialogPanel :class="['management-page', modal ? 'partner-modal' : 'mg-drawer']">
         <header class="mg-drawer-header">
-          <div><span v-if="eyebrow">{{ eyebrow }}</span><DialogTitle as="h2">{{ title }}</DialogTitle></div>
+          <div><span v-if="eyebrow">{{ eyebrow }}</span><DialogTitle as="h2"><slot name="title">{{ title }}</slot></DialogTitle></div>
           <button class="mg-page-button" type="button" :disabled="busy" aria-label="关闭" @click="close"><X :size="20" /></button>
         </header>
         <DialogDescription v-if="$slots.summary" as="div" class="mg-detail-description"><slot name="summary" /></DialogDescription>

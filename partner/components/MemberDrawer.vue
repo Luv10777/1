@@ -66,8 +66,10 @@ async function remove() {
 
 <template>
   <PartnerPanel :open="Boolean(member)" :busy="busy" :title="label || '成员'" :eyebrow="member ? `UID ${member.uid || '—'}` : ''" @close="emit('close')">
-    <template v-if="member" #summary>
+    <template v-if="member" #title>
       <MemberIdentity :number="member.memberNumber" :name="label" />
+    </template>
+    <template v-if="member" #summary>
       <span class="partner-pill" :class="{ bd: member.role === 'OWNER' }">{{ partnerRoles[member.role] || member.role }}</span>
       <span v-if="member.name && member.name !== member.displayName">账号名 {{ member.name }}</span>
       <span>加入于 {{ managementDate(member.createdAt) }}</span>

@@ -69,7 +69,16 @@ async function logout() {
         <div class="admin-topbar-actions" style="margin-left:auto">
           <a class="partner-balance partner-home" href="/" title="回到一方志创作"><ExternalLink :size="14" /><span class="partner-balance-label">一方志</span></a>
           <span class="partner-balance" :title="`团队烟火 ${number(partner.overview.account?.available)}：大家在一方志创作和分给商户都扣这里`" :aria-label="`团队烟火 ${number(partner.overview.account?.available)}`"><span class="partner-balance-label">团队烟火</span><YanhuoIcon :size="16" /><span class="mg-mono">{{ number(partner.overview.account?.available) }}</span></span>
-          <div class="admin-account"><button class="partner-account-name" type="button" title="修改团队称呼" @click="naming = true"><span class="admin-account-avatar">{{ (myName() || '服').slice(0, 1) }}</span><span><MemberIdentity :number="partner.overview.memberNumber" :name="myName() || '服务商成员'" /><small>{{ partnerRoles[partner.overview.role] || partner.overview.role }} · UID {{ auth.user?.uid || '—' }}</small></span></button><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div>
+          <div class="admin-account">
+            <button class="partner-account-name" type="button" title="修改团队称呼" @click="naming = true">
+              <span class="admin-account-avatar">{{ (myName() || '服').slice(0, 1) }}</span>
+              <span>
+                <MemberIdentity :number="partner.overview.memberNumber" :name="myName() || '服务商成员'" />
+                <small>{{ partnerRoles[partner.overview.role] || partner.overview.role }}<span class="partner-account-uid"> · UID {{ auth.user?.uid || '—' }}</span></small>
+              </span>
+            </button>
+            <button type="button" class="partner-sign-out" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button>
+          </div>
         </div>
       </header>
       <main id="partner-main" class="admin-main" tabindex="-1"><RouterView v-slot="{ Component, route: page }"><Transition name="ad-page" mode="out-in"><component :is="Component" :key="page.name" /></Transition></RouterView></main>
