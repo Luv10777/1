@@ -1,5 +1,6 @@
 package com.wuyao.growth.copywriting;
 
+import com.wuyao.growth.billing.BillingDtos;
 import jakarta.validation.constraints.*;
 
 import java.time.Instant;
@@ -47,11 +48,12 @@ public final class CopyDtos {
                        boolean voiceOn, String note, List<Image> images, List<ProductRef> products,
                        Long previousBatchId, List<Map<String, Object>> versions, List<Integer> finalized,
                        int rewriteCount, int rewriteLimit, Map<String, String> store, String errorMessage,
-                       Instant createdAt) {}
+                       Instant createdAt, BillingDtos.GenerationWallet billingWallet) {}
 
     /** 创作记录里的一条。thumbnail 为空表示只写了一句话，或图片已删除。 */
     public record History(Long id, String platform, String style, String status, String firstLine, String thumbnail,
-                          boolean hasImage, String creatorName, boolean finalized, String errorMessage, Instant createdAt) {}
+                          boolean hasImage, String creatorName, boolean finalized, String errorMessage, Instant createdAt,
+                          BillingDtos.GenerationWallet billingWallet) {}
 
     public record JournalEntry(Long id, Long batchId, int versionIndex, String platform, String title, String body,
                                List<String> tags, Instant finalizedAt) {}

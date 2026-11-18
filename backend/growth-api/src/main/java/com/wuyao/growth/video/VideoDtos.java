@@ -81,10 +81,10 @@ public final class VideoDtos {
     public record History(Long id, String prompt, String model, String ratio,
                           int durationSeconds, String resolution, String status, Instant createdAt,
                           String outputUrl, Integer actualWidth, Integer actualHeight, Integer actualDurationMs,
-                          String sceneKey) {
+                          String sceneKey, com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {
         public History(Long id, String prompt, String model, String ratio,
                        int durationSeconds, String resolution, String status, Instant createdAt) {
-            this(id, prompt, model, ratio, durationSeconds, resolution, status, createdAt, null, null, null, null, null);
+            this(id, prompt, model, ratio, durationSeconds, resolution, status, createdAt, null, null, null, null, null, null);
         }
     }
 
@@ -128,5 +128,6 @@ public final class VideoDtos {
             List<Reference> referenceVideos,
             List<Reference> referenceAudios,
             String sceneKey,
-            Long planId) {}
+             Long planId,
+             com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {}
 }

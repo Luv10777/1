@@ -9,10 +9,11 @@ const CodesView = () => import('./views/CodesView.vue')
 const TeamView = () => import('./views/TeamView.vue')
 const DashboardView = () => import('./views/DashboardView.vue')
 const DistributionsView = () => import('./views/DistributionsView.vue')
+const TaskLogsView = () => import('./views/TaskLogsView.vue')
 
 /** 服务商后台挂在一方志站的 /partner/ 下，和一方志共用登录。 */
 export const PARTNER_BASE = '/partner/'
-const PAGES = ['/overview', '/dashboard', '/tenants', '/codes', '/team', '/credits']
+const PAGES = ['/overview', '/dashboard', '/tenants', '/codes', '/team', '/credits', '/task-logs']
 export function partnerDestination(raw) {
   if (typeof raw !== 'string') return '/overview'
   return PAGES.includes(raw.split(/[?#]/)[0]) ? raw : '/overview'
@@ -34,6 +35,7 @@ export function createPartnerRouter(history = createWebHistory(PARTNER_BASE)) {
       { path: '/codes', name: 'partner-codes', component: CodesView, meta: { title: '激活码', partner: true, permission: 'codes' } },
       { path: '/credits', name: 'partner-credits', component: DistributionsView, meta: { title: '烟火', partner: true, permission: ['finance', 'distribute'] } },
       { path: '/distributions', redirect: '/credits' },
+      { path: '/task-logs', name: 'partner-task-logs', component: TaskLogsView, meta: { title: '任务日志', partner: true } },
       { path: '/team', name: 'partner-team', component: TeamView, meta: { title: '团队', partner: true } },
       { path: '/403', name: 'partner-forbidden', component: AccessView, meta: { title: '不是服务商成员' } },
       { path: '/:pathMatch(.*)*', name: 'partner-not-found', component: AccessView, meta: { title: '页面不存在' } },

@@ -98,7 +98,7 @@ public class ImageInspirationService {
                 p.getImageAssetIds().stream().map(id -> assets.imagePreview(id)
                         .map(image -> new ImageInspirationDtos.Image(id, image.name(), image.url()))
                         .orElse(new ImageInspirationDtos.Image(id, "参考图已不可用", null))).toList(),
-                p.getPlans(), p.getCreatedAt())).toList());
+                p.getPlans(), p.getCreatedAt(), billing.generationWallet(p.getBillingReservationId()))).toList());
     }
 
     @Transactional(readOnly = true)
@@ -169,8 +169,8 @@ public class ImageInspirationService {
         return inspirations.findById(id).orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "方案不存在"));
     }
 
-    private static ImageInspirationDtos.View view(ImageInspiration p) {
-        return new ImageInspirationDtos.View(p.getId(), p.getStatus(), p.getPlans(), CustomerMessages.plain(p.getErrorMessage(), "这次没有出成方案，请稍后重试。"), p.getPreviousId(), p.getCreatedAt());
+    private ImageInspirationDtos.View view(ImageInspiration p) {
+        return new ImageInspirationDtos.View(p.getId(), p.getStatus(), p.getPlans(), CustomerMessages.plain(p.getErrorMessage(), "这次没有出成方案，请稍后重试。"), p.getPreviousId(), p.getCreatedAt(), billing.generationWallet(p.getBillingReservationId()));
     }
 
     private static String trim(String value) { return value == null || value.isBlank() ? null : value.strip(); }

@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { nextTick, ref } from 'vue'
 import { Check, ChevronLeft, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import YanhuoIcon from './YanhuoIcon.vue'
@@ -52,7 +53,7 @@ const showRecords = async () => {
           <button v-for="item in records" :key="item.id" type="button" class="ip-record" :class="{ active: record?.id === item.id }" :disabled="working" @click="openRecord(item)">
             <span class="ip-record-thumbs" aria-hidden="true"><img v-for="image in item.images.filter(image => image.url).slice(0, 3)" :key="image.assetId" :src="image.url" alt=""><span v-if="!item.images.some(image => image.url)">没有参考图</span></span>
             <ol><li v-for="(plan, index) in item.plans" :key="index"><b>{{ videoPlanLetters[index] }}</b>{{ plan.title }}</li></ol>
-            <small>{{ videoHistoryTime(item.createdAt) }}<template v-if="item.style || item.idea"> · {{ item.style || item.idea }}</template></small>
+            <small>{{ videoHistoryTime(item.createdAt) }}<template v-if="item.billingWallet"> · {{ billingWalletLabel(item.billingWallet) }}</template><template v-if="item.style || item.idea"> · {{ item.style || item.idea }}</template></small>
           </button>
         </div>
         <p v-if="recordsLoading" class="ip-muted" role="status">正在读取灵感记录…</p>
@@ -70,7 +71,7 @@ const showRecords = async () => {
         <div class="ip-results-title">
           <button type="button" class="ip-back" :disabled="working" @click="showRecords"><ChevronLeft :size="14" :stroke-width="1.8" aria-hidden="true" />灵感记录</button>
           <h2>{{ resultInfo?.idea || '按参考图出的灵感方案' }}</h2>
-          <small v-if="resultMeta">{{ resultMeta }}</small>
+          <small v-if="resultMeta || result.billingWallet">{{ [resultMeta, billingWalletLabel(result.billingWallet)].filter(Boolean).join(' · ') }}</small>
         </div>
         <div class="ip-results-actions">
           <button type="button" class="ip-outline" :disabled="working" @click="showResults = false"><SlidersHorizontal :size="15" :stroke-width="1.8" aria-hidden="true" />重选</button>

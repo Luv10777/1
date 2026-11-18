@@ -24,7 +24,7 @@ public final class PartnerDtos {
      * account 是团队账户的烟火（成员在一方志里创作和分给商户都扣它）；monthCodes 是本月（北京时间）这家服务商生成的激活码个数。
      */
     public record Overview(Partner partner, List<Plan> plans, long tenantCount, String role, Permissions permissions,
-                           String displayName, String userName, Account account, long monthCodes) {}
+                           String displayName, String userName, Account account, long monthCodes, Long memberNumber) {}
     /** 团队账户的烟火：可用 = 赠送 + 充值。 */
     public record Account(long available, long gift, long purchased) {}
     /** 一方志站内判断要不要显示「服务商后台」入口：不是服务商成员时 member 为 false，其余为空。 */
@@ -35,7 +35,10 @@ public final class PartnerDtos {
      */
     public record Distribution(Long id, String source, String recipientType, Long recipientTenantId, String recipientName,
                                Long recipientUserId, long credits, long gift, long purchased, String note, Long actorUserId,
-                               String actorName, String status, Instant createdAt) {}
+                               String actorName, String status, Instant createdAt, Long actorNumber) {}
+    public record TeamActivity(Long id, String kind, Long actorNumber, String actorName, long credits,
+                               String capability, String description, String status, Instant createdAt) {}
+    public record TeamActivityLog(Page<TeamActivity> records, long creationCredits, long distributionCredits) {}
     /** 激活码统计：unused = generated - redeemed - voided；renewals 是其中直接续期的个数。 */
     public record CodeStats(long generated, long redeemed, long unused, long voided, long renewals) {}
     /**
@@ -43,7 +46,8 @@ public final class PartnerDtos {
      * monthlyCap 是每月最多分出的烟火（空表示不限），distributedThisMonth 是本月已分出的；tenantsAdded 是他按 UID 加进来的商户数。
      */
     public record Member(Long userId, Long uid, String name, String displayName, String phone, String role, Permissions permissions,
-                         Long monthlyCap, long distributedThisMonth, long tenantsAdded, CodeStats codes, Instant createdAt) {}
+                         Long monthlyCap, long distributedThisMonth, long tenantsAdded, CodeStats codes, Instant createdAt,
+                         Long memberNumber) {}
     /**
      * 按 UID 预查询，添加商户前确认对象。userName 打码；tenantState：NONE 没有归属、MINE 在本服务商名下、
      * OTHER 属于其他服务商（不透露是哪家）。tenantId 只在 MINE 时给出。

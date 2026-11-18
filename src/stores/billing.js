@@ -53,6 +53,12 @@ export async function requireAccount() {
   return account
 }
 
+export function generationBalance(wallet) {
+  const account = billing.summary
+  if (wallet === 'TEAM' && account?.workspaceGenerationWallet !== 'TEAM') return account?.generationTeam?.available ?? 0
+  return account?.available ?? 0
+}
+
 export const billingApi = {
   topUp: data => post('/api/billing/orders/topup', data),
   subscribe: data => post('/api/billing/orders/subscription', data),

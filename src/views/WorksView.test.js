@@ -16,10 +16,10 @@ test('image and video works download from cards and details, with busy and retry
   const response = data => ({ ok: true, json: async () => ({ code: 200, data }) })
   globalThis.fetch = async (url, options) => {
     if (url.startsWith('/api/image-creations/works')) return response({ items: [
-      { id: 1, creationId: 9, url: 'https://bucket.test/image.png', createdAt: '2026-11-12T08:00:00Z', quality: 'HD' },
+      { id: 1, creationId: 9, url: 'https://bucket.test/image.png', createdAt: '2026-11-12T08:00:00Z', quality: 'HD', billingWallet: 'PERSONAL' },
     ], totalPages: 1 })
     if (url.startsWith('/api/video/works')) return response({ items: [
-      { id: 'video-id', outputUrl: 'https://bucket.test/video.mp4', createdAt: '2026-11-12T09:00:00Z', durationSeconds: 5 },
+      { id: 'video-id', outputUrl: 'https://bucket.test/video.mp4', createdAt: '2026-11-12T09:00:00Z', durationSeconds: 5, billingWallet: 'TEAM' },
     ], totalPages: 1 })
     requests.push({ url, options })
     if (failDownload) return { ok: false, status: 403 }
@@ -77,6 +77,7 @@ test('image and video works download from cards and details, with busy and retry
     assert.ok(videoButton)
     assert.ok(imageButton)
     const videoCard = find(node => node.tag === 'article')
+    assert.match(text(videoCard), /团队账户扣款/)
     videoCard.props.onKeydown({ key: 'Enter', target: videoButton, currentTarget: videoCard })
     assert.equal(button('关闭详情'), undefined, 'download keyboard events do not open the detail dialog')
     const downloading = click(videoButton)
@@ -109,6 +110,7 @@ test('image and video works download from cards and details, with busy and retry
     assert.doesNotMatch(text(body), /下载地址可能已过期/)
     click(button('关闭详情')); await nextTick()
     const imageCard = [...nodes(root)].filter(node => node.tag === 'article')[1]
+    assert.match(text(imageCard), /个人账户扣款/)
     imageCard.props.onClick(); await nextTick()
     const imageDetailDownload = find(node => node.tag === 'button' && text(node).includes('下载图片'))
     assert.ok(imageDetailDownload)

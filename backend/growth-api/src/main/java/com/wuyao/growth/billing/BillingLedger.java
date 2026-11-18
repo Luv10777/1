@@ -11,6 +11,7 @@ public class BillingLedger {
     @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
     private Long tenantId;
     private Long actorUserId;
+    private Long payerPartnerId;
     @Column(length=160) private String eventKey;
     @Column(length=24) private String type;
     @Column(length=240) private String description;
@@ -21,5 +22,6 @@ public class BillingLedger {
     private long heldAfter;
     @Column(length=36) private String orderId;
     @Column(length=36) private String reservationId;
+    @Column(length=20) private String generationCapability;
     private Instant createdAt = Instant.now();
 }

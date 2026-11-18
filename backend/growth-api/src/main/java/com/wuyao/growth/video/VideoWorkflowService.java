@@ -9,6 +9,7 @@ import com.wuyao.growth.asset.AssetRepository;
 import com.wuyao.growth.asset.AssetService;
 import com.wuyao.growth.asset.VideoMediaProbe;
 import com.wuyao.growth.billing.BillingService;
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.billing.VideoPricingService;
 import com.wuyao.growth.common.ratelimit.TenantRateLimiter;
 import com.wuyao.growth.common.metrics.VideoMetrics;
@@ -100,6 +101,11 @@ public class VideoWorkflowService {
 
     @Transactional
     public VideoDtos.View create(VideoDtos.Create request, Long userId) {
+        return create(request, userId, null);
+    }
+
+    @Transactional
+    public VideoDtos.View create(VideoDtos.Create request, Long userId, GenerationWallet wallet) {
    billing.lockForGeneration();
         try {
             VideoCapabilities.validate(request);
@@ -115,7 +121,8 @@ public class VideoWorkflowService {
 
         Long tenantId = TenantContext.require();
         workflows.lockRequest(tenantId + ":" + request.requestKey());
-        String hash = hash(request);
+        boolean team = wallet == GenerationWallet.TEAM;
+        String hash = hash(team ? List.of(request, wallet) : request);
         var existing = workflows.findByRequestKey(request.requestKey());
         if (existing.isPresent()) {
             if (!hash.equals(existing.get().getRequestHash())) throw BizException.of(ErrorCode.CONFLICT, "同一提交标识不能用于不同的视频配置");
@@ -123,7 +130,9 @@ public class VideoWorkflowService {
         }
 
         var quote = pricing.requireApproved(request, request.quoteId());
-        String reservation = billing.reserve("video-create:" + request.requestKey(), "VIDEO", quote.credits(), "视频创作 · 预占烟火");
+        String billingKey = "video-create:" + request.requestKey();
+        String reservation = team ? billing.reserve(billingKey, "VIDEO", quote.credits(), "视频创作 · 预占烟火", wallet)
+                : billing.reserve(billingKey, "VIDEO", quote.credits(), "视频创作 · 预占烟火");
         acquirePermit(tenantId);
         VideoWorkflow workflow = new VideoWorkflow();
         workflow.setTenantId(tenantId);
@@ -322,7 +331,8 @@ public class VideoWorkflowService {
                 w.getResolution(), w.getStatus(), w.getCreatedAt(),
                 "SUCCEEDED".equals(w.getStatus()) && w.getOutputStorageKey() != null
                         ? storage.presignGet(w.getOutputStorageKey(), Duration.ofMinutes(30)) : null,
-                null, null, null, VideoScenes.normalize(w.getRequest().sceneKey()))).toList());
+                null, null, null, VideoScenes.normalize(w.getRequest().sceneKey()),
+                billing.generationWallet(w.getBillingReservationId()))).toList());
     }
 
     @Transactional(readOnly = true)
@@ -335,7 +345,8 @@ public class VideoWorkflowService {
             return new VideoDtos.History(w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(),
                     w.getDurationSeconds(), w.getResolution(), w.getStatus(), w.getCreatedAt(), url,
                     output == null ? null : output.getWidth(), output == null ? null : output.getHeight(),
-                    output == null ? null : output.getDurationMs(), VideoScenes.normalize(w.getRequest().sceneKey()));
+                    output == null ? null : output.getDurationMs(), VideoScenes.normalize(w.getRequest().sceneKey()),
+                    billing.generationWallet(w.getBillingReservationId()));
         }).toList());
     }
 
@@ -896,7 +907,7 @@ public class VideoWorkflowService {
                 request.videoReferences(), request.referenceAudioAssetIds(),
                 request.videoReferences().stream().map(this::referenceView).toList(),
                 request.referenceAudioAssetIds().stream().map(this::referenceView).toList(),
-                VideoScenes.normalize(request.sceneKey()), request.planId());
+                VideoScenes.normalize(request.sceneKey()), request.planId(), billing.generationWallet(workflow.getBillingReservationId()));
     }
 
     private VideoDtos.Reference referenceView(Long id) {
@@ -905,7 +916,7 @@ public class VideoWorkflowService {
                 .orElse(new VideoDtos.Reference(id, "参考素材已不可用", null));
     }
 
-    private String hash(VideoDtos.Create request) {
+    private String hash(Object request) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(request))); }
         catch (Exception e) { throw new IllegalStateException("视频请求无法序列化", e); }
     }

@@ -55,7 +55,8 @@ public class PartnerService {
         Instant monthStart = monthStart();
         long monthCodes = store.codeEvents(p.id(), monthStart).stream().filter(c -> !c.createdAt().isBefore(monthStart)).count();
         return new PartnerDtos.Overview(partnerView(p, team), plans(), store.tenantCount(p.id()), access.member().role(),
-                PartnerDtos.Permissions.of(access.perms()), access.member().displayName(), userName(userId), team, monthCodes);
+                PartnerDtos.Permissions.of(access.perms()), access.member().displayName(), userName(userId), team, monthCodes,
+                access.member().memberNumber());
     }
 
     /** 一方志站内用：当前账号是不是服务商成员（决定右上角要不要显示「服务商后台」）。不是成员时不报错。 */
@@ -125,8 +126,7 @@ public class PartnerService {
         var existing = store.distributionByKey(key);
         if (existing.isPresent()) {
             var d = existing.get();
-            if (!d.recipientTenantId().equals(recipientTenant) || d.credits() != credits)
-                throw bad("分配请求已用于其他对象或数量，请刷新后重试");
+            checkDistribution(d, recipientTenant, credits);
             if ("DONE".equals(d.status())) return d;
             if ("POOL".equals(d.source())) {
                 inScope(recipientTenant, false, () -> billing.creditFromPartner(credits, key, partner.name(), d.actorUserId()));
@@ -138,22 +138,36 @@ public class PartnerService {
         if (team == null) throw bad("服务商还没有团队账户，请联系平台");
         if (team.equals(recipientTenant)) throw bad("这是你们的团队账户，不用分");
         String target = "商户「" + tenantNames().get(recipientTenant) + "」";
-        var split = inScope(team, false, () -> {
-            store.lockPartner(partner.id());
+        var pending = inScope(team, false, () -> {
+            var locked = store.lockPartner(partner.id());
+            if (!team.equals(locked.teamTenantId()) || !"ACTIVE".equals(locked.status()))
+                throw PartnerService.bad("服务商团队账户当前不可分配烟火");
             var recorded = store.distributionByKey(key);
-            if (recorded.isPresent()) return new BillingDtos.CreditSplit(recorded.get().gift(), recorded.get().purchased());
-            Long cap = access.owner() ? null : store.member(partner.id(), actor).map(PartnerStore.MemberRow::monthlyCap).orElse(null);
+            if (recorded.isPresent()) {
+                checkDistribution(recorded.get(), recipientTenant, credits);
+                return recorded.get();
+            }
+            var member = store.member(partner.id(), actor).filter(m -> m.effective().distribute()).orElseThrow(
+                    () -> BizException.of(ErrorCode.FORBIDDEN, "你没有「分配烟火」权限，请联系负责人开通"));
+            Long cap = member.owner() ? null : member.monthlyCap();
             if (cap != null) {
                 long used = store.distributedBy(partner.id(), actor, monthStart());
                 if (used + credits > cap) throw bad("超出你每月的分配上限 " + cap + "，本月还能分 " + Math.max(0, cap - used));
             }
             var s = billing.debitForPartner(credits, key, "分配给" + target, actor);
             store.recordDistribution(partner.id(), key, "ACCOUNT", "TENANT", recipientTenant, null, s.gift(), s.purchased(), note, actor);
-            return s;
+            return store.distributionByKey(key).orElseThrow();
         });
-        inScope(recipientTenant, false, () -> billing.creditFromPartnerAccount(split, key, "服务商「" + partner.name() + "」分配烟火", actor));
+        if ("DONE".equals(pending.status())) return pending;
+        var split = new BillingDtos.CreditSplit(pending.gift(), pending.purchased());
+        inScope(recipientTenant, false, () -> billing.creditFromPartnerAccount(split, key, "服务商「" + partner.name() + "」分配烟火", pending.actorUserId()));
         tx(false, () -> { store.completeDistribution(key); return null; });
         return store.distributionByKey(key).orElseThrow();
+    }
+
+    private static void checkDistribution(PartnerStore.Distribution existing, Long recipientTenant, long credits) {
+        if (!Objects.equals(existing.recipientTenantId(), recipientTenant) || existing.credits() != credits)
+            throw bad("分配请求已用于其他对象或数量，请刷新后重试");
     }
 
     /** 补上一笔「未到账」的分配：用原来的请求再走一遍，已经做过的步骤不会重复，不会再扣一次。 */
@@ -183,10 +197,12 @@ public class PartnerService {
     List<PartnerDtos.Distribution> distributionViews(Long partnerId, List<PartnerStore.Distribution> rows) {
         Map<Long, String> names = tenantNames();
         Map<Long, String> people = memberNames(partnerId);
+        var members = store.numberedMembers(partnerId);
         return rows.stream().map(d -> new PartnerDtos.Distribution(d.id(), d.source(), d.recipientType(), d.recipientTenantId(),
                 d.recipientUserId() != null ? people.computeIfAbsent(d.recipientUserId(), this::userName) : names.get(d.recipientTenantId()),
                 d.recipientUserId(), d.credits(), d.gift(), d.purchased(), d.note(), d.actorUserId(),
-                people.computeIfAbsent(d.actorUserId(), this::userName), d.status(), d.createdAt())).toList();
+                members.containsKey(d.actorUserId()) ? members.get(d.actorUserId()).name() : people.computeIfAbsent(d.actorUserId(), this::userName),
+                d.status(), d.createdAt(), members.containsKey(d.actorUserId()) ? members.get(d.actorUserId()).number() : null)).toList();
     }
 
     /** 团队成员。手机号只给有团队管理权限的人看。 */
@@ -444,7 +460,7 @@ public class PartnerService {
             var codeStats = new PartnerDtos.CodeStats(s.generated(), s.redeemed(), s.generated() - s.redeemed() - s.voided(), s.voided(), s.renewals());
             return new PartnerDtos.Member(m.userId(), u == null ? null : u.uid(), u == null ? null : u.name(), m.displayName(),
                     withPhone && u != null ? u.phone() : null, m.role(), PartnerDtos.Permissions.of(m.effective()), m.owner() ? null : m.monthlyCap(),
-                    store.distributedBy(partnerId, m.userId(), monthStart), added.getOrDefault(m.userId(), 0L), codeStats, m.createdAt());
+                    store.distributedBy(partnerId, m.userId(), monthStart), added.getOrDefault(m.userId(), 0L), codeStats, m.createdAt(), m.memberNumber());
         }).toList();
     }
 

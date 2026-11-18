@@ -1,5 +1,7 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import AppSelect from '../components/AppSelect.vue'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AudioLines, ChevronRight, CircleAlert, Film, History, ImagePlus, Plus, UserRound, X } from 'lucide-vue-next'
@@ -30,7 +32,7 @@ const duration = ref(10)
 const ratio = ref('')
 const selectedModel = ref('SEEDANCE_2_5')
 const resolution = ref('720p')
-const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, quoted, quoting, estimate, confirmQuote, closeQuote, open: openWorkflow, reset: resetPreview } = useDigitalHumanVideo()
+const { workflow, isGenerating, previewStarted, submittedForm, outputUrl, stageLabel, notice: videoNotice, error: videoError, quoted, quoting, generationWallet, walletBalance, estimate, confirmQuote, closeQuote, open: openWorkflow, reset: resetPreview } = useDigitalHumanVideo()
 const priceDialog = ref(null)
 watch(quoted, async value => { await nextTick(); if (value) priceDialog.value?.showModal(); else priceDialog.value?.close() })
 const notice = ref('')
@@ -291,6 +293,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         continue-text="生成完成后可直接播放，成片将保存到作品库。"
         @switch-workspace="switchWorkspace"
       >
+        <p v-if="workflow?.billingWallet" class="vs-notice">{{ billingWalletLabel(workflow.billingWallet) }}<template v-if="workflow.chargedCredits != null"> · 实际消耗 {{ number(workflow.chargedCredits) }} 烟火</template></p>
         <template #actions>
           <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="dh-history" @click="toggleHistory"><History :size="16" :stroke-width="1.7" aria-hidden="true" />创作记录<i v-if="historyRunning" aria-hidden="true" /><span v-if="historyRunning" class="sr-only">，有任务生成中</span></button>
         </template>
@@ -324,7 +327,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         <div class="vs-drawer-list">
           <button v-for="item in historyItems" :key="item.id" type="button" class="vs-drawer-item" :class="{ active: workflow?.id === item.id }" :aria-current="workflow?.id === item.id ? 'true' : undefined" :disabled="!!openingRecord || (isGenerating && !workflow)" @click="openRecord(item)">
             <span class="vs-drawer-thumb"><video v-if="item.outputUrl" :src="`${item.outputUrl}#t=0.1`" muted playsinline preload="metadata" aria-hidden="true" /><Film v-else :size="18" :stroke-width="1.6" aria-hidden="true" /></span>
-            <span class="vs-drawer-text"><strong>{{ historyTitle(item.prompt) }}</strong><small><span :class="`is-${historyTone(item.status)}`">{{ openingRecord === item.id ? '正在打开…' : historyStatus(item.status) }}</span> · {{ item.durationSeconds }} 秒 · {{ videoHistoryTime(item.createdAt) }}</small></span>
+            <span class="vs-drawer-text"><strong>{{ historyTitle(item.prompt) }}</strong><small><span :class="`is-${historyTone(item.status)}`">{{ openingRecord === item.id ? '正在打开…' : historyStatus(item.status) }}</span> · {{ item.durationSeconds }} 秒 · {{ videoHistoryTime(item.createdAt) }}<template v-if="item.billingWallet"> · {{ billingWalletLabel(item.billingWallet) }}</template></small></span>
           </button>
           <p v-if="!auth.isAuthenticated" class="vs-drawer-empty">登录后查看创作记录。</p>
           <p v-else-if="historyError" class="vs-drawer-empty is-error" role="alert">{{ historyError }}</p>
@@ -335,7 +338,25 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
       </aside>
     </main>
     <dialog ref="priceDialog" class="yanhuo-payment video-price-dialog" aria-labelledby="dh-price-title" @cancel.prevent="closeQuote">
-      <template v-if="quoted"><header><img src="/images/brand/yifangzhi-mark.png" width="32" height="32" alt=""><h2 id="dh-price-title">确认视频费用</h2><button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="isGenerating" @click="closeQuote">×</button></header><template v-if="quoted.quote.available"><p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p><p class="yanhuo-note">{{ quoted.quote.message }}</p><p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p><p class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</p><button class="yanhuo-primary" type="button" :disabled="isGenerating || !!billing.error || (billing.summary?.available || 0) < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button></template><p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p><RouterLink to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink><p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p></template>
+      <template v-if="quoted">
+        <header>
+          <img src="/images/brand/yifangzhi-mark.png" width="32" height="32" alt="">
+          <h2 id="dh-price-title">确认视频费用</h2>
+          <button class="yanhuo-icon" type="button" aria-label="关闭报价" :disabled="isGenerating" @click="closeQuote">×</button>
+        </header>
+        <template v-if="quoted.quote.available">
+          <p class="yanhuo-payment-amount"><YanhuoIcon :size="28" />{{ number(quoted.quote.credits) }}</p>
+          <p class="yanhuo-note">{{ quoted.quote.message }}</p>
+          <p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p>
+          <p v-if="!billing.summary?.generationTeam" class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(walletBalance) }}</p>
+          <GenerationWalletPicker v-model="generationWallet" :disabled="isGenerating" />
+          <p v-if="billing.summary && walletBalance < quoted.quote.credits" class="yanhuo-alert">所选余额的烟火不足。</p>
+          <button class="yanhuo-primary" type="button" :disabled="isGenerating || !!billing.error || walletBalance < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button>
+        </template>
+        <p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p>
+        <RouterLink v-if="generationWallet === 'PERSONAL'" to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink>
+        <p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p>
+      </template>
     </dialog>
     <Transition name="dh-avatar-modal" appear>
       <div v-if="showAllAvatars" class="dh-avatar-modal" role="dialog" aria-modal="true" aria-label="全部数字人形象" @click.self="showAllAvatars = false">

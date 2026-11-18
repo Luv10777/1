@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ChevronDown, Film, ImageIcon, Play } from 'lucide-vue-next'
@@ -24,9 +25,9 @@ const loadingMore = ref(false)
 const expanded = ref(false)
 
 // 图片优先用小图（长边 640）；更早的图没有小图，加载失败时换回原图。
-const imageEntry = entry => ({ key: `image:${entry.id}`, kind: 'image', title: entry.title || entry.brief || '绘图创作', at: Date.parse(entry.createdAt) || 0, thumb: entry.previewThumbUrl || entry.previewUrl || '', full: entry.previewUrl || '' })
+const imageEntry = entry => ({ key: `image:${entry.id}`, kind: 'image', billingWallet: entry.billingWallet, title: entry.title || entry.brief || '绘图创作', at: Date.parse(entry.createdAt) || 0, thumb: entry.previewThumbUrl || entry.previewUrl || '', full: entry.previewUrl || '' })
 const thumbFailed = item => { if (item.full && item.thumb !== item.full) item.thumb = item.full }
-const videoEntry = entry => ({ key: `video:${entry.id}`, kind: 'video', title: videoConversationTitle(entry.prompt), at: Date.parse(entry.createdAt) || 0, thumb: entry.outputUrl || '' })
+const videoEntry = entry => ({ key: `video:${entry.id}`, kind: 'video', billingWallet: entry.billingWallet, title: videoConversationTitle(entry.prompt), at: Date.parse(entry.createdAt) || 0, thumb: entry.outputUrl || '' })
 
 async function fetchPage(kind, page) {
   const result = kind === 'image' ? await imageApi.history('POSTER', page) : await get('/api/video/workflows', { page, size: PAGE_SIZE })
@@ -96,7 +97,7 @@ onBeforeUnmount(() => window.removeEventListener(NOVICE_RECENTS_CHANGED, load))
             :to="{ name: 'studio', query: { open: item.key } }"
             class="novice-recent"
             :class="{ active: route.query.open === item.key }"
-            :title="item.title"
+            :title="[item.title, billingWalletLabel(item.billingWallet)].filter(Boolean).join(' · ')"
             @click="emit('open')"
           >
             <span class="novice-recent-thumb" aria-hidden="true">
@@ -106,7 +107,7 @@ onBeforeUnmount(() => window.removeEventListener(NOVICE_RECENTS_CHANGED, load))
               <Film v-else :size="15" :stroke-width="1.6" />
               <i v-if="item.kind === 'video' && item.thumb"><Play :size="9" fill="currentColor" :stroke-width="0" /></i>
             </span>
-            <span class="novice-recent-title">{{ item.title }}</span>
+            <span class="novice-recent-title">{{ item.title }}<small v-if="item.billingWallet" class="novice-recent-wallet">{{ billingWalletLabel(item.billingWallet) }}</small></span>
             <time class="novice-recent-time" :datetime="new Date(item.at).toISOString()">{{ timeLabel(item.at) }}</time>
           </RouterLink>
         </TransitionGroup>
@@ -140,6 +141,7 @@ onBeforeUnmount(() => window.removeEventListener(NOVICE_RECENTS_CHANGED, load))
 .novice-recent-thumb i { position: absolute; right: 2px; bottom: 2px; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: rgb(15 23 42 / 65%); color: #fff; }
 .novice-recent-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .novice-recent.active .novice-recent-title { font-weight: 600; }
+.novice-recent-wallet { display: block; color: var(--ink-muted); font-size: 10px; }
 .novice-recent-time { flex: none; color: var(--ink-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 /* 展开时新出现的条目依次淡入、轻轻落下。 */
 .novice-recent-item-enter-active { transition: opacity .3s ease, transform .35s cubic-bezier(.2, .8, .2, 1); }

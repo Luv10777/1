@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { imageApi } from '../services/imageCreation'
@@ -56,7 +57,8 @@ function mapImage(row) {
     typeLabel: '图片',
     title: row.title || '图片作品',
     createdAt: row.createdAt,
-    tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '灵感绘图', row.quality],
+    tags: [row.workflow === 'PRODUCT_SET' ? '产品套图' : '灵感绘图', row.quality, billingWalletLabel(row.billingWallet)].filter(Boolean),
+    billingWallet: row.billingWallet,
     url: row.url,
     // 列表用小图，详情和下载用原图；更早的图没有小图时换回原图。
     thumb: row.thumbUrl || row.url,
@@ -79,7 +81,8 @@ function mapVideo(row) {
     typeLabel: '视频',
     title: videoTitle(row.prompt),
     createdAt: row.createdAt,
-    tags: [row.model, `${row.resolution} · ${row.ratio}`, duration],
+    tags: [row.model, `${row.resolution} · ${row.ratio}`, duration, billingWalletLabel(row.billingWallet)].filter(Boolean),
+    billingWallet: row.billingWallet,
     url: row.outputUrl,
     model: row.model,
     dimensions,
@@ -264,6 +267,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
               <div><span>{{ selectedWork.type === 'image' ? '画质' : '模型' }}</span><strong>{{ selectedWork.quality || selectedWork.model }}</strong></div>
               <div><span>尺寸</span><strong>{{ selectedWork.dimensions }}</strong></div>
               <div v-if="selectedWork.duration"><span>时长</span><strong>{{ selectedWork.duration }}</strong></div>
+              <div v-if="selectedWork.billingWallet"><span>扣款来源</span><strong>{{ billingWalletLabel(selectedWork.billingWallet) }}</strong></div>
             </div>
           </div>
           <footer class="detail-footer">

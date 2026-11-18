@@ -11,6 +11,10 @@ export const BILLING_INTERVALS = Object.freeze({ MONTH: 'MONTH', QUARTER: 'QUART
 export const SUBSCRIPTION_STATES = Object.freeze({ INCOMPLETE: 'INCOMPLETE', TRIALING: 'TRIALING', ACTIVE: 'ACTIVE', PAST_DUE: 'PAST_DUE', GRACE_PERIOD: 'GRACE_PERIOD', SUSPENDED: 'SUSPENDED', CANCELED: 'CANCELED', EXPIRED: 'EXPIRED' })
 export const CREDIT_ENTRY_TYPES = Object.freeze({ PURCHASE: 'PURCHASE', GRANT: 'GRANT', PROMOTION: 'PROMOTION', RESERVE: 'RESERVE', CAPTURE: 'CAPTURE', RELEASE: 'RELEASE', ADJUSTMENT: 'ADJUSTMENT', EXPIRE: 'EXPIRE', REFUND_REVERSAL: 'REFUND_REVERSAL' })
 
+export const billingWalletLabel = wallet => ({ TEAM: '团队账户扣款', PERSONAL: '个人账户扣款' }[wallet] || '')
+
+export const generationWalletPath = (path, wallet) => wallet === 'TEAM' ? `${path}?wallet=TEAM` : path
+
 const ACTIVE_STATES = new Set([SUBSCRIPTION_STATES.TRIALING, SUBSCRIPTION_STATES.ACTIVE, SUBSCRIPTION_STATES.PAST_DUE, SUBSCRIPTION_STATES.GRACE_PERIOD])
 
 function id(prefix) { return `${prefix}_${crypto.randomUUID()}` }

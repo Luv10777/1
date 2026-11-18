@@ -7,6 +7,7 @@ import { managementDate } from '../../src/domain/platformManagement.js'
 import { number } from '../../src/domain/partnerOps.js'
 import { can, loadPartner, loadTeam, partner, teamNames } from '../partnerStore.js'
 import TenantDrawer from '../components/TenantDrawer.vue'
+import MemberIdentity from '../components/MemberIdentity.vue'
 
 /**
  * 烟火：团队账户的余额（大家在一方志创作和分给商户都扣它）、平台发放记录（财务权限）、分给商户的每一笔。
@@ -111,15 +112,16 @@ load()
       <div v-if="!records.length && !loading" class="pw-empty"><strong>{{ actor ? '没有匹配的记录' : '还没有分配过烟火' }}</strong><p>在商户详情里分配烟火后，会记在这里。</p></div>
       <div v-else class="management-table-wrap">
         <table class="management-table">
-          <thead><tr><th>时间</th><th>分给</th><th class="code-number">烟火</th><th class="code-number">赠送 / 充值</th><th>备注</th><th>操作人</th><th>状态</th></tr></thead>
+          <thead><tr><th>时间</th><th>分给</th><th class="code-number">烟火</th><th class="code-number">赠送 / 充值</th><th>扣款来源</th><th>备注</th><th>操作人</th><th>状态</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.id" :class="{ 'partner-row': item.recipientType === 'TENANT' }" :tabindex="item.recipientType === 'TENANT' ? 0 : undefined" @click="open(item)" @keydown.enter="open(item)">
               <td class="mg-time">{{ managementDate(item.createdAt) }}</td>
               <td><span>{{ item.recipientName || '—' }}</span><small v-if="item.recipientType !== 'TENANT'">以前分给 BD 的</small></td>
               <td class="code-number mg-mono">{{ number(item.credits) }}</td>
               <td class="code-number mg-mono">{{ number(item.gift) }} / {{ number(item.purchased) }}</td>
+              <td>{{ item.source === 'ACCOUNT' ? '团队账户' : item.source === 'POOL' ? '历史可分配额度' : '—' }}</td>
               <td>{{ item.note || '—' }}</td>
-              <td>{{ item.actorName || '—' }}</td>
+              <td><MemberIdentity :number="item.actorNumber" :name="item.actorName" /></td>
               <td><span v-if="item.status === 'DONE'" class="pw-plus">已到账</span><button v-else-if="can('distribute') && item.recipientType === 'TENANT'" class="mg-text-button partner-danger" type="button" :disabled="retrying === item.id" @click.stop="retry(item)">{{ retrying === item.id ? '正在补上…' : '未到账 · 补上' }}</button><span v-else class="partner-danger">未到账</span></td>
             </tr>
           </tbody>
@@ -127,7 +129,7 @@ load()
       </div>
       <footer v-if="pages > 1" class="management-pagination"><span>共 {{ number(total) }} 笔</span><div><button class="mg-page-button" type="button" :disabled="page === 0 || loading" aria-label="上一页" @click="movePage(page - 1)"><ChevronLeft :size="16" /></button><span>{{ page + 1 }} / {{ pages }}</span><button class="mg-page-button" type="button" :disabled="page + 1 >= pages || loading" aria-label="下一页" @click="movePage(page + 1)"><ChevronRight :size="16" /></button></div></footer>
     </section>
-    <p class="pw-note">「未到账」表示已经扣了团队账户、商户还没入账（例如网络中断），点「补上」即可到账，不会重复扣。</p>
+    <p class="pw-note">「未到账」表示款项已从记录所示账户扣出，商户尚未入账。点「补上」可继续入账，无需再次扣款。</p>
 
     <TenantDrawer v-if="can('tenants')" :tenant-id="openTenant" @close="openTenant = null" @updated="load" />
   </div>

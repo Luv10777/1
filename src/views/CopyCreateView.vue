@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Copy, History, Images, Lightbulb, Package, PenLine, Plus, RefreshCw, X } from 'lucide-vue-next'
@@ -451,7 +452,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); window.removeEventListen
       </section>
 
       <aside class="cw-phone-col" aria-label="发出去的样子">
-        <div class="cw-phone-head"><h2>发出去的样子</h2><span v-if="current">{{ platformLabel(batch.platform) }} · 第 {{ selected + 1 }} 条</span></div>
+        <div class="cw-phone-head"><h2>发出去的样子</h2><span v-if="current">{{ platformLabel(batch.platform) }} · 第 {{ selected + 1 }} 条<template v-if="batch.billingWallet"> · {{ billingWalletLabel(batch.billingWallet) }}</template></span></div>
         <div class="cw-phone">
           <div v-if="!preview" class="cw-phone-empty">选中一条文案，<br>这里显示发出去的样子</div>
           <div v-else-if="batch.platform === 'MOMENTS'" class="cw-moments">
@@ -518,6 +519,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); window.removeEventListen
               <span v-else class="cw-record-text">{{ record.hasImage ? '图' : '文' }}</span>
               <span class="cw-record-main">
                 <span :class="{ failed: record.status === 'FAILED' }">{{ record.status === 'FAILED' ? `没写成，${credits} 烟火已退回` : !isCopyDone(record) ? '正在写…' : record.firstLine || '（空）' }}</span>
+                <small v-if="record.billingWallet">{{ billingWalletLabel(record.billingWallet) }}</small>
                 <small>{{ platformLabel(record.platform) }} · {{ record.style }} · {{ clockTime(record.createdAt) }}<template v-if="record.creatorName"> · {{ record.creatorName }}</template></small>
               </span>
               <i v-if="record.finalized" class="cw-record-seal" aria-label="有定稿">定</i>

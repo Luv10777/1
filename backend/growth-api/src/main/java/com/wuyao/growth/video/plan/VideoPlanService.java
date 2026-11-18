@@ -102,7 +102,7 @@ public class VideoPlanService {
                 p.getImageAssetIds().stream().map(id -> assets.imagePreview(id)
                         .map(image -> new VideoPlanDtos.Image(id, image.name(), image.url()))
                         .orElse(new VideoPlanDtos.Image(id, "参考图已不可用", null))).toList(),
-                p.getPlans(), p.getCreatedAt(), p.getSceneKey())).toList());
+                p.getPlans(), p.getCreatedAt(), p.getSceneKey(), billing.generationWallet(p.getBillingReservationId()))).toList());
     }
 
     @Transactional(readOnly = true)
@@ -192,13 +192,13 @@ public class VideoPlanService {
     }
 
     @SuppressWarnings("unchecked")
-    private static VideoPlanDtos.View view(VideoPlan p) {
+    private VideoPlanDtos.View view(VideoPlan p) {
         Map<String, Object> metadata = p.getPlans() == null || p.getPlans().isEmpty() ? Map.of() : p.getPlans().getFirst();
         var stages = metadata.get("stages") instanceof Map<?, ?> m ? m : Map.of();
         String phase = !"GENERATING".equals(p.getStatus()) ? null : stages.containsKey("draft") ? "REVIEW" : stages.containsKey("concept") ? "DRAFT" : "CONCEPT";
         var clarification = metadata.get("clarification") instanceof Map<?, ?> m ? (Map<String, Object>)m : null;
         return new VideoPlanDtos.View(p.getId(), p.getStatus(), "SUCCEEDED".equals(p.getStatus()) ? p.getPlans() : List.of(), CustomerMessages.plain(p.getErrorMessage(), "这次没有出成方案，请稍后重试。"),
-                p.getPreviousPlanId(), p.getCreatedAt(), p.getSceneKey(), phase, clarification);
+                p.getPreviousPlanId(), p.getCreatedAt(), p.getSceneKey(), phase, clarification, billing.generationWallet(p.getBillingReservationId()));
     }
 
     private static String trim(String value) { return value == null || value.isBlank() ? null : value.strip(); }

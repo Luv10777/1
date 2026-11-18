@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import AppSelect from '../components/AppSelect.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight, Flame, Gift, RefreshCw, Search, Undo2, X, ClipboardList, CalendarClock } from 'lucide-vue-next'
@@ -100,7 +101,7 @@ onBeforeUnmount(() => { version++ })
               <td class="credit-model">{{ item.model || '—' }}</td>
               <td class="credit-elapsed">{{ taskElapsed(item) }}</td>
               <td><span class="mg-status" :class="`credit-${item.type.toLowerCase()}`"><i />{{ ledgerTypes[item.type] || item.type }}</span></td>
-              <td class="credit-number"><strong :class="`credit-${ledgerChange(item).tone}`">{{ ledgerChange(item).text }}</strong></td>
+              <td class="credit-number"><strong :class="`credit-${ledgerChange(item).tone}`">{{ ledgerChange(item).text }}</strong><small v-if="item.billingWallet">{{ billingWalletLabel(item.billingWallet) }}</small></td>
               <td class="credit-number">{{ number(item.availableAfter) }}</td>
             </tr>
           </tbody>

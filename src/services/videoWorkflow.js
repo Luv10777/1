@@ -1,9 +1,10 @@
 import { get, post, request } from '../utils/request'
+import { generationWalletPath } from '../domain/billing.js'
 export const getVideoQuote = data => post('/api/video/quote', data)
-export const submitVideoQuote = (data, quoteId) => post('/api/video/workflows', { ...data, quoteId })
+export const submitVideoQuote = (data, quoteId, wallet) => videoApi.create({ ...data, quoteId }, wallet)
 
 export const videoApi = {
-  create: data => post('/api/video/workflows', data),
+  create: (data, wallet) => post(generationWalletPath('/api/video/workflows', wallet), data),
   get: id => get(`/api/video/workflows/${id}`),
   works: (page = 0) => get('/api/video/works', { page, size: 20 }),
 }

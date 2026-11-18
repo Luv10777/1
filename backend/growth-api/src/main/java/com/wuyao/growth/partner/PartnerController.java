@@ -18,6 +18,7 @@ import java.util.List;
 public class PartnerController {
     private final PartnerService service;
     private final PartnerInsights insights;
+    private final PartnerTeamActivity activity;
 
     @GetMapping("/me")
     public ApiResponse<PartnerDtos.Overview> me(@AuthenticationPrincipal AuthPrincipal me) {
@@ -98,6 +99,13 @@ public class PartnerController {
     @GetMapping("/team")
     public ApiResponse<List<PartnerDtos.Member>> team(@AuthenticationPrincipal AuthPrincipal me) {
         return ApiResponse.ok(service.team(me.userId()));
+    }
+
+    @GetMapping("/task-logs")
+    public ApiResponse<PartnerDtos.TeamActivityLog> taskLogs(@RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size, @RequestParam(required = false) String kind,
+            @RequestParam(required = false) Long memberNumber, @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(activity.logs(me.userId(), page, size, kind, memberNumber));
     }
 
     @PostMapping("/team")

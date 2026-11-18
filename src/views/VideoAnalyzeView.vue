@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { videoAnalysisApi, uploadAnalysisVideo } from '../services/videoAnalysis'
@@ -362,6 +363,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
           <button type="button" class="vs-drawer-toggle" :aria-expanded="historyOpen" aria-controls="va-history" @click="historyOpen = !historyOpen; historyOpen && refreshHistory()"><History :size="16" :stroke-width="1.7" aria-hidden="true" />反推历史</button>
         </div>
         <div v-if="previewUrl" class="va-video-wrap"><video ref="player" class="analysis-video va-video" :src="previewUrl" :style="{ aspectRatio: previewAspectRatio }" controls playsinline preload="metadata" @loadedmetadata="onMetadata" /></div>
+        <small v-if="!loadingHistory && current?.billingWallet">{{ billingWalletLabel(current.billingWallet) }}</small>
         <div v-if="loadingHistory || isScanning" class="analysis-state" role="status" aria-live="polite"><h3>{{ loadingHistory ? '正在读取分析记录' : statusLabel }}</h3><p>分析完成后，将在这里显示关键帧、镜头拆解、声音报告和复刻提示词。</p><progress v-if="!loadingHistory" :value="progress" max="100" :aria-label="statusLabel" /><small v-if="current?.frames?.length">已提取 {{ current.frames.length }} 张画面</small></div>
         <div v-else-if="!result && (!previewUrl || current?.status === 'FAILED')" class="analysis-state"><img v-if="!previewUrl" class="va-mark" src="/images/brand/yifangzhi-mark.png" alt=""><h3>{{ current?.status === 'FAILED' ? '本次分析未完成' : '从一条视频开始' }}</h3><p>{{ current?.status === 'FAILED' ? current.errorMessage || '请重新提交分析。' : '上传视频并选择分析模式，提炼画面风格与可复用的镜头语言。原视频保留供回看，临时文件自动清理。' }}</p></div>
         <div v-else-if="result" class="console-body" :class="{ 'real-console': reportMode === 'real' }">
@@ -443,7 +445,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
             </div>
             <div class="vs-drawer-list">
               <div v-for="item in reverseHistories" :key="item.id" class="va-history-item" :class="{ active: current?.id === item.id }">
-                <span class="va-history-text"><input v-model="item.name" maxlength="200" aria-label="重命名历史记录" @change="renameHistory(item)"><small><span :class="`is-${historyTone(item.status)}`">{{ historyStatus(item.status) }}</span> · {{ item.mode === 'real' ? '实拍视频' : '生成视频' }} · {{ videoHistoryTime(item.createdAt) }}</small></span>
+                <span class="va-history-text"><input v-model="item.name" maxlength="200" aria-label="重命名历史记录" @change="renameHistory(item)"><small><span :class="`is-${historyTone(item.status)}`">{{ historyStatus(item.status) }}</span> · {{ item.mode === 'real' ? '实拍视频' : '生成视频' }} · {{ videoHistoryTime(item.createdAt) }}<template v-if="item.billingWallet"> · {{ billingWalletLabel(item.billingWallet) }}</template></small></span>
                 <button type="button" class="vs-drawer-icon" aria-label="打开此条反推历史" :disabled="Boolean(isScanning && current?.id !== item.id)" @click="openHistory(item)"><ChevronRight :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
               </div>
               <p v-if="!reverseHistories.length" class="vs-drawer-empty">暂无分析记录</p>

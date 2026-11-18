@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { stableUrl } from "../utils/stableUrl";
@@ -129,6 +130,7 @@ function turnMeta(turn, index) {
     index > 0 && `第 ${index + 1} 版`,
     (isImageActive(turn.status) || turn.completed > 0) && turn.completed !== turn.count && `${turn.completed}/${turn.count}`,
     historyDate(turn.createdAt),
+    billingWalletLabel(turn.billingWallet),
   ].filter(Boolean).join(" · ");
 }
 const retryable = item => ["FAILED", "INTERRUPTED", "UPSTREAM_UNKNOWN"].includes(item.status);
@@ -268,6 +270,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
               <button type="button" class="poster-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="13" /></button>
             </div>
             <time class="poster-history-date" :datetime="entry.createdAt">{{ historyDate(entry.createdAt) }}</time>
+            <small v-if="entry.billingWallet" class="poster-history-date">{{ billingWalletLabel(entry.billingWallet) }}</small>
           </li>
         </ul>
         <button v-if="studio.historyMore" type="button" class="poster-load-more" @click="studio.refreshHistory(false)">加载更多</button>

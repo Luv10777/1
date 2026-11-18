@@ -13,7 +13,19 @@ public final class BillingDtos {
                           int liveCreditsPerHour, long available,
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
                           Instant memberUntil, PlanSnapshot plan, boolean canManage, boolean operator,
-                          PaymentInstructions payment, String paymentMethod) {}
+                          PaymentInstructions payment, String paymentMethod, GenerationTeam generationTeam,
+                          GenerationWallet workspaceGenerationWallet) {
+        public Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits,
+                       int liveCreditsPerHour, long available, long giftAvailable, long purchasedAvailable,
+                       long held, boolean memberActive, Instant memberUntil, PlanSnapshot plan, boolean canManage,
+                       boolean operator, PaymentInstructions payment, String paymentMethod) {
+            this(currencyName, creditsPerYuan, imageCredits, videoAnalysisCredits, liveCreditsPerHour, available,
+                    giftAvailable, purchasedAvailable, held, memberActive, memberUntil, plan, canManage, operator,
+                    payment, paymentMethod, null, GenerationWallet.PERSONAL);
+        }
+    }
+    public record GenerationTeam(String name, long available) {}
+    public enum GenerationWallet { PERSONAL, TEAM }
     public record PaymentInstructions(boolean available, String recipient, String account, String bank,
                                       String instructions, String qrCodeUrl) {}
     public record TopUp(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
@@ -52,7 +64,7 @@ public final class BillingDtos {
     public record Confirmation(@Min(1) long receivedAmountMinor,
                                @NotBlank @Size(min=6,max=150) String receiptReference) {}
     public record LedgerView(Long id, String type, String description, long availableDelta, long heldDelta,
-                             long availableAfter, long heldAfter, Instant createdAt, Long actorUserId) {}
+                             long availableAfter, long heldAfter, Instant createdAt, Long actorUserId, GenerationWallet billingWallet) {}
     /** kind 为 TOPUP、MEMBERSHIP 或 ACTIVATION_CODE；activationCode 只在激活码订单付款后才有。 */
     public record OrderView(String id, String kind, long amountMinor, long credits, String state,
                             PlanSnapshot plan, Instant createdAt, Instant expiresAt, Instant paidAt,
@@ -79,7 +91,7 @@ public final class BillingDtos {
     public record PlatformLedgerEntry(Long id, Long tenantId, String tenantName, Long actorUserId, String actorName,
                                       String type, String capability, String description, long availableDelta,
                                       long heldDelta, long availableAfter, Instant createdAt, String model,
-                                      Long elapsedMillis, String taskStatus, Long previewElapsedMillis) {}
+                                      Long elapsedMillis, String taskStatus, Long previewElapsedMillis, GenerationWallet billingWallet) {}
 
     /** 时间窗口内的全平台合计；consumed 只算实际扣除（CAPTURE），预占不算消耗。 */
     public record PlatformLedgerSummary(int days, long consumed, long consumedToday, long refunded, long purchased,

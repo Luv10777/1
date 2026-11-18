@@ -1,13 +1,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { BarChart3, Coins, ExternalLink, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldCheck, Store, TicketCheck, Users } from 'lucide-vue-next'
+import { BarChart3, ClipboardList, Coins, ExternalLink, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldCheck, Store, TicketCheck, Users } from 'lucide-vue-next'
 import { auth } from '../src/stores/auth.js'
 import { useNavigationProgress } from '../admin/navigation.js'
 import { partnerRoles } from '../src/domain/partnerOps.js'
 import { can, myName, partner } from './partnerStore.js'
 import YanhuoIcon from '../src/components/YanhuoIcon.vue'
 import NameDialog from './components/NameDialog.vue'
+import MemberIdentity from './components/MemberIdentity.vue'
 import brandMark from '../public/favicon.png'
 
 const number = value => Number(value || 0).toLocaleString('zh-CN')
@@ -35,6 +36,7 @@ const navigation = computed(() => [
   ] },
   { label: '管理', items: [
     { name: 'partner-credits', label: '烟火', description: '团队烟火、平台发放和分配记录', icon: Coins, show: can('finance') || can('distribute') },
+    { name: 'partner-task-logs', label: '任务日志', description: '团队烟火的创作消耗和商户分配', icon: ClipboardList, show: true },
     { name: 'partner-team', label: '团队', description: '成员、权限和称呼', icon: Users, show: true },
   ] },
 ].map(group => ({ ...group, items: group.items.filter(item => item.show) })).filter(group => group.items.length))
@@ -67,7 +69,7 @@ async function logout() {
         <div class="admin-topbar-actions" style="margin-left:auto">
           <a class="partner-balance partner-home" href="/" title="回到一方志创作"><ExternalLink :size="14" /><span class="partner-balance-label">一方志</span></a>
           <span class="partner-balance" :title="`团队烟火 ${number(partner.overview.account?.available)}：大家在一方志创作和分给商户都扣这里`" :aria-label="`团队烟火 ${number(partner.overview.account?.available)}`"><span class="partner-balance-label">团队烟火</span><YanhuoIcon :size="16" /><span class="mg-mono">{{ number(partner.overview.account?.available) }}</span></span>
-          <div class="admin-account"><button class="partner-account-name" type="button" title="修改团队称呼" @click="naming = true"><span class="admin-account-avatar">{{ (myName() || '服').slice(0, 1) }}</span><span>{{ myName() || '服务商成员' }}<small>{{ partnerRoles[partner.overview.role] || partner.overview.role }} · UID {{ auth.user?.uid || '—' }}</small></span></button><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div>
+          <div class="admin-account"><button class="partner-account-name" type="button" title="修改团队称呼" @click="naming = true"><span class="admin-account-avatar">{{ (myName() || '服').slice(0, 1) }}</span><span><MemberIdentity :number="partner.overview.memberNumber" :name="myName() || '服务商成员'" /><small>{{ partnerRoles[partner.overview.role] || partner.overview.role }} · UID {{ auth.user?.uid || '—' }}</small></span></button><button type="button" :disabled="signingOut" @click="logout"><LogOut :size="14" />退出</button></div>
         </div>
       </header>
       <main id="partner-main" class="admin-main" tabindex="-1"><RouterView v-slot="{ Component, route: page }"><Transition name="ad-page" mode="out-in"><component :is="Component" :key="page.name" /></Transition></RouterView></main>

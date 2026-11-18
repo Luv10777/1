@@ -1,5 +1,6 @@
 package com.wuyao.growth.creative.inspiration;
 
+import com.wuyao.growth.billing.BillingDtos;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -30,11 +31,11 @@ public final class ImageInspirationDtos {
     }
 
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
-                       Long previousId, Instant createdAt) {}
+                       Long previousId, Instant createdAt, BillingDtos.GenerationWallet billingWallet) {}
 
     /** 灵感记录里的一批方案，带上当初的素材和要求。图片已删除时 url 为空。 */
     public record History(Long id, String style, String idea, List<Image> images,
-                          List<Map<String, Object>> plans, Instant createdAt) {}
+                          List<Map<String, Object>> plans, Instant createdAt, BillingDtos.GenerationWallet billingWallet) {}
 
     public record Image(Long assetId, String name, String url) {}
 

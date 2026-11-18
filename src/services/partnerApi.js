@@ -29,6 +29,7 @@ export const partnerApi = {
   /** 有财务权限的可按 tenantId、actorUserId 筛；只有分配权限的只返回自己分出去的。 */
   distributions: values => get('/api/partner/distributions', params(values)),
   retryDistribution: id => post(`/api/partner/distributions/${encodeURIComponent(id)}/retry`, {}),
+  taskLogs: values => get('/api/partner/task-logs', params(values)),
   codes: values => get('/api/partner/codes', params(values)),
   createCodes: values => post('/api/partner/codes', values),
   voidCode: id => post(`/api/partner/codes/${encodeURIComponent(id)}/void`, {}),

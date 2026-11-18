@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import AppSelect from './AppSelect.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -48,7 +49,7 @@ onBeforeUnmount(() => { alive = false; sequence++; clearTimeout(timer) })
     <div :class="mode === 'works' ? 'records-grid' : 'records-list'">
       <article v-for="row in records" :key="row.id">
         <RouterLink v-if="mode === 'works'" :to="link(row)"><img :src="row.url" :alt="row.title" loading="lazy" /></RouterLink>
-        <div><strong>{{ row.title || row.brief || '商品图片创作' }}</strong><p>{{ new Date(row.createdAt).toLocaleString() }}<template v-if="mode === 'tasks'"> · {{ IMAGE_STATUS[row.status] }} · {{ row.completed }}/{{ row.count }} 张</template></p></div>
+        <div><strong>{{ row.title || row.brief || '商品图片创作' }}</strong><p>{{ new Date(row.createdAt).toLocaleString() }}<template v-if="mode === 'tasks'"> · {{ IMAGE_STATUS[row.status] }} · {{ row.completed }}/{{ row.count }} 张</template><template v-if="row.billingWallet"> · {{ billingWalletLabel(row.billingWallet) }}</template></p></div>
         <footer><RouterLink :to="link(row)">{{ mode === 'works' ? '查看与修改' : '查看任务' }}</RouterLink><button v-if="mode === 'works'" type="button" @click="download(row)">下载</button></footer>
       </article>
     </div>

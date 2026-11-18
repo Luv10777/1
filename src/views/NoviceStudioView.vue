@@ -1,8 +1,10 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowUp, AudioLines, Check, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
 import { useImageCreation } from '../composables/useImageCreation'
 import { useVideoWorkbench, videoRatioOptions, videoStageLabel } from '../composables/useVideoWorkbench'
 import { useImageInspiration } from '../composables/useImageInspiration'
@@ -385,6 +387,7 @@ function videoTags(item) {
             <div class="ns-reply">
               <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
               <p v-if="version.status !== 'SUCCEEDED'" class="ns-status" role="status"><i :class="{ live: isImageActive(version.status) }" />{{ imageStatusLabel(version) }}<template v-if="version.count > 1 && version.completed"> · {{ version.completed }}/{{ version.count }}</template></p>
+              <p v-if="version.billingWallet" class="ns-spent">{{ billingWalletLabel(version.billingWallet) }}</p>
               <div class="ns-images" :class="imageGridClass(version.count)" :style="{ '--ns-ratio': imageDimensions(version.quality, version.ratio).width + '/' + imageDimensions(version.quality, version.ratio).height }">
                 <template v-if="!version.items.length && (isImageActive(version.status) || version.status === 'NEEDS_INPUT')">
                   <div v-for="n in version.count" :key="n" class="ns-image is-placeholder" :class="{ 'is-working': version.status !== 'NEEDS_INPUT' }"><template v-if="version.status !== 'NEEDS_INPUT'"><span class="ns-brew" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></template><small>{{ version.status === 'NEEDS_INPUT' ? '等你补充信息' : '一方志正在画' }}</small></div>
@@ -448,6 +451,7 @@ function videoTags(item) {
             </template>
             <template v-else>
               <p class="ns-say">出了三个方向，挑一个「用这个」，描述会填进输入框，你还能再改。</p>
+              <p v-if="turn.batch?.billingWallet" class="ns-spent">{{ billingWalletLabel(turn.batch.billingWallet) }}</p>
               <div class="ns-plans">
                 <article v-for="(plan, planIndex) in turn.batch.plans" :key="planIndex" class="ns-plan-card" :class="{ applied: turn.applied === planIndex }">
                   <header><span class="ns-plan-letter">{{ videoPlanLetters[planIndex] }}</span><h3>{{ plan.title }}</h3></header>
@@ -502,7 +506,8 @@ function videoTags(item) {
               <button v-if="turn.convId === video.activeConversationId && conversationOf(turn).workflow?.id && !conversationOf(turn).submitting" type="button" class="ns-link is-danger" @click="video.cancelVideo">取消生成，退回未消耗烟火</button>
             </div>
             <p v-if="conversationOf(turn).notice" class="ns-note" :class="{ 'ns-error': conversationOf(turn).error }">{{ conversationOf(turn).notice }}</p>
-            <p v-if="conversationOf(turn).workflow?.chargedCredits != null" class="ns-spent"><YanhuoIcon :size="14" />本次消耗 {{ number(conversationOf(turn).workflow.chargedCredits) }}</p>
+            <p v-if="conversationOf(turn).workflow?.chargedCredits != null" class="ns-spent"><YanhuoIcon :size="14" />本次消耗 {{ number(conversationOf(turn).workflow.chargedCredits) }}<template v-if="conversationOf(turn).workflow.billingWallet"> · {{ billingWalletLabel(conversationOf(turn).workflow.billingWallet) }}</template></p>
+            <p v-else-if="conversationOf(turn).workflow?.billingWallet" class="ns-spent">{{ billingWalletLabel(conversationOf(turn).workflow.billingWallet) }}</p>
             <button v-if="turn.convId === video.activeConversationId && conversationOf(turn).workflow?.retryable" type="button" class="ns-chip" :disabled="conversationOf(turn).submitting" @click="video.retryVideo">预估恢复费用</button>
 
             <section v-if="turn.convId === video.activeConversationId && video.quoted" class="ns-card ns-quote" aria-labelledby="ns-quote-title">
@@ -515,11 +520,12 @@ function videoTags(item) {
                   <div><dt>实际模型</dt><dd>{{ video.quoted.quote.providerModel }}</dd></div>
                   <div><dt>预估用量</dt><dd>{{ number(video.quoted.quote.estimatedTokens) }} 视频 Token</dd></div>
                   <div><dt>费率核验</dt><dd>{{ dateTime(video.quoted.quote.verifiedAt) }}</dd></div>
-                  <div><dt>可用烟火</dt><dd>{{ billing.error ? '暂不可读' : number(billing.summary?.available || 0) }}</dd></div>
+                  <div v-if="video.quoted.retryId || !billing.summary?.generationTeam"><dt>{{ video.generationWallet === 'TEAM' ? '团队可用烟火' : '可用烟火' }}</dt><dd>{{ billing.error ? '暂不可读' : number(video.walletBalance) }}</dd></div>
                 </dl>
-                <p v-if="billing.summary && billing.summary.available < video.quoted.quote.credits" class="ns-error">烟火不足，请先充值。</p>
+                <GenerationWalletPicker v-if="!video.quoted.retryId" v-model="video.generationWallet" :disabled="video.quoteBusy" />
+                <p v-if="billing.summary && video.walletBalance < video.quoted.quote.credits" class="ns-error">所选余额的烟火不足。</p>
                 <div class="ns-quote-actions">
-                  <button type="button" class="ns-primary" :disabled="video.quoteBusy || !!billing.error || (billing.summary?.available || 0) < video.quoted.quote.credits" @click="video.confirmQuote">{{ video.quoteBusy ? '正在提交…' : '确认费用，开始生成' }}</button>
+                  <button type="button" class="ns-primary" :disabled="video.quoteBusy || !!billing.error || video.walletBalance < video.quoted.quote.credits" @click="video.confirmQuote">{{ video.quoteBusy ? '正在提交…' : '确认费用，开始生成' }}</button>
                   <button type="button" class="ns-link" :disabled="video.quoteBusy" @click="video.closeQuote">先不做</button>
                 </div>
               </template>
@@ -527,7 +533,7 @@ function videoTags(item) {
                 <p class="ns-error">{{ video.quoted.quote.message }}</p>
                 <button type="button" class="ns-link" @click="video.closeQuote">知道了</button>
               </template>
-              <RouterLink v-if="(billing.summary?.available || 0) < video.quoted.quote.credits" class="ns-link" to="/billing" @click="video.closeQuote">前往套餐与充值</RouterLink>
+              <RouterLink v-if="video.generationWallet === 'PERSONAL' && video.walletBalance < video.quoted.quote.credits" class="ns-link" to="/billing" @click="video.closeQuote">前往套餐与充值</RouterLink>
               <p v-if="video.quoteError" class="ns-error" role="alert">{{ video.quoteError }}</p>
             </section>
           </div>
@@ -551,6 +557,7 @@ function videoTags(item) {
           </div>
           <button type="button" class="ns-idea-button" :class="{ active: ideaMode }" :aria-pressed="ideaMode" @click="toggleIdeas"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案<X v-if="ideaMode" :size="13" :stroke-width="2" aria-hidden="true" /></button>
         </div>
+        <GenerationWalletPicker v-if="mode === 'image' && !ideaMode" v-model="studio.generationWallet" :disabled="studio.busy || !!studio.pending" />
         <Transition name="ns-swap">
           <p v-if="ideaMode" class="ns-idea-hint">{{ answering ? '一方志想先确认一件事，回答后接着写方案。' : '说一句想要什么，一方志先出 3 个方向给你挑，挑中的再去生成。' }}</p>
         </Transition>

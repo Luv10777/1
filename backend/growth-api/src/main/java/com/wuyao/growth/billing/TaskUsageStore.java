@@ -27,12 +27,14 @@ public class TaskUsageStore {
 
     static final String REPORT = """
         WITH settlements AS (
-            SELECT reservation_id,
-                   SUM(CASE WHEN type='CAPTURE' THEN -held_delta ELSE 0 END) AS charged,
-                   SUM(held_delta) AS held,
-                   SUM(CASE WHEN type='RELEASE' THEN -held_delta ELSE 0 END) AS released,
-                   MAX(created_at) FILTER (WHERE type IN ('CAPTURE','RELEASE')) AS settled_at
-            FROM billing_ledger WHERE tenant_id=:tenant AND reservation_id IS NOT NULL GROUP BY reservation_id
+            SELECT r.id AS reservation_id,
+                   SUM(CASE WHEN l.type='CAPTURE' THEN -l.held_delta ELSE 0 END) AS charged,
+                   SUM(l.held_delta) AS held,
+                   SUM(CASE WHEN l.type='RELEASE' THEN -l.held_delta ELSE 0 END) AS released,
+                   MAX(l.created_at) FILTER (WHERE l.type IN ('CAPTURE','RELEASE')) AS settled_at
+            FROM billing_reservations r
+            JOIN billing_ledger l ON l.reservation_id=r.id AND l.tenant_id=COALESCE(r.payer_tenant_id,r.tenant_id)
+            WHERE r.tenant_id=:tenant GROUP BY r.id
         ), image_items_scoped AS (
         """ + IMAGE_ITEMS + """
         ), image_counts AS (
@@ -141,10 +143,13 @@ public class TaskUsageStore {
         ), settled_logs AS (
             SELECT s.*, CASE WHEN s.reservation_id IS NULL THEN NULL ELSE COALESCE(b.charged,0) END AS charged,
                    COALESCE(b.held,0) AS held, COALESCE(b.released,0) AS released,
+                   CASE WHEN r.id IS NOT NULL THEN
+                       CASE WHEN r.payer_tenant_id IS NOT NULL THEN 'TEAM' ELSE 'PERSONAL' END END AS billing_wallet,
                    CASE WHEN s.previewed_at IS NOT NULL THEN s.previewed_at
                         WHEN s.status NOT IN ('RUNNING','NEEDS_INPUT')
                         THEN GREATEST(s.source_finished_at,b.settled_at) END AS finished_at
             FROM sources s LEFT JOIN settlements b ON b.reservation_id=s.reservation_id
+            LEFT JOIN billing_reservations r ON r.id=s.reservation_id AND r.tenant_id=:tenant
         ), logs AS (
             SELECT s.*, CASE WHEN s.status NOT IN ('RUNNING','NEEDS_INPUT') AND s.finished_at IS NULL THEN NULL
                         ELSE GREATEST(0,EXTRACT(EPOCH FROM (COALESCE(s.finished_at,CURRENT_TIMESTAMP)-s.created_at))*1000)::bigint
@@ -166,19 +171,24 @@ public class TaskUsageStore {
                      i.model, i.effective_status AS status, i.reused,
                      CASE WHEN i.previewed_at IS NULL THEN i.error END AS error,
                      CASE WHEN c.billing_reservation_id IS NULL THEN NULL ELSE COALESCE((
-                         SELECT SUM(-l.held_delta) FROM billing_ledger l WHERE l.tenant_id=:tenant
-                         AND l.reservation_id=c.billing_reservation_id AND l.type='CAPTURE'
-                         AND split_part(l.event_key,':',1)='image-delivered'
-                         AND split_part(l.event_key,':',2)=i.id::text),0) END AS charged
+                         SELECT SUM(-l.held_delta) FROM billing_ledger l
+                         WHERE l.tenant_id=COALESCE(r.payer_tenant_id,r.tenant_id)
+                           AND l.reservation_id=r.id AND l.type='CAPTURE'
+                           AND starts_with(l.event_key,
+                               CASE WHEN l.generation_capability IS NOT NULL THEN 'generation:'||r.tenant_id||':' ELSE '' END
+                               ||'image-delivered:'||i.id||':')),0) END AS charged
               FROM image_items_scoped i JOIN image_creations c ON c.id=i.creation_id AND c.tenant_id=i.tenant_id
+              LEFT JOIN billing_reservations r ON r.id=c.billing_reservation_id AND r.tenant_id=c.tenant_id
               WHERE i.creation_id=:creation ORDER BY i.ordinal,i.id
             """, Map.of("tenant",tenant,"creation",creation));
     }
 
     List<Tuple> events(String reservation, long tenant) {
         return query("""
-            SELECT id,type,ABS(held_delta) AS credits,description,created_at FROM billing_ledger
-            WHERE tenant_id=:tenant AND reservation_id=:reservation ORDER BY id
+            SELECT l.id,l.type,ABS(l.held_delta) AS credits,l.description,l.created_at
+            FROM billing_reservations r
+            JOIN billing_ledger l ON l.reservation_id=r.id AND l.tenant_id=COALESCE(r.payer_tenant_id,r.tenant_id)
+            WHERE r.tenant_id=:tenant AND r.id=:reservation ORDER BY l.id
             """, Map.of("tenant",tenant,"reservation",reservation));
     }
 

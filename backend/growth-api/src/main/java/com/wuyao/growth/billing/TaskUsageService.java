@@ -58,17 +58,18 @@ public class TaskUsageService {
 
     @Transactional(readOnly=true, isolation=Isolation.REPEATABLE_READ)
     public TaskUsageDtos.Detail detail(String id) {
-        if(!id.matches("(image|video|analysis|plan)-[1-9][0-9]{0,18}")) throw bad("任务标识无效");
+        if(!id.matches("(image|video|analysis|plan|inspiration|copy)-[1-9][0-9]{0,18}")) throw bad("任务标识无效");
         long tenant=TenantContext.require();
         var rows=store.report("SELECT *","WHERE id=:id",java.util.Map.of("tenant",tenant,"id",id));
         if(rows.isEmpty()) throw BizException.of(ErrorCode.NOT_FOUND,"任务记录不存在");
         var row=rows.getFirst(); var task=log(row);
         var items=task.module().equals("IMAGE_GENERATION") ? store.items(task.taskId(),tenant).stream().map(i->new TaskUsageDtos.Item(
             number(i,"id"),(int)number(i,"ordinal")+1,string(i,"title"),"一方志Image",string(i,"status"),
-            nullableNumber(i,"charged"),Boolean.TRUE.equals(i.get("reused")),string(i,"error"))).toList() : List.<TaskUsageDtos.Item>of();
+            nullableNumber(i,"charged"),Boolean.TRUE.equals(i.get("reused")),string(i,"error"),
+            Boolean.TRUE.equals(i.get("reused"))?null:task.billingWallet())).toList() : List.<TaskUsageDtos.Item>of();
         String reservation=string(row,"reservation_id");
         var events=reservation==null ? List.<TaskUsageDtos.Event>of() : store.events(reservation,tenant).stream().map(e->
-            new TaskUsageDtos.Event(number(e,"id"),string(e,"type"),number(e,"credits"),string(e,"description"),instant(e,"created_at"))).toList();
+            new TaskUsageDtos.Event(number(e,"id"),string(e,"type"),number(e,"credits"),string(e,"description"),instant(e,"created_at"),task.billingWallet())).toList();
         return new TaskUsageDtos.Detail(task,items,events);
     }
 
@@ -77,7 +78,9 @@ public class TaskUsageService {
         return new TaskUsageDtos.Log(string(r,"id"),number(r,"task_id"),string(r,"module"),string(r,"workflow"),string(r,"title"),
             string(r,"model"),string(r,"status"),instant(r,"created_at"),quantity,succeeded,failed,cancelled,
             Math.max(0,quantity-succeeded-failed-cancelled),string(r,"unit"),nullableNumber(r,"charged"),number(r,"held"),number(r,"released"),
-            string(r,"resolution"),r.get("duration_seconds")==null?null:(int)number(r,"duration_seconds"),string(r,"error"),nullableNumber(r,"elapsed_millis"),nullableNumber(r,"preview_elapsed_millis"));
+            string(r,"resolution"),r.get("duration_seconds")==null?null:(int)number(r,"duration_seconds"),string(r,"error"),
+            nullableNumber(r,"elapsed_millis"),nullableNumber(r,"preview_elapsed_millis"),
+            r.get("billing_wallet")==null?null:BillingDtos.GenerationWallet.valueOf(string(r,"billing_wallet")));
     }
     private static long number(Tuple r,String key) { return ((Number)r.get(key)).longValue(); }
     private static Long nullableNumber(Tuple r,String key) { return r.get(key)==null?null:number(r,key); }

@@ -1,5 +1,6 @@
 package com.wuyao.growth.video.plan;
 
+import com.wuyao.growth.billing.BillingDtos;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -46,11 +47,12 @@ public final class VideoPlanDtos {
     }
 
     public record View(Long id, String status, List<Map<String, Object>> plans, String errorMessage,
-                       Long previousPlanId, Instant createdAt, String sceneKey, String phase, Map<String, Object> clarification) {}
+                       Long previousPlanId, Instant createdAt, String sceneKey, String phase, Map<String, Object> clarification,
+                       BillingDtos.GenerationWallet billingWallet) {}
 
     /** 灵感记录里的一批方案，带上当初的素材和要求，方便再看或换回这些参考图复用。图片已删除时 url 为空。 */
     public record History(Long id, String style, String idea, boolean referenceVideo, List<Image> images,
-                         List<Map<String, Object>> plans, Instant createdAt, String sceneKey) {}
+                         List<Map<String, Object>> plans, Instant createdAt, String sceneKey, BillingDtos.GenerationWallet billingWallet) {}
 
     public record Image(Long assetId, String name, String url) {}
 

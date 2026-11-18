@@ -10,12 +10,14 @@ public final class TaskUsageDtos {
     public record Log(String id, Long taskId, String module, String workflow, String title, String model,
                       String status, Instant createdAt, int quantity, int succeeded, int failed, int cancelled,
                       int pending, String unit, Long chargedCredits, long heldCredits, long releasedCredits,
-                      String resolution, Integer durationSeconds, String error, Long elapsedMillis, Long previewElapsedMillis) {}
+                      String resolution, Integer durationSeconds, String error, Long elapsedMillis, Long previewElapsedMillis,
+                      BillingDtos.GenerationWallet billingWallet) {}
     public record Summary(long tasks, long chargedCredits, long heldCredits, long releasedCredits,
                           long succeeded, long failed) {}
     public record Logs(PageResult<Log> records, Summary summary) {}
     public record Item(Long id, int ordinal, String title, String model, String status, Long chargedCredits,
-                       boolean reused, String error) {}
-    public record Event(Long id, String type, long credits, String description, Instant createdAt) {}
+                       boolean reused, String error, BillingDtos.GenerationWallet billingWallet) {}
+    public record Event(Long id, String type, long credits, String description, Instant createdAt,
+                        BillingDtos.GenerationWallet billingWallet) {}
     public record Detail(Log task, List<Item> items, List<Event> events) {}
 }

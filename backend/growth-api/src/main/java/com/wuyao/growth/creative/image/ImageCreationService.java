@@ -9,6 +9,7 @@ import com.wuyao.growth.common.storage.ObjectStorage;
 import com.wuyao.growth.common.task.*;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.billing.BillingService;
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.web.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,11 +64,15 @@ public class ImageCreationService {
  }
  @Transactional
  public ImageDtos.View create(ImageDtos.Create request,Long userId) {
-   billing.lockForGeneration();return createVersion(request,userId,null,null);}
- private ImageDtos.View createVersion(ImageDtos.Create req,Long userId,Long parent,String variation) {
+    return create(request,userId,null);
+  }
+  @Transactional
+  public ImageDtos.View create(ImageDtos.Create request,Long userId,GenerationWallet wallet) {
+    billing.lockForGeneration();return createVersion(request,userId,null,null,wallet);}
+  private ImageDtos.View createVersion(ImageDtos.Create req,Long userId,Long parent,String variation,GenerationWallet wallet) {
    Long tenantId = TenantContext.require();
    creations.lockRequest(tenantId + ":" + req.requestKey());
-       String hash=variation==null?hash(req,parent):hash(List.of(req,variation),parent);
+       String hash=paymentHash(variation==null?req:List.of(req,variation),parent,wallet);
        var old=creations.findByRequestKey(req.requestKey());
        if(old.isPresent()) {
          if(!hash.equals(old.get().getRequestHash())) throw bad("同一提交标识不能用于不同的创作内容");
@@ -84,8 +89,8 @@ public class ImageCreationService {
    acquirePermit(tenantId);
    var c=new ImageCreation(); c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(parent);c.setVariation(variation);c.setRequest(req);c.setRequestKey(req.requestKey());c.setRequestHash(hash);
-   c.setBillingReservationId(billing.reserve("image-create:"+req.requestKey(),"IMAGE",
-       Math.multiplyExact(req.count(),BillingService.IMAGE_CREDITS),"图片创作 · 预占 "+req.count()+" 张"));
+    c.setBillingReservationId(reserveImage(req.requestKey(),
+        Math.multiplyExact(req.count(),BillingService.IMAGE_CREDITS),"图片创作 · 预占 "+req.count()+" 张",wallet));
    creations.saveAndFlush(c);
    var task=tasks.submit("IMAGE_PLAN","DEFAULT",Map.of("creationId",c.getId()),"image-plan-"+c.getId(),userId);
    c.setTaskId(task.getId());
@@ -102,13 +107,13 @@ public class ImageCreationService {
      throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,"当前中转站不支持该比例的图片输出，请调整比例");
  }
  @Transactional
- public ImageDtos.View revise(Long id,ImageDtos.Revision revision,Long userId) {
+  public ImageDtos.View revise(Long id,ImageDtos.Revision revision,Long userId,GenerationWallet wallet) {
    billing.lockForGeneration();
    var c=find(id);var r=c.getRequest();
    String brief=r.brief()+"\n本次修改："+revision.instruction();
    if(brief.length()>2000) throw bad("修改历史过长，请新建创作");
    return createVersion(new ImageDtos.Create(revision.requestKey(),r.workflow(),brief,r.references(),r.ratio(),
-     r.quality(),r.count(),r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId()),userId,id,revision.variation());
+      r.quality(),r.count(),r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId()),userId,id,revision.variation(),wallet);
  }
  @Transactional(readOnly=true)
  public ImageDtos.View get(Long id) {return view(find(id));}
@@ -184,7 +189,7 @@ public class ImageCreationService {
      var preview=v.items().stream().filter(i->i.url()!=null).findFirst();
      return new ImageDtos.History(latest.getId(),latest.getRequest().workflow(),title(c),latest.getRequest().brief(),
        latest.getRequest().quality(),c.getCreatedAt(),v.status(),v.completed(),v.count(),
-       preview.map(ImageDtos.ItemView::url).orElse(null),preview.map(ImageDtos.ItemView::thumbUrl).orElse(null));
+       preview.map(ImageDtos.ItemView::url).orElse(null),preview.map(ImageDtos.ItemView::thumbUrl).orElse(null),v.billingWallet());
    }).toList());
  }
  private ImageCreation latestVersion(ImageCreation creation) {
@@ -210,7 +215,8 @@ public class ImageCreationService {
        storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30)),c.getRequest().quality(),
        i.getActualWidth()==null?d.width():i.getActualWidth(),
        i.getActualHeight()==null?d.height():i.getActualHeight(),i.getCreatedAt(),
-       storage.presignGet(ImageRenderer.thumbnailKey(i.getOutputKey()),Duration.ofMinutes(30)));
+       storage.presignGet(ImageRenderer.thumbnailKey(i.getOutputKey()),Duration.ofMinutes(30)),
+       i.getTaskId()==null?null:billing.generationWallet(c.getBillingReservationId()));
    }).toList());
  }
  @Transactional
@@ -263,6 +269,10 @@ public class ImageCreationService {
  }
  @Transactional
  public ImageDtos.View editText(Long id,Long itemId,ImageDtos.TextEdit edit,Long userId) {
+    return editText(id,itemId,edit,userId,null);
+  }
+  @Transactional
+  public ImageDtos.View editText(Long id,Long itemId,ImageDtos.TextEdit edit,Long userId,GenerationWallet wallet) {
    billing.lockForGeneration();
    var original=find(id);
    var source=items.findById(itemId).orElseThrow(()->bad("图片不存在"));
@@ -271,7 +281,7 @@ public class ImageCreationService {
    String brief="修改文字："+edit.headline()+"\n"+edit.caption();
    var req=new ImageDtos.Create(edit.requestKey(),r.workflow(),brief,r.references(),r.ratio(),r.quality(),1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
    creations.lockRequest(TenantContext.require()+":"+edit.requestKey());
-   String hash=hash(req,itemId);
+    String hash=paymentHash(req,itemId,wallet);
    var previous=creations.findByRequestKey(edit.requestKey());
    if(previous.isPresent()) {
      if(!hash.equals(previous.get().getRequestHash())) throw bad("提交标识已被使用");
@@ -283,7 +293,7 @@ public class ImageCreationService {
    var spec=new ImageDtos.Spec(source.getSpec().role(),"参考原图修改文字，尽量保持主体、构图、色彩与风格；去除旧标题和说明，按新的文案重新设计文字。",edit.headline(),edit.caption(),source.getId());
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(edit.requestKey());c.setRequestHash(hash);c.setRequest(req);
-   c.setBillingReservationId(billing.reserve("image-create:"+edit.requestKey(),"IMAGE",BillingService.IMAGE_CREDITS,"图片文字修改 · 预占 1 张"));
+    c.setBillingReservationId(reserveImage(edit.requestKey(),BillingService.IMAGE_CREDITS,"图片文字修改 · 预占 1 张",wallet));
    c.setPlan(new ImageDtos.Plan("参考原图修改文字，局部画面可能变化","",original.getPlan().visualDirection(),List.of(spec)));c.setStatus("GENERATING");creations.saveAndFlush(c);
    var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(c.getId());i.setSpec(spec);
    i.setBillingHeld(true);
@@ -292,6 +302,10 @@ public class ImageCreationService {
  }
  @Transactional
  public ImageDtos.View regenerate(Long id,Long itemId,String requestKey,String variation,Long userId) {
+    return regenerate(id,itemId,requestKey,variation,userId,null);
+  }
+  @Transactional
+  public ImageDtos.View regenerate(Long id,Long itemId,String requestKey,String variation,Long userId,GenerationWallet wallet) {
    billing.lockForGeneration();
    var original=find(id);
    var originals=items.findByCreationIdOrderByOrdinal(id);
@@ -303,11 +317,11 @@ public class ImageCreationService {
      var r=original.getRequest();
      var req=new ImageDtos.Create(requestKey,r.workflow(),r.brief(),r.references(),r.ratio(),r.quality(),
        1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
-     return createVersion(req,userId,id,direction);
+      return createVersion(req,userId,id,direction,wallet);
    }
    if(variation!=null) throw bad("产品套图不支持该换版方向");
    creations.lockRequest(TenantContext.require()+":"+requestKey);
-   String fingerprint=hash(List.of("regenerate",id,itemId),id);
+    String fingerprint=paymentHash(List.of("regenerate",id,itemId),id,wallet);
    var previous=creations.findByRequestKey(requestKey);
    if(previous.isPresent()) {
      if(!fingerprint.equals(previous.get().getRequestHash())) throw bad("提交标识已被使用");
@@ -318,7 +332,7 @@ public class ImageCreationService {
    acquirePermit(tenantId);
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(requestKey);c.setRequestHash(fingerprint);
-   c.setBillingReservationId(billing.reserve("image-create:"+requestKey,"IMAGE",BillingService.IMAGE_CREDITS,"重新生成图片 · 预占 1 张"));
+    c.setBillingReservationId(reserveImage(requestKey,BillingService.IMAGE_CREDITS,"重新生成图片 · 预占 1 张",wallet));
    c.setRequest(original.getRequest());c.setPlan(original.getPlan());c.setStatus("GENERATING");creations.saveAndFlush(c);
    for(var source:originals) {
      var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(c.getId());
@@ -332,6 +346,14 @@ public class ImageCreationService {
      if(source.getId().equals(itemId)) enqueue(i,c,"regenerate",0);
    }
    return view(c);
+ }
+ private String reserveImage(String requestKey,long credits,String description,GenerationWallet wallet) {
+   String key="image-create:"+requestKey;
+   return wallet==GenerationWallet.TEAM ? billing.reserve(key,"IMAGE",credits,description,wallet)
+     : billing.reserve(key,"IMAGE",credits,description);
+ }
+ private String paymentHash(Object request,Long parent,GenerationWallet wallet) {
+   return hash(wallet==GenerationWallet.TEAM?List.of(request,wallet):request,parent);
  }
  private String hash(Object request,Long parent) {
    try {return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
@@ -755,6 +777,6 @@ public class ImageCreationService {
    return new ImageDtos.View(c.getId(),c.getParentId(),c.getRequest().workflow(),c.getRequest().brief(),
      c.getRequest().quality(),c.getRequest().ratio(),state,c.getPlan()==null?"":c.getPlan().summary(),
      c.getPlan()==null?"":c.getPlan().question(),state.equals("INTERRUPTED")?"规划任务中断，可恢复重试":CustomerMessages.plain(c.getError(),"这次创作没有完成，可以重试。"),
-     done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId(),referenceViews(c));
+     done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId(),referenceViews(c),billing.generationWallet(c.getBillingReservationId()));
  }
 }

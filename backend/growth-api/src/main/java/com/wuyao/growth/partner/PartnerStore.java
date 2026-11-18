@@ -27,7 +27,7 @@ class PartnerStore {
      * 服务商的一个登录账号。role 为 OWNER（负责人，全部权限）或 MEMBER（成员，按 perms）；
      * monthlyCap 是成员每月最多分出的烟火，空表示不限；displayName 是团队里的称呼，空表示还没填。
      */
-    record MemberRow(Long userId, String role, Perms perms, Long monthlyCap, String displayName, Instant createdAt) {
+    record MemberRow(Long userId, String role, Perms perms, Long monthlyCap, String displayName, Instant createdAt, Long memberNumber) {
         boolean owner() { return "OWNER".equals(role); }
         Perms effective() { return owner() ? Perms.ALL : perms; }
     }
@@ -56,8 +56,12 @@ class PartnerStore {
     record CodeStats(long generated, long redeemed, long voided, long renewals) {}
 
     private static final String PARTNER_COLUMNS = "p.id, p.name, p.contact, p.status, p.team_tenant_id, p.created_at";
-    private static final String MEMBER_COLUMNS = "user_id, role, can_tenants, can_codes, can_distribute, can_finance, can_team, "
-            + "distribute_monthly_cap, display_name, created_at";
+    private static final String MEMBERS = """
+            SELECT m.user_id, m.role, m.can_tenants, m.can_codes, m.can_distribute, m.can_finance, m.can_team,
+                   m.distribute_monthly_cap, m.display_name, m.created_at, n.member_number
+            FROM partner_members m
+            JOIN partner_member_numbers n ON n.partner_id=m.partner_id AND n.user_id=m.user_id
+            """;
 
     @Transactional(readOnly = true)
     public Optional<Access> accessOfUser(Long userId) {
@@ -107,7 +111,7 @@ class PartnerStore {
     /** 负责人在前，其余按加入先后。 */
     @Transactional(readOnly = true)
     public List<MemberRow> members(Long partnerId) {
-        List<?> rows = em.createNativeQuery("SELECT " + MEMBER_COLUMNS + " FROM partner_members WHERE partner_id = :id ORDER BY role = 'OWNER' DESC, created_at, user_id")
+        List<?> rows = em.createNativeQuery(MEMBERS + " WHERE m.partner_id = :id ORDER BY m.role = 'OWNER' DESC, m.created_at, m.user_id")
                 .setParameter("id", partnerId).getResultList();
         return rows.stream().map(r -> memberRow((Object[]) r)).toList();
     }
@@ -115,14 +119,29 @@ class PartnerStore {
     /** 该账号在这家服务商的身份；不是这家的账号时为空。 */
     @Transactional(readOnly = true)
     public Optional<MemberRow> member(Long partnerId, Long userId) {
-        List<?> rows = em.createNativeQuery("SELECT " + MEMBER_COLUMNS + " FROM partner_members WHERE partner_id = :partner AND user_id = :user")
+        List<?> rows = em.createNativeQuery(MEMBERS + " WHERE m.partner_id = :partner AND m.user_id = :user")
                 .setParameter("partner", partnerId).setParameter("user", userId).getResultList();
         return rows.stream().map(r -> memberRow((Object[]) r)).findFirst();
     }
 
     private static MemberRow memberRow(Object[] r) {
         return new MemberRow(num(r[0]), (String) r[1], new Perms((Boolean) r[2], (Boolean) r[3], (Boolean) r[4], (Boolean) r[5], (Boolean) r[6]),
-                r[7] == null ? null : num(r[7]), (String) r[8], instant(r[9]));
+                r[7] == null ? null : num(r[7]), (String) r[8], instant(r[9]), num(r[10]));
+    }
+
+    record NumberedMember(Long number, String name) {}
+
+    @Transactional(readOnly = true)
+    Map<Long, NumberedMember> numberedMembers(Long partnerId) {
+        var result = new HashMap<Long, NumberedMember>();
+        for (var row : (List<?>) em.createNativeQuery("""
+                SELECT n.user_id, n.member_number, COALESCE(n.display_name, u.name)
+                FROM partner_member_numbers n JOIN users u ON u.id=n.user_id WHERE n.partner_id=:partner
+                """).setParameter("partner", partnerId).getResultList()) {
+            var values = (Object[]) row;
+            result.put(num(values[0]), new NumberedMember(num(values[1]), (String) values[2]));
+        }
+        return result;
     }
 
     /** 改成员的权限和每月分配上限（负责人的这几列不起作用）。 */

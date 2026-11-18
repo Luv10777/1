@@ -150,7 +150,7 @@ public class CopyService {
                 b.getId(), b.getPlatform(), b.getStyle(), b.getStatus(), firstLine(b), thumbnail(b),
                 !b.getImageAssetIds().isEmpty() || !b.getWorkItemIds().isEmpty(),
                 b.getCreatedBy() == null || b.getCreatedBy().equals(userId) ? null : names.get(b.getCreatedBy()),
-                finalized.contains(b.getId()), b.getErrorMessage(), b.getCreatedAt())).toList());
+                finalized.contains(b.getId()), b.getErrorMessage(), b.getCreatedAt(), billing.generationWallet(b.getBillingReservationId()))).toList());
     }
 
     @Transactional
@@ -338,7 +338,7 @@ public class CopyService {
         var store = stores.profile(b.getStoreId()).map(CopyContexts::storeValues).orElse(Map.of());
         return new CopyDtos.View(b.getId(), b.getStoreId(), b.getStatus(), b.getPlatform(), b.getStyle(), b.getStoreLevel(),
                 b.isVoiceOn(), b.getNote(), pictures, b.getProducts(), b.getPreviousBatchId(), b.getVersions(), finalized,
-                b.getRewriteCount(), REWRITE_LIMIT, store, b.getErrorMessage(), b.getCreatedAt());
+                b.getRewriteCount(), REWRITE_LIMIT, store, b.getErrorMessage(), b.getCreatedAt(), billing.generationWallet(b.getBillingReservationId()));
     }
 
     private String thumbnail(CopyBatch b) {

@@ -12,6 +12,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,12 +73,53 @@ class TaskUsageIntegrationTest {
         assertThat(report.summary().releasedCredits()).isEqualTo(3);
         assertThat(report.summary().heldCredits()).isZero();
         var row=report.records().items().getFirst();
+        assertThat(row.billingWallet()).isEqualTo(BillingDtos.GenerationWallet.PERSONAL);
         assertThat(row.quantity()).isEqualTo(4); assertThat(row.succeeded()).isEqualTo(3);
         assertThat(row.failed()).isEqualTo(1); assertThat(row.status()).isEqualTo("PARTIAL");
         var detail=TenantContext.runAs(tenant,()->usage.detail("image-"+id));
         assertThat(detail.items()).extracting(TaskUsageDtos.Item::chargedCredits).containsExactly(3L,3L,3L,0L);
         assertThat(detail.items().getLast().id()).isEqualTo(failed);
         assertThat(detail.events()).extracting(TaskUsageDtos.Event::type).containsExactly("RESERVE","CAPTURE","CAPTURE","CAPTURE","RELEASE");
+    }
+
+    @Test void teamPaidImagesShowSettlementsInTheirWorkspaceWithoutExposingOtherTeamActivity() {
+        long partner=owner.queryForObject("INSERT INTO partners(name,team_tenant_id,created_by) VALUES ('Team',?,?) RETURNING id",
+            Long.class,otherTenant,user);
+        owner.update("INSERT INTO partner_members(user_id,partner_id,created_by,role) VALUES (?,?,?,'OWNER')",user,partner,user);
+        var original=SecurityContextHolder.getContext();
+        var context=SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
+            new com.wuyao.growth.common.security.AuthPrincipal(user,tenant,"",0),null,List.of()));
+        String reservation;
+        try {
+            SecurityContextHolder.setContext(context);
+            reservation=TenantContext.runAs(tenant,()->billing.reserve("team-image","IMAGE",6,"Test hold",BillingDtos.GenerationWallet.TEAM));
+        } finally {
+            SecurityContextHolder.setContext(original);
+        }
+        String directTeam=TenantContext.runAs(otherTenant,()->billing.reserve("team-direct","IMAGE",3,"Direct team hold"));
+        long otherImage=image(otherTenant,"team-direct",1,null,directTeam,"GENERATING",null);
+        long id=image(tenant,"team-image",2,null,reservation,"GENERATING",null);
+        long delivered=item(id,0,"SUCCEEDED",1L);
+        item(id,1,"FAILED",1L);
+        capture(reservation,3,"image-delivered:"+delivered+":0");
+        TenantContext.runAs(tenant,()->{ billing.release(reservation,"test-team-release","Failed image refund"); return null; });
+
+        var report=logs(null,null,null,null,null,0,20);
+        assertThat(report.records().items()).singleElement().satisfies(row->{
+            assertThat(row.billingWallet()).isEqualTo(BillingDtos.GenerationWallet.TEAM);
+            assertThat(row.chargedCredits()).isEqualTo(3);
+            assertThat(row.releasedCredits()).isEqualTo(3);
+            assertThat(row.heldCredits()).isZero();
+        });
+        var detail=TenantContext.runAs(tenant,()->usage.detail("image-"+id));
+        assertThat(detail.items()).extracting(TaskUsageDtos.Item::chargedCredits).containsExactly(3L,0L);
+        assertThat(detail.items()).extracting(TaskUsageDtos.Item::billingWallet).containsOnly(BillingDtos.GenerationWallet.TEAM);
+        assertThat(detail.events()).extracting(TaskUsageDtos.Event::type).containsExactly("RESERVE","CAPTURE","RELEASE");
+        assertThat(detail.events()).extracting(TaskUsageDtos.Event::billingWallet).containsOnly(BillingDtos.GenerationWallet.TEAM);
+        assertThatThrownBy(()->TenantContext.runAs(tenant,()->usage.detail("image-"+otherImage))).isInstanceOf(BizException.class);
+        assertThat(TenantContext.runAs(otherTenant,()->usage.detail("image-"+otherImage)).task().billingWallet())
+            .isEqualTo(BillingDtos.GenerationWallet.TEAM);
     }
 
     @Test void imagePreviewAppearsBeforePersistenceAndLoadAcknowledgementIsIsolatedAndIdempotent() throws Exception {

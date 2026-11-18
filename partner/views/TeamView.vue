@@ -6,6 +6,7 @@ import { number, partnerRoles, permissionText } from '../../src/domain/partnerOp
 import { can, loadTeam, partner } from '../partnerStore.js'
 import MemberDrawer from '../components/MemberDrawer.vue'
 import AddMemberModal from '../components/AddMemberModal.vue'
+import MemberIdentity from '../components/MemberIdentity.vue'
 
 // 团队：成员都是团队账户的员工，在一方志创作用的是团队烟火；在这里按权限做事。点一行看详情，有团队管理权限的可以加人、改权限、移除。
 const loading = ref(false)
@@ -54,7 +55,7 @@ load()
             <thead><tr><th>成员</th><th>角色</th><th>权限</th><th class="code-number">本月分配</th><th class="code-number">加的商户</th><th class="code-number">激活码 生成 / 兑换</th><th>加入时间</th></tr></thead>
             <tbody>
               <tr v-for="m in partner.team" :key="m.userId" class="partner-row" tabindex="0" @click="openId = m.userId" @keydown.enter="openId = m.userId">
-                <td><span>{{ m.displayName || m.name || '未填写' }}</span><small>{{ m.displayName && m.name && m.name !== m.displayName ? `${m.name} · ` : '' }}UID {{ m.uid || '—' }}</small></td>
+                <td><MemberIdentity :number="m.memberNumber" :name="m.displayName || m.name" /><small>{{ m.displayName && m.name && m.name !== m.displayName ? `${m.name} · ` : '' }}UID {{ m.uid || '—' }}</small></td>
                 <td><span class="partner-pill" :class="{ bd: m.role === 'OWNER' }">{{ partnerRoles[m.role] || m.role }}</span></td>
                 <td>{{ permissionText(m) }}</td>
                 <td class="code-number mg-mono">{{ number(m.distributedThisMonth) }}<small v-if="m.monthlyCap"> / {{ number(m.monthlyCap) }}</small></td>

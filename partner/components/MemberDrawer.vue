@@ -9,6 +9,7 @@ import { can, loadPartner, partner } from '../partnerStore.js'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 import PermissionPicker from './PermissionPicker.vue'
+import MemberIdentity from './MemberIdentity.vue'
 
 /**
  * 团队成员详情：他做了什么（加的商户、激活码、本月分配）。有团队管理权限的人可以改他的权限和称呼、把他移出团队；
@@ -66,6 +67,7 @@ async function remove() {
 <template>
   <PartnerPanel :open="Boolean(member)" :busy="busy" :title="label || '成员'" :eyebrow="member ? `UID ${member.uid || '—'}` : ''" @close="emit('close')">
     <template v-if="member" #summary>
+      <MemberIdentity :number="member.memberNumber" :name="label" />
       <span class="partner-pill" :class="{ bd: member.role === 'OWNER' }">{{ partnerRoles[member.role] || member.role }}</span>
       <span v-if="member.name && member.name !== member.displayName">账号名 {{ member.name }}</span>
       <span>加入于 {{ managementDate(member.createdAt) }}</span>

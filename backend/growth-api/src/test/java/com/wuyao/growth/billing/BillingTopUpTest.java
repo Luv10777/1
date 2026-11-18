@@ -15,7 +15,7 @@ class BillingTopUpTest {
     private final AlipayGateway alipay=mock(AlipayGateway.class);
     private final BillingProperties config=new BillingProperties();
     private final BillingService billing=new BillingService(store,config,mock(com.wuyao.growth.backoffice.BackofficeAccess.class),mock(WechatPayGateway.class),alipay,
-        mock(ApplicationEventPublisher.class));
+        mock(ApplicationEventPublisher.class),mock(TeamGenerationWallet.class));
 
     @BeforeEach void setup() {
         TenantContext.set(7L);

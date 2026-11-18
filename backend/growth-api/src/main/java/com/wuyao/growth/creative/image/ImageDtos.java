@@ -41,12 +41,14 @@ public final class ImageDtos {
     public record View(Long id, Long parentId, String workflow, String brief, String quality,
                        String ratio, String status, String summary, String question, String error,
                        int completed, int count, List<ItemView> items, Instant createdAt, Long taskId,
-                       List<ReferenceView> references) {}
+                       List<ReferenceView> references, com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {}
     public record ReferenceView(Long assetId, String role, String name, String url) {}
     public record History(Long id, String workflow, String title, String brief, String quality, Instant createdAt,
-                          String status, int completed, int count, String previewUrl, String previewThumbUrl) {}
+                          String status, int completed, int count, String previewUrl, String previewThumbUrl,
+                          com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {}
     public record Work(Long id, Long creationId, String workflow, String title,
-                       String url, String quality, int width, int height, Instant createdAt, String thumbUrl) {}
+                       String url, String quality, int width, int height, Instant createdAt, String thumbUrl,
+                       com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {}
     public record Dimensions(int width, int height) {}
     public record Understanding(String summary, String question, List<String> mustChange,
                                 List<String> mustPreserve, List<String> mustAvoid) {}

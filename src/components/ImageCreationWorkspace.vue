@@ -1,4 +1,5 @@
 <script setup>
+import { billingWalletLabel } from '../domain/billing'
 import { computed, ref, toRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { IMAGE_STATUS, imageDimensions, imageStatusLabel } from '../domain/imageCreation'
@@ -49,7 +50,7 @@ async function saveTitle(entry) {
     <div v-if="studio.historyOpen" class="creation-history">
       <p v-if="!studio.history.length">还没有创作记录，开始做第一张图吧。</p>
       <div v-for="entry in studio.history" :key="entry.id" class="creation-history-entry">
-        <button type="button" class="creation-history-open" :disabled="studio.busy || !!studio.pending" @click="studio.openCreation(entry.id)"><img v-if="entry.previewUrl" class="creation-history-thumb" :src="entry.previewUrl" alt="" loading="lazy" /><span v-else class="creation-history-thumb" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="creation-history-copy"><span>{{ entry.title || '商品图片创作' }}</span><small>{{ new Date(entry.createdAt).toLocaleDateString() }}{{ entry.status === 'SUCCEEDED' ? '' : ` · ${IMAGE_STATUS[entry.status]}` }}</small></span></button>
+        <button type="button" class="creation-history-open" :disabled="studio.busy || !!studio.pending" @click="studio.openCreation(entry.id)"><img v-if="entry.previewUrl" class="creation-history-thumb" :src="entry.previewUrl" alt="" loading="lazy" /><span v-else class="creation-history-thumb" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><span class="creation-history-copy"><span>{{ entry.title || '商品图片创作' }}</span><small>{{ new Date(entry.createdAt).toLocaleDateString() }}{{ entry.status === 'SUCCEEDED' ? '' : ` · ${IMAGE_STATUS[entry.status]}` }}<template v-if="entry.billingWallet"> · {{ billingWalletLabel(entry.billingWallet) }}</template></small></span></button>
         <form v-if="editingTitleId === entry.id" class="creation-history-rename" @submit.prevent="saveTitle(entry)"><input v-model="editingTitle" maxlength="100" aria-label="作品名称" @keydown.esc.prevent="editingTitleId = null" /><button type="submit" title="保存名称" aria-label="保存名称" :disabled="titleSaving || !editingTitle.trim()"><Check :size="16" /></button><button type="button" title="取消" aria-label="取消" @click="editingTitleId = null"><X :size="16" /></button></form>
         <button v-else type="button" class="creation-history-rename-trigger" title="修改名称" aria-label="修改名称" @click="beginTitleEdit(entry)"><Pencil :size="16" /></button>
       </div>
@@ -73,7 +74,7 @@ async function saveTitle(entry) {
       <div class="creation-output-head">
         <div>
           <p class="creation-original">{{ studio.current.brief || '根据商品照片自动创作' }}</p>
-          <div class="creation-progress" role="status" aria-live="polite"><span class="creation-pulse" :class="{ done: !studio.active }" /><strong>{{ imageStatusLabel(studio.current) }}</strong><small>· {{ studio.current.completed }}/{{ studio.current.count }} 张</small><button v-if="studio.active" type="button" class="creation-text-button" :disabled="studio.busy" @click="studio.cancel()">取消</button></div>
+          <div class="creation-progress" role="status" aria-live="polite"><span class="creation-pulse" :class="{ done: !studio.active }" /><strong>{{ imageStatusLabel(studio.current) }}</strong><small>· {{ studio.current.completed }}/{{ studio.current.count }} 张<template v-if="studio.current.billingWallet"> · {{ billingWalletLabel(studio.current.billingWallet) }}</template></small><button v-if="studio.active" type="button" class="creation-text-button" :disabled="studio.busy" @click="studio.cancel()">取消</button></div>
         </div>
         <button type="button" class="creation-icon-button" aria-label="刷新" title="刷新" :disabled="studio.busy" @click="studio.load(studio.current.id)"><RefreshCw :size="17" :stroke-width="1.6" aria-hidden="true" /></button>
       </div>

@@ -1,5 +1,6 @@
 package com.wuyao.growth.video.analysis;
 
+import com.wuyao.growth.billing.BillingDtos;
 import jakarta.validation.constraints.*;
 
 import java.time.Instant;
@@ -24,7 +25,7 @@ public final class VideoAnalysisDtos {
     public record View(Long id, Long assetId, String name, String mode, String status, int progress,
                        String reverseNeed, Integer durationMs, Integer width, Integer height,
                        String videoUrl, List<FrameView> frames, Map<String, Object> result,
-                       String errorMessage, Instant createdAt) {}
+                       String errorMessage, Instant createdAt, BillingDtos.GenerationWallet billingWallet) {}
     public record Limits(long maxBytes, int maxDurationSeconds, int maxFrames, boolean configured, boolean audioConfigured,
                          int creditsPerAnalysis) {}
 }
