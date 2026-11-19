@@ -1,8 +1,9 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, useAttrs } from 'vue'
 import { materialLabels } from '../domain/videoMaterials'
 
 defineOptions({ inheritAttrs: false })
+const attrs = useAttrs()
 const props = defineProps({
   images: { type: Array, default: () => [] },
   videos: { type: Array, default: () => [] },
@@ -11,9 +12,30 @@ const props = defineProps({
 })
 const model = defineModel({ type: String, default: '' })
 const field = ref(null)
+const highlight = ref(null)
 const open = ref(false)
 const options = computed(() => Object.entries(materialLabels).flatMap(([type, label]) =>
   props[type + 's'].map((entry, index) => ({ entry, type, token: '@' + label + (index + 1) }))))
+const inputAttrs = computed(() => {
+  const { class: _class, style: _style, ...rest } = attrs
+  return rest
+})
+const mentionPattern = /[@＠](图片|视频|音频)(\d+)/g
+const highlightParts = computed(() => {
+  const parts = []
+  let cursor = 0
+  for (const match of model.value.matchAll(mentionPattern)) {
+    if (match.index > cursor) parts.push({ text: model.value.slice(cursor, match.index), valid: false })
+    const label = match[1]
+    const index = Number(match[2])
+    const type = Object.entries(materialLabels).find(([, value]) => value === label)?.[0]
+    const valid = Boolean(type && index >= 1 && index <= props[type + 's'].length)
+    parts.push({ text: match[0], valid })
+    cursor = match.index + match[0].length
+  }
+  if (cursor < model.value.length) parts.push({ text: model.value.slice(cursor), valid: false })
+  return parts
+})
 const focus = () => field.value?.focus()
 defineExpose({ focus })
 
@@ -42,10 +64,18 @@ function keydown(event) {
     else open.value = false
   }
 }
+function syncScroll() {
+  if (!field.value || !highlight.value) return
+  highlight.value.scrollTop = field.value.scrollTop
+  highlight.value.scrollLeft = field.value.scrollLeft
+}
 </script>
 
 <template>
-  <textarea ref="field" v-bind="$attrs" v-model="model" :disabled="disabled" @input="open = justTypedAt()" @click="open = justTypedAt()" @keydown.capture="keydown" />
+  <div class="mention-field" :class="$attrs.class">
+    <div ref="highlight" class="mention-highlight" aria-hidden="true"><template v-for="(part, index) in highlightParts" :key="index"><span :class="{ 'is-valid': part.valid }">{{ part.text }}</span></template><span v-if="!model" class="mention-placeholder">{{ $attrs.placeholder }}</span></div>
+    <textarea ref="field" v-bind="inputAttrs" v-model="model" :disabled="disabled" @input="open = justTypedAt()" @click="open = justTypedAt()" @scroll="syncScroll" @keydown.capture="keydown" />
+  </div>
   <div v-if="options.length" class="mention-tools">
     <button class="mention-trigger" type="button" :disabled="disabled" :aria-expanded="open" aria-haspopup="listbox" @click="open = !open"><span class="mention-trigger-mark">@</span><span>引用素材</span></button>
     <small>标注身份或用途，例如 <b>@图片1 是老板</b></small>
@@ -59,6 +89,14 @@ function keydown(event) {
 </template>
 
 <style scoped>
+.mention-field { position: relative; min-width: 0; box-sizing: border-box; background: var(--vs-fill, transparent); }
+.mention-highlight { position: absolute; inset: 0; z-index: 0; box-sizing: border-box; padding: inherit; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; color: var(--ink, inherit); font: inherit; line-height: inherit; pointer-events: none; }
+.mention-highlight span { color: inherit; }
+.mention-highlight .is-valid { color: #1974bd; font-weight: 650; }
+.mention-placeholder { color: var(--ink-muted, #8997a8); }
+.mention-field > textarea { position: relative; z-index: 1; width: 100%; min-height: inherit; max-height: inherit; box-sizing: border-box; margin: 0; padding: inherit; background: transparent !important; color: transparent !important; -webkit-text-fill-color: transparent; caret-color: var(--ink, #27445e); }
+.mention-field > textarea::placeholder { color: transparent; -webkit-text-fill-color: transparent; }
+.mention-field > textarea:disabled { cursor: not-allowed; }
 .mention-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin: 8px 0 2px; color: #708096; font-size: 12px; line-height: 1.4; }
 .mention-trigger { display: inline-flex; align-items: center; gap: 5px; height: 29px; padding: 0 10px 0 7px; border: 1px solid #c8d9e9; border-radius: 8px; background: #f4f8fc; color: #27577f; font: 600 12px/1 var(--font-sans, inherit); cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .mention-trigger:hover, .mention-trigger[aria-expanded="true"] { border-color: #8eb5d4; background: #eaf3fa; box-shadow: 0 2px 8px rgb(42 93 132 / 10%); }
