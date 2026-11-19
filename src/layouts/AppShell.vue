@@ -379,7 +379,7 @@ watch(() => [novice.value, route.name], ([isNovice, name]) => { if (isNovice && 
           <button class="icon-button mobile-menu-button" aria-label="打开导航" @click="menuOpen = true">☰</button>
           <div class="breadcrumb"><span>一方志</span><b>/</b><strong>{{ route.meta.title || '内容工具' }}</strong></div>
           <div class="topbar-actions">
-            <RouterLink v-if="auth.isAuthenticated && !aiCreationHidden" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span></RouterLink>
+            <RouterLink v-if="auth.isAuthenticated && !aiCreationHidden" :to="{ path: '/billing', query: { topup: '1' } }" class="topbar-entry topbar-balance" :title="billing.error ? '烟火账户暂时无法读取' : '烟火余额 · 充值'" :aria-label="billing.summary ? '烟火余额 ' + number(billing.summary.available) + (billing.summary.generationTeam ? '，团队余额 ' + number(billing.summary.generationTeam.available) : '') : '烟火余额'"><span class="topbar-balance-label">余额</span><YanhuoIcon :size="16" /><span>{{ billing.error ? '--' : billing.summary ? number(billing.summary.available) : '…' }}</span><template v-if="!billing.error && billing.summary?.generationTeam"><span class="topbar-balance-divider" aria-hidden="true" /><span class="topbar-balance-label" :title="billing.summary.generationTeam.name">团队</span><YanhuoIcon :size="16" /><span>{{ number(billing.summary.generationTeam.available) }}</span></template></RouterLink>
             <div v-if="auth.isAuthenticated && !aiCreationHidden" class="mode-switch" :class="{ 'is-pro': !novice }" role="group" aria-label="切换版式"><span class="mode-switch-thumb" aria-hidden="true" /><button type="button" :aria-pressed="novice" :class="{ active: novice }" @click="switchMode('novice')">新手<span class="mode-suffix">版</span></button><button type="button" :aria-pressed="!novice" :class="{ active: !novice }" @click="switchMode('pro')">进阶<span class="mode-suffix">版</span></button></div>
             <a v-if="showPartnerEntry" href="/partner/" target="_blank" rel="noopener" class="topbar-entry topbar-entry-primary" :title="`进入「${partnerMembership.partnerName || '服务商'}」的服务商后台`"><Briefcase :size="15" aria-hidden="true" />服务商后台</a>
             <StoreSwitcher v-if="auth.isAuthenticated" v-model="selectedStoreId" class="header-store" :stores="stores" :loading="storeLoading" />
@@ -517,6 +517,8 @@ watch(() => [novice.value, route.name], ([isNovice, name]) => { if (isNovice && 
 .topbar-balance { gap: 4px; font-variant-numeric: tabular-nums; font-weight: 500; }
 .topbar-balance .yanhuo-coin { margin-right: 0; }
 .topbar-balance-label { margin-right: 2px; color: var(--color-text-muted); font-weight: 400; }
+/* 服务商负责人另有团队余额，跟在个人余额后面，用竖线隔开 */
+.topbar-balance-divider { width: 1px; height: 14px; margin: 0 6px; background: var(--line); }
 .topbar-notice { position: relative; padding: 6px 8px; }
 .topbar-notice-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--color-accent); color: var(--color-on-accent); font: 600 12px/18px var(--font-mono); text-align: center; }
 .topbar-entry-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-on-accent); }
