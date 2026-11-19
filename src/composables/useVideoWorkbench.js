@@ -5,7 +5,7 @@ import { videoModels, isVideoInProgress, videoConversationTitle, videoCompletion
 import { generationBalance, refreshBilling, requireAccount } from '../stores/billing'
 import { getVideoQuote, submitVideoQuote, uploadVideoReference } from '../services/videoWorkflow'
 import { auth } from '../stores/auth'
-import { validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
+import { remapMentions, validateMentions, validateVideoMaterials, videoMaterialLimits } from '../domain/videoMaterials'
 import { FREE_SCENE, fetchVideoScenes, findVideoScene, videoSceneFields } from '../services/videoScenes'
 
 // 不再提供「自适应」：模型按参考图自己猜比例，常常和商家要发的平台对不上；改成默认不选，生成前引导选择。
@@ -215,11 +215,15 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     duration.value = Math.min(durationMax.value, Math.max(5, duration.value))
     if (!availableResolutions.value.includes(resolution.value)) resolution.value = availableResolutions.value[0]
   }
+  const replaceMaterials = (type, next) => {
+    prompt.value = remapMentions(prompt.value, type, referenceMaterials[type].value, next)
+    referenceMaterials[type].value = next
+  }
   const enforceMaterialLimits = () => {
     let trimmed = false
     for (const [type, materials] of Object.entries(referenceMaterials)) {
       if (materials.value.length > materialLimits.value[type]) {
-        materials.value = materials.value.slice(0, materialLimits.value[type])
+        replaceMaterials(type, materials.value.slice(0, materialLimits.value[type]))
         trimmed = true
       }
     }
@@ -241,7 +245,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
   }
   const handleMaterialChange = (type, event) => { addMaterialFiles(type, event.target.files); event.target.value = '' }
   const handleMaterialDrop = (type, event) => { event.preventDefault(); addMaterialFiles(type, event.dataTransfer.files) }
-  const removeMaterial = (type, asset) => { referenceMaterials[type].value = referenceMaterials[type].value.filter(item => item.id !== asset.id) }
+  const removeMaterial = (type, asset) => { replaceMaterials(type, referenceMaterials[type].value.filter(item => item.id !== asset.id)) }
 
   // item is the conversation being generated; the plan panel uploads the displayed materials and passes none.
   const uploadAsset = async (entry, type, item) => {
@@ -293,6 +297,7 @@ export function useVideoWorkbench({ onQuote, onQuoteClose, onSubmitted } = {}) {
     item.error = false
     item.notice = '正在上传参考素材并提交视频任务…'
     try {
+      validateMentions(item.prompt, { 图片: item.referenceImages.length, 视频: item.referenceVideos.length, 音频: item.referenceAudios.length })
       validateVideoMaterials({ model: item.selectedModel, images: item.referenceImages, videos: item.referenceVideos, audios: item.referenceAudios })
       const imageAssetIds = await Promise.all(item.referenceImages.map(entry => uploadAsset(entry, 'IMAGE', item)))
       const videoAssetIds = await Promise.all(item.referenceVideos.map(entry => uploadAsset(entry, 'VIDEO', item)))

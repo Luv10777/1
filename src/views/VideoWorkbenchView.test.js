@@ -52,7 +52,7 @@ test('workbench uploads, model changes, draft recall and quotes preserve the sup
         if (id.endsWith('.css')) return ''
         if (id.endsWith('/VideoPreviewPanel.vue')) return "import { h } from 'vue'; export default { inheritAttrs: false, setup(_, { slots }) { return () => h('div', slots.default?.()) } }"
         if (id.endsWith('/VideoPlanPanel.vue')) return 'export default { inheritAttrs: false, setup(_, { attrs }) { globalThis.videoPlanUpload = attrs.upload; return () => null } }'
-        if (id.endsWith('/VideoWorkbenchView.vue') || id.endsWith('/GenerationWalletPicker.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
+        if (id.endsWith('/VideoMentionInput.vue') || id.endsWith('/VideoWorkbenchView.vue') || id.endsWith('/GenerationWalletPicker.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
           { id, inlineTemplate: true }).content
         if (id.endsWith('.vue')) return 'export default { render() { return null } }'
       },

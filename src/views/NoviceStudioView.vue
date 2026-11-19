@@ -1,4 +1,5 @@
 <script setup>
+import VideoMentionInput from '../components/VideoMentionInput.vue'
 import { billingWalletLabel } from '../domain/billing'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -458,7 +459,7 @@ function videoTags(item) {
                   <p v-if="plan.idea" class="ns-plan-idea">{{ plan.idea }}</p>
                   <p v-if="turn.mode === 'video'" class="ns-plan-meta">{{ plan.ratio === 'auto' ? '比例自选' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots?.length || 0 }} 个镜头</p>
                   <ul v-if="plan.materials?.length" class="ns-plan-uses">
-                    <li v-for="material in plan.materials" :key="material.index"><img v-if="turn.images?.[material.index - 1]" :src="stableUrl(turn.images[material.index - 1])" alt="" />图{{ material.index }} {{ material.use }}</li>
+                    <li v-for="material in plan.materials" :key="material.index"><img v-if="turn.images?.[material.index - 1]" :src="stableUrl(turn.images[material.index - 1])" alt="" />{{ turn.mode === 'video' ? '@图片' : '图' }}{{ material.index }} {{ material.use }}</li>
                   </ul>
                   <details class="ns-plan-detail">
                     <summary>{{ turn.mode === 'video' ? '分镜和生成指令' : '完整画面描述' }}</summary>
@@ -585,7 +586,8 @@ function videoTags(item) {
         </div>
 
         <label for="ns-input" class="sr-only">{{ ideaMode ? '想要什么' : mode === 'image' ? '画面描述' : '描述你的成片需求' }}</label>
-        <textarea id="ns-input" ref="composerInput" v-model="draft" class="ns-input" :rows="started ? 1 : 3" maxlength="2000" :placeholder="placeholder" :disabled="ideaMode ? planEngine.working : mode === 'image' ? studio.locked : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
+        <VideoMentionInput v-if="mode === 'video'" id="ns-input" ref="composerInput" v-model="draft" :images="ideaMode ? vplan.planImages : video.referenceImages" :videos="ideaMode ? [] : video.referenceVideos" :audios="ideaMode ? [] : video.referenceAudios" class="ns-input" :rows="started ? 1 : 3" :maxlength="ideaMode ? (answering ? 1000 : 500) : 2000" :placeholder="placeholder" :disabled="ideaMode ? vplan.working : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
+        <textarea v-else id="ns-input" ref="composerInput" v-model="draft" class="ns-input" :rows="started ? 1 : 3" maxlength="2000" :placeholder="placeholder" :disabled="ideaMode ? planEngine.working : mode === 'image' ? studio.locked : video.isGenerating || video.activeConversation?.loading" @keydown="onKeydown" />
 
         <div class="ns-toolbar">
           <button v-if="mode === 'image'" type="button" class="ns-icon" :disabled="studio.locked || studio.files.length >= 6" aria-label="添加参考图，最多 6 张" title="添加参考图，最多 6 张" @click="imageInput?.click()"><Paperclip :size="18" :stroke-width="1.6" aria-hidden="true" /></button>

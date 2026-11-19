@@ -22,7 +22,8 @@ final class VideoPlanScript {
             允许创作角色的选择、误会、意外、幽默、反转和日常互动，包括角色决定参与活动；这些是剧情，不是顾客证言。
             不把尊重事实扩展为普遍禁止人物行动，不在每镜反复写“不能”“不表现”；只有用户明确提出的画面限制才进入剧本。
             人物、对白、旁白、字幕、Logo和音乐都可按叙事需要使用；尊重用户明确的选择。
-            参考图按图1、图2等原始顺序引用；人物、商品和场所应基于对应参考图，不能混用身份。
+            参考图按上传顺序引用为 @图片1、@图片2 等。严格沿用用户为每个 @素材 指定的身份与用途，例如老板与员工。
+            每份方案的 materials 须逐图填写 index 和具体用途，每张图恰好一项。未指定用途时根据图像和需求说明用途。
             """;
     static final String CONCEPT_SYSTEM = RULES + """
             你是短视频创意策划。这一轮只做事实梳理与三个故事概念，不写完整分镜。
@@ -126,7 +127,9 @@ final class VideoPlanScript {
             plan.put("concept", text(raw.get("concept"), 350, true));
             plan.put("visualStyle", text(raw.get("visualStyle"), 200, true));
             plan.put("continuity", text(raw.get("continuity"), 250, false));
-            var uses = materials(raw.get("materials"), images); plan.put("materials", uses);
+            var uses = materials(raw.get("materials"), images);
+            if (uses.size() != images) throw invalid("剧本未逐张说明参考图用途，烟火已退回，请重试");
+            plan.put("materials", uses);
             var shots = new ArrayList<Map<String, Object>>();
             double cursor = 0;
             for (Object value : list(raw.get("shots"), 2, 6)) {
@@ -162,9 +165,9 @@ final class VideoPlanScript {
             String prompt = "生成" + aspect + "视频，总时长" + duration + "秒。\n故事：" + plan.get("concept")
                     + "\n整体风格：" + plan.get("visualStyle") + (plan.get("continuity").toString().isEmpty() ? "" : "\n连续性：" + plan.get("continuity"))
                     + (facts.isEmpty() ? "" : "\n已确认信息：" + String.join("；", facts))
-                    + (uses.isEmpty() ? "" : "\n参考素材：" + String.join("；", uses.stream().map(u -> "图" + u.get("index") + "：" + u.get("use")).toList()))
+                    + (uses.isEmpty() ? "" : "\n参考素材：" + String.join("；", uses.stream().map(u -> "@图片" + u.get("index") + "：" + u.get("use")).toList()))
                     + "\n" + String.join("\n", shots.stream().map(s -> number((double)s.get("start")) + "–" + number((double)s.get("end")) + "秒：" + s.get("description")
-                            + (((List<?>)s.get("images")).isEmpty() ? "" : "（参考图" + s.get("images") + "）")).toList());
+                            + (((List<?>)s.get("images")).isEmpty() ? "" : "（" + String.join("、", ((List<?>) s.get("images")).stream().map(index -> "@图片" + index).toList()) + "）")).toList());
             plan.put("prompt", text(prompt, 4000, true)); plan.put("negativePrompt", "");
             if (!offerNumbers(String.join("；", facts)).containsAll(offerNumbers(prompt)))
                 throw invalid("剧本出现了未经确认的活动金额或期限，烟火已退回，请重试");

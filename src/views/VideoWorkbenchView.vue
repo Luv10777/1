@@ -1,4 +1,5 @@
 <script setup>
+import VideoMentionInput from '../components/VideoMentionInput.vue'
 import { billingWalletLabel } from '../domain/billing'
 import AppSelect from '../components/AppSelect.vue'
 import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
@@ -107,7 +108,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
 
         <section class="vs-group">
           <label for="video-prompt" class="vs-label">描述你的成片需求</label>
-          <textarea id="video-prompt" v-model="prompt" class="vs-textarea" rows="5" :placeholder="currentScene?.placeholder || defaultPlaceholder" />
+          <VideoMentionInput id="video-prompt" v-model="prompt" :images="referenceImages" :videos="referenceVideos" :audios="referenceAudios" class="vs-textarea" rows="5" :placeholder="currentScene?.placeholder || defaultPlaceholder" />
         </section>
 
         <section class="vs-settings">

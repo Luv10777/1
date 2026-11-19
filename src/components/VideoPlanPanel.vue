@@ -1,4 +1,5 @@
 <script setup>
+import VideoMentionInput from '../components/VideoMentionInput.vue'
 import { billingWalletLabel } from '../domain/billing'
 import { nextTick, ref } from 'vue'
 import { Check, ChevronLeft, Film, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
@@ -66,11 +67,11 @@ const showRecords = async () => {
           <input v-if="customOpen" v-model="customStyle" maxlength="40" aria-label="自己填写风格" placeholder="例如：复古港风、清冷极简">
         </div>
         <label for="vp-idea" class="sr-only">一句话说说想要什么</label>
-        <textarea id="vp-idea" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.exact="onIdeaEnter" />
+        <VideoMentionInput id="vp-idea" v-model="idea" :images="planImages" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发抖音，安静高级一点" @keydown.enter.exact="onIdeaEnter" />
         <section v-if="clarification" aria-label="补充剧本信息">
           <p class="ip-status">为了把活动卖点写清楚，需要补充一项信息。本次尚未生成剧本，预占烟火已退回。</p>
           <label for="vp-answer">{{ clarification.question }}</label>
-          <textarea id="vp-answer" v-model="answer" class="ip-idea" rows="3" maxlength="1000" :disabled="working" placeholder="填写实际活动信息；暂未确定的内容也可以说明" />
+          <VideoMentionInput id="vp-answer" v-model="answer" :images="planImages" class="ip-idea" rows="3" maxlength="1000" :disabled="working" placeholder="填写实际活动信息；暂未确定的内容也可以说明" />
         </section>
         <div class="ip-composer-foot">
           <small>每次出 3 个版本 · 换一批同价 · 失败不扣烟火</small>
@@ -116,7 +117,7 @@ const showRecords = async () => {
           <p v-if="plan.idea" class="ip-card-idea">{{ plan.idea }}</p>
           <p class="ip-card-meta">{{ plan.ratio === 'auto' ? '比例自选' : plan.ratio }} · {{ plan.durationSeconds }} 秒 · {{ plan.shots.length }} 个镜头</p>
           <ul v-if="plan.materials.length" class="ip-uses">
-            <li v-for="item in plan.materials" :key="item.index" :class="{ 'no-thumb': !resultImages[item.index - 1] }"><img v-if="resultImages[item.index - 1]" :src="resultImages[item.index - 1]" alt="">图{{ item.index }} {{ item.use }}</li>
+            <li v-for="item in plan.materials" :key="item.index" :class="{ 'no-thumb': !resultImages[item.index - 1] }"><img v-if="resultImages[item.index - 1]" :src="resultImages[item.index - 1]" alt="">@图片{{ item.index }} {{ item.use }}</li>
           </ul>
           <ol class="ip-shots">
             <li v-for="(shot, shotIndex) in plan.shots" :key="shotIndex"><time>{{ videoPlanSeconds(shot.start) }}–{{ videoPlanSeconds(shot.end) }}s</time><span>{{ shot.description }}</span></li>

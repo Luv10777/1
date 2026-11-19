@@ -77,10 +77,14 @@ public final class VideoScenes {
      */
     public static String providerPrompt(VideoDtos.Create request) {
         String prompt = request.prompt();
-        if (request.planId() != null) return prompt;
-        return guided(request.sceneKey()).map(s -> prompt.isBlank()
+        if (!request.referenceImageAssetIds().isEmpty() || !request.videoReferences().isEmpty() || !request.referenceAudioAssetIds().isEmpty()) {
+            prompt = "参考素材按上传顺序对应 @图片1、@图片2……、@视频1……、@音频1……。严格按照文字中对每个 @素材 的身份和用途使用，人物身份不得混淆。\n" + prompt;
+        }
+        final String promptText = prompt;
+        if (request.planId() != null) return promptText;
+        return guided(request.sceneKey()).map(s -> promptText.isBlank()
                 ? "【创作场景：" + s.name() + "】请按参考素材来拍，这类视频常见的分镜思路：" + s.guide()
-                : prompt + "\n\n【创作场景：" + s.name() + "】以下是这类视频常见的分镜思路，只用来补充上面没写到的部分；"
-                        + "和上面的描述冲突时，一律以上面的描述为准：" + s.guide()).orElse(prompt);
+                : promptText + "\n\n【创作场景：" + s.name() + "】以下是这类视频常见的分镜思路，只用来补充上面没写到的部分；"
+                        + "和上面的描述冲突时，一律以上面的描述为准：" + s.guide()).orElse(promptText);
     }
 }
