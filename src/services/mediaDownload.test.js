@@ -35,3 +35,53 @@ test('media downloads save a blob without forwarding application credentials and
     else delete globalThis.document
   }
 })
+
+test('desktop Chrome and Edge open a save-as dialog before fetching the file', async t => {
+  const saved = ['window', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
+  const steps = [], written = []
+  const blob = new Blob(['video'], { type: 'video/mp4' })
+  t.mock.method(globalThis, 'fetch', async () => { steps.push('fetch'); return { ok: true, blob: async () => blob } })
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0) Chrome/130' } })
+  let cancel = false
+  globalThis.window = { showSaveFilePicker: async options => {
+    steps.push('picker:' + options.suggestedName)
+    if (cancel) throw Object.assign(new Error('cancelled'), { name: 'AbortError' })
+    return { createWritable: async () => ({ write: async value => written.push(value), close: async () => steps.push('closed') }) }
+  } }
+  try {
+    await downloadMedia('https://bucket.test/video.mp4', '一方志视频.mp4')
+    assert.deepEqual(steps, ['picker:一方志视频.mp4', 'fetch', 'closed'])
+    assert.deepEqual(written, [blob])
+    cancel = true; steps.length = 0
+    await downloadMedia('https://bucket.test/video.mp4', '一方志视频.mp4')
+    assert.deepEqual(steps, ['picker:一方志视频.mp4'], 'cancelling the dialog downloads nothing')
+  } finally {
+    for (const [key, descriptor] of saved) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }
+  }
+})
+
+test('Apple devices open the share sheet so the file can go to Photos', async t => {
+  const saved = ['window', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
+  const shared = []
+  t.mock.method(globalThis, 'fetch', async () => ({ ok: true, blob: async () => new Blob(['video'], { type: 'video/mp4' }) }))
+  let refuse = true
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1',
+    canShare: data => data.files?.length === 1,
+    share: async data => {
+      if (refuse) { refuse = false; throw Object.assign(new Error('no gesture'), { name: 'NotAllowedError' }) }
+      shared.push(data.files[0])
+    },
+  } })
+  globalThis.window = {}
+  try {
+    await assert.rejects(downloadMedia('https://bucket.test/video.mp4', '一方志视频.mp4'), /再点一次/, 'a slow download loses the tap; ask for one more')
+    await downloadMedia('https://bucket.test/video.mp4', '一方志视频.mp4')
+    assert.equal(shared.length, 1)
+    assert.equal(shared[0].name, '一方志视频.mp4')
+    assert.equal(shared[0].type, 'video/mp4')
+    assert.equal(fetch.mock.callCount(), 1, 'the second tap reuses the file already fetched')
+  } finally {
+    for (const [key, descriptor] of saved) { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key] }
+  }
+})
