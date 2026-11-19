@@ -1,6 +1,8 @@
 <script setup>
 import AppSelect from './AppSelect.vue'
 import GenerationWalletPicker from './GenerationWalletPicker.vue'
+import BalanceShortageDialog from './BalanceShortageDialog.vue'
+import { billing } from '../stores/billing'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ChevronRight, Plus, RotateCcw, Sparkles, X } from 'lucide-vue-next'
 import { IMAGE_QUALITIES, IMAGE_RATIOS } from '../domain/imageCreation'
@@ -17,6 +19,20 @@ const serviceNotice = computed(() => studio.value.requiresLogin ? '登录后开�
   : studio.value.capabilityState === 'checking' ? '正在检查创作服务…'
   : studio.value.capabilityState === 'error' ? `创作服务检查失败：${studio.value.capabilityError}`
   : !studio.value.configured ? '图片创作服务暂未接通' : '')
+const walletAvailable = computed(() => studio.value.generationWallet === 'TEAM'
+  ? billing.summary?.generationTeam?.available ?? 0
+  : billing.summary?.available ?? 0)
+const walletLabel = computed(() => studio.value.generationWallet === 'TEAM' ? '团队额度' : '个人额度')
+const shortage = computed(() => {
+  if (!billing.summary || studio.value.estimatedCredits == null) return null
+  const required = Number(studio.value.estimatedCredits)
+  return walletAvailable.value < required ? { required, available: walletAvailable.value } : null
+})
+const showBalanceDialog = ref(false)
+function generate() {
+  if (shortage.value) { showBalanceDialog.value = true; return }
+  studio.value.generate()
+}
 
 function hasFiles(event) { return Array.from(event.dataTransfer?.types || []).includes('Files') }
 function onDragOver(event) {
@@ -53,7 +69,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <form class="poster-control-panel" @submit.prevent="studio.generate">
+  <form class="poster-control-panel" @submit.prevent="generate">
     <header class="poster-control-head"><h1>灵感绘图</h1><button type="button" class="poster-idea-entry" :aria-pressed="studio.workspaceTab === 'plan'" @click="studio.workspaceTab = 'plan'"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案</button></header>
     <div class="poster-control-scroll">
       <section class="poster-control-group">
@@ -95,7 +111,8 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
-    <footer class="poster-control-footer"><GenerationWalletPicker v-model="studio.generationWallet" :disabled="studio.busy || !!studio.pending" /><p v-if="studio.error" class="poster-control-error" role="alert">{{ studio.error }}</p><p v-show="serviceNotice" class="poster-service-state" role="status">{{ serviceNotice }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p><button type="submit" class="poster-generate-button" :disabled="studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.saving ? '正在保存原图…' : studio.active ? '创作中…' : '生成图片' }}</button><p class="poster-footer-meta">{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</p></footer>
+    <footer class="poster-control-footer"><p v-if="studio.error" class="poster-control-error" role="alert">{{ studio.error }}</p><p v-show="serviceNotice" class="poster-service-state" role="status">{{ serviceNotice }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p><div class="poster-generate-row"><GenerationWalletPicker v-model="studio.generationWallet" compact :disabled="studio.busy || !!studio.pending" /><button type="submit" class="poster-generate-button" :disabled="studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.saving ? '正在保存原图…' : studio.active ? '创作中…' : '生成图片' }}</button></div><p class="poster-footer-meta">{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</p></footer>
+    <BalanceShortageDialog v-model:open="showBalanceDialog" :required="shortage?.required || 0" :available="shortage?.available || 0" :wallet-label="walletLabel" />
     <div v-if="dragging" class="poster-drop-overlay" aria-hidden="true"><span>松开，添加到参考图</span></div>
   </form>
 </template>

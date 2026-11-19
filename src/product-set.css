@@ -57,6 +57,8 @@
 .product-set-studio .product-quality-grid button:disabled { opacity: .38; cursor: not-allowed; }
 
 .product-control-footer { display: flex; flex-shrink: 0; flex-direction: column; gap: 10px; padding: 16px 28px 28px; }
+.product-generate-row { display: flex; align-items: center; gap: 8px; }
+.product-generate-row .product-generate { flex: 1; }
 .product-set-studio .product-generate { min-height: 50px; border: 0; border-radius: 8px; background: var(--color-accent); color: var(--color-on-accent); font-size: 16px; font-weight: 600; letter-spacing: .04em; box-shadow: none; transition: background .18s; }
 .product-set-studio .product-generate:hover:not(:disabled) { background: var(--color-accent-hover); }
 .product-control-footer .generation-billing-note, .product-demo-note { margin: 0; color: var(--ink-muted); font-size: 13px; text-align: center; }

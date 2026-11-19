@@ -1,12 +1,14 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
 import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
+import BalanceShortageDialog from '../components/BalanceShortageDialog.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import ImageWorkspaceSwitch from '../components/ImageWorkspaceSwitch.vue'
 import ImageCreationWorkspace from '../components/ImageCreationWorkspace.vue'
 import ImageReferenceList from '../components/ImageReferenceList.vue'
 import { ChevronRight, Plus } from 'lucide-vue-next'
 import { useImageCreation } from '../composables/useImageCreation'
+import { billing } from '../stores/billing'
 import { IMAGE_QUALITIES, IMAGE_RATIOS, imageDimensions } from '../domain/imageCreation'
 import '../image-workflow.css'
 
@@ -19,6 +21,20 @@ const serviceNotice = computed(() => studio.requiresLogin ? '登录后开始创�
   : studio.capabilityState === 'checking' ? '正在检查创作服务…'
   : studio.capabilityState === 'error' ? `创作服务检查失败：${studio.capabilityError}`
   : !studio.configured ? '图片创作服务尚未接通，可先准备商品照片' : '')
+const walletAvailable = computed(() => studio.generationWallet === 'TEAM'
+  ? billing.summary?.generationTeam?.available ?? 0
+  : billing.summary?.available ?? 0)
+const walletLabel = computed(() => studio.generationWallet === 'TEAM' ? '团队额度' : '个人额度')
+const shortage = computed(() => {
+  if (!billing.summary || studio.estimatedCredits == null) return null
+  const required = Number(studio.estimatedCredits)
+  return walletAvailable.value < required ? { required, available: walletAvailable.value } : null
+})
+const showBalanceDialog = ref(false)
+function generate() {
+  if (shortage.value) { showBalanceDialog.value = true; return }
+  studio.generate()
+}
 const qualityDimensions = quality => {
   try { return imageDimensions(quality, studio.ratio) }
   catch { return { width: 0, height: 0 } }
@@ -97,7 +113,7 @@ watch([selectedPlatform, imageType], () => {
 
 <template>
   <section class="product-set-studio creation-product" aria-label="产品套图工作区">
-    <form class="product-control-panel" @submit.prevent="studio.generate">
+    <form class="product-control-panel" @submit.prevent="generate">
       <header class="product-panel-head"><h1>产品套图</h1><button type="button" class="product-reset" :disabled="studio.locked" @click="reset">重置</button></header>
       <fieldset class="product-form-scroll" :disabled="studio.locked">
         <section class="product-form-section">
@@ -136,10 +152,10 @@ watch([selectedPlatform, imageType], () => {
       <footer class="product-control-footer">
         <p v-if="studio.error" class="creation-item-error" role="alert">{{ studio.error }}</p>
         <p v-if="serviceNotice" class="product-demo-note" role="status">{{ serviceNotice }} <button v-if="studio.capabilityState === 'error'" type="button" class="creation-service-retry" @click="studio.loadCapabilities">重试</button></p>
-        <GenerationWalletPicker v-model="studio.generationWallet" :disabled="studio.busy || !!studio.pending" />
-        <button type="submit" class="product-generate" :disabled="studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.saving ? '正在保存原图…' : studio.active ? '创作中…' : '立即生成' }}</button>
+        <div class="product-generate-row"><GenerationWalletPicker v-model="studio.generationWallet" compact :disabled="studio.busy || !!studio.pending" /><button type="submit" class="product-generate" :disabled="studio.busy || (!studio.configured && !studio.requiresLogin) || studio.active || !!studio.pending">{{ studio.busy ? '正在提交…' : studio.saving ? '正在保存原图…' : studio.active ? '创作中…' : '立即生成' }}</button></div>
         <p v-if="studio.imageCredits != null" class="generation-billing-note">预占 {{ studio.estimatedCredits }} 烟火，未交付部分退回</p>
       </footer>
+      <BalanceShortageDialog v-model:open="showBalanceDialog" :required="shortage?.required || 0" :available="shortage?.available || 0" :wallet-label="walletLabel" />
     </form>
     <div class="product-showcase">
       <ImageCreationWorkspace ref="workspace" :studio="studio"><template #toolbar-end><ImageWorkspaceSwitch /></template><div class="product-wall" aria-hidden="true"><div v-for="(column, columnIndex) in wallColumns" :key="columnIndex" class="product-wall-column" :class="`product-wall-column-${columnIndex + 1}`"><img v-for="(image, index) in column" :key="`${columnIndex}-${index}`" :src="image" alt="" /></div></div></ImageCreationWorkspace>

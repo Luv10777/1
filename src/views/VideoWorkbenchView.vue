@@ -227,12 +227,11 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
               <dt>{{ generationWallet === 'TEAM' ? '团队可用烟火' : '可用烟火' }}</dt><dd>{{ billing.error ? '暂不可读' : number(walletBalance) }}</dd>
             </div>
           </dl>
-          <GenerationWalletPicker v-if="!quoted.retryId" v-model="generationWallet" :disabled="quoteBusy" />
           <p v-if="billing.summary && walletBalance < quoted.quote.credits" class="yanhuo-alert">所选余额的烟火不足。</p>
-          <button class="yanhuo-primary" type="button" :disabled="quoteBusy || !!billing.error || walletBalance < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button>
+          <div class="video-price-action-row"><GenerationWalletPicker v-if="!quoted.retryId" v-model="generationWallet" compact :disabled="quoteBusy" /><button class="yanhuo-primary" type="button" :disabled="quoteBusy || !!billing.error || walletBalance < quoted.quote.credits" @click="confirmQuote">{{ quoteBusy ? '正在提交...' : '确认费用，开始生成' }}</button></div>
         </template>
         <p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p>
-        <RouterLink v-if="generationWallet === 'PERSONAL' && walletBalance < quoted.quote.credits" class="generation-billing-link" to="/billing" @click="closeQuote">前往套餐与充值</RouterLink>
+        <RouterLink v-if="generationWallet === 'PERSONAL' && walletBalance < quoted.quote.credits" class="generation-billing-link" to="/billing?topup=1" @click="closeQuote">立即充值</RouterLink>
         <p v-if="quoteError" class="yanhuo-alert" role="alert">{{ quoteError }}</p>
       </template>
     </dialog>

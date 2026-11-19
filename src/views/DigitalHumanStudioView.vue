@@ -349,12 +349,11 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
           <p class="yanhuo-note">{{ quoted.quote.message }}</p>
           <p class="yanhuo-note">{{ quoted.quote.providerModel }} · {{ quoted.quote.resolution }}</p>
           <p v-if="!billing.summary?.generationTeam" class="yanhuo-note">可用烟火：{{ billing.error ? '暂不可读' : number(walletBalance) }}</p>
-          <GenerationWalletPicker v-model="generationWallet" :disabled="isGenerating" />
           <p v-if="billing.summary && walletBalance < quoted.quote.credits" class="yanhuo-alert">所选余额的烟火不足。</p>
-          <button class="yanhuo-primary" type="button" :disabled="isGenerating || !!billing.error || walletBalance < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button>
+          <div class="video-price-action-row"><GenerationWalletPicker v-model="generationWallet" compact :disabled="isGenerating" /><button class="yanhuo-primary" type="button" :disabled="isGenerating || !!billing.error || walletBalance < quoted.quote.credits" @click="confirmQuote">{{ isGenerating ? '正在提交...' : '确认费用，开始生成' }}</button></div>
         </template>
         <p v-else class="yanhuo-alert">{{ quoted.quote.message }}</p>
-        <RouterLink v-if="generationWallet === 'PERSONAL'" to="/billing" class="generation-billing-link" @click="closeQuote">套餐与充值 →</RouterLink>
+        <RouterLink v-if="generationWallet === 'PERSONAL'" to="/billing?topup=1" class="generation-billing-link" @click="closeQuote">立即充值</RouterLink>
         <p v-if="videoError" class="yanhuo-alert" role="alert">{{ videoError }}</p>
       </template>
     </dialog>

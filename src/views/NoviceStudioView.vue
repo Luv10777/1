@@ -6,6 +6,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowUp, AudioLines, Check, Download, Film, ImagePlus, Minus, Paperclip, Plus, RefreshCw, SlidersHorizontal, Sparkles, X } from 'lucide-vue-next'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
+import BalanceShortageDialog from '../components/BalanceShortageDialog.vue'
 import { useImageCreation } from '../composables/useImageCreation'
 import { useVideoWorkbench, videoRatioOptions, videoStageLabel } from '../composables/useVideoWorkbench'
 import { useImageInspiration } from '../composables/useImageInspiration'
@@ -297,6 +298,33 @@ const sendLabel = computed(() => (ideaMode.value ? (planEngine.value.working ? '
 const sendBusy = computed(() => (ideaMode.value ? planEngine.value.working : mode.value === 'image' ? studio.busy || studio.active : video.isGenerating))
 // 图片按张计费、方案按次计费，按钮旁直接写这次要花多少烟火；视频要先报价。
 const imageCost = computed(() => (ideaMode.value ? planEngine.value.credits : mode.value === 'image' ? studio.estimatedCredits : null))
+const walletAvailable = computed(() => studio.generationWallet === 'TEAM'
+  ? billing.summary?.generationTeam?.available ?? 0
+  : billing.summary?.available ?? 0)
+const walletLabel = computed(() => studio.generationWallet === 'TEAM' ? '团队额度' : '个人额度')
+const balanceShortage = computed(() => {
+  if (ideaMode.value || mode.value !== 'image' || imageCost.value == null || !billing.summary) return null
+  const required = Number(imageCost.value)
+  return walletAvailable.value < required ? { required, available: walletAvailable.value } : null
+})
+const videoBalanceShortage = computed(() => {
+  const quote = video.quoted?.quote
+  if (mode.value !== 'video' || !quote?.available || !billing.summary) return null
+  const required = Number(quote.credits)
+  return video.walletBalance < required ? { required, available: video.walletBalance } : null
+})
+const activeBalanceShortage = computed(() => balanceShortage.value || videoBalanceShortage.value)
+const dialogShortage = computed(() => activeBalanceShortage.value || (showBalanceDialog.value && mode.value === 'image'
+  ? { required: Number(imageCost.value) || 0, available: walletAvailable.value }
+  : null))
+const dialogWalletLabel = computed(() => mode.value === 'video'
+  ? (video.generationWallet === 'TEAM' ? '团队额度' : '个人额度')
+  : walletLabel.value)
+const showBalanceDialog = ref(false)
+watch(videoBalanceShortage, shortageValue => { if (shortageValue) showBalanceDialog.value = true })
+watch(() => studio.error, error => {
+  if (error && /余额|烟火|额度|insufficient|credit/i.test(error)) showBalanceDialog.value = true
+})
 const sendTitle = computed(() => (ideaMode.value ? '每次出 3 个方案 · 换一批同价 · 失败不扣烟火'
   : mode.value === 'image'
     ? `${studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : ''}成功交付后扣费`
@@ -310,7 +338,10 @@ function switchMode(next) {
 function send() {
   panel.value = ''
   if (ideaMode.value) { sendIdea(); return }
-  if (mode.value === 'image') studio.generate()
+  if (mode.value === 'image') {
+    if (balanceShortage.value) { showBalanceDialog.value = true; return }
+    studio.generate()
+  }
   else { if (!video.format) panel.value = 'output'; video.generate() }
   scrollToEnd()
 }
@@ -543,9 +574,8 @@ function videoTags(item) {
                   <div><dt>费率核验</dt><dd>{{ dateTime(video.quoted.quote.verifiedAt) }}</dd></div>
                   <div v-if="video.quoted.retryId || !billing.summary?.generationTeam"><dt>{{ video.generationWallet === 'TEAM' ? '团队可用烟火' : '可用烟火' }}</dt><dd>{{ billing.error ? '暂不可读' : number(video.walletBalance) }}</dd></div>
                 </dl>
-                <GenerationWalletPicker v-if="!video.quoted.retryId" v-model="video.generationWallet" :disabled="video.quoteBusy" />
-                <p v-if="billing.summary && video.walletBalance < video.quoted.quote.credits" class="ns-error">所选余额的烟火不足。</p>
                 <div class="ns-quote-actions">
+                  <GenerationWalletPicker v-if="!video.quoted.retryId" v-model="video.generationWallet" compact :disabled="video.quoteBusy" />
                   <button type="button" class="ns-primary" :disabled="video.quoteBusy || !!billing.error || video.walletBalance < video.quoted.quote.credits" @click="video.confirmQuote">{{ video.quoteBusy ? '正在提交…' : '确认费用，开始生成' }}</button>
                   <button type="button" class="ns-link" :disabled="video.quoteBusy" @click="video.closeQuote">先不做</button>
                 </div>
@@ -554,7 +584,7 @@ function videoTags(item) {
                 <p class="ns-error">{{ video.quoted.quote.message }}</p>
                 <button type="button" class="ns-link" @click="video.closeQuote">知道了</button>
               </template>
-              <RouterLink v-if="video.generationWallet === 'PERSONAL' && video.walletBalance < video.quoted.quote.credits" class="ns-link" to="/billing" @click="video.closeQuote">前往套餐与充值</RouterLink>
+               <RouterLink v-if="video.generationWallet === 'PERSONAL' && video.walletBalance < video.quoted.quote.credits" class="ns-link" to="/billing?topup=1" @click="video.closeQuote">立即充值</RouterLink>
               <p v-if="video.quoteError" class="ns-error" role="alert">{{ video.quoteError }}</p>
             </section>
           </div>
@@ -578,7 +608,6 @@ function videoTags(item) {
           </div>
           <button type="button" class="ns-idea-button" :class="{ active: ideaMode }" :aria-pressed="ideaMode" @click="toggleIdeas"><Sparkles :size="15" :stroke-width="1.8" aria-hidden="true" />灵感方案<X v-if="ideaMode" :size="13" :stroke-width="2" aria-hidden="true" /></button>
         </div>
-        <GenerationWalletPicker v-if="mode === 'image' && !ideaMode" v-model="studio.generationWallet" :disabled="studio.busy || !!studio.pending" />
         <Transition name="ns-swap">
           <p v-if="ideaMode" class="ns-idea-hint">{{ answering ? '一方志想先确认一件事，回答后接着写方案。' : '说一句想要什么，一方志先出 3 个方向给你挑，挑中的再去生成。' }}</p>
         </Transition>
@@ -631,14 +660,17 @@ function videoTags(item) {
               </template>
             </div>
           </Transition>
-          <span class="ns-cost" :title="sendTitle">
-            <YanhuoIcon :size="16" />
-            <strong>{{ imageCost != null ? number(imageCost) : mode === 'video' ? '报价后扣' : '—' }}</strong><small v-if="ideaMode">/ 次</small>
-          </span>
-          <button type="submit" class="ns-send" :class="{ busy: sendBusy }" :disabled="sendDisabled" :title="sendTitle" :aria-label="sendLabel">
-            <span v-if="sendBusy" class="ns-spinner" aria-hidden="true" />
-            <ArrowUp v-else :size="18" :stroke-width="2.2" aria-hidden="true" />
-          </button>
+          <div class="ns-send-group">
+            <GenerationWalletPicker v-if="mode === 'image' && !ideaMode" v-model="studio.generationWallet" compact :disabled="studio.busy || !!studio.pending" />
+            <span class="ns-cost" :title="sendTitle">
+              <YanhuoIcon :size="16" />
+              <strong>{{ imageCost != null ? number(imageCost) : mode === 'video' ? '报价后扣' : '—' }}</strong><small v-if="ideaMode">/ 次</small>
+            </span>
+            <button type="submit" class="ns-send" :class="{ busy: sendBusy }" :disabled="sendDisabled" :title="sendTitle" :aria-label="sendLabel">
+              <span v-if="sendBusy" class="ns-spinner" aria-hidden="true" />
+              <ArrowUp v-else :size="18" :stroke-width="2.2" aria-hidden="true" />
+            </button>
+          </div>
         </div>
         <input ref="imageInput" class="sr-only" type="file" accept="image/jpeg,image/png" multiple :disabled="studio.locked" @change="studio.addFiles" />
         <input :ref="el => (videoInputs.image.value = el)" class="sr-only" type="file" accept="image/*" multiple @change="video.handleMaterialChange('image', $event)" />
@@ -658,6 +690,8 @@ function videoTags(item) {
         <button v-for="item in planRecords" :key="item.id" type="button" :disabled="planEngine.working" @click="openPlanRecord(item)">{{ item.idea || item.plans?.[0]?.title || '按参考图出的方案' }}</button>
       </div>
       <p v-if="mode === 'video' && activeVideoDraft && video.notice" class="ns-composer-note" :class="{ 'ns-error': video.activeConversation?.error }" role="status">{{ video.notice }}</p>
+
+      <BalanceShortageDialog v-model:open="showBalanceDialog" :required="dialogShortage?.required || 0" :available="dialogShortage?.available || 0" :wallet-label="dialogWalletLabel" />
 
       <section v-if="panel === 'style'" class="ns-panel" aria-label="风格">
         <header><h2>风格</h2><small>不选就是「帮我搭配」，按画面需求自动匹配</small></header>
