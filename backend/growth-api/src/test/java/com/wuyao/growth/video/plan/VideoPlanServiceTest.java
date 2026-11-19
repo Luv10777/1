@@ -1,6 +1,7 @@
 package com.wuyao.growth.video.plan;
 
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.task.*;
@@ -41,6 +42,18 @@ class VideoPlanServiceTest {
         assertThat(view.status()).isEqualTo("QUEUED");
         verify(billing).requireMembership("VIDEO_PLAN");
         verify(assets).imageReference(5L);
+    }
+
+    @Test void theTeamWalletReservesThePlanFromTheTeam() {
+        when(gateway.configured(ModelAlias.VIDEO_PLANNER)).thenReturn(true);
+        when(plans.findByRequestKey("plan-key-1")).thenReturn(Optional.empty());
+        when(billing.reserve(eq("video-plan:plan-key-1"), eq("VIDEO_PLAN"), eq((long) BillingService.VIDEO_PLAN_CREDITS), anyString(),
+                eq(BillingDtos.GenerationWallet.TEAM))).thenReturn("team-r1");
+        when(plans.saveAndFlush(any())).thenAnswer(call -> { VideoPlan p = call.getArgument(0); p.setId(7L); return p; });
+        var task = new Task(); task.setId(70L);
+        when(tasks.submit(anyString(), anyString(), anyMap(), anyString(), anyLong())).thenReturn(task);
+        TenantContext.runAs(3L, () -> service.create(request(null), 1L, BillingDtos.GenerationWallet.TEAM));
+        verify(billing, never()).reserve(anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test void anotherRoundNeedsAFinishedPreviousBatch() {

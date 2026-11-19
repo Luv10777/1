@@ -1,5 +1,6 @@
 package com.wuyao.growth.video.plan;
 
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.common.web.PageResult;
@@ -16,8 +17,9 @@ public class VideoPlanController {
     @GetMapping("/config") public ApiResponse<VideoPlanDtos.Config> config() { return ApiResponse.ok(service.config()); }
     @PostMapping
     public ApiResponse<VideoPlanDtos.View> create(@Valid @RequestBody VideoPlanDtos.Create request,
-                                                 @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.create(request, me.userId()));
+                                                 @AuthenticationPrincipal AuthPrincipal me,
+                                                 @RequestParam(required = false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.create(request, me.userId(), wallet));
     }
     @GetMapping
     public ApiResponse<PageResult<VideoPlanDtos.History>> history(@RequestParam(defaultValue = "0") int page,

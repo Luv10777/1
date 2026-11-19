@@ -14,8 +14,10 @@ import { findDesktopDownloads } from '../services/desktopDownload'
 import { productApi } from '../services/productApi'
 import { knowledgeApi } from '../services/knowledgeApi'
 import { liveApi, defaultLiveConfig, normalizeLiveConfig, toSessionQa, defaultSessionName, pickCurrentSession, describeSession, sessionStatusLabel, isActiveSession, startBlockers, toCommentFeedItem, answeringCohostId, liveCostEstimate, liveBillingProgress } from '../services/liveApi'
-import { billing as account, refreshBilling } from '../stores/billing'
+import { billing as account, generationBalance, refreshBilling } from '../stores/billing'
 import YanhuoIcon from '../components/YanhuoIcon.vue'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
+import { useGenerationWallet } from '../composables/useGenerationWallet'
 
 /* ---------------- 场次配置 ---------------- */
 const route = useRoute()
@@ -462,7 +464,7 @@ const transitionSession = async (action) => {
     if (!session?.id) throw new Error('请先保存本场配置')
     if (action === 'end' && !window.confirm('确定结束本系统记录的本场吗？这不会关闭抖音直播，请另外在抖音 App 结束直播。结束后本场不能继续播报。')) return
     if (action === 'end') await audioControl.value?.stopForEnd()
-    const result = await liveApi[action](session.id)
+    const result = action === 'start' ? await liveApi.start(session.id, liveWallet.value) : await liveApi[action](session.id)
     if (!isCurrent(ticket, storeId)) return
     currentSession.value = result
     rememberSession(result)
@@ -578,7 +580,9 @@ watch(() => [stage.value, activeSessionId.value], ([nextStage, id]) => {
 onBeforeUnmount(() => { clearInterval(realtimePoll); clearInterval(sessionStatusPoll); clearInterval(billingClock) })
 /* ---------------- 本场烟火 ---------------- */
 // 后端给的是响应那一刻的在播秒数；在播时页面自己往上加，每 30 秒核对状态时再校准。
-const cost = computed(() => liveCostEstimate(account.summary))
+// 服务商负责人开播时可以选团队额度，整场都从开播时选的余额扣；其他账号只有个人额度。
+const { wallet: liveWallet, available: liveWalletAvailable } = useGenerationWallet()
+const cost = computed(() => liveCostEstimate(account.summary, liveWalletAvailable.value))
 const sessionFetchedAt = ref(Date.now())
 const clockNow = ref(Date.now())
 let billingClock = null
@@ -588,7 +592,7 @@ watch(() => currentSession.value?.billing?.onAir === true, (onAir) => {
   if (onAir) billingClock = setInterval(() => { clockNow.value = Date.now() }, 15000)
 }, { immediate: true })
 const sessionCost = computed(() => liveBillingProgress(currentSession.value?.billing,
-  (clockNow.value - sessionFetchedAt.value) / 1000, account.summary?.available ?? null))
+  (clockNow.value - sessionFetchedAt.value) / 1000, account.summary ? generationBalance(currentSession.value?.billing?.wallet || 'PERSONAL') : null))
 // 桌面端是用来开播的：只要这一场还没结束，打开就是直播工作台；配置在旁边的页签里。
 const stageFor = (status) => (status === 'ENDED' ? 'review' : hasWorkbench && (isActiveSession({ status }) || inDesktop) ? 'live' : 'setup')
 const loadSessionCore = async (id, ticket, storeId) => {
@@ -999,6 +1003,7 @@ onBeforeUnmount(() => {
           <div><dt>问答</dt><dd>{{ qaPairs.length }} 条</dd></div>
         </dl>
         <p v-if="cost && currentStatus === 'DRAFT'" class="ls-cost-rule">直播每小时 {{ cost.perHour }} 烟火，按实际在播的分钟算，暂停不计。开播先预占一小时，快播满时再预占下一小时，下播后没用完的退回。</p>
+        <GenerationWalletPicker v-if="currentStatus === 'DRAFT' && hasWorkbench" v-model="liveWallet" :disabled="apiBusy" />
         <button v-if="currentStatus === 'DRAFT'" class="primary-button" type="button" :disabled="loadBusy || loadFailed || apiBusy || launchingApp || !selectedStoreId || blockers.length > 0" @click="startSession">开始本场<span v-if="cost" class="ls-cost-tag"><YanhuoIcon :size="13" />预占 {{ cost.perHour }}</span></button>
         <button v-else-if="hasWorkbench && currentStatus !== 'ENDED'" class="primary-button" type="button" @click="setStage('live')">前往直播工作台</button>
         <p v-else-if="currentStatus !== 'ENDED'" class="ls-precheck-live">本场正在一方志软件里直播。</p>

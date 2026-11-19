@@ -4,6 +4,8 @@ import { billingWalletLabel } from '../domain/billing'
 import { nextTick, ref } from 'vue'
 import { Check, ChevronLeft, Film, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import YanhuoIcon from './YanhuoIcon.vue'
+import GenerationWalletPicker from './GenerationWalletPicker.vue'
+import BalanceShortageDialog from './BalanceShortageDialog.vue'
 import { videoPlanLetters, videoPlanSeconds, videoPlanStyles } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
 import { FREE_SCENE, videoSceneCover, videoSceneKey, videoSceneName } from '../services/videoScenes'
@@ -32,7 +34,7 @@ const {
   style, customStyle, customOpen, idea, working, error, clarification, answer, phaseLabel, result, showResults,
   appliedIndex, resultImages, resultInfo, record, records, recordsPage, recordsHasMore, recordsLoading, recordsError,
   credits, unavailable, planImages, missingRecordImages, currentScene, resultMeta,
-  loadRecords, pickStyle, openCustom, run, onIdeaEnter, openRecord, use,
+  loadRecords, pickStyle, openCustom, run, onIdeaEnter, openRecord, use, wallet, walletLabel, balanceShortage,
 } = useVideoPlan(props, emit)
 const recordsSection = ref(null)
 
@@ -75,7 +77,7 @@ const showRecords = async () => {
         </section>
         <div class="ip-composer-foot">
           <small>每次出 3 个版本 · 换一批同价 · 失败不扣烟火</small>
-          <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : clarification ? '补充并生成剧本' : '生成剧本' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
+          <span class="ip-actions"><GenerationWalletPicker v-model="wallet" compact :disabled="working" /><button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : clarification ? '补充并生成剧本' : '生成剧本' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button></span>
         </div>
       </div>
       <button v-if="result" type="button" class="ip-link" @click="showResults = true">回到上一批方案</button>
@@ -107,6 +109,7 @@ const showRecords = async () => {
         </div>
         <div class="ip-results-actions">
           <button type="button" class="ip-outline" :disabled="working" @click="showResults = false"><SlidersHorizontal :size="15" :stroke-width="1.8" aria-hidden="true" />重选</button>
+          <GenerationWalletPicker v-model="wallet" compact :disabled="working" />
           <button type="button" class="ip-primary" :disabled="working" @click="run(result.id)"><RefreshCw :size="15" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在换一批…' : '换一批' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
         </div>
       </header>
@@ -132,5 +135,6 @@ const showRecords = async () => {
     <p v-if="working" class="ip-status" role="status">{{ phaseLabel }}。可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
     <p v-if="unavailable" class="ip-status" role="status">出方案暂未开放，可以直接在左侧写描述。</p>
     <p v-if="error" class="ip-status is-error" role="alert">{{ error }}</p>
+    <BalanceShortageDialog :open="!!balanceShortage" :required="balanceShortage?.required || 0" :available="balanceShortage?.available || 0" :wallet-label="walletLabel" @close="balanceShortage = null" />
   </section>
 </template>

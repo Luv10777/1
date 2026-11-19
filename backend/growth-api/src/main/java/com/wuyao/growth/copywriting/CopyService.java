@@ -1,6 +1,7 @@
 package com.wuyao.growth.copywriting;
 
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
 import com.wuyao.growth.common.task.Task;
@@ -55,6 +56,11 @@ public class CopyService {
 
     @Transactional
     public CopyDtos.View create(CopyDtos.Create request, Long userId) {
+        return create(request, userId, null);
+    }
+
+    @Transactional
+    public CopyDtos.View create(CopyDtos.Create request, Long userId, BillingDtos.GenerationWallet wallet) {
         billing.lockForGeneration();
         if (!CopyModel.configured(gateway)) throw BizException.of(ErrorCode.COPY_NOT_CONFIGURED, "文案模型尚未配置");
         storeAccess.requireAccess(request.storeId(), userId);
@@ -71,7 +77,8 @@ public class CopyService {
                     || prior.isVoiceOn() != request.voiceOn() || !prior.getImageAssetIds().equals(imageIds)
                     || !prior.getWorkItemIds().equals(workIds)
                     || !prior.getProducts().stream().map(CopyDtos.ProductRef::id).toList().equals(productIds)
-                    || !Objects.equals(prior.getNote(), note) || !Objects.equals(prior.getPreviousBatchId(), request.previousBatchId())) {
+                    || !Objects.equals(prior.getNote(), note) || !Objects.equals(prior.getPreviousBatchId(), request.previousBatchId())
+                    || billing.walletDiffers(prior.getBillingReservationId(), wallet)) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的文案，请重新提交");
             }
             return view(prior);
@@ -115,8 +122,11 @@ public class CopyService {
         batch.setProductFacts(chosen.isEmpty() ? null : chosen.stream().map(CopyService::productFacts).collect(Collectors.joining("\n")));
         batch.setNote(note);
         batch.setPreviousBatchId(request.previousBatchId());
-        batch.setBillingReservationId(billing.reserve("copy-generate:" + request.requestKey(), "COPY", BillingService.COPY_CREDITS,
-                (request.previousBatchId() == null ? "文案创作" : "文案创作换一批") + " · 预占 " + BillingService.COPY_CREDITS + " 烟火"));
+        String description = (request.previousBatchId() == null ? "文案创作" : "文案创作换一批") + " · 预占 " + BillingService.COPY_CREDITS + " 烟火";
+        String key = "copy-generate:" + request.requestKey();
+        batch.setBillingReservationId(wallet == BillingDtos.GenerationWallet.TEAM
+                ? billing.reserve(key, "COPY", BillingService.COPY_CREDITS, description, wallet)
+                : billing.reserve(key, "COPY", BillingService.COPY_CREDITS, description));
         batches.saveAndFlush(batch);
         Task task = tasks.submit(CopyGenerateHandler.TYPE, "DEFAULT", Map.of("batchId", batch.getId()),
                 "copy-generate-" + batch.getId(), userId);

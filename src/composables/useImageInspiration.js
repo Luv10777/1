@@ -4,6 +4,7 @@ import { uploadImageReference } from '../services/imageCreation'
 import { imageInspirationApi, inspirationRecordFiles, inspirationStyle, isImageInspirationDone } from '../services/imageInspirations'
 import { videoHistoryTime } from '../services/videoConversations'
 import { auth } from '../stores/auth'
+import { useGenerationWallet } from './useGenerationWallet'
 
 /**
  * 灵感绘图「灵感方案」：按参考图、绘图风格和一句话出 3 个画面描述，「用这个」填进画面描述。
@@ -30,6 +31,9 @@ export function useImageInspiration(props) {
   const recordsHasMore = ref(false)
   const recordsLoading = ref(false)
   const recordsError = ref('')
+  // 服务商负责人可以选团队额度；余额读得到且不够时先弹充值窗口，不发请求。
+  const { wallet, label: walletLabel, shortage } = useGenerationWallet()
+  const balanceShortage = ref(null)
   let requestKey = ''
   let signature = ''
   let disposed = false
@@ -94,6 +98,7 @@ export function useImageInspiration(props) {
     try { await requireAccount() }
     catch (e) { error.value = e.message; return }
     if (!studio.value.files.length && !idea.value.trim() && !studio.value.brief?.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的画面。'; return }
+    if ((balanceShortage.value = shortage(credits.value))) return
     working.value = true
     try {
       // 和生成图片一样：没上传过的参考图先上传，记下素材编号，之后生成图片时不再重复上传。
@@ -101,9 +106,10 @@ export function useImageInspiration(props) {
       for (const file of references) if (!file.assetId) file.assetId = await uploadImageReference(file.file)
       const body = { imageAssetIds: references.map(file => file.assetId), style: styleName.value, idea: idea.value.trim(), previousId, sourceBrief: studio.value.brief?.trim() || '' }
       // 网络中断后重试同一份请求沿用原编号，不会重复预占烟火。
-      if (JSON.stringify(body) !== signature) { requestKey = `image-inspiration-${crypto.randomUUID()}`; signature = JSON.stringify(body) }
+      const payer = wallet.value
+      if (JSON.stringify({ ...body, payer }) !== signature) { requestKey = `image-inspiration-${crypto.randomUUID()}`; signature = JSON.stringify({ ...body, payer }) }
       const images = references.map(file => file.preview)
-      let batch = await imageInspirationApi.create({ requestKey, ...body })
+      let batch = await imageInspirationApi.create({ requestKey, ...body }, payer)
       refreshBilling()
       batch = await settle(batch)
       if (!batch) return
@@ -186,6 +192,6 @@ export function useImageInspiration(props) {
   return {
     config, idea, working, error, result, showResults, appliedIndex, resultImages, resultReferences, resultInfo, record,
     records, recordsPage, recordsHasMore, recordsLoading, recordsError, credits, unavailable, planFiles, styleName,
-    missingRecordImages, resultMeta, loadRecords, run, onIdeaEnter, openRecord, use,
+    missingRecordImages, resultMeta, loadRecords, run, onIdeaEnter, openRecord, use, wallet, walletLabel, balanceShortage,
   }
 }

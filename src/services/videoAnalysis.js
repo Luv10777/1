@@ -1,12 +1,13 @@
 import { get, post, put } from '../utils/request'
+import { generationWalletPath } from '../domain/billing.js'
 import { analysisMimeType, validateAnalysisFile } from '../domain/videoAnalysis'
 
 export const videoAnalysisApi = {
   limits: () => get('/api/video/analyses/limits'),
   list: () => get('/api/video/analyses', { size: 20 }),
   get: id => get(`/api/video/analyses/${id}`),
-  create: data => post('/api/video/analyses', data),
-  importUrl: data => post('/api/video/analyses/import-url', data),
+  create: (data, wallet) => post(generationWalletPath('/api/video/analyses', wallet), data),
+  importUrl: (data, wallet) => post(generationWalletPath('/api/video/analyses/import-url', wallet), data),
   cancel: id => post(`/api/video/analyses/${id}/cancel`, {}),
   rename: (id, name) => put(`/api/video/analyses/${id}/name`, { name }),
 }

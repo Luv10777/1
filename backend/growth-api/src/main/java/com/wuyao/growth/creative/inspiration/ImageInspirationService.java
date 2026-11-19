@@ -2,6 +2,7 @@ package com.wuyao.growth.creative.inspiration;
 
 import com.wuyao.growth.common.web.CustomerMessages;
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
 import com.wuyao.growth.common.gateway.ModelAlias;
@@ -41,6 +42,11 @@ public class ImageInspirationService {
 
     @Transactional
     public ImageInspirationDtos.View create(ImageInspirationDtos.Create request, Long userId) {
+        return create(request, userId, null);
+    }
+
+    @Transactional
+    public ImageInspirationDtos.View create(ImageInspirationDtos.Create request, Long userId, BillingDtos.GenerationWallet wallet) {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.IMAGE_INSPIRATION_PLANNER)) throw BizException.of(ErrorCode.IMAGE_NOT_CONFIGURED, "灵感方案模型尚未配置");
         String style = trim(request.style()), idea = trim(request.idea());
@@ -51,6 +57,7 @@ public class ImageInspirationService {
             var prior = existing.get();
             if (!prior.getImageAssetIds().equals(images) || !Objects.equals(prior.getStyle(), style)
                     || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousId(), request.previousId())
+                    || billing.walletDiffers(prior.getBillingReservationId(), wallet)
                     || !Objects.equals(sourceBrief, prior.getTaskId() == null ? null : taskRepository.findById(prior.getTaskId())
                         .map(t -> (String) t.getPayload().get("sourceBrief")).orElse(null))) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的方案，请重新提交");
@@ -74,8 +81,11 @@ public class ImageInspirationService {
         inspiration.setStyle(style);
         inspiration.setIdea(idea);
         inspiration.setPreviousId(request.previousId());
-        inspiration.setBillingReservationId(billing.reserve("image-inspiration:" + request.requestKey(), CAPABILITY,
-                BillingService.IMAGE_INSPIRATION_CREDITS, (request.previousId() == null ? "灵感方案" : "灵感方案换一批") + " · 预占 " + BillingService.IMAGE_INSPIRATION_CREDITS + " 烟火"));
+        String description = (request.previousId() == null ? "灵感方案" : "灵感方案换一批") + " · 预占 " + BillingService.IMAGE_INSPIRATION_CREDITS + " 烟火";
+        String key = "image-inspiration:" + request.requestKey();
+        inspiration.setBillingReservationId(wallet == BillingDtos.GenerationWallet.TEAM
+                ? billing.reserve(key, CAPABILITY, BillingService.IMAGE_INSPIRATION_CREDITS, description, wallet)
+                : billing.reserve(key, CAPABILITY, BillingService.IMAGE_INSPIRATION_CREDITS, description));
         inspirations.saveAndFlush(inspiration);
         var payload = new java.util.LinkedHashMap<String, Object>();
         payload.put("inspirationId", inspiration.getId());

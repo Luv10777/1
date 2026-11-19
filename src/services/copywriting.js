@@ -1,10 +1,11 @@
 import { get, post, put } from '../utils/request.js'
+import { generationWalletPath } from '../domain/billing.js'
 
 /** 文案创作：看图或一句话，给朋友圈、抖音、小红书写 3 条配文。每次（含换一批）3 烟火，失败退回；改写不另收费。 */
 export const copyApi = {
   config: () => get('/api/copy/config'),
   almanac: storeId => get('/api/copy/almanac/today', { storeId }),
-  create: request => post('/api/copy/batches', request),
+  create: (request, wallet) => post(generationWalletPath('/api/copy/batches', wallet), request),
   get: id => get(`/api/copy/batches/${id}`),
   history: (storeId, { platform = '', page = 0 } = {}) => get('/api/copy/batches', { storeId, ...(platform ? { platform } : {}), page, size: 20 }),
   rewrite: (id, index, action) => post(`/api/copy/batches/${id}/versions/${index}/rewrite`, { action }),

@@ -1,5 +1,6 @@
 package com.wuyao.growth.creative.inspiration;
 
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.common.web.PageResult;
@@ -16,8 +17,9 @@ public class ImageInspirationController {
     @GetMapping("/config") public ApiResponse<ImageInspirationDtos.Config> config() { return ApiResponse.ok(service.config()); }
     @PostMapping
     public ApiResponse<ImageInspirationDtos.View> create(@Valid @RequestBody ImageInspirationDtos.Create request,
-                                                        @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.create(request, me.userId()));
+                                                        @AuthenticationPrincipal AuthPrincipal me,
+                                                        @RequestParam(required = false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.create(request, me.userId(), wallet));
     }
     @GetMapping
     public ApiResponse<PageResult<ImageInspirationDtos.History>> history(@RequestParam(defaultValue = "0") int page,

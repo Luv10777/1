@@ -1,5 +1,6 @@
 package com.wuyao.growth.video.analysis;
 
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.asset.AssetDtos;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
@@ -22,13 +23,15 @@ public class VideoAnalysisController {
     }
     @PostMapping
     public ApiResponse<VideoAnalysisDtos.View> create(@Valid @RequestBody VideoAnalysisDtos.Create request,
-                                                     @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.create(request, me.userId()));
+                                                     @AuthenticationPrincipal AuthPrincipal me,
+                                                     @RequestParam(required = false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.create(request, me.userId(), wallet));
     }
     @PostMapping("/import-url")
     public ApiResponse<VideoAnalysisDtos.View> importUrl(@Valid @RequestBody VideoAnalysisDtos.Import request,
-                                                        @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.importUrl(request, me.userId()));
+                                                        @AuthenticationPrincipal AuthPrincipal me,
+                                                        @RequestParam(required = false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.importUrl(request, me.userId(), wallet));
     }
     @GetMapping("/{id}") public ApiResponse<VideoAnalysisDtos.View> get(@PathVariable Long id) { return ApiResponse.ok(service.get(id)); }
     @PostMapping("/{id}/cancel")

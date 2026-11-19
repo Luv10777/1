@@ -1,4 +1,5 @@
 import { get, post, put, del, request } from '../utils/request.js'
+import { generationWalletPath } from '../domain/billing.js'
 
 export const liveApi = {
   list: (storeId) => get(`/api/stores/${storeId}/live-sessions`),
@@ -6,7 +7,7 @@ export const liveApi = {
   get: (id) => get(`/api/live-sessions/${id}`),
   update: (id, data) => request(`/api/live-sessions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   updateAudioRoute: (id, data) => request(`/api/live-sessions/${id}/audio-route`, { method: 'PATCH', body: JSON.stringify(data) }),
-  start: (id) => post(`/api/live-sessions/${id}/start`, {}),
+  start: (id, wallet) => post(generationWalletPath(`/api/live-sessions/${id}/start`, wallet), {}),
   pause: (id) => post(`/api/live-sessions/${id}/pause`, {}),
   resume: (id) => post(`/api/live-sessions/${id}/resume`, {}),
   end: (id) => post(`/api/live-sessions/${id}/end`, {}),
@@ -238,10 +239,10 @@ export function formatLiveDuration(seconds) {
 }
 
 /** 开播前：余额够播多久。没有会员、套餐不含直播、余额不够一小时时给出要处理的事。 */
-export function liveCostEstimate(summary) {
+export function liveCostEstimate(summary, available = summary?.available) {
   if (!summary) return null
   const perHour = summary.liveCreditsPerHour
-  const available = Math.max(0, summary.available || 0)
+  available = Math.max(0, available || 0)
   let problem = ''
   if (!summary.memberActive) problem = '还没有开通会员，开不了播'
   else if (summary.plan && summary.plan.liveEnabled === false) problem = '当前套餐不含直播'

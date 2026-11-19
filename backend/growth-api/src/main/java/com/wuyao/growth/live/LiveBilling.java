@@ -1,5 +1,6 @@
 package com.wuyao.growth.live;
 
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -29,9 +30,16 @@ public class LiveBilling {
 
     /** 开播或恢复：没有会员权限或烟火不足时抛出业务异常，调用方的事务随之回滚。 */
     void startAir(LiveSession session, Instant now) {
+        startAir(session, now, null);
+    }
+
+    /** 开播时选的余额（个人或团队）决定整场都从哪里扣；恢复和续占沿用开播时的预占。 */
+    void startAir(LiveSession session, Instant now, BillingDtos.GenerationWallet wallet) {
         if (session.getBillingReservationId() == null) {
-            session.setBillingReservationId(billing.reserve("live:" + session.getId(), "LIVE",
-                    BillingService.LIVE_CREDITS_PER_HOUR, "直播「" + session.getName() + "」· 预占 1 小时"));
+            String key = "live:" + session.getId(), description = "直播「" + session.getName() + "」· 预占 1 小时";
+            session.setBillingReservationId(wallet == BillingDtos.GenerationWallet.TEAM
+                    ? billing.reserve(key, "LIVE", BillingService.LIVE_CREDITS_PER_HOUR, description, wallet)
+                    : billing.reserve(key, "LIVE", BillingService.LIVE_CREDITS_PER_HOUR, description));
             session.setBilledHours(1);
         } else {
             billing.requireMembership("LIVE");
@@ -59,7 +67,7 @@ public class LiveBilling {
         }
         while ((long) session.getBilledHours() * HOUR_SECONDS < onAir + RENEW_AHEAD_SECONDS) {
             // 先问再预占：预占失败的异常会把整个事务标记为回滚，暂停也就写不进去了。
-            if (!billing.canReserve("LIVE", BillingService.LIVE_CREDITS_PER_HOUR)) {
+            if (!billing.canReserveMore(session.getBillingReservationId(), BillingService.LIVE_CREDITS_PER_HOUR)) {
                 return onAir + STOP_MARGIN_SECONDS < (long) session.getBilledHours() * HOUR_SECONDS;
             }
             reserveNextHour(session);
@@ -81,14 +89,21 @@ public class LiveBilling {
         billing.release(reservation, "live-release:" + session.getId(), "直播结束 · 退回未用烟火");
     }
 
-    static LiveDtos.Billing view(LiveSession session, Instant now) {
+    LiveDtos.Billing view(LiveSession session, Instant now) {
+        var base = view(session, now, null);
+        if (session.getBillingReservationId() == null) return base;
+        return new LiveDtos.Billing(base.creditsPerHour(), base.liveSeconds(), base.onAir(), base.reservedCredits(),
+                base.usedCredits(), base.refundedCredits(), billing.generationWallet(session.getBillingReservationId()));
+    }
+
+    static LiveDtos.Billing view(LiveSession session, Instant now, BillingDtos.GenerationWallet wallet) {
         long seconds = onAirSeconds(session, now);
         long reserved = session.getBillingReservationId() == null ? 0
                 : (long) session.getBilledHours() * BillingService.LIVE_CREDITS_PER_HOUR;
         long used = Math.min(charge(seconds), reserved);
         boolean ended = "ENDED".equals(session.getStatus());
         return new LiveDtos.Billing(BillingService.LIVE_CREDITS_PER_HOUR, seconds,
-                session.getLiveSegmentStartedAt() != null, reserved, used, ended ? reserved - used : 0);
+                session.getLiveSegmentStartedAt() != null, reserved, used, ended ? reserved - used : 0, wallet);
     }
 
     static long onAirSeconds(LiveSession session, Instant now) {

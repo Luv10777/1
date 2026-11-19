@@ -39,6 +39,7 @@
 .ip-idea::placeholder { color: var(--ip-faint); }
 .ip-composer-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; padding-top: 12px; border-top: 1px solid var(--ip-line); }
 .ip-composer-foot small { color: var(--ip-faint); font-size: 12px; }
+.ip-actions { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .ip-panel :is(.ip-primary, .ip-outline) { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 8px; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .18s, box-shadow .18s, color .18s; }
 .ip-panel .ip-primary { background: var(--ip-accent); color: var(--ip-on-accent); }
 .ip-panel .ip-primary:hover:not(:disabled) { background: var(--ip-accent-hover); }
@@ -69,7 +70,7 @@
 .ip-panel .ip-back { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 0; border: 0; background: transparent; color: var(--ip-muted); font-size: 12px; cursor: pointer; }
 .ip-panel .ip-back:hover:not(:disabled) { color: var(--ip-ink); }
 .ip-results-title small { color: var(--ip-faint); font-size: 12px; }
-.ip-results-actions { display: flex; flex: none; gap: 8px; }
+.ip-results-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ip-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; transition: opacity .18s; }
 .ip-cards.is-working { opacity: .55; }
 .ip-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 20px; border-radius: 12px; background: var(--ip-surface); box-shadow: 0 0 0 1px var(--ip-line); transition: box-shadow .18s; }

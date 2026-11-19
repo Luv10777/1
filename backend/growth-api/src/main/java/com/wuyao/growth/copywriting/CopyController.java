@@ -1,5 +1,6 @@
 package com.wuyao.growth.copywriting;
 
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.common.web.PageResult;
@@ -24,8 +25,9 @@ public class CopyController {
     }
 
     @PostMapping("/batches")
-    public ApiResponse<CopyDtos.View> create(@Valid @RequestBody CopyDtos.Create request, @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.create(request, me.userId()));
+    public ApiResponse<CopyDtos.View> create(@Valid @RequestBody CopyDtos.Create request, @AuthenticationPrincipal AuthPrincipal me,
+            @RequestParam(required = false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.create(request, me.userId(), wallet));
     }
 
     @GetMapping("/batches")

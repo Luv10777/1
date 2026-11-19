@@ -3,6 +3,8 @@ import { billingWalletLabel } from '../domain/billing'
 import { nextTick, ref } from 'vue'
 import { Check, ChevronLeft, RefreshCw, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import YanhuoIcon from './YanhuoIcon.vue'
+import GenerationWalletPicker from './GenerationWalletPicker.vue'
+import BalanceShortageDialog from './BalanceShortageDialog.vue'
 import { videoPlanLetters } from '../services/videoPlans'
 import { videoHistoryTime } from '../services/videoConversations'
 import { useImageInspiration } from '../composables/useImageInspiration'
@@ -14,7 +16,7 @@ const props = defineProps({ studio: { type: Object, required: true } })
 const {
   idea, working, error, result, showResults, appliedIndex, resultImages, resultInfo, record,
   records, recordsPage, recordsHasMore, recordsLoading, recordsError, credits, unavailable, planFiles, styleName,
-  missingRecordImages, resultMeta, loadRecords, run, onIdeaEnter, openRecord, use,
+  missingRecordImages, resultMeta, loadRecords, run, onIdeaEnter, openRecord, use, wallet, walletLabel, balanceShortage,
 } = useImageInspiration(props)
 const studio = props.studio
 const recordsSection = ref(null)
@@ -43,7 +45,7 @@ const showRecords = async () => {
         <textarea id="poster-idea-input" v-model="idea" class="ip-idea" rows="2" maxlength="500" placeholder="一句话说说想要什么，例如：新品香水上新，发小红书，安静高级一点" @keydown.enter.exact="onIdeaEnter" />
         <div class="ip-composer-foot">
           <small>每次出 3 个画面 · 换一批同价 · 失败不扣烟火</small>
-          <button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成灵感方案' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
+          <span class="ip-actions"><GenerationWalletPicker v-model="wallet" compact :disabled="working" /><button class="ip-primary" type="button" :disabled="working || unavailable" @click="run()"><Sparkles :size="16" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在出方案…' : '生成灵感方案' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button></span>
         </div>
       </div>
       <button v-if="result" type="button" class="ip-link" @click="showResults = true">回到上一批方案</button>
@@ -75,6 +77,7 @@ const showRecords = async () => {
         </div>
         <div class="ip-results-actions">
           <button type="button" class="ip-outline" :disabled="working" @click="showResults = false"><SlidersHorizontal :size="15" :stroke-width="1.8" aria-hidden="true" />重选</button>
+          <GenerationWalletPicker v-model="wallet" compact :disabled="working" />
           <button type="button" class="ip-primary" :disabled="working" @click="run(result.id)"><RefreshCw :size="15" :stroke-width="1.8" aria-hidden="true" />{{ working ? '正在换一批…' : '换一批' }}<span class="ip-cost"><YanhuoIcon :size="13" />{{ credits }} 烟火</span></button>
         </div>
       </header>
@@ -96,5 +99,6 @@ const showRecords = async () => {
     <p v-if="working" class="ip-status" role="status">正在看图出方案，通常 1 分钟左右，可以先回左侧继续编辑；离开页面再回来也会接着显示这一批。</p>
     <p v-if="unavailable" class="ip-status" role="status">灵感方案暂未开放，可以直接在左侧写画面描述。</p>
     <p v-if="error" class="ip-status is-error" role="alert">{{ error }}</p>
+    <BalanceShortageDialog :open="!!balanceShortage" :required="balanceShortage?.required || 0" :available="balanceShortage?.available || 0" :wallet-label="walletLabel" @close="balanceShortage = null" />
   </section>
 </template>

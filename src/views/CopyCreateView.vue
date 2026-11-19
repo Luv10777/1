@@ -8,6 +8,9 @@ import { copyApi, copyPlatforms, copyRewrites, copyStoreLevels, copyStyles, aiLe
 import { selectedStoreId, selectedStore } from '../stores/merchantContext'
 import { auth } from '../stores/auth'
 import { refreshBilling, requireAccount } from '../stores/billing'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
+import BalanceShortageDialog from '../components/BalanceShortageDialog.vue'
+import { useGenerationWallet } from '../composables/useGenerationWallet'
 import '../copywriting.css'
 
 const route = useRoute()
@@ -44,6 +47,9 @@ function blankForm() {
 const styles = computed(() => config.value?.styles || copyStyles)
 const maxImages = computed(() => config.value?.maxImages || 6)
 const credits = computed(() => config.value?.credits ?? 1)
+// 服务商负责人可以选团队额度；余额读得到且不够时先弹充值窗口，不发请求。
+const { wallet, label: walletLabel, shortage } = useGenerationWallet()
+const balanceShortage = ref(null)
 const store = computed(() => batch.value?.store || {})
 const versions = computed(() => batch.value?.status === 'SUCCEEDED' ? batch.value.versions || [] : [])
 const generating = computed(() => submitting.value || (batch.value && !isCopyDone(batch.value)))
@@ -160,6 +166,7 @@ function toggleProduct(product) {
 
 async function generate(again = false) {
   if (!canGenerate.value && !again) return
+  if ((balanceShortage.value = shortage(credits.value))) return
   error.value = ''
   notice.value = ''
   submitting.value = true
@@ -182,7 +189,7 @@ async function generate(again = false) {
       productIds: form.value.products.map(p => p.id),
       note: form.value.note.trim() || null,
       previousBatchId: again && batch.value?.status === 'SUCCEEDED' ? batch.value.id : null,
-    })
+    }, wallet.value)
     batch.value = view
     selected.value = 0
     whyOpen.value = rewriteOpen.value = copied.value = stamped.value = -1
@@ -366,6 +373,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); window.removeEventListen
         <div v-if="error" class="cw-error" role="alert">{{ error }}</div>
         <p v-if="config && !config.configured" class="cw-hint">文案模型尚未配置，暂时不能生成。</p>
         <p v-else-if="!selectedStoreId && auth.isAuthenticated" class="cw-hint">先选一家门店，文案会用到门店的名字和地址。</p>
+        <GenerationWalletPicker v-model="wallet" :disabled="Boolean(generating) || submitting" />
         <button type="button" class="cw-generate" :disabled="!canGenerate" @click="generate(false)">
           {{ generating ? '正在写…' : `生成文案 · ${credits} 烟火` }}
         </button>
@@ -567,5 +575,6 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); window.removeEventListen
         </div>
       </div>
     </Teleport>
+    <BalanceShortageDialog :open="!!balanceShortage" :required="balanceShortage?.required || 0" :available="balanceShortage?.available || 0" :wallet-label="walletLabel" @close="balanceShortage = null" />
   </div>
 </template>

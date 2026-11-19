@@ -1,5 +1,6 @@
 package com.wuyao.growth.live;
 
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
@@ -500,6 +501,18 @@ class LiveSessionServiceTest {
     }
 
     @Test
+    void startingWithTheTeamWalletReservesTheFirstHourFromTheTeam() {
+        selectProduct(30L);
+        when(knowledge.context(2L, 4L)).thenReturn(new KnowledgeDtos.KnowledgeContext(2L, null, List.of(), Instant.now()));
+        when(billingService.reserve(eq("live:20"), eq("LIVE"), eq(35L), anyString(), eq(BillingDtos.GenerationWallet.TEAM))).thenReturn("team-reservation");
+
+        service.start(20L, 4L, BillingDtos.GenerationWallet.TEAM);
+
+        assertThat(session.getBillingReservationId()).isEqualTo("team-reservation");
+        verify(billingService, never()).reserve(anyString(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
     void pausedTimeIsFreeAndEndingSettlesByTheMinuteAndReturnsTheRest() {
         session.setStatus("LIVE");
         session.setBillingReservationId("reservation-1");
@@ -543,13 +556,13 @@ class LiveSessionServiceTest {
         session.setBillingReservationId("reservation-1");
         session.setBilledHours(1);
         session.setLiveSegmentStartedAt(Instant.now().minusSeconds(56 * 60));
-        when(billingService.canReserve("LIVE", 35L)).thenReturn(true);
+        when(billingService.canReserveMore("reservation-1", 35L)).thenReturn(true);
 
         assertThat(service.meter(20L)).isTrue();
         verify(billingService).reserveMore(eq("reservation-1"), eq(35L), eq("live-hour:20:2"), anyString());
         assertThat(session.getBilledHours()).isEqualTo(2);
 
-        when(billingService.canReserve("LIVE", 35L)).thenReturn(false);
+        when(billingService.canReserveMore("reservation-1", 35L)).thenReturn(false);
         session.setLiveSegmentStartedAt(Instant.now().minusSeconds(116 * 60));
         assertThat(service.meter(20L)).isTrue();
         assertThat(session.getStatus()).isEqualTo("LIVE");

@@ -1,6 +1,7 @@
 package com.wuyao.growth.copywriting;
 
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
 import com.wuyao.growth.common.gateway.ModelAlias;
@@ -59,6 +60,17 @@ class CopyServiceTest {
         }
         batch.setVersions(versions);
         return batch;
+    }
+
+    @Test void theTeamWalletReservesTheCopyFromTheTeam() {
+        configured();
+        when(billing.reserve(eq("copy-generate:copy-key-1"), eq("COPY"), eq((long) BillingService.COPY_CREDITS), anyString(),
+                eq(BillingDtos.GenerationWallet.TEAM))).thenReturn("team-r1");
+        when(batches.saveAndFlush(any())).thenAnswer(call -> { CopyBatch b = call.getArgument(0); b.setId(7L); return b; });
+        var task = new Task(); task.setId(70L);
+        when(tasks.submit(anyString(), anyString(), anyMap(), anyString(), anyLong())).thenReturn(task);
+        TenantContext.runAs(3L, () -> service.create(request(List.of(5L), List.of(), "今天下雨"), 1L, BillingDtos.GenerationWallet.TEAM));
+        verify(billing, never()).reserve(anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test void createReservesOneCreditSnapshotsProductsAndQueuesGeneration() {

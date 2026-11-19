@@ -2,6 +2,7 @@ package com.wuyao.growth.video.analysis;
 
 import com.wuyao.growth.common.web.CustomerMessages;
 import com.wuyao.growth.asset.*;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.storage.ObjectStorage;
@@ -53,6 +54,11 @@ public class VideoAnalysisService {
 
     @Transactional
     public VideoAnalysisDtos.View create(VideoAnalysisDtos.Create request, Long userId) {
+        return create(request, userId, null);
+    }
+
+    @Transactional
+    public VideoAnalysisDtos.View create(VideoAnalysisDtos.Create request, Long userId, BillingDtos.GenerationWallet wallet) {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VISION_ANALYZER)) {
             throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频反推模型尚未配置");
@@ -64,7 +70,7 @@ public class VideoAnalysisService {
         if (existing.isPresent()) {
             VideoAnalysis prior = existing.get();
             if (!prior.getAssetId().equals(request.assetId()) || !prior.getMode().equals(request.mode())
-                    || !Objects.equals(prior.getReverseNeed(), need)) {
+                    || !Objects.equals(prior.getReverseNeed(), need) || billing.walletDiffers(prior.getBillingReservationId(), wallet)) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的分析，请重新提交");
             }
             return view(prior, true);
@@ -87,13 +93,20 @@ public class VideoAnalysisService {
         analysis.setMode(request.mode());
         analysis.setReverseNeed(need);
         analysis.setAssetId(asset.getId());
-        analysis.setBillingReservationId(billing.reserve("video-analysis:" + request.requestKey(), "VIDEO_ANALYSIS",
-                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 " + BillingService.VIDEO_ANALYSIS_CREDITS + " 烟火"));
+        analysis.setBillingReservationId(reserve(request.requestKey(), wallet));
         analyses.saveAndFlush(analysis);
         Task task = tasks.submit(VideoAnalysisPrepareHandler.TYPE, "MEDIA_CPU", Map.of("analysisId", analysis.getId()),
                 "video-analysis-prepare-" + analysis.getId(), userId);
         analysis.setTaskId(task.getId());
         return view(analysis, true);
+    }
+
+    private String reserve(String requestKey, BillingDtos.GenerationWallet wallet) {
+        String key = "video-analysis:" + requestKey;
+        String description = "视频反推 · 预占 " + BillingService.VIDEO_ANALYSIS_CREDITS + " 烟火";
+        return wallet == BillingDtos.GenerationWallet.TEAM
+                ? billing.reserve(key, "VIDEO_ANALYSIS", BillingService.VIDEO_ANALYSIS_CREDITS, description, wallet)
+                : billing.reserve(key, "VIDEO_ANALYSIS", BillingService.VIDEO_ANALYSIS_CREDITS, description);
     }
 
     private void checkSize(long size) {
@@ -104,6 +117,11 @@ public class VideoAnalysisService {
 
     @Transactional
     public VideoAnalysisDtos.View importUrl(VideoAnalysisDtos.Import request, Long userId) {
+        return importUrl(request, userId, null);
+    }
+
+    @Transactional
+    public VideoAnalysisDtos.View importUrl(VideoAnalysisDtos.Import request, Long userId, BillingDtos.GenerationWallet wallet) {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VISION_ANALYZER)) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "视频反推模型尚未配置");
         String url = request.url().strip();
@@ -114,11 +132,12 @@ public class VideoAnalysisService {
         if (existing.isPresent()) {
             var prior = existing.get();
             if (!Objects.equals(prior.getSourceUrl(), url) || !prior.getMode().equals(request.mode())
-                    || !Objects.equals(prior.getReverseNeed(), need)) throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的分析");
+                    || !Objects.equals(prior.getReverseNeed(), need) || billing.walletDiffers(prior.getBillingReservationId(), wallet)) {
+                throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的分析");
+            }
             return view(prior, true);
         }
-        String reservation = billing.reserve("video-analysis:" + request.requestKey(), "VIDEO_ANALYSIS",
-                BillingService.VIDEO_ANALYSIS_CREDITS, "视频反推 · 预占 " + BillingService.VIDEO_ANALYSIS_CREDITS + " 烟火");
+        String reservation = reserve(request.requestKey(), wallet);
         var asset = new Asset();
         asset.setTenantId(TenantContext.require()); asset.setCreatedBy(userId);
         asset.setName("链接视频.mp4"); asset.setType("VIDEO"); asset.setMimeType("video/mp4");

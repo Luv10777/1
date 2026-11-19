@@ -1,5 +1,6 @@
 package com.wuyao.growth.live;
 
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.common.tenant.TenantContext;
 import com.wuyao.growth.common.web.BizException;
 import com.wuyao.growth.common.web.ErrorCode;
@@ -112,6 +113,11 @@ public class LiveSessionService {
     /** Starts the configured session lifecycle; external streaming is not implemented here. */
     @Transactional
     public LiveDtos.View start(Long id, Long userId) {
+        return start(id, userId, null);
+    }
+
+    @Transactional
+    public LiveDtos.View start(Long id, Long userId, BillingDtos.GenerationWallet wallet) {
         billing.lockAccount();
         LiveSession session = require(id, userId, true);
         requireState(session, Set.of("DRAFT"));
@@ -132,7 +138,7 @@ public class LiveSessionService {
         buildSnapshot(session, selected, userId);
         Instant now = Instant.now();
         // Reserves the first hour; no live entitlement or too few credits leaves the session a draft.
-        billing.startAir(session, now);
+        billing.startAir(session, now, wallet);
         session.setStatus("LIVE");
         session.setStartedAt(now);
         try {
@@ -463,7 +469,7 @@ public class LiveSessionService {
                                 snapshot.getSourceId(), snapshot.getQuestion(), snapshot.getAnswer(),
                                 snapshot.getPriority())).toList(), session.getConfig(), session.getAudioRoute(),
                 session.getAudioTestStatus(), session.isPlayerPaired(), session.getPlayerLastHeartbeatAt(),
-                LiveBilling.view(session, Instant.now()));
+                billing.view(session, Instant.now()));
     }
 
     private static void requireDraft(LiveSession session) {

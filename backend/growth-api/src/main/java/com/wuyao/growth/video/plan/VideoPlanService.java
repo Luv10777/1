@@ -2,6 +2,7 @@ package com.wuyao.growth.video.plan;
 
 import com.wuyao.growth.common.web.CustomerMessages;
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.AiGateway;
 import com.wuyao.growth.common.gateway.ModelAlias;
@@ -40,6 +41,11 @@ public class VideoPlanService {
 
     @Transactional
     public VideoPlanDtos.View create(VideoPlanDtos.Create request, Long userId) {
+        return create(request, userId, null);
+    }
+
+    @Transactional
+    public VideoPlanDtos.View create(VideoPlanDtos.Create request, Long userId, BillingDtos.GenerationWallet wallet) {
         billing.lockForGeneration();
         if (!gateway.configured(ModelAlias.VIDEO_PLANNER)) throw BizException.of(ErrorCode.VIDEO_NOT_CONFIGURED, "出方案模型尚未配置");
         String style = trim(request.style()), idea = trim(request.idea());
@@ -54,7 +60,7 @@ public class VideoPlanService {
             if (!prior.getImageAssetIds().equals(images) || prior.isReferenceVideo() != request.referenceVideo()
                     || !Objects.equals(prior.getStyle(), style) || !Objects.equals(prior.getSceneKey(), scene)
                     || !Objects.equals(prior.getIdea(), idea) || !Objects.equals(prior.getPreviousPlanId(), request.previousPlanId())
-                    || !constraints.equals(storedConstraints(prior))) {
+                    || !constraints.equals(storedConstraints(prior)) || billing.walletDiffers(prior.getBillingReservationId(), wallet)) {
                 throw BizException.of(ErrorCode.CONFLICT, "请求编号已用于不同的方案，请重新提交");
             }
             return view(prior);
@@ -78,8 +84,11 @@ public class VideoPlanService {
         plan.setIdea(idea);
         plan.setSceneKey(scene);
         plan.setPreviousPlanId(request.previousPlanId());
-        plan.setBillingReservationId(billing.reserve("video-plan:" + request.requestKey(), "VIDEO_PLAN",
-                BillingService.VIDEO_PLAN_CREDITS, (request.previousPlanId() == null ? "视频方案" : "视频方案换一批") + " · 预占 " + BillingService.VIDEO_PLAN_CREDITS + " 烟火"));
+        String description = (request.previousPlanId() == null ? "视频方案" : "视频方案换一批") + " · 预占 " + BillingService.VIDEO_PLAN_CREDITS + " 烟火";
+        String key = "video-plan:" + request.requestKey();
+        plan.setBillingReservationId(wallet == BillingDtos.GenerationWallet.TEAM
+                ? billing.reserve(key, "VIDEO_PLAN", BillingService.VIDEO_PLAN_CREDITS, description, wallet)
+                : billing.reserve(key, "VIDEO_PLAN", BillingService.VIDEO_PLAN_CREDITS, description));
         plans.saveAndFlush(plan);
         var payload = new java.util.LinkedHashMap<String, Object>();
         payload.put("planId", plan.getId());

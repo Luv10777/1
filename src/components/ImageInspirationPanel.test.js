@@ -7,7 +7,7 @@ import { createServer } from 'vite'
 
 async function mountPanel(studioState, { history = [], config = { configured: true, credits: 1, maxImages: 6 } } = {}) {
   const saved = Object.fromEntries(['window', 'document', 'Document', 'ShadowRoot', 'fetch', 'sessionStorage'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
-  const timers = [], requests = [], storage = {}
+  const timers = [], requests = [], wallets = [], storage = {}
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { setTimeout: callback => { timers.push(callback); return timers.length } } })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: { activeElement: null } })
   globalThis.Document = class {}
@@ -18,6 +18,8 @@ async function mountPanel(studioState, { history = [], config = { configured: tr
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-image-inspiration-tests',
     optimizeDeps: { noDiscovery: true, entries: [] }, server: { middlewareMode: true, hmr: false }, appType: 'custom',
     plugins: [{ name: 'image-inspiration-test', load(id) {
+      // 余额不足弹窗里有 RouterLink，这里没有路由，换成只显示数字的替身。
+      if (id.endsWith('/BalanceShortageDialog.vue')) return "import { h } from 'vue'; export default { props: ['open', 'required', 'available', 'walletLabel'], emits: ['close'], setup(props, { emit }) { return () => props.open ? h('div', [`余额不足 ${props.required}/${props.available} ${props.walletLabel}`, h('button', { onClick: () => emit('close') }, '先不充值')]) : null } }"
       if (id.endsWith('.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
         { id: 'image-inspiration-test', inlineTemplate: true }).content
     } }],
@@ -27,7 +29,7 @@ async function mountPanel(studioState, { history = [], config = { configured: tr
   auth.state.token = { accessToken: 'test-only' }
   const { imageInspirationApi } = await vite.ssrLoadModule('/src/services/imageInspirations.js')
   imageInspirationApi.config = async () => config
-  imageInspirationApi.create = async body => { requests.push(body); return { id: 7, status: 'QUEUED' } }
+  imageInspirationApi.create = async (body, wallet) => { requests.push(body); wallets.push(wallet); return { id: 7, status: 'QUEUED' } }
   imageInspirationApi.history = async () => ({ items: history, totalPages: 1 })
   const { default: Panel } = await vite.ssrLoadModule('/src/components/ImageInspirationPanel.vue')
   const renderer = createRenderer({
@@ -55,7 +57,8 @@ async function mountPanel(studioState, { history = [], config = { configured: tr
   const button = label => find(node => node.tag === 'button' && text(node).includes(label))
   const idea = value => find(node => node.props?.id === 'poster-idea-input').props['onUpdate:modelValue'](value)
   const keydown = event => find(node => node.props?.id === 'poster-idea-input').props.onKeydown(event)
-  return { api: imageInspirationApi, studio, timers, requests, root, text, button, idea, keydown, settle,
+  const { billing } = await vite.ssrLoadModule('/src/stores/billing.js')
+  return { api: imageInspirationApi, billing, studio, timers, requests, wallets, root, text, button, idea, keydown, settle,
     async close() {
       app.unmount(); auth.state.user = null; auth.state.token = null; await vite.close()
       for (const [key, descriptor] of Object.entries(saved)) {
@@ -103,6 +106,29 @@ test('without a chosen style the request leaves style empty, and an empty form a
     panel.timers.shift()(); await generating; await panel.settle()
     assert.match(panel.text(panel.root), /烟火已退回/)
   } finally { await panel.close() }
+})
+
+test('a partner owner can pay plans from the team, and a short balance sends no request', async () => {
+  const panel = await mountPanel({})
+  try {
+    const summary = { memberActive: true, available: 0, generationTeam: { name: '梧桐服务商', available: 50 } }
+    globalThis.fetch = async () => ({ ok: true, json: async () => ({ code: 200, data: summary }) })
+    panel.billing.summary = summary
+    await panel.settle()
+    assert.match(panel.text(panel.root), /个人额度.*团队额度/)
+    panel.idea('开业海报'); await panel.settle()
+    await panel.button('生成灵感方案').props.onClick(); await panel.settle()
+    assert.equal(panel.requests.length, 0, 'the personal balance is short, so nothing is reserved')
+    assert.match(panel.text(panel.root), /余额不足 1\/0 个人额度/)
+    panel.button('先不充值').props.onClick(); await panel.settle()
+    assert.doesNotMatch(panel.text(panel.root), /余额不足/)
+    panel.button('团队额度').props.onClick(); await panel.settle()
+    panel.api.get = async () => ({ id: 7, status: 'FAILED', errorMessage: '失败' })
+    const generating = panel.button('生成灵感方案').props.onClick()
+    await panel.settle()
+    assert.deepEqual(panel.wallets, ['TEAM'])
+    panel.timers.shift()(); await generating
+  } finally { panel.billing.summary = null; await panel.close() }
 })
 
 test('enter generates plans, but not while an input method is still composing', async () => {

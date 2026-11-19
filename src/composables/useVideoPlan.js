@@ -4,6 +4,7 @@ import { isVideoPlanDone, videoPlanApi, videoPlanForm, videoPlanLetters, videoPl
 import { videoHistoryTime } from '../services/videoConversations'
 import { FREE_SCENE, findVideoScene, videoSceneKey, videoSceneName } from '../services/videoScenes'
 import { auth } from '../stores/auth'
+import { useGenerationWallet } from './useGenerationWallet'
 
 /**
  * 视频「帮我出方案」：按参考素材、风格、场景和一句话出 3 个版本，「用这个」通过 emit('apply') 填进视频表单。
@@ -13,6 +14,9 @@ import { auth } from '../stores/auth'
  */
 export function useVideoPlan(props, emit) {
   const config = ref(null)
+  // 服务商负责人可以选团队额度；余额读得到且不够时先弹充值窗口，不发请求。
+  const { wallet, label: walletLabel, shortage } = useGenerationWallet()
+  const balanceShortage = ref(null)
   const style = ref('')
   const customStyle = ref('')
   const customOpen = ref(false)
@@ -126,6 +130,7 @@ export function useVideoPlan(props, emit) {
     if (!props.images.length && !idea.value.trim() && !props.brief.trim()) { error.value = '请先在左侧添加参考图，或写一句想要的效果。'; return }
     const seconds = videoPlanRequestedSeconds(idea.value) ?? videoPlanRequestedSeconds(props.brief) ?? props.duration
     if (!Number.isInteger(seconds) || seconds < 5 || seconds > props.maxDuration) { error.value = `你要求 ${seconds} 秒，当前模型最长支持 ${props.maxDuration} 秒。请先调整时长或切换模型，不会自动缩短方案。`; return }
+    if ((balanceShortage.value = shortage(credits.value))) return
     working.value = true
     phase.value = 'CONCEPT'
     try {
@@ -137,9 +142,10 @@ export function useVideoPlan(props, emit) {
         ...(answer.value.trim() && { clarificationAnswer: answer.value.trim() }),
         ...(videoSceneKey(props.scene) !== FREE_SCENE && { sceneKey: props.scene }) }
       // 网络中断后重试同一份请求沿用原编号，不会重复预占烟火。
-      if (JSON.stringify(body) !== signature) { requestKey = `video-plan-${crypto.randomUUID()}`; signature = JSON.stringify(body) }
+      const payer = wallet.value
+      if (JSON.stringify({ ...body, payer }) !== signature) { requestKey = `video-plan-${crypto.randomUUID()}`; signature = JSON.stringify({ ...body, payer }) }
       const images = references.map(entry => entry.url)
-      let plan = await videoPlanApi.create({ requestKey, ...body })
+      let plan = await videoPlanApi.create({ requestKey, ...body }, payer)
       refreshBilling()
       plan = await settle(plan)
       if (!plan) return
@@ -225,6 +231,6 @@ export function useVideoPlan(props, emit) {
     config, style, customStyle, customOpen, idea, working, error, clarification, answer, phase, phaseLabel, result, showResults,
     appliedIndex, resultImages, resultReferences, resultInfo, record, records, recordsPage, recordsHasMore, recordsLoading, recordsError,
     credits, styleText, unavailable, planImages, missingRecordImages, currentScene, resultSceneName, resultMeta,
-    loadRecords, pickStyle, openCustom, run, onIdeaEnter, openRecord, use,
+    loadRecords, pickStyle, openCustom, run, onIdeaEnter, openRecord, use, wallet, walletLabel, balanceShortage,
   }
 }

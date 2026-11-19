@@ -248,6 +248,8 @@ async function sendIdea(previousId = null) {
   const before = engine.result?.id
   ownPlanRun = true
   try { await engine.run(previousId) } finally { ownPlanRun = false }
+  // 余额不够时没有发请求，只弹充值窗口，对话里不留这一轮。
+  if (engine.balanceShortage) { turns.value = turns.value.filter(entry => entry !== turn); return }
   if (engine.result && engine.result.id !== before) {
     Object.assign(turn, { status: 'done', batch: engine.result, images: [...engine.resultImages], context: planContext(engine) })
     engine.idea = ''
@@ -314,14 +316,18 @@ const videoBalanceShortage = computed(() => {
   return video.walletBalance < required ? { required, available: video.walletBalance } : null
 })
 const activeBalanceShortage = computed(() => balanceShortage.value || videoBalanceShortage.value)
-const dialogShortage = computed(() => activeBalanceShortage.value || (showBalanceDialog.value && mode.value === 'image'
-  ? { required: Number(imageCost.value) || 0, available: walletAvailable.value }
-  : null))
-const dialogWalletLabel = computed(() => mode.value === 'video'
+const dialogShortage = computed(() => (ideaMode.value ? planEngine.value.balanceShortage : null) || activeBalanceShortage.value
+  || (showBalanceDialog.value && mode.value === 'image'
+    ? { required: Number(imageCost.value) || 0, available: walletAvailable.value }
+    : null))
+const dialogWalletLabel = computed(() => ideaMode.value ? planEngine.value.walletLabel : mode.value === 'video'
   ? (video.generationWallet === 'TEAM' ? '团队额度' : '个人额度')
   : walletLabel.value)
 const showBalanceDialog = ref(false)
 watch(videoBalanceShortage, shortageValue => { if (shortageValue) showBalanceDialog.value = true })
+// 方案余额不够时 run() 不发请求，只留下 balanceShortage：弹窗提醒，关掉后清空，下一次再检查。
+watch(() => planEngine.value.balanceShortage, shortageValue => { if (shortageValue) showBalanceDialog.value = true })
+watch(showBalanceDialog, open => { if (!open) { insp.balanceShortage = null; vplan.balanceShortage = null } })
 watch(() => studio.error, error => {
   if (error && /余额|烟火|额度|insufficient|credit/i.test(error)) showBalanceDialog.value = true
 })
@@ -662,6 +668,7 @@ function videoTags(item) {
           </Transition>
           <div class="ns-send-group">
             <GenerationWalletPicker v-if="mode === 'image' && !ideaMode" v-model="studio.generationWallet" compact :disabled="studio.busy || !!studio.pending" />
+            <GenerationWalletPicker v-else-if="ideaMode" v-model="planEngine.wallet" compact :disabled="planEngine.working" />
             <span class="ns-cost" :title="sendTitle">
               <YanhuoIcon :size="16" />
               <strong>{{ imageCost != null ? number(imageCost) : mode === 'video' ? '报价后扣' : '—' }}</strong><small v-if="ideaMode">/ 次</small>

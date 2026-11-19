@@ -13,8 +13,14 @@ async function mountAnalyzeView(path) {
   const vite = await createServer({ configFile: false, cacheDir: 'node_modules/.vite-merchant-tests',
     optimizeDeps: { noDiscovery: true, entries: [] }, server: { middlewareMode: true, hmr: false }, appType: 'custom',
     plugins: [{ name: 'merchant-view-test', resolveId(id) { if (id === '/merchant-view-under-test') return moduleId },
-      load(id) { if (id === moduleId) return compileScript(parse(readFileSync(filename, 'utf8'), { filename }).descriptor,
-        { id: 'merchant-view', inlineTemplate: true }).content } }],
+      load(id) {
+        if (id === moduleId) return compileScript(parse(readFileSync(filename, 'utf8'), { filename }).descriptor,
+          { id: 'merchant-view', inlineTemplate: true }).content
+        // 扣款余额选择器和余额不足弹窗照常编译，页面里其他组件不在这里测。
+        if (id.endsWith('/GenerationWalletPicker.vue') || id.endsWith('/BalanceShortageDialog.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
+          { id, inlineTemplate: true }).content
+        if (id.endsWith('.vue')) return 'export default { render() { return null } }'
+      } }],
   })
   const clipboard = [], downloads = [], navigations = [], renderErrors = []
   const savedGlobals = Object.fromEntries(['window', 'document', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))

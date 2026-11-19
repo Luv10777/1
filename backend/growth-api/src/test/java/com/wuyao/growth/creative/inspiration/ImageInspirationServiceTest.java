@@ -1,6 +1,7 @@
 package com.wuyao.growth.creative.inspiration;
 
 import com.wuyao.growth.asset.AssetService;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.task.*;
@@ -42,6 +43,24 @@ class ImageInspirationServiceTest {
         assertThat(view.status()).isEqualTo("QUEUED");
         verify(billing).requireMembership("IMAGE_INSPIRATION");
         verify(assets).imageReference(5L);
+    }
+
+    @Test void theTeamWalletReservesFromTheTeamAndASwitchedWalletCannotReuseTheRequestKey() {
+        when(gateway.configured(ModelAlias.IMAGE_INSPIRATION_PLANNER)).thenReturn(true);
+        when(inspirations.findByRequestKey("inspiration-key-1")).thenReturn(Optional.empty());
+        when(billing.reserve(eq("image-inspiration:inspiration-key-1"), eq("IMAGE_INSPIRATION"), eq((long) BillingService.IMAGE_INSPIRATION_CREDITS),
+                anyString(), eq(BillingDtos.GenerationWallet.TEAM))).thenReturn("team-r1");
+        when(inspirations.saveAndFlush(any())).thenAnswer(call -> { ImageInspiration p = call.getArgument(0); p.setId(7L); return p; });
+        var task = new Task(); task.setId(70L);
+        when(tasks.submit(anyString(), anyString(), anyMap(), anyString(), anyLong())).thenReturn(task);
+        TenantContext.runAs(3L, () -> service.create(request(null), 1L, BillingDtos.GenerationWallet.TEAM));
+        verify(billing, never()).reserve(anyString(), anyString(), anyLong(), anyString());
+
+        var prior = new ImageInspiration(); prior.setId(7L); prior.setImageAssetIds(List.of(5L));
+        prior.setStyle("写实摄影"); prior.setIdea("新品上新"); prior.setBillingReservationId("team-r1");
+        when(inspirations.findByRequestKey("inspiration-key-1")).thenReturn(Optional.of(prior));
+        when(billing.walletDiffers("team-r1", null)).thenReturn(true);
+        assertThatThrownBy(() -> service.create(request(null), 1L)).isInstanceOf(BizException.class).hasMessageContaining("不同的方案");
     }
 
     @Test void unconfiguredModelIsRejectedBeforeBilling() {

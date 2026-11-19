@@ -1,9 +1,10 @@
 import { get, post } from '../utils/request.js'
+import { generationWalletPath } from '../domain/billing.js'
 
 /** 灵感绘图「灵感方案」：看参考图出 3 个画面描述，每次（含换一批）1 烟火，失败退回。 */
 export const imageInspirationApi = {
   config: () => get('/api/image/inspirations/config'),
-  create: request => post('/api/image/inspirations', request),
+  create: (request, wallet) => post(generationWalletPath('/api/image/inspirations', wallet), request),
   get: id => get(`/api/image/inspirations/${id}`),
   history: page => get('/api/image/inspirations', { page, size: 10 }),
 }

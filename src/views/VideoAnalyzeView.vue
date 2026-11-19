@@ -10,6 +10,9 @@ import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
 import { ChevronRight, Download, History, Upload, Video, X } from 'lucide-vue-next'
 import { videoHistoryTime } from '../services/videoConversations'
+import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
+import BalanceShortageDialog from '../components/BalanceShortageDialog.vue'
+import { useGenerationWallet } from '../composables/useGenerationWallet'
 import '../video-studio.css'
 import '../video-analyze-simple.css'
 
@@ -33,6 +36,9 @@ const current = ref(null)
 const uploading = ref(false)
 const loadingHistory = ref(false)
 const error = ref('')
+// 服务商负责人可以选团队额度；余额读得到且不够时先弹充值窗口，不发请求。
+const { wallet, label: walletLabel, shortage } = useGenerationWallet()
+const balanceShortage = ref(null)
 const pollingInterrupted = ref(false)
 const historyOpen = ref(false)
 const reverseHistories = ref([])
@@ -44,6 +50,7 @@ let copyTimer
 let pollGeneration = 0
 let disposed = false
 let submissionKey = ''
+let submissionWallet = ''
 
 const isScanning = computed(() => uploading.value || (current.value && !analysisTerminal(current.value.status)))
 const result = computed(() => current.value?.status === 'SUCCEEDED' ? customizeAnalysisRecreation(current.value, merchantEdits.value) : null)
@@ -229,9 +236,12 @@ function onMetadata(event) {
 async function startScan() {
   if (!auth.requireLogin()) return
   if (!canStart.value) return
+  if ((balanceShortage.value = shortage(limits.value.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1))) return
   uploading.value = true
   error.value = ''
-  if (!submissionKey || current.value) submissionKey = crypto.randomUUID()
+  // 换了扣款余额就换新编号：后端不允许同一编号改用另一份余额。
+  if (!submissionKey || current.value || submissionWallet !== wallet.value) submissionKey = crypto.randomUUID()
+  submissionWallet = wallet.value
   try {
     await requireAccount()
     if (disposed) return
@@ -240,10 +250,10 @@ async function startScan() {
     if (inputMode.value === 'url') {
       const url = new URL(videoUrl.value.trim())
       if (url.protocol !== 'https:') throw new Error('请使用公开 HTTPS 视频文件直链。')
-      analysis = await videoAnalysisApi.importUrl({ ...request, url: url.href })
+      analysis = await videoAnalysisApi.importUrl({ ...request, url: url.href }, submissionWallet)
     } else {
       if (!uploadedAssetId.value) uploadedAssetId.value = await uploadAnalysisVideo(selectedFile.value, limits.value)
-      analysis = await videoAnalysisApi.create({ ...request, assetId: uploadedAssetId.value })
+      analysis = await videoAnalysisApi.create({ ...request, assetId: uploadedAssetId.value }, submissionWallet)
     }
     if (disposed) return
     current.value = analysis
@@ -351,6 +361,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         </div>
         <div class="vs-footer va-footer">
           <div v-if="error" class="va-error" role="alert">{{ error }}<button v-if="pollingInterrupted" type="button" @click="error = ''; poll(current.id)">重新连接</button></div>
+          <GenerationWalletPicker v-model="wallet" :disabled="isScanning || uploading" />
           <button type="button" class="vs-generate" :disabled="!canStart" @click="startScan">{{ isScanning ? statusLabel : current ? '重新分析' : '开始分析' }}</button>
           <button v-if="current && !analysisTerminal(current.status)" type="button" class="va-text-button" :disabled="uploading" @click="cancelScan">取消分析</button>
           <small>每次分析 {{ limits.creditsPerAnalysis ?? billing.summary?.videoAnalysisCredits ?? 1 }} 烟火，成功后扣除，失败或取消退回{{ current ? '；重新分析会再次计费' : '' }}</small>
@@ -454,6 +465,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); releasePreview(); window
         </Teleport>
       </section>
     </main>
+    <BalanceShortageDialog :open="!!balanceShortage" :required="balanceShortage?.required || 0" :available="balanceShortage?.available || 0" :wallet-label="walletLabel" @close="balanceShortage = null" />
   </div>
 </template>
 

@@ -1,5 +1,6 @@
 package com.wuyao.growth.live;
 
+import com.wuyao.growth.billing.BillingDtos.GenerationWallet;
 import com.wuyao.growth.common.security.AuthPrincipal;
 import com.wuyao.growth.common.web.ApiResponse;
 import com.wuyao.growth.live.reply.LiveCommentFeed;
@@ -72,8 +73,9 @@ public class LiveSessionController {
     }
 
     @PostMapping("/live-sessions/{id}/start")
-    public ApiResponse<LiveDtos.View> start(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me) {
-        return ApiResponse.ok(service.start(id, me.userId()));
+    public ApiResponse<LiveDtos.View> start(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal me,
+            @RequestParam(required = false) GenerationWallet wallet) {
+        return ApiResponse.ok(service.start(id, me.userId(), wallet));
     }
 
     @PostMapping("/live-sessions/{id}/pause")

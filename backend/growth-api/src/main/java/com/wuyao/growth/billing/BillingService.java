@@ -407,7 +407,6 @@ public class BillingService {
         var r=new BillingReservation(); r.setTenantId(TenantContext.require()); r.setRequestKey(requestKey);
         r.setCreatedBy(currentUserId());
         if(team) {
-            if(!"IMAGE".equals(capability)&&!"VIDEO".equals(capability)) throw bad("团队余额仅支持生成图片或视频");
             teamWallet.setOwnerPayer(r);
         } else {
             var accountTeam = teamWallet.accountTeam(r.getTenantId(), r.getCreatedBy());
@@ -423,7 +422,7 @@ public class BillingService {
         var a=store.lockAccount(); var r=requireReservation(store.reservation(reservationId));
         if(reservationEventExists(r,eventKey)) return;
         requireEntitlement(a,r.getCapability());
-        if(r.hasExternalPayer()) teamWallet.requireOriginalTeam(r,currentUserId());
+        if(r.hasExternalPayer()) teamWallet.requireOriginalTeam(r,actor(r));
         hold(payer(a,r),r,amount,eventKey,description);
     }
     @Transactional
@@ -457,6 +456,12 @@ public class BillingService {
         var reservation=reservationId==null?null:store.reservationSnapshot(reservationId);
         return reservation==null?null:reservation.wallet();
     }
+    /** Whether a repeated request asks for a different wallet than the one its original reservation was paid from. */
+    @Transactional(readOnly=true)
+    public boolean walletDiffers(String reservationId,BillingDtos.GenerationWallet wallet) {
+        var reservation=reservationId==null?null:store.reservationSnapshot(reservationId);
+        return reservation!=null&&reservation.hasExternalPayer()!=(wallet==BillingDtos.GenerationWallet.TEAM);
+    }
     @Transactional
     public void releaseAmount(String reservationId,long amount,String eventKey,String description) {
         var a=store.lockAccount(); var r=requireReservation(store.reservation(reservationId));
@@ -480,6 +485,16 @@ public class BillingService {
         var a=store.lockAccount();
         try { requireEntitlement(a,capability); } catch(BizException e) { return false; }
         return a.available()>=amount;
+    }
+    /** Like canReserve, but for topping up an existing reservation from the wallet that pays for it. */
+    @Transactional
+    public boolean canReserveMore(String reservationId,long amount) {
+        var a=store.lockAccount(); var r=requireReservation(store.reservationSnapshot(reservationId));
+        try {
+            requireEntitlement(a,r.getCapability());
+            if(r.hasExternalPayer()) teamWallet.requireOriginalTeam(r,actor(r));
+        } catch(BizException e) { return false; }
+        return payer(a,r).available()>=amount;
     }
     @Transactional(readOnly=true)
     public void requirePlatformMembership() { requireActiveMembership(store.account()); }
@@ -599,6 +614,10 @@ public class BillingService {
         if(!store.publishedPlanExists(code,id)) return;
         if(!replace) throw bad("同一套餐标识已有上架版本，请先下架旧版本，或选择替换上架");
         store.unpublishOthers(code,id);
+    }
+    /** Background renewals (live metering) run without a signed-in user; they act for whoever made the reservation. */
+    private Long actor(BillingReservation reservation) {
+        Long user=currentUserId(); return user!=null?user:reservation.getCreatedBy();
     }
     private Long currentUserId() {
         var authentication=SecurityContextHolder.getContext().getAuthentication();

@@ -1,6 +1,7 @@
 package com.wuyao.growth.video.analysis;
 
 import com.wuyao.growth.asset.*;
+import com.wuyao.growth.billing.BillingDtos;
 import com.wuyao.growth.billing.BillingService;
 import com.wuyao.growth.common.gateway.*;
 import com.wuyao.growth.common.storage.ObjectStorage;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class VideoAnalysisServiceTest {
@@ -47,6 +49,19 @@ class VideoAnalysisServiceTest {
         assertThat(service.completed(2L, task, VideoAnalysisOutputTest.valid())).isFalse();
         assertThat(service.begin(2L, task, "ANALYZING", 65)).isFalse();
         verifyNoInteractions(analyses);
+    }
+    @Test void linkAnalysisWithTheTeamWalletReservesFromTheTeam() {
+        when(gateway.configured(ModelAlias.VISION_ANALYZER)).thenReturn(true);
+        when(analyses.findByRequestKey("key")).thenReturn(Optional.empty());
+        when(billing.reserve(eq("video-analysis:key"), eq("VIDEO_ANALYSIS"), eq((long) BillingService.VIDEO_ANALYSIS_CREDITS), anyString(),
+                eq(BillingDtos.GenerationWallet.TEAM))).thenReturn("team-r1");
+        when(assets.saveAndFlush(any())).thenAnswer(call -> { Asset a = call.getArgument(0); a.setId(1L); return a; });
+        when(analyses.saveAndFlush(any())).thenAnswer(call -> { VideoAnalysis a = call.getArgument(0); a.setId(2L); return a; });
+        var task = new Task(); task.setId(3L);
+        when(tasks.submit(anyString(), anyString(), anyMap(), anyString(), anyLong())).thenReturn(task);
+        com.wuyao.growth.common.tenant.TenantContext.runAs(3L, () -> service.importUrl(
+                new VideoAnalysisDtos.Import("https://example.com/a.mp4", "key", "ai", ""), 1L, BillingDtos.GenerationWallet.TEAM));
+        verify(billing, never()).reserve(anyString(), anyString(), anyLong(), anyString());
     }
     @Test void mismatchedIdempotencyKeysCannotCreateASecondPaidTask() {
         when(gateway.configured(ModelAlias.VISION_ANALYZER)).thenReturn(true);
