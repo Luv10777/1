@@ -43,6 +43,8 @@ test('novice studio drives the poster and video workflows from one composer', as
     if (url === '/api/video/capabilities') return response([])
     if (url === '/api/video/scenes') return response([{ key: 'free', name: '自由创作', summary: '', icon: 'edit_note' }, { key: 'ecommerce', name: '电商带货', summary: '商品主图视频、带货短视频', icon: 'shopping_bag' }])
     if (url.startsWith('/api/video/workflows?')) return response({ items: [], totalPages: 0 })
+    if (url === '/api/video/workflows/5') return response({ id: 5, status: 'SUCCEEDED', prompt: '新品香水上新，安静高级一点', outputUrl: '/output.mp4', model: 'SEEDANCE_2_5', ratio: '9:16', durationSeconds: 10, resolution: '720p', sceneKey: 'ecommerce', chargedCredits: 30,
+      referenceImageAssets: [{ id: 3, name: '香水.png', url: '/perfume.png' }] })
     if (url === '/api/video/quote') {
       quotes.push(JSON.parse(options.body))
       return response({ available: true, credits: 30, quoteId: 'quote-1', message: '按实际时长计费', providerModel: 'test-model', estimatedTokens: 1000, verifiedAt: '2026-11-17T08:00:00Z' })
@@ -168,7 +170,15 @@ test('novice studio drives the poster and video workflows from one composer', as
     assert.equal(submissions[0].quoteId, 'quote-1')
     assert.ok(find(node => node.tag === 'video' && node.props.src === '/output.mp4#t=0.1'), 'the finished video is shown in the thread')
     assert.equal(input().value, '', 'the composer is ready for the next request')
+    assert.ok(find(node => node.tag === 'button' && node.props['aria-label'] === '下载这条视频到本地'), 'the finished video can be saved locally')
+    assert.ok(find(node => node.tag === 'button' && node.props['aria-label'] === '下载这张图片到本地'), 'a finished image can be saved locally')
     assert.match(text(root), /一杯手冲咖啡/, 'the earlier image turn stays in the conversation')
+
+    // 从侧栏「最近」打开已完成的视频：需求和素材留在对话里，输入框是空的。
+    route.query = { open: 'video:5' }; await settle()
+    assert.ok(find(node => node.tag === 'video' && node.props.src === '/output.mp4#t=0.1'), 'the opened video is shown in the thread')
+    assert.equal(input().value, '', 'opening a finished record leaves the composer empty')
+    assert.ok(!find(node => node.props?.class === 'ns-attachment'), 'materials of the opened record are not put back into the composer')
   } finally {
     await settle()
     app.unmount()

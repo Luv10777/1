@@ -47,7 +47,13 @@
 .ns-image.is-placeholder { aspect-ratio: var(--ns-ratio, 3 / 4); color: var(--ns-muted); font-size: 12px; }
 .ns-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .ns-image-item figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.ns-video { width: min(360px, 100%); max-height: 70vh; border-radius: 16px; background: #000; box-shadow: 0 24px 48px -28px rgb(15 23 42 / 45%); }
+.ns-video { display: block; width: min(360px, 100%); max-height: 70vh; border-radius: 16px; background: #000; box-shadow: 0 24px 48px -28px rgb(15 23 42 / 45%); }
+.ns-image-item, .ns-video-item { position: relative; }
+.ns-video-item { width: fit-content; max-width: 100%; }
+/* 作品右上角的下载：直接保存到本地 */
+.ns-save { position: absolute; top: 10px; right: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 11px 0 9px; border: 0; border-radius: 15px; background: rgb(15 23 42 / 62%); color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; backdrop-filter: blur(6px); transition: background .18s ease; }
+.ns-save:hover:not(:disabled) { background: rgb(15 23 42 / 82%); }
+.ns-save:disabled { cursor: not-allowed; opacity: .6; }
 .ns-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .ns-revise { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: min(100%, 560px); }
 .ns-revise input { flex: 1 1 260px; min-height: 40px; padding: 0 14px; border: 1px solid var(--ns-line); border-radius: 20px; background: var(--ns-surface); color: inherit; font: inherit; }
@@ -87,7 +93,7 @@
 /* —— 输入框 —— */
 .ns-dock { display: flex; flex-direction: column; gap: 12px; }
 /* 外层滚动区底部有 28px 内边距，吸底时往下多贴 28px，免得对话内容从输入框下面露出来。 */
-.ns-page.is-started .ns-dock { position: sticky; bottom: -28px; z-index: 5; padding: 18px 0 42px; background: linear-gradient(to bottom, transparent, var(--night, var(--color-bg-canvas)) 18px); }
+.ns-page.is-started .ns-dock { position: sticky; bottom: -28px; z-index: 5; padding: 14px 0 34px; background: linear-gradient(to bottom, transparent, var(--night, var(--color-bg-canvas)) 18px); }
 .ns-page.is-started .ns-dock > :not(.ns-composer) { order: -1; }
 .ns-composer { display: flex; flex-direction: column; border-radius: 24px; background: var(--ns-surface); box-shadow: 0 0 0 1px var(--ns-line), 0 2px 4px rgb(15 23 42 / 3%), 0 28px 60px -30px rgb(15 23 42 / 32%); }
 .ns-composer:focus-within { box-shadow: 0 0 0 1px var(--line-strong, var(--ns-muted)), 0 2px 4px rgb(15 23 42 / 3%), 0 28px 60px -30px rgb(15 23 42 / 32%); }
@@ -114,8 +120,18 @@
 .ns-role.is-static { cursor: default; }
 .ns-remove { position: absolute; top: -5px; right: -5px; display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 2px solid var(--ns-surface); border-radius: 50%; background: var(--ns-ink); color: var(--ns-surface); cursor: pointer; }
 .ns-input { field-sizing: content; min-height: 84px; max-height: 200px; margin: 12px 18px 4px; padding: 0; border: 0; outline: none; overflow-y: auto; background: transparent; color: inherit; font: inherit; font-size: 16px; line-height: 1.75; resize: none; }
-.ns-page.is-started .ns-input { min-height: 28px; max-height: 112px; font-size: 15px; }
+.ns-page.is-started .ns-input { min-height: 28px; max-height: 84px; margin-top: 8px; font-size: 15px; }
+/* 对话开始后输入区收紧，把上面的对话露出来：缩略图变小，引用素材只留按钮 */
+.ns-page.is-started .ns-composer-top { padding-top: 10px; }
+.ns-page.is-started .ns-attachments { gap: 8px; padding-top: 8px; }
+.ns-page.is-started .ns-attachment { width: 42px; height: 42px; border-radius: 10px; }
+.ns-page.is-started .ns-attachment img { border-radius: 10px; }
+.ns-page.is-started .ns-composer .mention-tools { margin-top: 4px; }
+.ns-page.is-started .ns-composer .mention-tools small { display: none; }
+.ns-page.is-started .ns-toolbar { padding-block: 6px; }
 .ns-input::placeholder { color: var(--ns-muted); opacity: .8; }
+/* 「引用素材」和输入框左边对齐，不贴着对话框边缘 */
+.ns-page .ns-composer .mention-tools { margin: 6px 18px 0; }
 .ns-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 10px 10px 12px; border-top: 1px solid var(--ns-line); }
 .ns-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
 .ns-icon:hover:not(:disabled), .ns-icon[aria-expanded='true'] { background: var(--ns-soft); }

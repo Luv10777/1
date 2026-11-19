@@ -19,6 +19,7 @@ import { billing, dateTime, number } from '../stores/billing'
 import { NOVICE_RECENTS_CHANGED } from '../stores/uiMode'
 import { auth } from '../stores/auth'
 import { stableUrl } from '../utils/stableUrl'
+import { downloadMedia } from '../services/mediaDownload'
 import '../novice-studio.css'
 
 // 新手版对话页：灵感绘图和视频创作原样搬进一个输入框，功能、计费和接口都不变，只换外壳。
@@ -57,13 +58,17 @@ const greeting = computed(() => {
 
 const announce = () => window.dispatchEvent(new Event(NOVICE_RECENTS_CHANGED))
 const studio = useImageCreation('POSTER')
+// 已经发出去的需求和素材留在对话里，输入框清空，下一句话就是新的一条。
+// 当前对话已有任务时，清空只改输入框，不改那条记录（下次生成会另开一条）。
+function clearVideoComposer() {
+  video.prompt = ''
+  video.referenceImages = []
+  video.referenceVideos = []
+  video.referenceAudios = []
+}
 const video = reactive(useVideoWorkbench({
-  // 确认报价、开始生成后清空输入框，下一句话就是新的一条。
   onSubmitted: () => {
-    video.prompt = ''
-    video.referenceImages = []
-    video.referenceVideos = []
-    video.referenceAudios = []
+    clearVideoComposer()
     announce()
     scrollToEnd()
   },
@@ -113,7 +118,8 @@ watch(() => {
   if (!id || turns.value.some(entry => entry.kind === 'video' && entry.convId === id)) return
   turns.value.push({ key: `video:${id}`, kind: 'video', convId: id })
   scrollToEnd()
-})
+// 同步触发：重新打开正在看的那条记录时，会话 ID 在同一刻先换成新对话再换回来，异步侦听会漏掉这一轮。
+}, { flush: 'sync' })
 // 报价出来、视频出片时滚到底，确认按钮和成片不会被输入框挡住。
 watch(() => [Boolean(video.quoted), video.outputUrl], ([quoted, output]) => { if (quoted || output) scrollToEnd() })
 const conversationOf = turn => video.conversations.find(item => item.id === turn.convId)
@@ -155,6 +161,7 @@ async function openFromQuery() {
   } else if (kind === 'video') {
     mode.value = 'video'
     await video.openWorkflow(id)
+    clearVideoComposer()
     router.replace({ name: 'studio', query: { mode: 'video' } })
   }
 }
@@ -343,6 +350,16 @@ function submitRevision() {
   revisingRoot.value = null
   scrollToEnd()
 }
+// 下载直接存到本地（先取成 blob 再保存），不在新窗口打开。
+const videoDownloads = reactive({})
+async function downloadVideo(item) {
+  const url = item.workflow?.outputUrl
+  if (!url || videoDownloads[item.id]) return
+  videoDownloads[item.id] = true
+  try { await downloadMedia(stableUrl(url), `一方志-视频-${item.workflow.id}.mp4`) }
+  catch (error) { item.error = true; item.notice = error.message || '视频下载失败，请重试' }
+  finally { videoDownloads[item.id] = false }
+}
 function videoTags(item) {
   const value = item.workflow?.ratio || item.format
   const ratio = value === 'auto' ? '自适应' : value
@@ -394,12 +411,12 @@ function videoTags(item) {
                   <div v-for="n in version.count" :key="n" class="ns-image is-placeholder" :class="{ 'is-working': version.status !== 'NEEDS_INPUT' }"><template v-if="version.status !== 'NEEDS_INPUT'"><span class="ns-brew" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></template><small>{{ version.status === 'NEEDS_INPUT' ? '等你补充信息' : '一方志正在画' }}</small></div>
                 </template>
                 <figure v-for="item in version.items" :key="item.id" class="ns-image-item">
+                  <button v-if="item.url" type="button" class="ns-save" title="下载到本地" aria-label="下载这张图片到本地" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="15" :stroke-width="2" aria-hidden="true" /><span>下载</span></button>
                   <a v-if="item.url" :href="stableUrl(item.url)" target="_blank" rel="noopener" class="ns-image" :style="{ aspectRatio: item.width + '/' + item.height }" aria-label="在新窗口查看原图">
                     <img :src="imageSrc(item)" alt="生成的图片" decoding="async" @load="studio.reportImageVisible(item)" @error="onImageError(item)" />
                   </a>
                   <div v-else class="ns-image is-placeholder" :class="{ 'is-working': isImageActive(item.status) }" :style="{ aspectRatio: item.width + '/' + item.height }"><template v-if="isImageActive(item.status)"><span class="ns-brew" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span></template><small>{{ IMAGE_STATUS[item.status] }}</small></div>
-                  <figcaption v-if="item.url || item.error || retryable(item)">
-                    <button v-if="item.url" type="button" class="ns-chip is-icon" title="下载" aria-label="下载这张" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="14" aria-hidden="true" /></button>
+                  <figcaption v-if="(item.url && isLiveImage(turn)) || item.error || retryable(item)">
                     <button v-if="item.url && isLiveImage(turn)" type="button" class="ns-chip" :disabled="studio.locked" @click="studio.regenerate(item)"><RefreshCw :size="13" aria-hidden="true" />再画一张</button>
                     <span v-if="item.error" class="ns-error">{{ item.error }}</span>
                     <button v-if="retryable(item) && isLiveImage(turn)" type="button" class="ns-chip" :disabled="studio.busy || !!studio.pending" @click="studio.retry(item)">{{ item.status === 'FAILED' ? '重新生成这张' : item.status === 'UPSTREAM_UNKNOWN' ? '核对后重新生成' : '恢复这张' }}</button>
@@ -500,7 +517,10 @@ function videoTags(item) {
           </div>
           <div class="ns-reply">
             <div class="ns-reply-head"><img src="/images/brand/yifangzhi-mark.png" alt="" /><strong>一方志</strong></div>
-            <video v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video" :src="`${stableUrl(conversationOf(turn).workflow.outputUrl)}#t=0.1`" controls playsinline preload="metadata" />
+            <div v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video-item">
+              <video class="ns-video" :src="`${stableUrl(conversationOf(turn).workflow.outputUrl)}#t=0.1`" controls playsinline preload="metadata" />
+              <button type="button" class="ns-save" title="下载到本地" aria-label="下载这条视频到本地" :disabled="videoDownloads[conversationOf(turn).id]" :aria-busy="videoDownloads[conversationOf(turn).id]" @click="downloadVideo(conversationOf(turn))"><Download :size="15" :stroke-width="2" aria-hidden="true" /><span>{{ videoDownloads[conversationOf(turn).id] ? '下载中…' : '下载' }}</span></button>
+            </div>
             <div v-else-if="conversationOf(turn).submitting || isVideoInProgress(conversationOf(turn).workflow)" class="ns-card ns-progress" role="status">
               <div class="ns-progress-head"><span class="ns-brew is-small" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><div><strong>{{ videoStageLabel(conversationOf(turn)) }}</strong><small>通常要几分钟，可以先离开，回来会接着显示</small></div></div>
               <span class="ns-bar" aria-hidden="true"><i /></span>
