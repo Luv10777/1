@@ -63,6 +63,9 @@ test('novice studio drives the poster and video workflows from one composer', as
         if (id.endsWith('/NoviceStudioView.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
           { id: 'novice-studio-test', inlineTemplate: true }).content
           .replace(/Transition as _Transition,?\s*/, '') + '\nfunction _Transition(_, { slots }) { return slots.default?.() }\n'
+        // 视频模式的输入框是 VideoMentionInput 里的 textarea，要真实渲染才找得到。
+        if (id.endsWith('/VideoMentionInput.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
+          { id, inlineTemplate: true }).content
         if (id.endsWith('.vue')) return 'export default { render() { return null } }'
       },
     }],

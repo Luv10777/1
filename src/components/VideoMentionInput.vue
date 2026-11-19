@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, useAttrs } from 'vue'
+import { computed, nextTick, ref, useAttrs, watch } from 'vue'
 import { materialLabels } from '../domain/videoMaterials'
 
 defineOptions({ inheritAttrs: false })
@@ -14,6 +14,7 @@ const model = defineModel({ type: String, default: '' })
 const field = ref(null)
 const highlight = ref(null)
 const open = ref(false)
+const overflowing = ref(false)
 const options = computed(() => Object.entries(materialLabels).flatMap(([type, label]) =>
   props[type + 's'].map((entry, index) => ({ entry, type, token: '@' + label + (index + 1) }))))
 const inputAttrs = computed(() => {
@@ -64,16 +65,19 @@ function keydown(event) {
     else open.value = false
   }
 }
+// 高亮层与输入框逐字重叠：输入框出现滚动条时，高亮层要预留同样宽度，否则换行位置会错开
 function syncScroll() {
   if (!field.value || !highlight.value) return
+  overflowing.value = field.value.scrollHeight > field.value.clientHeight
   highlight.value.scrollTop = field.value.scrollTop
   highlight.value.scrollLeft = field.value.scrollLeft
 }
+watch(model, () => nextTick(syncScroll))
 </script>
 
 <template>
   <div class="mention-field">
-    <div ref="highlight" class="mention-highlight" :class="$attrs.class" aria-hidden="true"><template v-for="(part, index) in highlightParts" :key="index"><span :class="{ 'is-valid': part.valid }">{{ part.text }}</span></template><span v-if="!model" class="mention-placeholder">{{ $attrs.placeholder }}</span></div>
+    <div ref="highlight" class="mention-highlight" :class="[$attrs.class, { 'is-overflowing': overflowing }]" aria-hidden="true"><template v-for="(part, index) in highlightParts" :key="index"><span :class="{ 'is-valid': part.valid }">{{ part.text }}</span></template><span v-if="!model" class="mention-placeholder">{{ $attrs.placeholder }}</span></div>
     <textarea ref="field" v-bind="inputAttrs" v-model="model" :class="$attrs.class" :disabled="disabled" @input="open = justTypedAt()" @click="open = justTypedAt()" @scroll="syncScroll" @keydown.capture="keydown" />
   </div>
   <div v-if="options.length" class="mention-tools">
@@ -89,12 +93,16 @@ function syncScroll() {
 </template>
 
 <style scoped>
-.mention-field { position: relative; min-width: 0; }
-.mention-highlight { position: absolute; inset: 0; z-index: 0; box-sizing: border-box; padding: inherit; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; color: var(--ink, inherit); font: inherit; line-height: inherit; pointer-events: none; }
+/* 输入框和高亮层共用宿主的 class：字体、内边距、外边距、背景都由宿主决定，这里只覆盖叠放必需的属性。
+   flex 容器让输入框的外边距留在容器内、不产生基线空隙，高亮层的 inset 加同样的外边距正好落在输入框上。 */
+.mention-field { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.mention-highlight { position: absolute; inset: 0; z-index: 0; overflow: hidden; resize: none; white-space: pre-wrap; overflow-wrap: break-word; letter-spacing: normal; word-spacing: normal; text-indent: 0; pointer-events: none; }
+.mention-highlight.is-overflowing { scrollbar-gutter: stable; }
 .mention-highlight span { color: inherit; }
-.mention-highlight .is-valid { color: #1974bd; font-weight: 650; }
+/* 不能加粗：加粗会让字变宽，和透明输入框里的光标错位 */
+.mention-highlight .is-valid { border-radius: 3px; background: rgb(25 116 189 / 12%); color: #1974bd; }
 .mention-placeholder { color: var(--ink-muted, #8997a8); }
-.mention-field > textarea { position: relative; z-index: 1; color: transparent !important; -webkit-text-fill-color: transparent; caret-color: var(--ink, #27445e); }
+.mention-field > textarea { position: relative; z-index: 1; outline: none; background: transparent !important; color: transparent !important; -webkit-text-fill-color: transparent; caret-color: var(--ink, #27445e); }
 .mention-field > textarea::placeholder { color: transparent; -webkit-text-fill-color: transparent; }
 .mention-field > textarea:disabled { cursor: not-allowed; }
 .mention-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin: 8px 0 2px; color: #708096; font-size: 12px; line-height: 1.4; }
