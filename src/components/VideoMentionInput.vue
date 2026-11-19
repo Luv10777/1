@@ -15,6 +15,8 @@ const field = ref(null)
 const highlight = ref(null)
 const open = ref(false)
 const overflowing = ref(false)
+// 输入法拼写中 v-model 还没更新，这时直接显示输入框自己的文字（含拼音），结束后再交回高亮层
+const composing = ref(false)
 const options = computed(() => Object.entries(materialLabels).flatMap(([type, label]) =>
   props[type + 's'].map((entry, index) => ({ entry, type, token: '@' + label + (index + 1) }))))
 const inputAttrs = computed(() => {
@@ -76,9 +78,9 @@ watch(model, () => nextTick(syncScroll))
 </script>
 
 <template>
-  <div class="mention-field">
-    <div ref="highlight" class="mention-highlight" :class="[$attrs.class, { 'is-overflowing': overflowing }]" aria-hidden="true"><template v-for="(part, index) in highlightParts" :key="index"><span :class="{ 'is-valid': part.valid }">{{ part.text }}</span></template><span v-if="!model" class="mention-placeholder">{{ $attrs.placeholder }}</span></div>
-    <textarea ref="field" v-bind="inputAttrs" v-model="model" :class="$attrs.class" :disabled="disabled" @input="open = justTypedAt()" @click="open = justTypedAt()" @scroll="syncScroll" @keydown.capture="keydown" />
+  <div class="mention-field" :class="{ 'is-composing': composing }">
+    <div ref="highlight" class="mention-highlight" :class="[$attrs.class, { 'is-overflowing': overflowing }]" aria-hidden="true"><template v-for="(part, index) in highlightParts" :key="index"><span :class="{ 'is-valid': part.valid }">{{ part.text }}</span></template></div>
+    <textarea ref="field" v-bind="inputAttrs" v-model="model" :class="$attrs.class" :disabled="disabled" @input="open = justTypedAt()" @click="open = justTypedAt()" @scroll="syncScroll" @compositionstart="composing = true" @compositionend="composing = false" @keydown.capture="keydown" />
   </div>
   <div v-if="options.length" class="mention-tools">
     <button class="mention-trigger" type="button" :disabled="disabled" :aria-expanded="open" aria-haspopup="listbox" @click="open = !open"><span class="mention-trigger-mark">@</span><span>引用素材</span></button>
@@ -101,9 +103,11 @@ watch(model, () => nextTick(syncScroll))
 .mention-highlight span { color: inherit; }
 /* 不能加粗：加粗会让字变宽，和透明输入框里的光标错位 */
 .mention-highlight .is-valid { border-radius: 3px; background: rgb(25 116 189 / 12%); color: #1974bd; }
-.mention-placeholder { color: var(--ink-muted, #8997a8); }
-.mention-field > textarea { position: relative; z-index: 1; outline: none; background: transparent !important; color: transparent !important; -webkit-text-fill-color: transparent; caret-color: var(--ink, #27445e); }
-.mention-field > textarea::placeholder { color: transparent; -webkit-text-fill-color: transparent; }
+/* 只用 text-fill-color 隐藏输入框里的字，color 仍是宿主的颜色：占位符和拼写中的文字直接用它显示，和普通输入框一样 */
+.mention-field > textarea { position: relative; z-index: 1; outline: none; background: transparent !important; -webkit-text-fill-color: transparent; caret-color: var(--ink, #27445e); }
+.mention-field > textarea::placeholder { -webkit-text-fill-color: currentColor; }
+.mention-field.is-composing > textarea { -webkit-text-fill-color: currentColor; }
+.mention-field.is-composing > .mention-highlight { visibility: hidden; }
 .mention-field > textarea:disabled { cursor: not-allowed; }
 .mention-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; margin: 8px 0 2px; color: #708096; font-size: 12px; line-height: 1.4; }
 .mention-trigger { display: inline-flex; align-items: center; gap: 5px; height: 29px; padding: 0 10px 0 7px; border: 1px solid #c8d9e9; border-radius: 8px; background: #f4f8fc; color: #27577f; font: 600 12px/1 var(--font-sans, inherit); cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
