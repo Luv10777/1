@@ -16,9 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Map;
@@ -46,6 +44,9 @@ public class AssetService {
     private Duration presignTtl;
     @Value("${growth.image.upload-max-pixels:50000000}")
     private long maxImagePixels;
+    /** 上传的原图最大 100 MB；超过 20 MB 的在确认时压缩，存下来的图片都不超过 20 MB（下游按这个读）。 */
+    private int maxImageUploadBytes = 100 * 1024 * 1024;
+    private int storedImageMaxBytes = 20 * 1024 * 1024;
     @Value("${growth.video.reference-max-bytes:524288000}")
     private long maxVideoReferenceBytes;
     @Value("${growth.video.reference-max-duration-seconds:300}")
@@ -194,27 +195,30 @@ public class AssetService {
         asset.setStatus("VIDEO".equals(asset.getType()) ? "VERIFYING" : "READY");
         asset.setSizeBytes(stored.sizeBytes());
         if ("IMAGE".equals(asset.getType())) {
-            byte[] bytes = storage.read(asset.getStorageKey(), 20 * 1024 * 1024);
-            BufferedImage image;
+            if (stored.sizeBytes() > maxImageUploadBytes) {
+                throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片不能超过 100 MB");
+            }
+            byte[] bytes = storage.read(asset.getStorageKey(), maxImageUploadBytes);
+            ImageFit.Decoded decoded;
             try {
-                image = ImageIO.read(new ByteArrayInputStream(bytes));
+                decoded = ImageFit.decode(bytes, maxImagePixels);
             } catch (Exception e) {
                 throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片文件无法解析");
             }
-            if (image == null) throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "只支持有效的 PNG 或 JPEG 图片");
-            long pixels = (long) image.getWidth() * image.getHeight();
-            if (pixels > maxImagePixels) {
-                throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片像素过高，请压缩后重试");
-            }
+            if (decoded == null) throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "只支持有效的 PNG 或 JPEG 图片");
+            BufferedImage image = decoded.image();
             String mimeType = stored.contentType();
             int orientation = ImageOrientation.read(bytes);
-            if (orientation != 1) {
-                // 竖拍原图的像素是横着存的，模型不认 EXIF 标记；转正后覆盖原文件，下游拿到的都是正的。
+            if (orientation != 1 || decoded.subsampled() || bytes.length > storedImageMaxBytes) {
+                // 竖拍原图的像素是横着存的，模型不认 EXIF 标记，要转正；
+                // 超过 20 MB 或像素过高的原图压到下游都能用的大小。处理后覆盖原文件。
                 try {
-                    image = ImageOrientation.upright(image, orientation);
-                    bytes = ImageOrientation.encodeJpeg(image);
+                    if (orientation != 1) image = ImageOrientation.upright(image, orientation);
+                    var fitted = ImageFit.jpegWithin(image, storedImageMaxBytes);
+                    image = fitted.image();
+                    bytes = fitted.jpeg();
                 } catch (Exception e) {
-                    throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片方向处理失败，请重新上传");
+                    throw BizException.of(ErrorCode.ASSET_UPLOAD_FAILED, "图片处理失败，请重新上传");
                 }
                 mimeType = "image/jpeg";
                 storage.put(asset.getStorageKey(), bytes, mimeType);

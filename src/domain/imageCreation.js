@@ -34,6 +34,6 @@ export function imageDimensions(quality, ratio) {
 }
 export function validateImageFile(file) {
   if (!['image/jpeg', 'image/png'].includes(file.type)) throw new Error('请选择 JPG 或 PNG 图片')
-  if (file.size > 20 * 1024 * 1024) throw new Error('每张图片不能超过 20 MB')
+  if (file.size > 100 * 1024 * 1024) throw new Error('每张图片不能超过 100 MB')
   if (file.size === 0) throw new Error('不能上传空文件')
 }

@@ -26,7 +26,7 @@ test('quality resolves Flu standard 1K, 2K and 4K dimensions', () => {
 })
 test('upload rejects unrenderable or oversized reference files', () => {
   assert.throws(() => validateImageFile({ type: 'image/svg+xml', size: 10 }))
-  assert.throws(() => validateImageFile({ type: 'image/png', size: 21 * 1024 * 1024 }))
+  assert.throws(() => validateImageFile({ type: 'image/png', size: 101 * 1024 * 1024 }))
   assert.throws(() => validateImageFile({ type: 'image/jpeg', size: 0 }))
   assert.doesNotThrow(() => validateImageFile({ type: 'image/jpeg', size: 500 }))
 })

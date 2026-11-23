@@ -56,7 +56,7 @@ export const copyRewrites = [
   { id: 'DE_AI', label: '去 AI 味' },
 ]
 export const copyImageTypes = ['image/jpeg', 'image/png', 'image/webp']
-export const COPY_IMAGE_MAX_BYTES = 20 * 1024 * 1024
+export const COPY_IMAGE_MAX_BYTES = 100 * 1024 * 1024
 
 export const platformLabel = id => copyPlatforms.find(platform => platform.id === id)?.label || id
 export const isCopyDone = batch => ['SUCCEEDED', 'FAILED'].includes(batch?.status)
@@ -64,7 +64,7 @@ export const isRewriting = batch => Boolean(batch?.versions?.some(version => ver
 
 export function validateCopyImage(file) {
   if (!copyImageTypes.includes(file.type)) return '请选择 JPG、PNG 或 WebP 图片'
-  if (file.size > COPY_IMAGE_MAX_BYTES) return '图片不能超过 20 MB'
+  if (file.size > COPY_IMAGE_MAX_BYTES) return '图片不能超过 100 MB'
   return ''
 }
 

@@ -85,5 +85,5 @@ test('owners are sent to complete the brand, staff only see a hint', () => {
 test('only small enough jpg, png and webp images are accepted', () => {
   assert.equal(validateCopyImage({ type: 'image/webp', size: 1024 }), '')
   assert.match(validateCopyImage({ type: 'image/gif', size: 1024 }), /JPG/)
-  assert.match(validateCopyImage({ type: 'image/png', size: 21 * 1024 * 1024 }), /20 MB/)
+  assert.match(validateCopyImage({ type: 'image/png', size: 101 * 1024 * 1024 }), /100 MB/)
 })

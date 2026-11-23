@@ -125,6 +125,43 @@ class AssetImageOrientationTest {
         assertThat(fixture.asset.getSizeBytes()).isEqualTo(upload.length);
     }
 
+    @Test
+    void anOriginalOver20MegabytesIsAcceptedAndStoredWithin20Megabytes() throws Exception {
+        // 噪点图压不小，PNG 约 30 MB，模拟手机/微信原图。
+        var noise = new BufferedImage(3200, 3200, BufferedImage.TYPE_INT_RGB);
+        var random = new java.util.Random(1);
+        for (int y = 0; y < noise.getHeight(); y++) {
+            for (int x = 0; x < noise.getWidth(); x++) noise.setRGB(x, y, random.nextInt(0x1000000));
+        }
+        var png = new ByteArrayOutputStream();
+        ImageIO.write(noise, "png", png);
+        byte[] upload = png.toByteArray();
+        assertThat(upload.length).isGreaterThan(20 * 1024 * 1024);
+
+        var fixture = new Fixture(upload);
+        fixture.confirm();
+
+        var stored = ArgumentCaptor.forClass(byte[].class);
+        verify(fixture.storage).put(eq("t1/image/a"), stored.capture(), eq("image/jpeg"));
+        assertThat(stored.getValue().length).isLessThanOrEqualTo(20 * 1024 * 1024);
+        assertThat(fixture.asset.getStatus()).isEqualTo("READY");
+        assertThat(fixture.asset.getSizeBytes()).isEqualTo(stored.getValue().length);
+        assertThat(fixture.asset.getMimeType()).isEqualTo("image/jpeg");
+    }
+
+    @Test
+    void anImageOverThePixelLimitIsScaledDownInsteadOfRejected() throws Exception {
+        byte[] upload = plainJpeg(400, 300);
+        var fixture = new Fixture(upload);
+        ReflectionTestUtils.setField(fixture.service, "maxImagePixels", 30_000L);
+
+        fixture.confirm();
+
+        verify(fixture.storage).put(eq("t1/image/a"), any(byte[].class), eq("image/jpeg"));
+        assertThat((long) fixture.asset.getWidth() * fixture.asset.getHeight()).isLessThanOrEqualTo(30_000L);
+        assertThat(fixture.asset.getStatus()).isEqualTo("READY");
+    }
+
     private static final class Fixture {
         final AssetRepository repository = mock(AssetRepository.class);
         final ObjectStorage storage = mock(ObjectStorage.class);
