@@ -79,6 +79,15 @@ class ImageModelHttpAdapterTest {
      assertThat(captured.get(5,TimeUnit.SECONDS)).contains("query","job-123","stable-key");
    }
  }
+ @Test void upstream400IsShownAsOutputParameterError() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+     pool.submit(()->respond(server,400,"{\"error\":{\"code\":\"invalid_size\"}}"));
+     assertThatThrownBy(()->new ImageModelHttpAdapter(openAiConfig(server),new ObjectMapper())
+       .invoke(imageRequest(List.of())))
+       .isInstanceOf(BizException.class)
+       .hasMessage("图片服务拒绝了这次输出参数，请调整画质或比例后重试");
+   }
+ }
  @Test void unconfiguredCapabilitiesCannotFallThroughToEcho() {
    var adapter=new ImageModelHttpAdapter(new ImageModelProperties(),new ObjectMapper());
    var gateway=new AiGateway(List.of(new EchoProviderAdapter(),adapter));
@@ -107,6 +116,17 @@ class ImageModelHttpAdapterTest {
      assertThat(request).contains("\"quality\":\"high\"").doesNotContain("\"operation\"","\"seriesKey\"","\"references\"","response_format");
    }
  }
+ @Test void fluLegacyQualityAndResponseFormatAreNormalized() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+     var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"b64_json\":\"aW1hZ2U=\"}]}"));
+     var p=openAiConfig(server);
+     p.getGenerator().setModel("gpt-image-2.5-ultra-fast");
+     p.getGenerator().setQuality("standard");
+     p.getGenerator().setResponseFormat("url");
+     new ImageModelHttpAdapter(p,new ObjectMapper()).invoke(imageRequest(List.of()));
+     assertThat(captured.get(5,TimeUnit.SECONDS)).contains("\"quality\":\"high\"").doesNotContain("response_format");
+   }
+  }
  @Test void responseWithoutSingleImageLogsRedactedRelayError() throws Exception {
    try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
      String token="A".repeat(40);
@@ -163,7 +183,7 @@ class ImageModelHttpAdapterTest {
  @Test void imageUrlIsReturnedWithoutDownloading() throws Exception {
    try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
      String origin="http://127.0.0.1:"+server.getLocalPort();
-     var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"url\":\""+origin+"/image.png?signature=private\"}]}"));
+     var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"url\":\""+origin+"/image.png?signature=private\",\"b64_json\":\"ignored\"}]}"));
      var p=openAiConfig(server);p.getGenerator().setDownloadAllowedOrigins(List.of(origin));
      var result=new ImageModelHttpAdapter(p,new ObjectMapper()).invoke(imageRequest(List.of()));
      assertThat(result.output()).containsEntry("imageUrl",origin+"/image.png?signature=private")

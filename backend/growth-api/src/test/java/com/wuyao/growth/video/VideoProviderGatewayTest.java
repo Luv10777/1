@@ -188,7 +188,7 @@ class VideoProviderGatewayTest {
                     when(response.getCode()).thenReturn(200);
                     when(response.getEntity()).thenReturn(new StringEntity(request instanceof HttpPost
                             ? "{\"id\":\"job-1\",\"status\":\"queued\"}"
-                            : "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://haomaotoken.com/video.mp4\"},\"usage\":{\"completion_tokens\":1234}}",
+                            : "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://haomao.pro/video.mp4\"},\"usage\":{\"completion_tokens\":1234}}",
                             ContentType.APPLICATION_JSON));
                     return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
                 });
@@ -200,7 +200,7 @@ class VideoProviderGatewayTest {
         var result = gateway.poll("job-1", alias, "poll-key");
 
         assertThat(result.status()).isEqualTo("SUCCEEDED");
-        assertThat(result.resultUrl()).isEqualTo("https://haomaotoken.com/video.mp4");
+        assertThat(result.resultUrl()).isEqualTo("https://haomao.pro/video.mp4");
         assertThat(result.billingTokens()).isEqualTo(1234L);
         assertThat(requests).hasSize(2);
         assertThat(requests.get(0).getRequestUri()).endsWith("/api/v3/contents/generations/tasks");
@@ -220,7 +220,7 @@ class VideoProviderGatewayTest {
                     var response = mock(ClassicHttpResponse.class);
                     when(response.getCode()).thenReturn(200);
                     when(response.getEntity()).thenReturn(new StringEntity(
-                            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://haomaotoken.com/video.mp4\"},\"usage\":{\"video_tokens\":\"4321\"}}",
+                            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://haomao.pro/video.mp4\"},\"usage\":{\"video_tokens\":\"4321\"}}",
                             ContentType.APPLICATION_JSON));
                     return ((HttpClientResponseHandler<?>) invocation.getArgument(1)).handleResponse(response);
                 });
@@ -247,7 +247,8 @@ class VideoProviderGatewayTest {
         assertThat(body.path("resolution").asText()).isEqualTo("4k");
         assertThat(body.has("seconds") || body.has("mode") || body.has("prompt") || body.has("input_reference")).isFalse();
         assertThat(body.path("content").size()).isEqualTo(3);
-        assertThat(body.path("content").get(0).path("text").asText()).isEqualTo("商品旋转");
+        // 带参考素材时，提示词前面加上 @素材 的对应说明（VideoScenes.providerPrompt）。
+        assertThat(body.path("content").get(0).path("text").asText()).startsWith("参考素材按上传顺序").endsWith("。\n商品旋转");
         assertThat(body.path("content").get(1).path("image_url").path("url").asText()).endsWith("/image.png");
         assertThat(body.path("content").get(2).path("type").asText()).isEqualTo("video_url");
         assertThat(body.path("content").get(2).path("role").asText()).isEqualTo("reference_video");
@@ -268,7 +269,7 @@ class VideoProviderGatewayTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"{\"status\":\"succeeded\"}",
-            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"http://haomaotoken.com/video.mp4\"}}",
+            "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"http://haomao.pro/video.mp4\"}}",
             "{\"status\":\"succeeded\",\"content\":{\"video_url\":\"https://127.0.0.1/video.mp4\"}}"})
     void completedVolcengineTaskCannotImportAMissingOrUnsafeResult(String responseBody) throws Exception {
         var http = mock(HttpClient.class);
@@ -281,9 +282,9 @@ class VideoProviderGatewayTest {
     @Test
     void volcengineCanReadWrappedContentArraysAndTotalTokenUsage() throws Exception {
         var http = mock(HttpClient.class);
-        jsonResponse(http, "{\"data\":{\"status\":\"succeeded\",\"content\":[{\"type\":\"video_url\",\"video_url\":{\"url\":\"https://haomaotoken.com/video.mp4\"}}],\"usage\":{\"total_tokens\":900}}}");
+        jsonResponse(http, "{\"data\":{\"status\":\"succeeded\",\"content\":[{\"type\":\"video_url\",\"video_url\":{\"url\":\"https://haomao.pro/video.mp4\"}}],\"usage\":{\"total_tokens\":900}}}");
         var result = volcengineGateway(mock(AssetService.class), http).poll("job-1", "SEEDANCE_2_0_FAST", "poll-key");
-        assertThat(result.resultUrl()).isEqualTo("https://haomaotoken.com/video.mp4");
+        assertThat(result.resultUrl()).isEqualTo("https://haomao.pro/video.mp4");
         assertThat(result.billingTokens()).isEqualTo(900L);
     }
 
@@ -468,7 +469,7 @@ class VideoProviderGatewayTest {
 
     private VideoProviderGateway volcengineGateway(AssetService assets, HttpClient http) {
         var gateway = gateway(assets, http);
-        ReflectionTestUtils.setField(gateway, "baseUrl", "https://haomaotoken.com");
+        ReflectionTestUtils.setField(gateway, "baseUrl", "https://haomao.pro");
         ReflectionTestUtils.setField(gateway, "protocol", "VOLCENGINE");
         ReflectionTestUtils.setField(gateway, "providerName", "haomaotoken");
         ReflectionTestUtils.setField(gateway, "submitPath", "/api/v3/contents/generations/tasks");

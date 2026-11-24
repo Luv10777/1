@@ -130,10 +130,14 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    // Resolution tiers are not OpenAI's low/medium/high parameter. GPT Image omits response_format.
    // The UI no longer exposes a quality selector. Treat legacy "auto" config as
    // the provider's highest standard quality so old containers follow the same rule.
+   // Legacy DALL-E values standard and hd are also mapped to high for GPT Image.
    String quality = endpoint.getQuality();
-   if (quality.isBlank() || quality.equalsIgnoreCase("auto")) quality = "high";
+   if (quality.isBlank() || quality.equalsIgnoreCase("auto")
+       || (isGptImageModel(endpoint.getModel()) && (quality.equalsIgnoreCase("standard")
+         || quality.equalsIgnoreCase("hd")))) quality = "high";
    body.put("quality", quality);
-   if(!endpoint.getResponseFormat().isBlank()) body.put("response_format",endpoint.getResponseFormat());
+   if(!endpoint.getResponseFormat().isBlank() && !isGptImageModel(endpoint.getModel()))
+     body.put("response_format",endpoint.getResponseFormat());
    byte[] response;
    if(refs.isEmpty()) response=post(config.generatorUrl(),endpoint,req,"application/json",List.of(json.writeValueAsBytes(body)));
    else {
@@ -269,6 +273,9 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      return location;
    });
  }
+ private boolean isGptImageModel(String model) {
+   return model!=null && model.matches("(?i)gpt-image-2([.-].+)?");
+ }
  private URI checkedUri(String value) {
    URI uri=URI.create(value);
    if(uri.getScheme()==null || !Set.of("http","https").contains(uri.getScheme().toLowerCase(Locale.ROOT)) || uri.getHost()==null
@@ -288,7 +295,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
        case 401 -> "模型服务令牌无效或已过期";
        case 403 -> "模型未获当前令牌授权，或模型 ID 不受中转站支持（"+model+"）";
        case 404 -> "模型接口或模型 ID 不存在（"+model+"）";
-       case 400 -> "模型服务拒绝请求参数（请核对模型 ID、尺寸和质量参数）";
+       case 400 -> "图片服务拒绝了这次输出参数，请调整画质或比例后重试";
        default -> "模型服务请求失败（HTTP "+status+"）";
      };
      throw failure(reason);

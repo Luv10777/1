@@ -27,8 +27,8 @@ IMAGE_TEXT_TIMEOUT_SECONDS=300
 IMAGE_GENERATOR_MODEL=gpt-image-2.5-ultra-fast
 IMAGE_GENERATOR_PROTOCOL=OPENAI
 IMAGE_GENERATOR_URL=https://new.fluapi.com/v1/images/generations
-IMAGE_GENERATOR_QUALITY=standard
-IMAGE_GENERATOR_RESPONSE_FORMAT=url
+IMAGE_GENERATOR_QUALITY=high
+IMAGE_GENERATOR_RESPONSE_FORMAT=
 IMAGE_GENERATOR_TIMEOUT_SECONDS=600
 IMAGE_TIMEOUT_SECONDS=300
 IMAGE_SUPPORTED_QUALITIES=1K,2K,4K
@@ -43,9 +43,10 @@ IMAGE_FONT=Microsoft YaHei
 
 `IMAGE_SUPPORTED_QUALITIES` 只填写实际支持的档位。`IMAGE_MAX_OUTPUT_PIXELS` 可按中转站实测能力限制可选输出尺寸；0 表示不额外限制。带参考图时，规划模型必须支持图像输入。
 当前生产图片模型为 `gpt-image-2.5-ultra-fast`，使用 Flu 的 OpenAI 兼容
-`/v1/images/generations` 接口，并请求 `response_format=url`。Flu 单次请求等待生图完成，
-不返回 `task_id`，也没有查询接口；服务端使用 600 秒 Worker 超时接收最终图片 URL，
-再将 URL 流式转存到自己的对象存储，前端不接触供应商令牌。参考图编辑能力需以
+`https://new.fluapi.com/v1/images/generations` 接口，优先接收 `data[0].url`，没有 URL 时读取 `data[0].b64_json`。
+质量参数使用 `auto`、`low`、`medium` 或 `high`，不能使用旧 DALL·E 的 `standard`。
+Flu 单次请求等待生图完成，不返回任务 ID，也没有查询接口；服务端使用 600 秒 Worker
+超时接收最终图片，再将图片写入自己的对象存储，前端不接触供应商令牌。参考图编辑能力需以
 中转站对 `/v1/images/edits` 的实际支持为准。
 
 ```powershell
@@ -184,7 +185,7 @@ JSON 包含 `model`、`messages`、`response_format: {type: "json_object"}`。
 `/v1/files/{file_id}/content` 需要服务端携带 API Key 请求；它返回 `302` 和临时签名链接，
 不能把该接口地址直接交给浏览器。跳转后的签名地址不携带 API Key，默认 1 小时有效。
 Files API 上传响应只有文件 ID，不含下载 URL；文件默认保留 7 天。
-当前接入的图片生成接口已确认返回 URL；其他兼容接口返回 Base64 时仍走原有路径。
+当前接入的 Flu 图片生成接口优先返回 URL；没有 URL 时读取 Base64，其他兼容接口沿用同一回退逻辑。
 
 成本字段只记录供应商信息，不执行用户扣款。
 
@@ -198,15 +199,15 @@ Files API 上传响应只有文件 ID，不含下载 URL；文件默认保留 7 
 - 带参考图：`POST /v1/images/edits`，发送 multipart，单图字段为 `image`，多图为 `image[]`。
 - 请求包含 `model`、`prompt`、`n=1`、`size=宽x高`；套图按单张任务生成。
 - 参考图按原顺序传递，主体与风格的用途说明写入提示词。
-- `data[0].b64_json` 走同步保存路径；`data[0].url` 立即作为生成结果返回，
-  由 `IMAGE_DOWNLOAD` 后台任务下载和保存。
+- `data[0].url` 立即作为生成结果返回，由 `IMAGE_DOWNLOAD` 后台任务下载和保存；
+  没有 URL 时读取 `data[0].b64_json` 并同步保存。
 - URL 来源必须列入 `IMAGE_DOWNLOAD_ALLOWED_ORIGINS`，支持精确来源或
-  `*.aliyuncs.com` 这样的 HTTPS 子域名规则。
+  `*.aliyuncs.com,*.fluapi.com` 这样的 HTTPS 子域名规则。
   普通签名 URL 下载不携带模型令牌且不跟随跳转；OnlyRouter Files API 的
   `/content` 地址仅跟随一次 `302`，且不会向签名地址转发 API Key。
 
 `IMAGE_GENERATOR_QUALITY` 是模型的 `auto/low/medium/high` 等质量参数，
-与界面中的 1K、2K、4K 输出分辨率不同。默认不发送 `response_format`、
+与界面中的 1K、2K、4K 输出分辨率不同。Flu GPT Image 不使用 `response_format`，
 `input_fidelity` 等可选参数；只有当前图片接口明确要求时才配置
 `IMAGE_GENERATOR_RESPONSE_FORMAT`。返回格式以实际接口响应为准。
 

@@ -20,6 +20,30 @@ class ImageQualityTest {
    assertThat(ImageQuality.usesGptImage2(p)).isTrue();
    assertThat(ImageQuality.modelDimensions("4K","16:9",p)).isEqualTo(new ImageDtos.Dimensions(3840,2160));
  }
+ @Test void gptImage25NormalizesNonMultipleOf16RatioTiers() {
+   var p=config();p.getGenerator().setModel("gpt-image-2.5-flare-ab");
+   assertThat(ImageQuality.modelDimensions("1K", "16:9", p))
+     .isEqualTo(new ImageDtos.Dimensions(1792,1008));
+   assertThat(ImageQuality.modelDimensions("2K", "2:3", p))
+     .isEqualTo(new ImageDtos.Dimensions(2048,3072));
+   for (String quality : List.of("1K", "2K", "4K")) {
+     for (String ratio : List.of("1:1", "3:4", "4:3", "9:16", "16:9", "2:3", "3:2")) {
+       try {
+         var size=ImageQuality.modelDimensions(quality,ratio,p);
+         assertThat(size.width()%16).as(quality+" "+ratio).isZero();
+         assertThat(size.height()%16).as(quality+" "+ratio).isZero();
+         assertThat((long)size.width()*size.height()).as(quality+" "+ratio)
+           .isBetween(655_360L,8_294_400L);
+         assertThat(Math.max(size.width(),size.height())).as(quality+" "+ratio)
+           .isLessThanOrEqualTo(3840);
+       } catch (RuntimeException ignored) {
+         // 4K only exposes the provider's native 16:9 and 9:16 tiers.
+         assertThat(quality).isEqualTo("4K");
+         assertThat(ratio).isNotIn("16:9", "9:16");
+       }
+     }
+   }
+ }
  @Test void fourKRejectsSquareAndSupportsLandscapeAndPortrait() {
    assertThat(ImageQuality.modelDimensions("4K","16:9",config())).isEqualTo(new ImageDtos.Dimensions(3840,2160));
    assertThat(ImageQuality.modelDimensions("4K","9:16",config())).isEqualTo(new ImageDtos.Dimensions(2160,3840));

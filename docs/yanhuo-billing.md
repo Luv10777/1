@@ -296,7 +296,7 @@ growth:
   billing:
     video:
       rates:
-        - provider-base-url: https://haomaotoken.com
+        - provider-base-url: https://haomao.pro
           provider-model: seedance-2.0
           resolution: 720p
           video-input: t2v

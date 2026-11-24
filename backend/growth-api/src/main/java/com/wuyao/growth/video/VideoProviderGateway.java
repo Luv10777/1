@@ -51,7 +51,7 @@ public class VideoProviderGateway {
     private final AssetService assets;
     private final HttpClient httpClient;
 
-    @Value("${growth.video.provider.base-url:https://haomaotoken.com}") private String baseUrl;
+    @Value("${growth.video.provider.base-url:https://haomao.pro}") private String baseUrl;
     @Value("${growth.video.provider.api-key:}") private String apiKey;
     @Value("${growth.video.provider.api-key-seedance-2-5:}") private String seedance25ApiKey;
     @Value("${growth.video.provider.api-key-seedance-2-0:}") private String seedance20ApiKey;

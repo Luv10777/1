@@ -36,8 +36,8 @@ class VideoQaHandlerTest {
     @Test
     void billedWorkflowsSettleWithTheQuotaOfTheRelayThatAcceptedTheQuote() {
         var task = task();
-        when(workflows.findById(42L)).thenReturn(Optional.of(billed("https://haomaotoken.com")));
-        when(provider.baseUrl()).thenReturn("https://haomaotoken.com");
+        when(workflows.findById(42L)).thenReturn(Optional.of(billed("https://haomao.pro")));
+        when(provider.baseUrl()).thenReturn("https://haomao.pro");
         when(provider.billedQuota("task_abc", SUBMITTED)).thenReturn(2185000L);
         handler.handle(task);
         verify(service).completeQa(42L, task, 2185000L);
@@ -47,7 +47,7 @@ class VideoQaHandlerTest {
     void unbilledOrSwitchedProviderWorkflowsNeverAskTheRelay() {
         var task = task();
         when(provider.baseUrl()).thenReturn("https://another-relay.example");
-        when(workflows.findById(42L)).thenReturn(Optional.of(billed("https://haomaotoken.com")));
+        when(workflows.findById(42L)).thenReturn(Optional.of(billed("https://haomao.pro")));
         handler.handle(task);
         var unbilled = billed("https://another-relay.example");
         unbilled.setBillingReservationId(null);

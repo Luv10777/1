@@ -14,9 +14,9 @@ public final class CustomerMessages {
         Rule(String regex, String message) { this(Pattern.compile(regex, Pattern.CASE_INSENSITIVE), message); }
     }
 
-    /** 原始报错的痕迹：JSON 符号、HTTP、英文错误码、内部称呼。 */
+    /** 原始报错的痕迹：JSON 符号、HTTP、英文错误码、整句英文、内部称呼。 */
     private static final Pattern TECHNICAL = Pattern.compile(
-            "[{}\"\\\\]|HTTP|Exception|供应商|中转站|上游|[A-Z][a-z]+[A-Z]\\w*|[a-z]+_[a-z]+");
+            "[{}\"\\\\]|HTTP|Exception|供应商|中转站|上游|[A-Z][a-z]+[A-Z]\\w*|[a-z]+_[a-z]+|[A-Za-z]{2,}(?: [A-Za-z]{2,}){2}");
 
     // 顺序有讲究：真人隐私的错误码里也带 Sensitive，要排在敏感内容前面。
     private static final List<Rule> RULES = List.of(

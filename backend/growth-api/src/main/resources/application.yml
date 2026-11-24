@@ -159,7 +159,7 @@ growth:
       timeout-seconds: ${IMAGE_GENERATOR_TIMEOUT_SECONDS:600}
       quality: ${IMAGE_GENERATOR_QUALITY:}
       response-format: ${IMAGE_GENERATOR_RESPONSE_FORMAT:}
-      download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:*.aliyuncs.com}
+      download-allowed-origins: ${IMAGE_DOWNLOAD_ALLOWED_ORIGINS:*.aliyuncs.com,*.fluapi.com}
     qualities: ${IMAGE_SUPPORTED_QUALITIES:1K,2K,4K}
     max-output-pixels: ${IMAGE_MAX_OUTPUT_PIXELS:0}
     timeout-seconds: ${IMAGE_TIMEOUT_SECONDS:120}
@@ -190,7 +190,7 @@ growth:
     provider:
       name: ${VIDEO_PROVIDER_NAME:haomaotoken}
       protocol: ${VIDEO_PROVIDER_PROTOCOL:VOLCENGINE}
-      base-url: ${VIDEO_PROVIDER_BASE_URL:https://haomaotoken.com}
+      base-url: ${VIDEO_PROVIDER_BASE_URL:https://haomao.pro}
       api-key: ${VIDEO_PROVIDER_API_KEY:}
       api-key-seedance-2-5: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_5:}
       api-key-seedance-2-0: ${VIDEO_PROVIDER_API_KEY_SEEDANCE_2_0:}

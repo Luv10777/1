@@ -25,6 +25,13 @@ class CustomerMessagesTest {
     }
 
     @Test
+    void plainEnglishModerationSentenceIsTranslated() {
+        String raw = "volc asset processing failed: The request failed because the input text may contain sensitive information. "
+                + "Request ID: 2026112315332659743CFBB6C63468176_asset-20261123153327-6q5v6";
+        assertThat(CustomerMessages.plain(raw, FALLBACK)).startsWith("画面或描述里可能有平台不允许的内容");
+    }
+
+    @Test
     void commonProviderFailuresAreTranslated() {
         assertThat(CustomerMessages.plain("供应商响应 HTTP 429: rate limit exceeded", FALLBACK)).isEqualTo("现在使用的人比较多，请过几分钟再试。");
         assertThat(CustomerMessages.plain("视频供应商在规定时间内未完成任务", FALLBACK)).isEqualTo("这次生成等了太久没有完成，请稍后重试。");

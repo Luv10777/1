@@ -11,7 +11,7 @@ growth:
     video:
       rates:
         - &seedance20-common
-          provider-base-url: https://haomaotoken.com
+          provider-base-url: https://haomao.pro
           provider-model: seedance-2.0
           resolution: 480p
           video-input: t2v

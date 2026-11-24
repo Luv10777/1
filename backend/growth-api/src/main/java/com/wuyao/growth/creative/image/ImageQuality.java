@@ -6,6 +6,10 @@ import java.util.Map;
 import java.util.Set;
 
 public final class ImageQuality {
+    private static final long MIN_MODEL_PIXELS = 655_360L;
+    private static final long MAX_MODEL_PIXELS = 8_294_400L;
+    private static final int MAX_MODEL_EDGE = 3_840;
+
     private ImageQuality() {}
     public static boolean usesGptImage2(ImageModelProperties config) {
         String model=config.getGenerator().getModel();
@@ -15,7 +19,22 @@ public final class ImageQuality {
     public static ImageDtos.Dimensions modelDimensions(String quality,String ratio,ImageModelProperties config) {
         var target=dimensions(quality,ratio);
         if(!usesGptImage2(config)) return target;
-        return target;
+        // GPT Image 2/2.5 accepts custom pixel sizes, but both edges must be
+        // multiples of 16 and the full image must stay within the provider's
+        // pixel and edge limits. The UI's ratio tiers are not all exact
+        // multiples of 16 (for example 1K 16:9 would be 1820x1024), so map
+        // them to the closest valid size before the request reaches the relay.
+        String[] parts=ratio.split(":");
+        int x=Integer.parseInt(parts[0]), y=Integer.parseInt(parts[1]);
+        int unitX=x*16, unitY=y*16;
+        double targetScale=Math.max((double)target.width()/unitX,(double)target.height()/unitY);
+        int scale=Math.max(1,(int)Math.round(targetScale));
+        while((long)unitX*unitY*scale*scale<MIN_MODEL_PIXELS) scale++;
+        int width=unitX*scale, height=unitY*scale;
+        if(width>MAX_MODEL_EDGE || height>MAX_MODEL_EDGE || (long)width*height>MAX_MODEL_PIXELS)
+            throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,
+                "当前模型的输出尺寸超出上游限制，请调整画质或比例");
+        return new ImageDtos.Dimensions(width,height);
     }
     public static boolean supportsOutput(String quality,String ratio,ImageModelProperties config) {
         try {
