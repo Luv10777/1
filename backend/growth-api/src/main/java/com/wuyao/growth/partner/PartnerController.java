@@ -77,6 +77,13 @@ public class PartnerController {
         return ApiResponse.ok(service.tenantDetail(me.userId(), tenantId));
     }
 
+    /** 商户备注名，整个团队共用；{remark} 为空时删掉。 */
+    @PutMapping("/tenants/{tenantId}/remark")
+    public ApiResponse<PartnerDtos.TenantView> remark(@PathVariable Long tenantId, @Valid @RequestBody PartnerDtos.Remark input,
+            @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.setRemark(me.userId(), tenantId, input.remark()));
+    }
+
     @PostMapping("/tenants/{tenantId}/renewals")
     public ApiResponse<PartnerDtos.TenantView> renew(@PathVariable Long tenantId, @Valid @RequestBody PartnerDtos.Renew input,
             @AuthenticationPrincipal AuthPrincipal me) {

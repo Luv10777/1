@@ -82,7 +82,7 @@ load()
 
     <section class="management-list" :aria-busy="loading" aria-label="名下商户列表">
       <form class="management-filters" @submit.prevent="search">
-        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索商户名、联系人或 UID" aria-label="搜索商户" maxlength="60" /></label>
+        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索备注名、商户名、联系人或 UID" aria-label="搜索商户" maxlength="60" /></label>
         <label class="mg-select"><span class="sr-only">会员状态</span><AppSelect v-model="expiry" @change="search"><option value="">全部会员状态</option><option v-for="(label, value) in expiryFilters" :key="value" :value="value">{{ label }}</option></AppSelect></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
       </form>
@@ -104,7 +104,7 @@ load()
           <tbody>
             <tr v-for="item in records" :key="item.tenantId" class="partner-row" tabindex="0" @click="openTenant = item.tenantId" @keydown.enter="openTenant = item.tenantId">
               <td v-if="distributor" class="partner-check" @click.stop><input type="checkbox" :checked="picked.has(item.tenantId)" :aria-label="`选择${item.tenantName || '商户'}`" @change="togglePick(item)" /></td>
-              <td><span>{{ item.tenantName || '—' }}</span><small>商户 #{{ item.tenantId }}</small></td>
+              <td><span>{{ item.remark || item.tenantName || '—' }}</span><small>{{ item.remark ? `${item.tenantName || '—'} · ` : '' }}商户 #{{ item.tenantId }}</small></td>
               <td><span>{{ item.ownerName || '—' }}</span><small>UID {{ item.ownerUid || '—' }}</small></td>
               <td :class="['partner-member', membershipState(item).tone]"><span>{{ membershipState(item).short }}</span><small v-if="item.memberUntil">{{ item.planName || '会员' }} · {{ managementDate(item.memberUntil).slice(0, 10) }}</small></td>
               <td class="code-number mg-mono">{{ item.creditsAvailable == null ? '—' : number(item.creditsAvailable) }}</td>

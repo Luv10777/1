@@ -171,10 +171,11 @@ V84：
 | `PUT /api/partner/me/name` | 成员 | `{displayName}` 设自己的团队称呼 |
 | `GET /api/partner/workbench` | 商户 | 待办：`todos`（`type` 为 `EXPIRING`/`EXPIRED`/`LOW_BALANCE`/`NOT_STARTED`/`IDLE`，带商户）和各类数量 |
 | `GET /api/partner/dashboard?days=` | 商户 | 经营看板，`days` 取 1、7、30、90；烟火数字只给财务权限 |
-| `GET /api/partner/tenants` | 商户 | 名下商户（含会员状态、烟火余额、谁添加的），`keyword` 按商户名、联系人、UID 搜；`expiry` 取 `SOON7`/`SOON30`/`EXPIRED`/`NEVER` |
+| `GET /api/partner/tenants` | 商户 | 名下商户（含会员状态、烟火余额、谁添加的、备注名 `remark`），`keyword` 按备注名、商户名、联系人、UID 搜；`expiry` 取 `SOON7`/`SOON30`/`EXPIRED`/`NEVER` |
 | `GET /api/partner/lookup?uid=` | 商户 | 按 UID 预查询：商户名、打码姓名、`tenantState`（`NONE`/`MINE`/`OTHER`） |
 | `POST /api/partner/tenants` | 商户 | `{uid}` 按 UID 添加 |
 | `GET /api/partner/tenants/{tenantId}` | 商户 | 商户详情：会员和余额、这家服务商分给他的烟火（分配或财务权限）、他兑换过的本服务商激活码（含直接续期） |
+| `PUT /api/partner/tenants/{tenantId}/remark` | 商户 | `{remark}` 给商户起备注名（最多 30 字，整个团队共用，空字符串删掉）；按（服务商, 商户）记，改归属后新服务商看不到 |
 | `POST /api/partner/tenants/{tenantId}/renewals` | 商户 | `{requestKey, planCode}` 直接续期 |
 | `GET/PUT/POST /api/partner/tenants/{tenantId}/crm`、`/profile`、`/follow-ups`，`GET /api/partner/follow-ups/due` | 商户 | 商户档案和跟进记录 |
 | `POST /api/partner/tenants/{tenantId}/credits` | 分配 | `{requestKey, credits, note}` 从团队账户分给商户 |

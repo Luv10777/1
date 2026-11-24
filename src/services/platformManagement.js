@@ -1,4 +1,4 @@
-import { get, post } from '../utils/request.js'
+import { get, post, put } from '../utils/request.js'
 
 const params = values => Object.fromEntries(Object.entries(values || {}).filter(([, value]) => value != null && value !== ''))
 const target = (item, resource) => `/api/platform/tenants/${encodeURIComponent(item.tenantId)}/${resource}/${encodeURIComponent(item.id)}`
@@ -15,6 +15,8 @@ export const platformManagementApi = {
   users: values => get('/api/platform/users', params(values)),
   userSummary: () => get('/api/platform/users/summary'),
   userSuspension: (item, values) => post(`/api/platform/users/${encodeURIComponent(item.id)}/suspension`, values),
+  /** 备注名全体管理员共用；空字符串表示删掉。 */
+  userRemark: (item, remark) => put(`/api/platform/users/${encodeURIComponent(item.id)}/remark`, { remark }),
   // 会员和烟火按商户记账：对某个账号操作，作用于他所属的整个商户。
   userMembership: (item, values) => post(`/api/platform/users/${encodeURIComponent(item.id)}/membership`, values),
   userCredits: (item, values) => post(`/api/platform/users/${encodeURIComponent(item.id)}/credits`, values),

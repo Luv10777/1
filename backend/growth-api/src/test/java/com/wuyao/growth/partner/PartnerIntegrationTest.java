@@ -570,6 +570,28 @@ class PartnerIntegrationTest {
         assertThat(owner.queryForObject("SELECT count(*) FROM partner_follow_ups WHERE partner_id=?",Long.class,a)).isEqualTo(1);
     }
 
+    @Test void remarksAreSharedByTheTeamSearchableAndStayWithTheirPartner() throws Exception {
+        long a=partner("甲服务商",agentA), b=partner("乙服务商",agentB);
+        call(agentA,agency,post("/api/partner/tenants"),"{\"uid\":"+uid(shopOwner)+"}").andExpect(status().isOk());
+        call(agentA,agency,put("/api/partner/tenants/"+shop+"/remark"),"{\"remark\":\"  西湖店老客户 \"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.remark").value("西湖店老客户"));
+        call(agentA,agency,put("/api/partner/tenants/"+shop+"/remark"),"{\"remark\":\""+"长".repeat(31)+"\"}").andExpect(status().isBadRequest());
+        // 成员要有「商户」权限才能看和改，看到的是团队共用的那一个。
+        call(agentA,agency,post("/api/partner/team"),member("13800006666","周晓",MEMBER_PERMS,null)).andExpect(status().isOk());
+        long staff=owner.queryForObject("SELECT id FROM users WHERE phone='13800006666'",Long.class);
+        call(staff,agency,get("/api/partner/tenants").param("keyword","西湖"),null).andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].remark").value("西湖店老客户"));
+        call(staff,agency,get("/api/partner/tenants/"+shop),null).andExpect(jsonPath("$.data.tenant.remark").value("西湖店老客户"));
+        call(agentB,agencyB,put("/api/partner/tenants/"+shop+"/remark"),"{\"remark\":\"抢\"}").andExpect(status().isNotFound());
+        // 改归属后新服务商看不到上一家的备注。
+        platform(put("/api/platform/partners/assignments/"+shop),"{\"partnerId\":"+b+"}").andExpect(status().isOk());
+        call(agentB,agencyB,get("/api/partner/tenants/"+shop),null).andExpect(jsonPath("$.data.tenant.remark").doesNotExist());
+        platform(put("/api/platform/partners/assignments/"+shop),"{\"partnerId\":"+a+"}").andExpect(status().isOk());
+        call(agentA,agency,put("/api/partner/tenants/"+shop+"/remark"),"{\"remark\":\"\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.remark").doesNotExist());
+        assertThat(owner.queryForObject("SELECT count(*) FROM partner_tenant_remarks",Long.class)).isZero();
+    }
+
     @Test void rolesEnforceFinanceReviewerAndSupportBoundariesAndAuditChanges() throws Exception {
         platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(shopOwner)+",\"roles\":[\"REVIEWER\"]}").andExpect(status().isOk());
         platform(put("/api/platform/security/roles"),"{\"uid\":"+uid(cafeOwner)+",\"roles\":[\"FINANCE\"]}").andExpect(status().isOk());

@@ -42,7 +42,8 @@ class PartnerStore {
         Perms perms() { return member.effective(); }
     }
     /** changedBy：按 UID 添加的是添加人，兑换激活码归属的为空，平台改的是平台运营。 */
-    record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long changedBy) {}
+    /** remark 是这家服务商给商户起的备注名，团队共用；没起时为空。 */
+    record Binding(Long tenantId, Long partnerId, String source, Instant boundAt, Long changedBy, String remark) {}
     /** 服务商流水：GRANT 平台发放（V84 起直接进团队账户，availableAfter 为空），TRANSFER 是 V84 以前从可分配烟火分出去的。 */
     record LedgerRow(Long id, String type, long delta, Long availableAfter, Long tenantId, String note, Long actorUserId, Instant createdAt) {}
     /** 一笔分配：source 为 POOL（V84 以前的可分配烟火）或 ACCOUNT（团队账户）；recipientType 为 TENANT（V84 以前还有 BD）。 */
@@ -209,11 +210,12 @@ class PartnerStore {
                 .setParameter("id", partnerId).getSingleResult());
     }
 
-    private static final String BINDING_COLUMNS = "tenant_id, partner_id, source, bound_at, changed_by";
+    private static final String SELECT_BINDINGS = "SELECT b.tenant_id, b.partner_id, b.source, b.bound_at, b.changed_by, r.remark FROM partner_tenants b "
+            + "LEFT JOIN partner_tenant_remarks r ON r.partner_id = b.partner_id AND r.tenant_id = b.tenant_id";
 
     @Transactional(readOnly = true)
     public Optional<Binding> binding(Long tenantId) {
-        List<?> rows = em.createNativeQuery("SELECT " + BINDING_COLUMNS + " FROM partner_tenants WHERE tenant_id = :t")
+        List<?> rows = em.createNativeQuery(SELECT_BINDINGS + " WHERE b.tenant_id = :t")
                 .setParameter("t", tenantId).getResultList();
         return rows.stream().map(r -> binding((Object[]) r)).findFirst();
     }
@@ -260,13 +262,27 @@ class PartnerStore {
 
     @Transactional(readOnly = true)
     public List<Binding> tenants(Long partnerId) {
-        List<?> rows = em.createNativeQuery("SELECT " + BINDING_COLUMNS + " FROM partner_tenants WHERE partner_id = :p ORDER BY bound_at DESC, tenant_id DESC")
+        List<?> rows = em.createNativeQuery(SELECT_BINDINGS + " WHERE b.partner_id = :p ORDER BY b.bound_at DESC, b.tenant_id DESC")
                 .setParameter("p", partnerId).getResultList();
         return rows.stream().map(r -> binding((Object[]) r)).toList();
     }
 
     private static Binding binding(Object[] r) {
-        return new Binding(num(r[0]), num(r[1]), (String) r[2], instant(r[3]), r[4] == null ? null : num(r[4]));
+        return new Binding(num(r[0]), num(r[1]), (String) r[2], instant(r[3]), r[4] == null ? null : num(r[4]), (String) r[5]);
+    }
+
+    /** 设商户备注名；remark 为空时删掉。 */
+    @Transactional
+    public void setRemark(Long partnerId, Long tenantId, String remark, Long actor) {
+        if (remark == null) {
+            em.createNativeQuery("DELETE FROM partner_tenant_remarks WHERE partner_id = :p AND tenant_id = :t")
+                    .setParameter("p", partnerId).setParameter("t", tenantId).executeUpdate();
+            return;
+        }
+        em.createNativeQuery("""
+                INSERT INTO partner_tenant_remarks(partner_id, tenant_id, remark, updated_by) VALUES (:p, :t, :r, :a)
+                ON CONFLICT (partner_id, tenant_id) DO UPDATE SET remark = EXCLUDED.remark, updated_by = EXCLUDED.updated_by, updated_at = now()""")
+                .setParameter("p", partnerId).setParameter("t", tenantId).setParameter("r", remark).setParameter("a", actor).executeUpdate();
     }
 
     @Transactional(readOnly = true)

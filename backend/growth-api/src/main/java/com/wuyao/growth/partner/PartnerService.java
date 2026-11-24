@@ -396,6 +396,14 @@ public class PartnerService {
         return tenantView(binding.tenantId());
     }
 
+    /** 给名下商户起备注名（团队共用），空白时删掉备注。 */
+    public PartnerDtos.TenantView setRemark(Long userId, Long tenantId, String remark) {
+        var access = require(userId, PartnerStore.Perms::tenants, "商户");
+        var binding = owned(access, tenantId);
+        store.setRemark(access.partner().id(), binding.tenantId(), blank(remark) ? null : remark.trim(), userId);
+        return tenantView(binding.tenantId());
+    }
+
     public PartnerDtos.Page<PartnerDtos.LedgerEntry> ledger(Long userId, int page, int size) {
         return ledgerOf(require(userId, PartnerStore.Perms::finance, "财务查看").partner().id(), page, size);
     }
@@ -485,7 +493,7 @@ public class PartnerService {
         Map<Long, PlatformAccountDirectory.PlatformUser> owners = owners();
         Map<Long, String> people = new HashMap<>();
         String key = blank(keyword) ? "" : keyword.trim().toLowerCase(Locale.ROOT);
-        var matched = bindings.stream().filter(b -> key.isEmpty() || Stream.of(names.get(b.tenantId()), String.valueOf(b.tenantId()),
+        var matched = bindings.stream().filter(b -> key.isEmpty() || Stream.of(b.remark(), names.get(b.tenantId()), String.valueOf(b.tenantId()),
                         owners.get(b.tenantId()) == null ? null : owners.get(b.tenantId()).name(),
                         owners.get(b.tenantId()) == null ? null : String.valueOf(owners.get(b.tenantId()).uid()))
                 .filter(Objects::nonNull).anyMatch(v -> v.toLowerCase(Locale.ROOT).contains(key))).toList();
@@ -527,7 +535,8 @@ public class PartnerService {
                 store.member(b.partnerId(), id).map(PartnerStore.MemberRow::displayName).filter(n -> !blank(n)).orElseGet(() -> userName(id))) : null;
         return new PartnerDtos.TenantView(b.tenantId(), names.get(b.tenantId()), owner == null ? null : owner.uid(), owner == null ? null : owner.name(),
                 b.source(), b.boundAt(), summary == null ? null : summary.memberActive(), summary == null ? null : summary.memberUntil(),
-                summary == null || summary.plan() == null ? null : summary.plan().name(), summary == null ? null : summary.available(), addedBy);
+                summary == null || summary.plan() == null ? null : summary.plan().name(), summary == null ? null : summary.available(), addedBy,
+                b.remark());
     }
 
     /** 每个商户最早注册的管理员，作为商户的联系人展示。 */

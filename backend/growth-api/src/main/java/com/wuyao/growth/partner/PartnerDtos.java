@@ -91,8 +91,10 @@ public final class PartnerDtos {
                             Long granted, Long transferred, long codesGenerated, long codesRedeemed, long renewals, long codesVoided,
                             List<DailyPoint> daily, List<TenantRank> topTenants, List<MemberRank> members) {}
     /** 名下商户；会员和余额读不到时为空。source 为 UID、CODE 或 PLATFORM；addedByName 是按 UID 添加他的成员。 */
+    /** remark：服务商团队给这个商户起的备注名，没起时为空。 */
     public record TenantView(Long tenantId, String tenantName, Long ownerUid, String ownerName, String source, Instant boundAt,
-                             Boolean memberActive, Instant memberUntil, String planName, Long creditsAvailable, String addedByName) {}
+                             Boolean memberActive, Instant memberUntil, String planName, Long creditsAvailable, String addedByName,
+                             String remark) {}
     /**
      * 服务商流水：GRANT 平台发放（V84 起直接进团队账户，availableAfter 为空）；TRANSFER 是 V84 以前从可分配烟火分给商户的，
      * 以及 V84 把剩余的可分配烟火转进团队账户的那一笔。
@@ -101,6 +103,8 @@ public final class PartnerDtos {
                               String note, String actorName, Instant createdAt) {}
     public record Page<T>(List<T> items, int page, int size, long total) {}
 
+    /** 备注名，最多 30 字；空白表示删掉。 */
+    public record Remark(@Size(max=30) String remark) {}
     public record UidRequest(@NotNull @Min(10000000) @Max(99999999) Long uid) {}
     public record Transfer(@NotBlank @Pattern(regexp="[a-zA-Z0-9-]{8,80}") String requestKey,
                            @Min(1) @Max(1000000) long credits, @Size(max=200) String note) {}

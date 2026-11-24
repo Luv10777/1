@@ -84,6 +84,7 @@ public class BackofficeWebConfig implements WebMvcConfigurer {
         if(p.endsWith("/profile")) return "更新商户档案";
         if(p.contains("/assignments/")) return "调整商户归属";
         if(p.endsWith("/me/name")) return "修改团队称呼";
+        if(p.endsWith("/remark")) return "修改备注名";
         if(p.endsWith("/credits")) return "分配烟火";
         if(p.contains("/codes") || p.contains("/redeem-codes")) return "管理兑换码";
         if(p.endsWith("/confirm")) return "确认订单收款";

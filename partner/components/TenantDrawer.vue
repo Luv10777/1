@@ -6,6 +6,7 @@ import { managementDate } from '../../src/domain/platformManagement.js'
 import { accountSplit, capabilityBars, dateText, membershipState, number, renewedUntil, sinceText, tenantTimeline, transferError, transferPresets } from '../../src/domain/partnerOps.js'
 import { can, loadPartner, partner } from '../partnerStore.js'
 import MerchantCrm from './MerchantCrm.vue'
+import RemarkField from '../../src/components/RemarkField.vue'
 import PartnerPanel from './PartnerPanel.vue'
 import ConfirmBox from './ConfirmBox.vue'
 import OptionCards from './OptionCards.vue'
@@ -84,6 +85,13 @@ async function refresh(message) {
   reset()
 }
 
+// 备注名团队共用；改完把新的商户行交回列表。
+async function saveRemark(remark) {
+  const row = await partnerApi.setRemark(props.tenantId, remark)
+  detail.value = { ...detail.value, tenant: row }
+  emit('updated', row)
+}
+
 function askRenew() {
   renewal.error = renewPlan.value ? '' : '请选择套餐。'
   renewal.confirming = !renewal.error
@@ -119,7 +127,7 @@ async function sendCredits() {
 </script>
 
 <template>
-  <PartnerPanel :open="Boolean(tenantId)" :busy="busy" :title="tenant?.tenantName || '商户详情'" :eyebrow="tenant ? `商户 #${tenant.tenantId}` : ''" @close="emit('close')">
+  <PartnerPanel :open="Boolean(tenantId)" :busy="busy" :title="tenant?.remark || tenant?.tenantName || '商户详情'" :eyebrow="tenant ? `${tenant.remark ? `${tenant.tenantName || '—'} · ` : ''}商户 #${tenant.tenantId}` : ''" @close="emit('close')">
     <template v-if="tenant" #summary>
       <span :class="['partner-member', state.tone]">{{ state.text }}</span>
       <span>{{ tenant.ownerName || '—' }} · UID {{ tenant.ownerUid || '—' }}</span>
@@ -138,6 +146,8 @@ async function sendCredits() {
         <section class="mg-detail-section">
           <h3><Store :size="17" />基本信息</h3>
           <dl class="mg-detail-grid">
+            <div class="full"><dt>备注名</dt><dd><RemarkField :value="tenant.remark || ''" :save="saveRemark" :disabled="busy" placeholder="例如：西湖店、张总介绍的" /></dd></div>
+            <div><dt>商户名</dt><dd>{{ tenant.tenantName || '—' }}</dd></div>
             <div><dt>联系人</dt><dd>{{ tenant.ownerName || '—' }}</dd></div>
             <div><dt>联系人 UID</dt><dd class="mg-mono">{{ tenant.ownerUid || '—' }}</dd></div>
             <div><dt>归属方式</dt><dd>{{ tenantSources[tenant.source] || tenant.source }}</dd></div>

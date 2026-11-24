@@ -35,7 +35,8 @@ class PlatformUserServiceTest {
     private final BillingService billing = mock(BillingService.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final RealNameApplicationRepository identities = mock(RealNameApplicationRepository.class);
-    private final PlatformUserService service = new PlatformUserService(management, access, directory, audits, billing, transactions, identities);
+    private final PlatformUserRemarks remarks = mock(PlatformUserRemarks.class);
+    private final PlatformUserService service = new PlatformUserService(management, access, directory, audits, billing, transactions, identities, remarks);
     private final Instant now = Instant.now();
 
     private RealNameApplication identity(long id, long tenantId, long userId, String status) {
@@ -157,5 +158,25 @@ class PlatformUserServiceTest {
 
         var result = service.suspension(operator, 5L, new PlatformDtos.UserSuspensionRequest(true, "多次发布违规信息"));
         assertThat(result.identity().id()).isEqualTo(41L);
+    }
+
+    @Test
+    void remarksShowInTheListAndCanBeSearched() {
+        when(remarks.all()).thenReturn(java.util.Map.of(7L, "杭州老客户"));
+        var items = service.users(operator, 0, 20, null, null, null).items();
+        assertThat(items).extracting(PlatformDtos.UserView::remark).containsExactly(null, null, "杭州老客户");
+        assertThat(service.users(operator, 0, 20, null, null, "老客户").items()).extracting(PlatformDtos.UserView::id).containsExactly(7L);
+    }
+
+    @Test
+    void remarkIsTrimmedBlankClearsItAndMerchantsCannotSetOne() {
+        when(directory.user(5L)).thenReturn(user(5, 2, "林知夏", "ACTIVE", null));
+        when(remarks.of(5L)).thenReturn("代理A介绍");
+        assertThat(service.remark(operator, 5L, new PlatformDtos.UserRemarkRequest("  代理A介绍 ")).remark()).isEqualTo("代理A介绍");
+        verify(remarks).set(5L, "代理A介绍", 1L);
+        service.remark(operator, 5L, new PlatformDtos.UserRemarkRequest("   "));
+        verify(remarks).set(5L, null, 1L);
+        assertThatThrownBy(() -> service.remark(merchant, 5L, new PlatformDtos.UserRemarkRequest("x"))).isInstanceOf(BizException.class);
+        verify(remarks, times(2)).set(any(), any(), any());
     }
 }

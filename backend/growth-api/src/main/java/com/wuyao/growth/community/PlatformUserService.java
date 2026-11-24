@@ -38,6 +38,7 @@ public class PlatformUserService {
     private final BillingService billing;
     private final PlatformTransactionManager transactionManager;
     private final RealNameApplicationRepository identities;
+    private final PlatformUserRemarks remarks;
 
     /** 默认不列出已被商户移除的账号；按状态筛选 REMOVED 时才显示。 */
     public PageResult<PlatformDtos.UserView> users(AuthPrincipal me, int page, int size, String status, String role, String keyword) {
@@ -46,11 +47,12 @@ public class PlatformUserService {
         checkFilter(status, STATUSES);
         checkFilter(role, ROLES);
         Map<Long, String> tenantNames = tenantNames();
+        Map<Long, String> remarked = remarks.all();
         String key = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
         var matched = directory.users().stream()
                 .filter(u -> blank(status) ? !"REMOVED".equals(u.status()) : status.equals(u.status()))
                 .filter(u -> blank(role) || role.equals(u.role()))
-                .filter(u -> key.isEmpty() || Stream.of(u.name(), u.phone(), u.username(), tenantNames.get(u.tenantId()), String.valueOf(u.id()), String.valueOf(u.uid()))
+                .filter(u -> key.isEmpty() || Stream.of(remarked.get(u.id()), u.name(), u.phone(), u.username(), tenantNames.get(u.tenantId()), String.valueOf(u.id()), String.valueOf(u.uid()))
                         .filter(Objects::nonNull).anyMatch(v -> v.toLowerCase(Locale.ROOT).contains(key)))
                 .toList();
         int start = (int) Math.min((long) page * size, matched.size());
@@ -60,7 +62,7 @@ public class PlatformUserService {
         Map<Long, Map<Long, PlatformDtos.UserIdentity>> verified = new HashMap<>();
         var items = matched.subList(start, end).stream()
                 .map(u -> view(u, tenantNames.get(u.tenantId()), memberships.computeIfAbsent(u.tenantId(), this::membership),
-                        verified.computeIfAbsent(u.tenantId(), this::verifiedIdentities).get(u.id())))
+                        verified.computeIfAbsent(u.tenantId(), this::verifiedIdentities).get(u.id()), remarked.get(u.id())))
                 .toList();
         return new PageResult<>(items, page, size, matched.size(), (int) Math.ceil((double) matched.size() / size));
     }
@@ -101,7 +103,16 @@ public class PlatformUserService {
             audits.saveAndFlush(event);
             return result;
         });
-        return view(updated, tenantNames().get(tenantId), membership(tenantId), identity(tenantId, userId));
+        return detail(updated);
+    }
+
+    /** 备注名只给管理员自己区分账号用，对方看不到；空白时删掉。 */
+    public PlatformDtos.UserView remark(AuthPrincipal me, Long userId, PlatformDtos.UserRemarkRequest request) {
+        access.require(me.userId(), "USERS");
+        var user = directory.user(userId);
+        String remark = request.remark() == null || request.remark().isBlank() ? null : request.remark().trim();
+        remarks.set(userId, remark, me.userId());
+        return detail(user);
     }
 
     /** 会员按商户计：给某个账号开通或关闭，就是给他所属的商户开通或关闭。 */
@@ -139,7 +150,7 @@ public class PlatformUserService {
             audits.saveAndFlush(event);
             return null;
         });
-        return view(directory.user(userId), tenantNames().get(tenantId), membership(tenantId), identity(tenantId, userId));
+        return detail(directory.user(userId));
     }
 
     private static String reason(String note) {
@@ -148,12 +159,16 @@ public class PlatformUserService {
         return value;
     }
 
+    private PlatformDtos.UserView detail(PlatformAccountDirectory.PlatformUser u) {
+        return view(u, tenantNames().get(u.tenantId()), membership(u.tenantId()), identity(u.tenantId(), u.id()), remarks.of(u.id()));
+    }
+
     private PlatformDtos.UserView view(PlatformAccountDirectory.PlatformUser u, String tenantName, BillingDtos.Summary member,
-                                       PlatformDtos.UserIdentity identity) {
+                                       PlatformDtos.UserIdentity identity, String remark) {
         return new PlatformDtos.UserView(u.id(), u.tenantId(), tenantName, u.name(), PlatformManagementService.maskPhone(u.phone()),
                 u.username(), u.role(), u.status(), u.lastLoginAt(), u.createdAt(), u.suspendedAt(),
                 member.memberActive(), member.memberUntil(), member.plan() == null ? null : member.plan().name(),
-                member.available(), access.access(u.id()).operator(), identity, u.uid());
+                member.available(), access.access(u.id()).operator(), identity, u.uid(), remark);
     }
 
     /** 商户里实名核验通过的账号，按用户编号取。核验不一致或未提交的不在其中，列表显示为未实名。 */

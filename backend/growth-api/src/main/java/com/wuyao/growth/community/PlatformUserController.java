@@ -37,6 +37,12 @@ public class PlatformUserController {
         return ApiResponse.ok(service.suspension(me, userId, request));
     }
 
+    @PutMapping("/{userId}/remark")
+    public ApiResponse<PlatformDtos.UserView> remark(@AuthenticationPrincipal AuthPrincipal me, @PathVariable Long userId,
+            @Valid @RequestBody PlatformDtos.UserRemarkRequest request) {
+        return ApiResponse.ok(service.remark(me, userId, request));
+    }
+
     @PostMapping("/{userId}/membership")
     public ApiResponse<PlatformDtos.UserView> membership(@AuthenticationPrincipal AuthPrincipal me, @PathVariable Long userId,
             @Valid @RequestBody PlatformDtos.MembershipRequest request) {

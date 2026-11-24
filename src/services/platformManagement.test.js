@@ -50,6 +50,9 @@ test('platform controls send authenticated requests and identity values are only
     await api.userCredits({ id: 9, tenantId: 3 }, { credits: 500, requestKey: 'platform-key-0002', note: '活动奖励赠送' })
     assert.deepEqual([calls.at(-1).url, calls.at(-1).options.method], ['/api/platform/users/9/credits', 'POST'])
     assert.equal(JSON.parse(calls.at(-1).options.body).credits, 500)
+    await api.userRemark({ id: 9, tenantId: 3 }, '杭州老客户')
+    assert.deepEqual([calls.at(-1).url, calls.at(-1).options.method], ['/api/platform/users/9/remark', 'PUT'])
+    assert.deepEqual(JSON.parse(calls.at(-1).options.body), { remark: '杭州老客户' })
     for (const call of calls) {
       assert.equal(call.options.headers.Authorization, 'Bearer test-platform-token')
       assert.ok(!call.url.includes(values.idNumber))

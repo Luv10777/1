@@ -29,7 +29,10 @@ public final class PlatformDtos {
     public record UserView(Long id, Long tenantId, String tenantName, String name, String phoneMasked, String username,
                            String role, String status, Instant lastLoginAt, Instant createdAt, Instant suspendedAt,
                            boolean memberActive, Instant memberUntil, String planName, long creditsAvailable,
-                           boolean operator, UserIdentity identity, Long uid) {}
+                           boolean operator, UserIdentity identity, Long uid, String remark) {}
+
+    /** 管理后台给账号起的备注名，全体管理员共用；最多 30 字，空白表示删掉。 */
+    public record UserRemarkRequest(@jakarta.validation.constraints.Size(max = 30) String remark) {}
 
     /** 已通过的实名记录；id 是实名申请编号，按用途查看完整资料时使用。 */
     public record UserIdentity(Long id, String legalNameMasked, String idNumberMasked, Instant verifiedAt) {}

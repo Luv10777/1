@@ -1,5 +1,6 @@
 <script setup>
 import AppSelect from '../components/AppSelect.vue'
+import RemarkField from '../components/RemarkField.vue'
 import { onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { Dialog, DialogPanel, DialogTitle, DialogDescription } from '@headlessui/vue'
 import { Ban, Check, ChevronLeft, ChevronRight, ClipboardList, Crown, Eye, Flame, Gift, LockKeyhole, LogIn, RefreshCw, Search, ShieldCheck, UserCheck, UserPlus, Users, X, Handshake } from 'lucide-vue-next'
@@ -265,6 +266,12 @@ async function changeSuspension(suspended) {
     if (attempt === detailVersion) actionError.value = failure.message || '暂时无法确认处理结果，请刷新后核对。'
   } finally { if (attempt === detailVersion) busy.value = false }
 }
+// 备注名只改这一行，不动列表其他数据。
+async function saveRemark(remark) {
+  const result = await api.userRemark(selected.value, remark)
+  selected.value = result
+  records.value = records.value.map(row => row.id === result.id ? { ...row, remark: result.remark } : row)
+}
 const membership = item => item.memberActive ? `${item.planName || '会员'} · ${managementDate(item.memberUntil).slice(0, 10)} 到期` : '未开通会员'
 
 watch(() => [auth.user?.id, auth.tenantId], () => {
@@ -293,7 +300,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
     <section class="management-list" :aria-busy="loading" aria-label="用户列表">
       <div class="mg-list-caption"><h2>全部用户</h2><span><LockKeyhole :size="13" />手机号、实名资料默认脱敏</span></div>
       <form class="management-filters" @submit.prevent="search">
-        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索姓名、手机号、登录账号、商户或 UID" aria-label="搜索关键词" maxlength="100" /><button v-if="keyword" type="button" aria-label="清空搜索" @click="keyword = ''; search()"><X :size="14" /></button></label>
+        <label class="mg-search"><Search :size="17" /><input v-model="keyword" placeholder="搜索备注名、姓名、手机号、登录账号、商户或 UID" aria-label="搜索关键词" maxlength="100" /><button v-if="keyword" type="button" aria-label="清空搜索" @click="keyword = ''; search()"><X :size="14" /></button></label>
         <label class="mg-select"><span class="sr-only">角色</span><AppSelect v-model="role"><option value="">全部角色</option><option v-for="(label, value) in userRoles" :key="value" :value="value">{{ label }}</option></AppSelect></label>
         <label class="mg-select"><span class="sr-only">账号状态</span><AppSelect v-model="status"><option value="">当前账号</option><option v-for="(label, value) in userStatuses" :key="value" :value="value">{{ label }}</option></AppSelect></label>
         <button class="mg-button mg-primary" type="submit" :disabled="loading">查询</button>
@@ -306,7 +313,7 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
           <thead><tr><th>用户</th><th>实名</th><th>所属商户</th><th>会员与烟火</th><th>状态</th><th>最近登录</th><th class="mg-table-action">操作</th></tr></thead>
           <tbody>
             <tr v-for="item in records" :key="item.id">
-              <td><button class="mg-record-title" type="button" @click="openDetail(item)"><span class="mg-avatar">{{ (item.name || '用').slice(0, 1) }}</span><span><strong>{{ item.name || '未填写姓名' }}</strong><small>UID {{ item.uid || '—' }} · {{ item.phoneMasked }}</small></span></button></td>
+              <td><button class="mg-record-title" type="button" @click="openDetail(item)"><span class="mg-avatar">{{ (item.remark || item.name || '用').slice(0, 1) }}</span><span><strong>{{ item.remark || item.name || '未填写姓名' }}</strong><small>{{ item.remark ? `${item.name || '未填写姓名'} · ` : '' }}UID {{ item.uid || '—' }} · {{ item.phoneMasked }}</small></span></button></td>
               <td><template v-if="item.identity"><span>{{ item.identity.legalNameMasked }}</span><small class="mg-mono">{{ item.identity.idNumberMasked }}</small></template><span v-else class="mg-status"><i />未实名</span></td>
               <td><span>{{ item.tenantName || '—' }}</span><small>{{ userRoles[item.role] || item.role }}{{ item.operator ? ' · 平台运营' : '' }}</small></td>
               <td><span>{{ membership(item) }}</span><small>烟火 {{ Number(item.creditsAvailable).toLocaleString('zh-CN') }}</small></td>
@@ -324,11 +331,12 @@ onBeforeUnmount(() => { version++; detailVersion++; clearTimeout(revealTimer); r
     <Dialog :open="Boolean(selected)" class="management-dialog" @close="closeDetail">
       <div class="mg-backdrop" aria-hidden="true" /><div class="mg-drawer-position">
         <DialogPanel class="mg-drawer management-page">
-          <header class="mg-drawer-header"><div><span>UID {{ selected?.uid || '—' }}</span><DialogTitle as="h2">{{ selected?.name || '未填写姓名' }}</DialogTitle></div><button class="mg-page-button" type="button" :disabled="busy" aria-label="关闭详情" @click="closeDetail"><X :size="20" /></button></header>
+          <header class="mg-drawer-header"><div><span>UID {{ selected?.uid || '—' }}</span><DialogTitle as="h2">{{ selected?.remark || selected?.name || '未填写姓名' }}</DialogTitle></div><button class="mg-page-button" type="button" :disabled="busy" aria-label="关闭详情" @click="closeDetail"><X :size="20" /></button></header>
           <template v-if="selected">
             <DialogDescription class="mg-detail-description"><span class="mg-status" :class="`mg-${selected.status.toLowerCase()}`"><i />{{ userStatuses[selected.status] || selected.status }}</span><span>{{ selected.tenantName }} · 商户 #{{ selected.tenantId }}</span></DialogDescription>
             <div class="mg-drawer-body">
-              <section class="mg-detail-section"><h3><Users :size="17" />账号资料</h3><dl class="mg-detail-grid"><div><dt>角色</dt><dd>{{ userRoles[selected.role] || selected.role }}{{ selected.operator ? ' · 平台运营' : '' }}</dd></div><div><dt>绑定手机</dt><dd>{{ selected.phoneMasked }}</dd></div><div><dt>登录账号</dt><dd>{{ selected.username || '未设置' }}</dd></div><div><dt>注册时间</dt><dd>{{ managementDate(selected.createdAt) }}</dd></div><div><dt>最近登录</dt><dd>{{ selected.lastLoginAt ? managementDate(selected.lastLoginAt) : '从未登录' }}</dd></div><div v-if="selected.suspendedAt"><dt>平台停用于</dt><dd>{{ managementDate(selected.suspendedAt) }}</dd></div></dl></section>
+              <section class="mg-detail-section" aria-labelledby="user-remark-title"><h3 id="user-remark-title">备注名</h3><RemarkField :value="selected.remark || ''" :save="saveRemark" :disabled="busy" /></section>
+              <section class="mg-detail-section"><h3><Users :size="17" />账号资料</h3><dl class="mg-detail-grid"><div><dt>姓名</dt><dd>{{ selected.name || '未填写姓名' }}</dd></div><div><dt>角色</dt><dd>{{ userRoles[selected.role] || selected.role }}{{ selected.operator ? ' · 平台运营' : '' }}</dd></div><div><dt>绑定手机</dt><dd>{{ selected.phoneMasked }}</dd></div><div><dt>登录账号</dt><dd>{{ selected.username || '未设置' }}</dd></div><div><dt>注册时间</dt><dd>{{ managementDate(selected.createdAt) }}</dd></div><div><dt>最近登录</dt><dd>{{ selected.lastLoginAt ? managementDate(selected.lastLoginAt) : '从未登录' }}</dd></div><div v-if="selected.suspendedAt"><dt>平台停用于</dt><dd>{{ managementDate(selected.suspendedAt) }}</dd></div></dl></section>
               <section class="mg-detail-section" aria-labelledby="user-identity-title">
                 <h3 id="user-identity-title"><ShieldCheck :size="17" />实名信息</h3>
                 <template v-if="selected.identity">

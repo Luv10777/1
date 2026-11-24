@@ -19,6 +19,8 @@ export const partnerApi = {
   lookup: uid => get('/api/partner/lookup', { uid: Number(uid) }),
   addTenant: uid => post('/api/partner/tenants', { uid: Number(uid) }),
   transfer: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/credits`, values),
+  /** 商户备注名，整个团队共用；空字符串表示删掉。 */
+  setRemark: (tenantId, remark) => put(`/api/partner/tenants/${encodeURIComponent(tenantId)}/remark`, { remark }),
   renew: (tenantId, values) => post(`/api/partner/tenants/${encodeURIComponent(tenantId)}/renewals`, values),
   team: () => get('/api/partner/team'),
   /** { phone, name, permissions, monthlyCap }：按手机号把人加进团队账户。 */
