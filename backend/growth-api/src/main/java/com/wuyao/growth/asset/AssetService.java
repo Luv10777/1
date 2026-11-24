@@ -115,7 +115,20 @@ public class AssetService {
                 throw BizException.of(ErrorCode.BAD_REQUEST, "参考视频尚未完成媒体校验，或超过支持范围");
             }
         }
+        if ("IMAGE".equals(expectedType) && outOfVideoImageRange(asset.getWidth(), asset.getHeight())) {
+            // 火山方舟建素材要求宽高都在 300–6000 像素，超出会被退回「invalid asset request」。
+            throw BizException.of(ErrorCode.BAD_REQUEST, "参考图「" + asset.getName() + "」是 " + asset.getWidth() + "×" + asset.getHeight()
+                    + " 像素，视频模型要求宽和高都在 " + VIDEO_IMAGE_MIN_EDGE + "–" + VIDEO_IMAGE_MAX_EDGE + " 像素之间，请换一张图片。");
+        }
         return new MediaReference(asset.getId(), asset.getStorageKey(), asset.getMimeType(), asset.getDurationMs());
+    }
+
+    static final int VIDEO_IMAGE_MIN_EDGE = 300;
+    static final int VIDEO_IMAGE_MAX_EDGE = 6000;
+
+    private static boolean outOfVideoImageRange(Integer width, Integer height) {
+        if (width == null || height == null) return false;
+        return Math.min(width, height) < VIDEO_IMAGE_MIN_EDGE || Math.max(width, height) > VIDEO_IMAGE_MAX_EDGE;
     }
 
     public String presignedReference(Long id, String expectedType) {
