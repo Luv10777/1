@@ -13,6 +13,7 @@ import { POSTER_STYLES, SEASONAL_PREFIX, upcomingMoment } from "../domain/poster
 import ImageWorkspaceSwitch from "./ImageWorkspaceSwitch.vue";
 import ImageInspirationPanel from "./ImageInspirationPanel.vue";
 import PosterStyleCard from "./PosterStyleCard.vue";
+import SaveToLibraryButton from "./SaveToLibraryButton.vue";
 import { ArrowUp, Check, Download, Folder, Maximize2, Pencil, RefreshCw, X } from "lucide-vue-next";
 
 const props = defineProps({ studio: { type: Object, required: true } });
@@ -355,6 +356,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
                   <div v-if="item.url" class="poster-image-actions">
                     <button type="button" aria-label="放大查看" title="放大查看" @click="showPreview(item)"><Maximize2 :size="15" :stroke-width="1.8" aria-hidden="true" /></button>
                     <button type="button" aria-label="下载图片" title="下载图片" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="15" :stroke-width="1.8" aria-hidden="true" /></button>
+                    <SaveToLibraryButton v-if="item.status === 'SUCCEEDED'" kind="IMAGE" :source-id="item.id" compact :disabled="!studio.canUseAsset(item)" />
                   </div>
                 </div>
                 <p v-if="item.similarityWarning" class="poster-result-note">这张与近期图片较相似，可换构图或场景。</p>

@@ -51,6 +51,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -339,15 +340,37 @@ public class VideoWorkflowService {
     public PageResult<VideoDtos.History> works(int page, int size, Long userId) {
         var result = workflows.findByCreatedByAndStatusAndOutputStorageKeyIsNotNullOrderByIdDesc(
                 userId, "SUCCEEDED", PageRequest.of(Math.max(0, page), Math.min(50, Math.max(1, size))));
-        return PageResult.of(result, result.getContent().stream().map(w -> {
-            Asset output = w.getOutputAssetId() == null ? null : assets.findById(w.getOutputAssetId()).orElse(null);
-            String url = storage.presignGet(w.getOutputStorageKey(), Duration.ofMinutes(30));
-            return new VideoDtos.History(w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(),
-                    w.getDurationSeconds(), w.getResolution(), w.getStatus(), w.getCreatedAt(), url,
-                    output == null ? null : output.getWidth(), output == null ? null : output.getHeight(),
-                    output == null ? null : output.getDurationMs(), VideoScenes.normalize(w.getRequest().sceneKey()),
-                    billing.generationWallet(w.getBillingReservationId()));
-        }).toList());
+        return PageResult.of(result, result.getContent().stream().map(this::work).toList());
+    }
+
+    /** 作品库用：按视频 ID 取已完成的成片，没完成或不存在的不返回。 */
+    @Transactional(readOnly = true)
+    public Map<Long, VideoDtos.History> worksByIds(Collection<Long> ids) {
+        var result = new HashMap<Long, VideoDtos.History>();
+        workflows.findAllById(ids).stream().filter(this::completedWork).forEach(w -> result.put(w.getId(), work(w)));
+        return result;
+    }
+
+    /** 保存到作品库前核对：视频是这个账号生成的，并且成片已经完成。 */
+    @Transactional(readOnly = true)
+    public void requireSavableWork(Long id, Long userId) {
+        var workflow = workflows.findById(id).filter(w -> Objects.equals(w.getCreatedBy(), userId))
+                .orElseThrow(() -> BizException.of(ErrorCode.NOT_FOUND, "视频不存在"));
+        if (!completedWork(workflow)) throw BizException.of(ErrorCode.BAD_REQUEST, "视频还没有生成完成，完成后再保存");
+    }
+
+    private boolean completedWork(VideoWorkflow w) {
+        return "SUCCEEDED".equals(w.getStatus()) && w.getOutputStorageKey() != null;
+    }
+
+    private VideoDtos.History work(VideoWorkflow w) {
+        Asset output = w.getOutputAssetId() == null ? null : assets.findById(w.getOutputAssetId()).orElse(null);
+        String url = storage.presignGet(w.getOutputStorageKey(), Duration.ofMinutes(30));
+        return new VideoDtos.History(w.getId(), w.getRequest().prompt(), w.getModel(), w.getRatio(),
+                w.getDurationSeconds(), w.getResolution(), w.getStatus(), w.getCreatedAt(), url,
+                output == null ? null : output.getWidth(), output == null ? null : output.getHeight(),
+                output == null ? null : output.getDurationMs(), VideoScenes.normalize(w.getRequest().sceneKey()),
+                billing.generationWallet(w.getBillingReservationId()));
     }
 
     @Transactional(readOnly = true)

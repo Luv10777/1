@@ -14,7 +14,10 @@ test('product carousel, submission progress and generated images occupy the work
     optimizeDeps: { noDiscovery: true }, server: { middlewareMode: true, hmr: false }, appType: 'custom',
     plugins: [{ name: 'workspace-test', resolveId(id) { if (id === '/workspace-under-test') return moduleId },
       load(id) { if (id === moduleId) return compileScript(parse(readFileSync(filename, 'utf8'), { filename }).descriptor,
-        { id: 'workspace-test', inlineTemplate: true }).content } }],
+        { id: 'workspace-test', inlineTemplate: true }).content
+        // 工作区里用到的子组件（保存到作品库按钮）同样编译，样式不参与测试。
+        if (id.endsWith('.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
+          { id: `workspace-test-${id.split('/').pop()}`, inlineTemplate: true }).content } }],
   })
   const renderer = createRenderer({
     createElement: tag => ({ tag, props: {}, children: [], addEventListener() {}, removeEventListener() {} }),

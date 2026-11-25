@@ -35,6 +35,11 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 同日起只有 AI 实景直播要求会员（`PlatformMembershipInterceptor` 只挂直播接口，`requireEntitlement` 只校验 `LIVE`），其他功能按烟火使用。
 2026-11-11 起改为账号激活（会员生效中）后才能使用功能，未激活只能查看：`PlatformMembershipInterceptor` 挂在 AI 创作站各模块的写接口上，`requireEntitlement` 校验所有计费功能；激活码是兑换码的 `MEMBERSHIP` 种类（迁移 V78），规则见 [会员与烟火计费](../../docs/yanhuo-billing.md)。
 同日新增用户 ID（`users.uid`，8 位随机数字）和服务商模块（`partner`，迁移 V79）：服务商后台接口 `/api/partner/**`，平台管理 `/api/platform/partners/**`，见 [用户 ID 与服务商](../../docs/partners.md)。
+2026-11-25 作品库改为手动保存并支持文件夹（`library` 模块，迁移 V89）：生成完的图片和视频不再自动进作品库，生成页上点「保存到作品库」选位置（未归类或某个文件夹）；
+作品库按账号分，文件夹只有一层、同一账号内不重名。`library_works` 只记位置（`IMAGE` 指图片 ID，`VIDEO` 指视频 ID），移出作品库、删除文件夹（里面的作品一起移出）都不动生成记录和文件。
+V89 把上线前已完成的作品登记到各自创建人的未归类里。接口：`GET/POST /api/library/folders`、`PUT/DELETE /api/library/folders/{id}`、
+`GET /api/library/works?folder=all|root|{id}&kind=`、`POST /api/library/works`（重复保存等于移动）、`PUT /api/library/works/{id}/folder`、`DELETE /api/library/works/{id}`、`GET /api/library/saved?kind=&sourceIds=`。
+文案创作「从作品库选」只列已保存的图片。
 
 任务中心和后台烟火日志统一显示模型名：图片为「一方志Image」，视频反推为「一方志反推」，
 视频方案为「一方志提示词」，视频生成显示对应的 Seedance 型号。视频方案每批记录三个方案及实际烟火结算。

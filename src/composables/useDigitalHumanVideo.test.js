@@ -78,7 +78,7 @@ test('digital human task lifecycle follows the real video API', async t => {
         assert.equal(studio.workflow.value.actualWidth, 720)
         assert.equal(studio.workflow.value.actualHeight, 1280)
         assert.equal(studio.workflow.value.actualDurationMs, 5200)
-        assert.equal(studio.notice.value, '视频已完成并保存到作品库。')
+        assert.equal(studio.notice.value, '视频已完成，可以保存到作品库。')
         assert.equal(posts, 1)
         assert.equal(timers.size, 0)
       } finally { app.unmount() }

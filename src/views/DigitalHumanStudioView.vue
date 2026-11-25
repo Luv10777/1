@@ -281,6 +281,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         class="dh-preview-panel dh-result-panel"
         :is-generating="isGenerating"
         :output-url="outputUrl"
+        :workflow-id="workflow?.status === 'SUCCEEDED' ? workflow.id : null"
         :actual-width="workflow?.actualWidth"
         :actual-height="workflow?.actualHeight"
         :format="submittedForm?.ratio || ratio"
@@ -290,7 +291,7 @@ onBeforeUnmount(() => [avatarFile.value, productFile.value, packageFile.value, .
         :stage-label="stageLabel"
         :error="isGenerating ? '' : videoError"
         active-workspace="digital-human"
-        continue-text="生成完成后可直接播放，成片将保存到作品库。"
+        continue-text="生成完成后可直接播放，也可以保存到作品库。"
         @switch-workspace="switchWorkspace"
       >
         <p v-if="workflow?.billingWallet" class="vs-notice">{{ billingWalletLabel(workflow.billingWallet) }}<template v-if="workflow.chargedCredits != null"> · 实际消耗 {{ number(workflow.chargedCredits) }} 烟火</template></p>

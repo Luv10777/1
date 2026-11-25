@@ -3,11 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { Download } from 'lucide-vue-next'
 import { downloadMedia } from '../services/mediaDownload'
 import { stableUrl } from '../utils/stableUrl'
+import SaveToLibraryButton from './SaveToLibraryButton.vue'
 
 const props = defineProps({
   isGenerating: Boolean,
   isMorphing: Boolean,
   outputUrl: { type: String, default: '' },
+  /** 已完成的视频 ID，有值时成片旁显示「保存到作品库」。 */
+  workflowId: { type: Number, default: null },
   actualWidth: { type: Number, default: null },
   actualHeight: { type: Number, default: null },
   format: { type: String, default: 'auto' },
@@ -75,6 +78,7 @@ defineEmits(['switch-workspace'])
         <button class="video-download-button" type="button" :disabled="downloading" :aria-busy="downloading" @click="downloadVideo">
           <Download :size="16" aria-hidden="true" />{{ downloading ? '正在下载…' : '下载视频' }}
         </button>
+        <SaveToLibraryButton v-if="workflowId" class="video-download-button" kind="VIDEO" :source-id="workflowId" :icon-size="16" />
       </div>
     </div>
     <div v-else class="video-device-stage">

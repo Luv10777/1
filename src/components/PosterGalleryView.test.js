@@ -69,5 +69,13 @@ test('poster gallery shows a visible preview as saving and never prints the item
     assert.match(html, /图片已出，正在保存原图/)
     assert.doesNotMatch(html, /正在生成或接收图片/)
     assert.doesNotMatch(html, /SUBJECT/)
+    assert.doesNotMatch(html, /保存到作品库/, 'only finished images can be saved')
+
+    // 完成并保存好原图后，图片旁出现「保存到作品库」；生成完不会自动进作品库。
+    Object.assign(turn, { status: 'SUCCEEDED', completed: 1 })
+    Object.assign(turn.items[0], { status: 'SUCCEEDED', persisted: true })
+    studio.canUseAsset = () => true
+    const done = await renderToString(createSSRApp({ render: () => h(Gallery, { studio }) }).use(router))
+    assert.match(done, /<button[^>]*aria-label="保存到作品库"/)
   } finally { await vite.close() }
 })

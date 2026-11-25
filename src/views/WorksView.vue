@@ -2,11 +2,12 @@
 import { billingWalletLabel } from '../domain/billing'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { imageApi } from '../services/imageCreation'
 import { stableUrl } from '../utils/stableUrl'
-import { videoApi } from '../services/videoWorkflow'
+import { libraryApi, markLibraryRemoved, markLibrarySaved, syncLibraryFolder } from '../services/library'
 import { downloadMedia } from '../services/mediaDownload'
-import { ArrowUpRight, Check, Clock3, Download, Edit3, Image as ImageIcon, LayoutGrid, List, Play, Plus, Search, X } from 'lucide-vue-next'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import LibraryFolderDialog from '../components/LibraryFolderDialog.vue'
+import { ArrowUpRight, Check, Clock3, Download, Edit3, Folder, FolderInput, FolderPlus, Image as ImageIcon, LayoutGrid, List, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-vue-next'
 
 const router = useRouter()
 const filters = [
@@ -19,25 +20,39 @@ const searchQuery = ref('')
 const layout = ref('grid')
 const works = ref([])
 const worksPage = ref(0)
-const imageTotalPages = ref(0)
-const videoTotalPages = ref(0)
+const totalPages = ref(0)
 const worksLoading = ref(false)
 const worksError = ref('')
 const selectedWork = ref(null)
 const downloadingWorks = ref(new Set())
 const downloadError = ref(null)
 
+// 文件夹：all 是全部作品，root 是没放进文件夹的，其余是文件夹 ID。
+const folders = ref([])
+const rootCount = ref(0)
+const activeFolder = ref('all')
+const foldersError = ref('')
+const currentFolder = computed(() => folders.value.find(folder => folder.id === activeFolder.value) || null)
+const allCount = computed(() => rootCount.value + folders.value.reduce((sum, folder) => sum + folder.workCount, 0))
+const folderName = id => folders.value.find(folder => folder.id === id)?.name || null
+
+// 新建 / 改名共用一个输入框；folder 为空是新建。
+const nameDialog = ref(null)
+const nameBusy = ref(false)
+const nameError = ref('')
+// 移动作品、移出作品库、删除文件夹。
+const movingWork = ref(null)
+const moveBusy = ref(false)
+const moveError = ref('')
+const removingWork = ref(null)
+const deletingFolder = ref(null)
+const actionError = ref('')
+
 const filteredWorks = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase()
-  return works.value.filter(work => (activeFilter.value === 'all' || work.type === activeFilter.value)
-    && (!query || `${work.title} ${work.tags.join(' ')}`.toLocaleLowerCase().includes(query)))
+  return works.value.filter(work => !query || `${work.title} ${work.tags.join(' ')}`.toLocaleLowerCase().includes(query))
 })
-const hasMoreWorks = computed(() => {
-  const totalPages = activeFilter.value === 'image' ? imageTotalPages.value
-    : activeFilter.value === 'video' ? videoTotalPages.value
-      : Math.max(imageTotalPages.value, videoTotalPages.value)
-  return worksPage.value + 1 < totalPages
-})
+const hasMoreWorks = computed(() => worksPage.value + 1 < totalPages.value)
 
 function formatDate(value) {
   return new Date(value).toLocaleDateString('zh-CN')
@@ -48,10 +63,14 @@ function videoTitle(prompt) {
   return text.length > 54 ? `${text.slice(0, 54)}…` : text || '视频作品'
 }
 
-function mapImage(row) {
-  if (!row.url) return null
+function mapImage(row, entry) {
+  if (!row?.url) return null
   return {
     id: `image-${row.id}`,
+    kind: 'IMAGE',
+    sourceId: row.id,
+    libraryId: entry.id,
+    folderId: entry.folderId,
     creationId: row.creationId,
     type: 'image',
     typeLabel: '图片',
@@ -68,14 +87,18 @@ function mapImage(row) {
   }
 }
 
-function mapVideo(row) {
-  if (!row.outputUrl) return null
+function mapVideo(row, entry) {
+  if (!row?.outputUrl) return null
   const duration = row.actualDurationMs ? `${Math.round(row.actualDurationMs / 1000)} 秒` : `${row.durationSeconds} 秒`
   const dimensions = row.actualWidth && row.actualHeight
     ? `${row.actualWidth} × ${row.actualHeight} px`
     : `${row.resolution} · ${row.ratio}`
   return {
     id: `video-${row.id}`,
+    kind: 'VIDEO',
+    sourceId: row.id,
+    libraryId: entry.id,
+    folderId: entry.folderId,
     workflowId: row.id,
     type: 'video',
     typeLabel: '视频',
@@ -93,25 +116,141 @@ function mapVideo(row) {
   }
 }
 
+// 切换文件夹或类型时作废还在路上的旧请求，免得旧结果覆盖新列表。
+let worksRequest = 0
 async function loadWorks(page = 0) {
-  if (worksLoading.value) return
+  if (worksLoading.value && page > 0) return
+  const request = ++worksRequest
   worksLoading.value = true
   worksError.value = ''
   try {
-    const [images, videos] = await Promise.all([imageApi.works(page), videoApi.works(page)])
-    const pageWorks = [
-      ...(images.items || []).map(mapImage),
-      ...(videos.items || []).map(mapVideo),
-    ].filter(Boolean)
+    const kind = { image: 'IMAGE', video: 'VIDEO' }[activeFilter.value] || ''
+    const result = await libraryApi.works({ folder: activeFolder.value, kind, page })
+    if (request !== worksRequest) return
+    const pageWorks = (result.items || [])
+      .map(entry => entry.kind === 'IMAGE' ? mapImage(entry.image, entry) : mapVideo(entry.video, entry))
+      .filter(Boolean)
     works.value = [...(page === 0 ? [] : works.value), ...pageWorks]
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-    imageTotalPages.value = images.totalPages || 0
-    videoTotalPages.value = videos.totalPages || 0
+    totalPages.value = result.totalPages || 0
     worksPage.value = page
   } catch (error) {
-    worksError.value = error.message || '作品暂时无法加载'
+    if (request === worksRequest) worksError.value = error.message || '作品暂时无法加载'
   } finally {
-    worksLoading.value = false
+    if (request === worksRequest) worksLoading.value = false
+  }
+}
+
+async function loadFolders() {
+  foldersError.value = ''
+  try {
+    const result = await libraryApi.folders()
+    folders.value = result.folders || []
+    rootCount.value = result.rootCount || 0
+    if (typeof activeFolder.value === 'number' && !currentFolder.value) selectFolder('all')
+  } catch (error) {
+    foldersError.value = error.message || '文件夹暂时无法读取'
+  }
+}
+
+function selectFolder(key) {
+  if (activeFolder.value === key) return
+  activeFolder.value = key
+  loadWorks(0)
+}
+
+function selectFilter(key) {
+  if (activeFilter.value === key) return
+  activeFilter.value = key
+  loadWorks(0)
+}
+
+function openNameDialog(folder = null) {
+  nameError.value = ''
+  nameDialog.value = { folder, name: folder?.name || '' }
+}
+
+async function submitName() {
+  const name = nameDialog.value?.name.trim()
+  if (!name || nameBusy.value) return
+  nameBusy.value = true
+  nameError.value = ''
+  try {
+    const { folder } = nameDialog.value
+    if (folder) {
+      const renamed = await libraryApi.renameFolder(folder.id, name)
+      syncLibraryFolder(folder.id, renamed.name)
+    } else {
+      const created = await libraryApi.createFolder(name)
+      activeFolder.value = created.id
+      worksRequest++
+      works.value = []
+      totalPages.value = 0
+      worksLoading.value = false
+    }
+    nameDialog.value = null
+    await loadFolders()
+  } catch (error) {
+    nameError.value = error.message || '文件夹保存失败'
+  } finally {
+    nameBusy.value = false
+  }
+}
+
+async function confirmDeleteFolder() {
+  const folder = deletingFolder.value
+  deletingFolder.value = null
+  actionError.value = ''
+  try {
+    await libraryApi.deleteFolder(folder.id)
+    syncLibraryFolder(folder.id, null)
+    activeFolder.value = 'all'
+    await Promise.all([loadFolders(), loadWorks(0)])
+  } catch (error) {
+    actionError.value = error.message || '文件夹删除失败'
+  }
+}
+
+function startMove(work) {
+  moveError.value = ''
+  movingWork.value = work
+}
+
+async function moveWork(folderId) {
+  const work = movingWork.value
+  if (!work || moveBusy.value) return
+  if (folderId === work.folderId) { movingWork.value = null; return }
+  moveBusy.value = true
+  moveError.value = ''
+  try {
+    await libraryApi.move(work.libraryId, folderId)
+    await loadFolders()
+    work.folderId = folderId
+    markLibrarySaved(work.kind, work.sourceId, { folderId, folderName: folderName(folderId) })
+    // 不是在「全部作品」里移动的，作品已经不属于当前位置。
+    if (activeFolder.value !== 'all') {
+      works.value = works.value.filter(item => item.id !== work.id)
+      if (selectedWork.value?.id === work.id) closeDetails()
+    }
+    movingWork.value = null
+  } catch (error) {
+    moveError.value = error.message || '移动失败，请重试'
+  } finally {
+    moveBusy.value = false
+  }
+}
+
+async function confirmRemoveWork() {
+  const work = removingWork.value
+  removingWork.value = null
+  actionError.value = ''
+  try {
+    await libraryApi.remove(work.libraryId)
+    markLibraryRemoved(work.kind, work.sourceId)
+    works.value = works.value.filter(item => item.id !== work.id)
+    if (selectedWork.value?.id === work.id) closeDetails()
+    await loadFolders()
+  } catch (error) {
+    actionError.value = error.message || '移出失败，请重试'
   }
 }
 
@@ -149,11 +288,18 @@ function closeDetails() {
 }
 
 function handleModalKeydown(event) {
-  if (event.key === 'Escape') closeDetails()
+  // 上面还叠着移动、确认这些弹窗时，Esc 先交给它们。
+  if (event.key !== 'Escape' || movingWork.value || removingWork.value || deletingFolder.value) return
+  if (nameDialog.value) {
+    if (!nameBusy.value) nameDialog.value = null
+    return
+  }
+  closeDetails()
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleModalKeydown)
+  loadFolders()
   loadWorks()
 })
 onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
@@ -180,7 +326,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
             type="button"
             role="tab"
             :aria-selected="activeFilter === filter.key"
-            @click="activeFilter = filter.key"
+            @click="selectFilter(filter.key)"
           >
             {{ filter.label }}
           </button>
@@ -198,7 +344,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
       </div>
     </header>
 
-    <div class="library-meta"><span>已载入 {{ filteredWorks.length }} 件作品</span></div>
+    <nav class="folder-bar" aria-label="作品库文件夹">
+      <button type="button" class="folder-chip" :class="{ active: activeFolder === 'all' }" :aria-pressed="activeFolder === 'all'" @click="selectFolder('all')">全部作品<small>{{ allCount }}</small></button>
+      <button type="button" class="folder-chip" :class="{ active: activeFolder === 'root' }" :aria-pressed="activeFolder === 'root'" @click="selectFolder('root')">未归类<small>{{ rootCount }}</small></button>
+      <button
+        v-for="folder in folders" :key="folder.id" type="button" class="folder-chip" :class="{ active: activeFolder === folder.id }"
+        :aria-pressed="activeFolder === folder.id" @click="selectFolder(folder.id)"
+      >
+        <Folder :size="14" stroke-width="1.8" aria-hidden="true" /><span>{{ folder.name }}</span><small>{{ folder.workCount }}</small>
+      </button>
+      <button type="button" class="folder-chip folder-new" @click="openNameDialog()"><FolderPlus :size="14" stroke-width="1.8" aria-hidden="true" />新建文件夹</button>
+    </nav>
+    <p v-if="foldersError" class="works-error" role="alert">{{ foldersError }} <button type="button" @click="loadFolders">重试</button></p>
+
+    <div class="library-meta">
+      <span>{{ currentFolder ? currentFolder.name : activeFolder === 'root' ? '未归类' : '全部作品' }} · 已载入 {{ filteredWorks.length }} 件作品</span>
+      <span v-if="currentFolder" class="folder-actions">
+        <button type="button" @click="openNameDialog(currentFolder)"><Pencil :size="13" aria-hidden="true" />重命名</button>
+        <button type="button" class="is-danger" @click="deletingFolder = currentFolder"><Trash2 :size="13" aria-hidden="true" />删除文件夹</button>
+      </span>
+    </div>
+    <p v-if="actionError" class="works-error" role="alert">{{ actionError }}</p>
     <p v-if="worksError" class="works-error" role="alert">
       {{ worksError }} <button type="button" @click="loadWorks(worksPage)">重试</button>
     </p>
@@ -221,6 +387,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
             <button class="download-button" type="button" :aria-label="downloadingWorks.has(work.id) ? '正在下载' : `下载${work.typeLabel}`" :title="`下载${work.typeLabel}`" :disabled="downloadingWorks.has(work.id)" :aria-busy="downloadingWorks.has(work.id)" @click.stop="downloadWork(work)">
               <Download :size="17" stroke-width="1.8" />
             </button>
+            <button class="download-button" type="button" aria-label="移动到文件夹" title="移动到文件夹" @click.stop="startMove(work)">
+              <FolderInput :size="17" stroke-width="1.8" />
+            </button>
+            <button class="download-button" type="button" aria-label="移出作品库" title="移出作品库" @click.stop="removingWork = work">
+              <Trash2 :size="17" stroke-width="1.8" />
+            </button>
           </div>
           <span class="status-pill"><Check :size="12" stroke-width="2.2" /> 已完成</span>
         </div>
@@ -229,7 +401,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
             <h2>{{ work.title }}</h2>
             <button class="more-button" type="button" aria-label="查看详情" @click.stop="selectedWork = work"><ArrowUpRight :size="16" stroke-width="1.7" /></button>
           </div>
-          <div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ formatDate(work.createdAt) }}</div>
+          <div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ formatDate(work.createdAt) }}<template v-if="activeFolder === 'all' && folderName(work.folderId)"> · <Folder :size="12" stroke-width="1.8" aria-hidden="true" />{{ folderName(work.folderId) }}</template></div>
           <div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div>
         </div>
       </article>
@@ -237,7 +409,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 
     <div v-if="!worksLoading && !worksError && !filteredWorks.length" class="empty-state">
       <ImageIcon :size="22" stroke-width="1.5" />
-      <strong>{{ works.length ? '没有找到匹配的作品' : '暂无作品' }}</strong>
+      <strong>{{ works.length ? '没有找到匹配的作品' : currentFolder ? '这个文件夹还是空的' : '暂无作品' }}</strong>
+      <p v-if="!works.length">生成的图片和视频点「保存到作品库」后会出现在这里。</p>
     </div>
     <p v-if="worksLoading && !works.length" class="loading-state">正在读取作品…</p>
     <button v-if="hasMoreWorks" class="works-load-more" type="button" :disabled="worksLoading" @click="loadWorks(worksPage + 1)">
@@ -268,18 +441,48 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
               <div><span>尺寸</span><strong>{{ selectedWork.dimensions }}</strong></div>
               <div v-if="selectedWork.duration"><span>时长</span><strong>{{ selectedWork.duration }}</strong></div>
               <div v-if="selectedWork.billingWallet"><span>扣款来源</span><strong>{{ billingWalletLabel(selectedWork.billingWallet) }}</strong></div>
+              <div><span>位置</span><strong>{{ folderName(selectedWork.folderId) || '未归类' }}</strong></div>
             </div>
           </div>
           <footer class="detail-footer">
             <span>作品 ID · {{ selectedWork.id }}</span>
             <div>
-              <button class="secondary-modal-button" type="button" @click="closeDetails">关闭</button>
+              <button class="secondary-modal-button" type="button" @click="removingWork = selectedWork"><Trash2 :size="14" aria-hidden="true" /> 移出作品库</button>
+              <button class="secondary-modal-button" type="button" @click="startMove(selectedWork)"><FolderInput :size="14" aria-hidden="true" /> 移动</button>
               <button class="secondary-modal-button" type="button" :disabled="downloadingWorks.has(selectedWork.id)" :aria-busy="downloadingWorks.has(selectedWork.id)" @click="downloadWork(selectedWork)"><Download :size="14" aria-hidden="true" /> {{ downloadingWorks.has(selectedWork.id) ? '正在下载…' : `下载${selectedWork.typeLabel}` }}</button>
               <button class="primary-modal-button" type="button" @click="editWork(selectedWork)"><Edit3 :size="14" /> 继续创作</button>
             </div>
           </footer>
           <p v-if="downloadError?.workId === selectedWork.id" class="works-error detail-download-error" role="alert">{{ downloadError.message }}</p>
         </section>
+      </div>
+    </Teleport>
+
+    <LibraryFolderDialog
+      :open="!!movingWork" title="移动到" confirm-text="移到这里" :current-folder-id="movingWork?.folderId ?? null"
+      :busy="moveBusy" :error="moveError" @confirm="moveWork" @cancel="movingWork = null" @folders-changed="loadFolders"
+    />
+    <ConfirmDialog
+      :open="!!removingWork" title="移出作品库" danger confirm-text="移出"
+      message="作品会从作品库里移除，生成记录不受影响，之后仍可在创作页重新保存。"
+      @confirm="confirmRemoveWork" @cancel="removingWork = null"
+    />
+    <ConfirmDialog
+      :open="!!deletingFolder" title="删除文件夹" danger confirm-text="删除"
+      :message="deletingFolder?.workCount ? `「${deletingFolder.name}」里的 ${deletingFolder.workCount} 件作品会一起移出作品库，生成记录不受影响。` : `确定删除「${deletingFolder?.name}」吗？`"
+      @confirm="confirmDeleteFolder" @cancel="deletingFolder = null"
+    />
+    <Teleport to="body">
+      <div v-if="nameDialog" class="detail-scrim" @click.self="!nameBusy && (nameDialog = null)">
+        <form class="folder-name-dialog" role="dialog" aria-modal="true" :aria-label="nameDialog.folder ? '重命名文件夹' : '新建文件夹'" @submit.prevent="submitName">
+          <h2>{{ nameDialog.folder ? '重命名文件夹' : '新建文件夹' }}</h2>
+          <input v-model="nameDialog.name" maxlength="30" placeholder="文件夹名称" aria-label="文件夹名称" :disabled="nameBusy" autofocus />
+          <p v-if="nameError" class="works-error" role="alert">{{ nameError }}</p>
+          <footer>
+            <button class="secondary-modal-button" type="button" :disabled="nameBusy" @click="nameDialog = null">取消</button>
+            <button class="primary-modal-button" type="submit" :disabled="nameBusy || !nameDialog.name.trim()">{{ nameBusy ? '正在保存…' : nameDialog.folder ? '保存' : '创建' }}</button>
+          </footer>
+        </form>
       </div>
     </Teleport>
   </section>
@@ -314,7 +517,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .layout-switch { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
 .layout-switch button { display: grid; place-items: center; width: 29px; height: 28px; border: 0; color: var(--muted); background: transparent; }
 .layout-switch button.active { color: var(--color-accent-text); background: var(--color-bg-subtle); }
-.library-meta { margin: 0 0 10px; color: var(--muted); font: 500 12px var(--font-mono); }
+.library-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; color: var(--muted); font: 500 12px var(--font-mono); }
+.folder-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.folder-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; min-height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface); font-size: 12px; cursor: pointer; }
+.folder-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-chip small { font: 11px var(--font-mono); }
+.folder-chip:hover { color: var(--ink); }
+.folder-chip.active { border-color: var(--color-accent); color: var(--color-accent-text); font-weight: 600; }
+.folder-new { border-style: dashed; color: var(--color-accent-text); }
+.folder-actions { display: inline-flex; gap: 12px; }
+.folder-actions button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; color: var(--muted); background: transparent; font: inherit; cursor: pointer; }
+.folder-actions button:hover { color: var(--ink); }
+.folder-actions button.is-danger:hover { color: var(--color-error); }
+.folder-name-dialog { display: grid; gap: 12px; width: min(360px, 100%); padding: 18px 20px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.folder-name-dialog h2 { margin: 0; color: var(--ink); font: 600 16px/1.3 var(--font-serif); }
+.folder-name-dialog input { height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); font-size: 13px; }
+.folder-name-dialog input:focus { border-color: var(--color-accent); outline: 0; }
+.folder-name-dialog footer { display: flex; justify-content: flex-end; gap: 7px; }
+.folder-name-dialog .works-error { margin: 0; }
 .works-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); align-items: start; gap: 14px; }
 .work-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); transition: border-color .16s ease, transform .16s ease; cursor: pointer; }
 .work-card:hover { transform: translateY(-2px); border-color: var(--color-accent); }
@@ -323,7 +543,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .work-media { display: block; width: 100%; height: 100%; object-fit: cover; }
 .work-thumb video { background: #202020; }
 .video-play-icon { position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255, 255, 255, .78); border-radius: 50%; color: #fff; background: rgba(20, 20, 20, .48); transform: translate(-50%, -50%); pointer-events: none; }
-.thumb-overlay { position: absolute; inset: 0; display: flex; justify-content: flex-end; padding: 10px; background: rgba(20, 20, 20, .12); opacity: 0; transition: opacity .16s ease; }
+.thumb-overlay { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: flex-end; gap: 6px; padding: 10px; background: rgba(20, 20, 20, .12); opacity: 0; transition: opacity .16s ease; }
 .work-card:hover .thumb-overlay, .work-card:focus-within .thumb-overlay { opacity: 1; }
 .download-button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); cursor: pointer; }
 .download-button:disabled, .secondary-modal-button:disabled { opacity: .55; cursor: wait; }
@@ -343,6 +563,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .list-layout .work-body { display: flex; flex-direction: column; justify-content: center; padding: 14px 16px; }
 .empty-state { display: grid; justify-items: center; gap: 9px; padding: 72px 16px; color: var(--muted); }
 .empty-state strong { color: var(--ink); font-size: 13px; font-weight: 500; }
+.empty-state p { margin: 0; font-size: 12px; }
 .loading-state { padding: 28px 0; color: var(--muted); font-size: 12px; text-align: center; }
 .works-error { margin: 0 0 12px; color: var(--color-error); font-size: 12px; }
 .works-error button { padding: 0; border: 0; color: inherit; background: transparent; text-decoration: underline; cursor: pointer; }

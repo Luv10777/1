@@ -543,7 +543,7 @@ onBeforeUnmount(() => { disposed = true; stopPolling(); window.removeEventListen
         <div class="cw-modal" role="dialog" aria-modal="true" aria-label="从作品库选图片">
           <div class="cw-drawer-head"><h2>从作品库选</h2><button type="button" class="cw-icon-button" aria-label="关闭" @click="worksOpen = false"><X :size="18" :stroke-width="1.8" aria-hidden="true" /></button></div>
           <p v-if="worksLoading" class="cw-drawer-empty">正在读取…</p>
-          <p v-else-if="!works.length" class="cw-drawer-empty">作品库里还没有图片，先去图片创作做几张。</p>
+          <p v-else-if="!works.length" class="cw-drawer-empty">作品库里还没有图片。先去图片创作做几张，点「保存到作品库」后就能在这里选。</p>
           <div v-else class="cw-works">
             <button
               v-for="work in works" :key="work.id" type="button" :aria-pressed="form.pictures.some(p => p.key === `WORK-${work.id}`)"

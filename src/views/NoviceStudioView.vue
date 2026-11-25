@@ -7,6 +7,7 @@ import { ArrowUp, AudioLines, Check, Download, Film, ImagePlus, Minus, Paperclip
 import YanhuoIcon from '../components/YanhuoIcon.vue'
 import GenerationWalletPicker from '../components/GenerationWalletPicker.vue'
 import BalanceShortageDialog from '../components/BalanceShortageDialog.vue'
+import SaveToLibraryButton from '../components/SaveToLibraryButton.vue'
 import { useImageCreation } from '../composables/useImageCreation'
 import { useVideoWorkbench, videoRatioOptions, videoStageLabel } from '../composables/useVideoWorkbench'
 import { useImageInspiration } from '../composables/useImageInspiration'
@@ -449,6 +450,7 @@ function videoTags(item) {
                 </template>
                 <figure v-for="item in version.items" :key="item.id" class="ns-image-item">
                   <button v-if="item.url" type="button" class="ns-save" title="下载到本地" aria-label="下载这张图片到本地" :disabled="studio.busy || !!studio.pending || !studio.canUseAsset(item)" @click="studio.download(item)"><Download :size="15" :stroke-width="2" aria-hidden="true" /><span>下载</span></button>
+                  <SaveToLibraryButton v-if="item.url && item.status === 'SUCCEEDED'" class="ns-save ns-library" kind="IMAGE" :source-id="item.id" :disabled="!studio.canUseAsset(item)" />
                   <a v-if="item.url" :href="stableUrl(item.url)" target="_blank" rel="noopener" class="ns-image" :style="{ aspectRatio: item.width + '/' + item.height }" aria-label="在新窗口查看原图">
                     <img :src="imageSrc(item)" alt="生成的图片" decoding="async" @load="studio.reportImageVisible(item)" @error="onImageError(item)" />
                   </a>
@@ -557,6 +559,7 @@ function videoTags(item) {
             <div v-if="conversationOf(turn).workflow?.outputUrl" class="ns-video-item">
               <video class="ns-video" :src="`${stableUrl(conversationOf(turn).workflow.outputUrl)}#t=0.1`" controls playsinline preload="metadata" />
               <button type="button" class="ns-save" title="下载到本地" aria-label="下载这条视频到本地" :disabled="videoDownloads[conversationOf(turn).id]" :aria-busy="videoDownloads[conversationOf(turn).id]" @click="downloadVideo(conversationOf(turn))"><Download :size="15" :stroke-width="2" aria-hidden="true" /><span>{{ videoDownloads[conversationOf(turn).id] ? '下载中…' : '下载' }}</span></button>
+              <SaveToLibraryButton v-if="conversationOf(turn).workflow.status === 'SUCCEEDED'" class="ns-save ns-library" kind="VIDEO" :source-id="conversationOf(turn).workflow.id" />
             </div>
             <div v-else-if="conversationOf(turn).submitting || isVideoInProgress(conversationOf(turn).workflow)" class="ns-card ns-progress" role="status">
               <div class="ns-progress-head"><span class="ns-brew is-small" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span><div><strong>{{ videoStageLabel(conversationOf(turn)) }}</strong><small>通常要几分钟，可以先离开，回来会接着显示</small></div></div>

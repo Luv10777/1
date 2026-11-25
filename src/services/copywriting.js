@@ -14,7 +14,11 @@ export const copyApi = {
   voice: storeId => get('/api/copy/voice', { storeId }),
   updateVoice: (storeId, samples) => put('/api/copy/voice', { storeId, samples }),
   products: storeId => get(`/api/stores/${storeId}/products`, { page: 0, size: 100 }),
-  works: (page = 0) => get('/api/image-creations/works', { page, size: 20 }),
+  /** 从作品库选图：只列已保存到作品库的图片，形状与原来的图片作品一致。 */
+  async works(page = 0) {
+    const result = await get('/api/library/works', { folder: 'all', kind: 'IMAGE', page, size: 20 })
+    return { ...result, items: (result.items || []).map(row => row.image).filter(Boolean) }
+  },
   /** 上传一张图片换成素材 ID：先拿上传地址，直传对象存储，再确认。 */
   async uploadImage(file, uploadFetch = (...args) => globalThis.fetch(...args)) {
     const ticket = await post('/api/assets/upload-url', { name: file.name, type: 'IMAGE', mimeType: file.type })

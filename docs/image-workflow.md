@@ -262,7 +262,8 @@ worker 崩溃后若底图已经保存，则从底图恢复；只有提交标记�
 | POST | `/api/image-creations/{id}/retry` | 恢复规划任务 |
 | POST | `/api/image-creations/{id}/items/{itemId}/retry` | 恢复中断任务或重试失败图片 |
 
-作品接口为 `GET /api/image-creations/works`，支持 page/size。
+`GET /api/image-creations/works` 列出这个账号生成完成的全部图片，支持 page/size。
+作品库页面不再用它：2026-11-25 起作品库只收用户点「保存到作品库」的作品，接口见 `/api/library`（后端 README）。
 已完成图片可通过单图路径后的 `/text` 修改标题说明，
 或 `/regenerate` 仅重做该张。两种操作均创建新版本，原作品保留。
 

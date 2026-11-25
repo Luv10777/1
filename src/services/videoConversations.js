@@ -20,7 +20,7 @@ export const videoHistoryTime = value => {
   return date.toDateString() === new Date().toDateString() ? `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}` : `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-export const videoCompletionNotice = () => '视频已完成并保存到作品库。'
+export const videoCompletionNotice = () => '视频已完成，可以保存到作品库。'
 
 // Copy the attachment entries as well as the settings: editing a recalled form must
 // never change the inputs belonging to an earlier generation.

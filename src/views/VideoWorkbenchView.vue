@@ -141,6 +141,7 @@ onBeforeUnmount(() => window.clearTimeout(morphTimer))
       :is-generating="isGenerating"
       :is-morphing="isMorphing"
       :output-url="outputUrl"
+      :workflow-id="workflow?.status === 'SUCCEEDED' ? workflow.id : null"
       :actual-width="workflow?.actualWidth"
       :actual-height="workflow?.actualHeight"
       :format="workflow?.ratio || format"

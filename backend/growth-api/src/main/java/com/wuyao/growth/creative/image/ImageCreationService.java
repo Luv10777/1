@@ -209,15 +209,33 @@ public class ImageCreationService {
  public PageResult<ImageDtos.Work> works(int page,int size,Long userId) {
    checkPage(page,size);
    var result=items.findWorksByCreator(userId,PageRequest.of(page,size));
-   return PageResult.of(result,result.stream().map(i->{
-     var c=find(i.getCreationId());var d=ImageQuality.dimensions(c.getRequest().quality(),c.getRequest().ratio());
-     return new ImageDtos.Work(i.getId(),c.getId(),c.getRequest().workflow(),title(root(c)),
-       storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30)),c.getRequest().quality(),
-       i.getActualWidth()==null?d.width():i.getActualWidth(),
-       i.getActualHeight()==null?d.height():i.getActualHeight(),i.getCreatedAt(),
-       storage.presignGet(ImageRenderer.thumbnailKey(i.getOutputKey()),Duration.ofMinutes(30)),
-       i.getTaskId()==null?null:billing.generationWallet(c.getBillingReservationId()));
-   }).toList());
+   return PageResult.of(result,result.stream().map(this::work).toList());
+ }
+ /** 作品库用：按图片 ID 取已完成的图片，没完成或不存在的不返回。 */
+ @Transactional(readOnly=true)
+ public Map<Long,ImageDtos.Work> worksByItemIds(Collection<Long> itemIds) {
+   var result=new HashMap<Long,ImageDtos.Work>();
+   items.findAllById(itemIds).stream().filter(this::completedWork).forEach(i->result.put(i.getId(),work(i)));
+   return result;
+ }
+ /** 保存到作品库前核对：图片是这个账号生成的，并且已经完成保存。 */
+ @Transactional(readOnly=true)
+ public void requireSavableWork(Long itemId,Long userId) {
+   var item=items.findById(itemId).orElseThrow(()->BizException.of(ErrorCode.NOT_FOUND,"图片不存在"));
+   if(!Objects.equals(find(item.getCreationId()).getCreatedBy(),userId)) throw BizException.of(ErrorCode.NOT_FOUND,"图片不存在");
+   if(!completedWork(item)) throw bad("图片还没有生成完成，完成后再保存");
+ }
+ private boolean completedWork(ImageItem i) {
+   return "SUCCEEDED".equals(i.getStatus())&&i.getOutputKey()!=null;
+ }
+ private ImageDtos.Work work(ImageItem i) {
+   var c=find(i.getCreationId());var d=ImageQuality.dimensions(c.getRequest().quality(),c.getRequest().ratio());
+   return new ImageDtos.Work(i.getId(),c.getId(),c.getRequest().workflow(),title(root(c)),
+     storage.presignGet(i.getOutputKey(),Duration.ofMinutes(30)),c.getRequest().quality(),
+     i.getActualWidth()==null?d.width():i.getActualWidth(),
+     i.getActualHeight()==null?d.height():i.getActualHeight(),i.getCreatedAt(),
+     storage.presignGet(ImageRenderer.thumbnailKey(i.getOutputKey()),Duration.ofMinutes(30)),
+     i.getTaskId()==null?null:billing.generationWallet(c.getBillingReservationId()));
  }
  @Transactional
  public ImageDtos.View retry(Long id,Long itemId,Long expectedTaskId,Long userId) {

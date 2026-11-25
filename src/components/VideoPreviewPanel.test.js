@@ -21,6 +21,9 @@ test('completed video preview uses its own aspect ratio without parameter notice
       assert.match(html, /class="video-result-stage"/)
       assert.match(html, /<button[^>]+class="video-download-button"/)
       assert.match(html, /下载视频/)
+      assert.doesNotMatch(html, /保存到作品库/, 'without a finished video id there is nothing to save')
+      const saveable = await render({ outputUrl: '/test/output.mp4', workflowId: 12 })
+      assert.match(saveable, /<button[^>]*aria-label="保存到作品库"[^>]*>.*保存到作品库<\/span>/s)
       assert.match(html, /--video-aspect-ratio:0.5625/)
       assert.doesNotMatch(html, /device-player|device-island|device-mac-ui/)
       assert.doesNotMatch(html, /实际成片|请求：|成片参数需核对|重新生成可能再次计费/)
@@ -30,7 +33,7 @@ test('completed video preview uses its own aspect ratio without parameter notice
       assert.match(old, /<video[^>]+src="\/test\/old.mp4"/)
       assert.match(old, /preload="metadata"/)
       assert.doesNotMatch(old, /尺寸未记录|时长未记录/)
-      assert.equal(videoCompletionNotice({ status: 'SUCCEEDED' }), '视频已完成并保存到作品库。')
+      assert.equal(videoCompletionNotice({ status: 'SUCCEEDED' }), '视频已完成，可以保存到作品库。')
     })
     await t.test('the progress and failure views remain available', async () => {
       const html = await render({ isGenerating: true })
