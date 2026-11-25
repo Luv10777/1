@@ -1,17 +1,18 @@
 // Names are sent as the request `style`; the server keeps the matching art-direction notes.
+// ?v= busts browser caches when a sample is replaced under the same file name.
 export const POSTER_STYLES = [
-  { key: 'photo', name: '写实摄影', fit: '人物、动物、静物与自然场景', image: '/images/drawing-styles/photo.webp' },
-  { key: 'cinema', name: '电影质感', fit: '场景叙事、人物与氛围画面', image: '/images/drawing-styles/cinema.webp' },
-  { key: 'watercolor', name: '手绘水彩', fit: '故事插画、植物与轻盈色彩', image: '/images/drawing-styles/watercolor.webp' },
-  { key: 'ink', name: '国风意境', fit: '山水、花鸟与东方意境', image: '/images/drawing-styles/ink.webp' },
-  { key: 'minimal', name: '极简留白', fit: '静物、抽象画面与简洁构图', image: '/images/drawing-styles/minimal.webp' },
-  { key: 'film', name: '胶片纪实', fit: '日常生活、街景与真实瞬间', image: '/images/drawing-styles/film.webp' },
-  { key: 'graphic', name: '平面设计', fit: '图形、封面与视觉设计', image: '/images/drawing-styles/graphic.webp' },
-  { key: 'lowkey', name: '暗调光影', fit: '静物、人物与戏剧光影', image: '/images/drawing-styles/lowkey.webp' },
-  { key: 'food', name: '美食特写', fit: '菜品、饮品与烘焙的食欲感', image: '/images/drawing-styles/food.webp' },
-  { key: 'cartoon3d', name: '3D 卡通', fit: '萌趣角色、吉祥物与活动主视觉', image: '/images/drawing-styles/cartoon3d.webp' },
-  { key: 'airy', name: '清新日系', fit: '咖啡、花店、美业与日常生活', image: '/images/drawing-styles/airy.webp' },
-  { key: 'guochao', name: '国潮插画', fit: '节日活动、国货品牌与传统元素新玩法', image: '/images/drawing-styles/guochao.webp' },
+  { key: 'photo', name: '写实摄影', fit: '人物、动物、静物与自然场景', image: '/images/drawing-styles/photo.webp?v=2' },
+  { key: 'cinema', name: '电影质感', fit: '场景叙事、人物与氛围画面', image: '/images/drawing-styles/cinema.webp?v=2' },
+  { key: 'watercolor', name: '手绘水彩', fit: '故事插画、植物与轻盈色彩', image: '/images/drawing-styles/watercolor.webp?v=2' },
+  { key: 'ink', name: '国风意境', fit: '山水、花鸟与东方意境', image: '/images/drawing-styles/ink.webp?v=2' },
+  { key: 'minimal', name: '极简留白', fit: '静物、抽象画面与简洁构图', image: '/images/drawing-styles/minimal.webp?v=2' },
+  { key: 'film', name: '胶片纪实', fit: '日常生活、街景与真实瞬间', image: '/images/drawing-styles/film.webp?v=2' },
+  { key: 'graphic', name: '平面设计', fit: '图形、封面与视觉设计', image: '/images/drawing-styles/graphic.webp?v=2' },
+  { key: 'lowkey', name: '暗调光影', fit: '静物、人物与戏剧光影', image: '/images/drawing-styles/lowkey.webp?v=2' },
+  { key: 'food', name: '美食特写', fit: '菜品、饮品与烘焙的食欲感', image: '/images/drawing-styles/food.webp?v=2' },
+  { key: 'cartoon3d', name: '3D 卡通', fit: '萌趣角色、吉祥物与活动主视觉', image: '/images/drawing-styles/cartoon3d.webp?v=2' },
+  { key: 'airy', name: '清新日系', fit: '咖啡、花店、美业与日常生活', image: '/images/drawing-styles/airy.webp?v=2' },
+  { key: 'guochao', name: '国潮插画', fit: '节日活动、国货品牌与传统元素新玩法', image: '/images/drawing-styles/guochao.webp?v=2' },
 ]
 
 export const SEASONAL_PREFIX = '应时·'
