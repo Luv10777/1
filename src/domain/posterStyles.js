@@ -1,4 +1,6 @@
 // Names are sent as the request `style`; the server keeps the matching art-direction notes.
+// The triptych banner only works as one wide picture, so choosing it fixes the ratio at 3:1.
+export const TRIPTYCH_STYLE = '门店三联图'
 export const POSTER_STYLES = [
   { key: 'photo', name: '写实摄影', fit: '人物、动物、静物与自然场景', image: '/images/drawing-styles/photo.webp' },
   { key: 'cinema', name: '电影质感', fit: '场景叙事、人物与氛围画面', image: '/images/drawing-styles/cinema.webp' },
@@ -8,6 +10,7 @@ export const POSTER_STYLES = [
   { key: 'film', name: '胶片纪实', fit: '日常生活、街景与真实瞬间', image: '/images/drawing-styles/film.webp' },
   { key: 'graphic', name: '平面设计', fit: '图形、封面与视觉设计', image: '/images/drawing-styles/graphic.webp' },
   { key: 'lowkey', name: '暗调光影', fit: '静物、人物与戏剧光影', image: '/images/drawing-styles/lowkey.webp' },
+  { key: 'triptych', name: TRIPTYCH_STYLE, fit: '3:1 门店横幅，可切成店铺页前三张图', image: '/images/drawing-styles/triptych.webp', ratio: '3:1' },
 ]
 
 export const SEASONAL_PREFIX = '应时·'

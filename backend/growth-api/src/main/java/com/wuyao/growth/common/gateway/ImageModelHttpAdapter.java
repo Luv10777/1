@@ -59,7 +59,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      if(planner) output=plan(req,endpoint);
      else if(config.getGenerator().getProtocol()==ImageModelProperties.Protocol.BRIDGE) {
        var body=new LinkedHashMap<String,Object>(req.options());
-       body.put("model",endpoint.getModel());body.put("prompt",req.prompt());body.put("idempotencyKey",req.idempotencyKey());
+       body.put("model",model(req,endpoint));body.put("prompt",req.prompt());body.put("idempotencyKey",req.idempotencyKey());
        output=json.readValue(post(config.generatorUrl(),endpoint,req,"application/json",List.of(json.writeValueAsBytes(body))),new TypeReference<>(){});
        // Some relays return the completed URL under the conventional `url`
        // field instead of the adapter's normalized `imageUrl` field.
@@ -71,7 +71,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
        output.put("imageSourceUrl",url);
        if(isOnlyRouterFilesContent(URI.create(url))) output.put("imageUrl",resolveFileUrl(url));
      }
-     output.put("_model",endpoint.getModel());
+     output.put("_model",model(req,endpoint));
      return new ProviderResult(true,code(),(String)output.get("jobId"),output,null,null);
    } catch(BizException e) {throw e;}
    catch(ProviderOutcomeUnknownException e) {throw e;}
@@ -91,7 +91,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      content.add(Map.of("type","text","text","Reference role: "+reference.get("role")));
      content.add(Map.of("type","image_url","image_url",Map.of("url",reference.get("dataUrl"))));
    }
-   var body=new LinkedHashMap<String,Object>(Map.of("model",endpoint.getModel(),"stream",false,
+   var body=new LinkedHashMap<String,Object>(Map.of("model",model(req,endpoint),"stream",false,
      "messages",List.of(Map.of("role","system","content",req.options().get("system")),Map.of("role","user","content",content)),
      "response_format",Map.of("type","json_object")));
    if(endpoint.getTemperature()!=null) body.put("temperature",endpoint.getTemperature());
@@ -125,7 +125,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      prompt.append("\n参考图 ").append(n+1).append(guidance);
    }
    var body=new LinkedHashMap<String,Object>();
-   body.put("model",endpoint.getModel());body.put("prompt",prompt.toString());body.put("n",1);
+   body.put("model",model(req,endpoint));body.put("prompt",prompt.toString());body.put("n",1);
    body.put("size",req.options().get("width")+"x"+req.options().get("height"));
    // Resolution tiers are not OpenAI's low/medium/high parameter. GPT Image omits response_format.
    // The UI no longer exposes a quality selector. Treat legacy "auto" config as
@@ -133,10 +133,10 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    // Legacy DALL-E values standard and hd are also mapped to high for GPT Image.
    String quality = endpoint.getQuality();
    if (quality.isBlank() || quality.equalsIgnoreCase("auto")
-       || (isGptImageModel(endpoint.getModel()) && (quality.equalsIgnoreCase("standard")
+       || (isGptImageModel(model(req,endpoint)) && (quality.equalsIgnoreCase("standard")
          || quality.equalsIgnoreCase("hd")))) quality = "high";
    body.put("quality", quality);
-   if(!endpoint.getResponseFormat().isBlank() && !isGptImageModel(endpoint.getModel()))
+   if(!endpoint.getResponseFormat().isBlank() && !isGptImageModel(model(req,endpoint)))
      body.put("response_format",endpoint.getResponseFormat());
    byte[] response;
    if(refs.isEmpty()) response=post(config.generatorUrl(),endpoint,req,"application/json",List.of(json.writeValueAsBytes(body)));
@@ -158,12 +158,12 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
    }
    var root=json.readTree(response);var data=root.path("data");
    if(!data.isArray() || data.isEmpty()) {
-     log.warn("图片响应缺少单张图片: model={} dataSize={} fields={} error={}",endpoint.getModel(),
+     log.warn("图片响应缺少单张图片: model={} dataSize={} fields={} error={}",model(req,endpoint),
        data.isArray()?data.size():"none",fieldNames(root,endpoint.getApiKey()),relayError(root,endpoint.getApiKey()));
      throw failure("图片服务未返回单张有效图片");
    }
    // 中转站有时无视 n=1 返回多张；图已生成，取第一张，不要整单判失败。
-   if(data.size()>1) log.warn("图片响应多于一张，取第一张: model={} dataSize={}",endpoint.getModel(),data.size());
+   if(data.size()>1) log.warn("图片响应多于一张，取第一张: model={} dataSize={}",model(req,endpoint),data.size());
    String url=data.get(0).path("url").asText("");
    var output=new LinkedHashMap<String,Object>();output.put("status","SUCCEEDED");
    if(!url.isBlank()) {
@@ -230,21 +230,21 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      .setConnectTimeout(Timeout.ofSeconds(Math.max(1, Math.min(endpoint.getTimeoutSeconds(), 60))))
      .setResponseTimeout(Timeout.ofSeconds(Math.max(1, endpoint.getTimeoutSeconds())))
      .build());
-   if(req.alias()!=ModelAlias.IMAGE_PRIMARY) return execute(request,endpoint.getModel(),48*1024*1024);
+   if(req.alias()!=ModelAlias.IMAGE_PRIMARY) return execute(request,model(req,endpoint),48*1024*1024);
    long started=System.nanoTime();
-   log.info("图片请求开始: model={} host={} requestBytes={}",endpoint.getModel(),uri.getHost(),body.size());
+   log.info("图片请求开始: model={} host={} requestBytes={}",model(req,endpoint),uri.getHost(),body.size());
    try {
-     byte[] response=execute(request,endpoint.getModel(),48*1024*1024);
-     log.info("图片响应收完: model={} host={} responseBytes={} elapsedMs={}",endpoint.getModel(),uri.getHost(),response.length,(System.nanoTime()-started)/1_000_000);
+     byte[] response=execute(request,model(req,endpoint),48*1024*1024);
+     log.info("图片响应收完: model={} host={} responseBytes={} elapsedMs={}",model(req,endpoint),uri.getHost(),response.length,(System.nanoTime()-started)/1_000_000);
      return response;
    } catch (IOException e) {
-     log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",endpoint.getModel(),uri.getHost(),
+     log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",model(req,endpoint),uri.getHost(),
        (System.nanoTime()-started)/1_000_000,e.getClass().getSimpleName());
      if(req.alias()==ModelAlias.IMAGE_PRIMARY)
        throw new ProviderOutcomeUnknownException("中转站响应未完整返回，生成结果状态未确认", e);
      throw e;
    } catch (RuntimeException e) {
-     log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",endpoint.getModel(),uri.getHost(),
+     log.warn("图片请求异常: model={} host={} elapsedMs={} type={}",model(req,endpoint),uri.getHost(),
        (System.nanoTime()-started)/1_000_000,e.getClass().getSimpleName());
      throw e;
    }
@@ -273,6 +273,11 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
      return location;
    });
  }
+ /** Image requests may name the upstream model the user chose; planner calls always use their own endpoint. */
+ private static String model(ProviderRequest req,ImageModelProperties.Endpoint endpoint) {
+   return req.alias()==ModelAlias.IMAGE_PRIMARY && req.options().get("model") instanceof String chosen && !chosen.isBlank()
+     ? chosen : endpoint.getModel();
+ }
  private boolean isGptImageModel(String model) {
    return model!=null && model.matches("(?i)gpt-image-2([.-].+)?");
  }
@@ -287,7 +292,7 @@ public class ImageModelHttpAdapter implements ProviderAdapter {
  }
  private byte[] responseBytes(ClassicHttpResponse connection,String model,int limit) throws IOException {
    int status=connection.getCode();
-   if(model.equals(config.getGenerator().getModel()))
+   if(model.equals(config.getGenerator().getModel()) || model.equals(config.getGenerator().getModel26()))
      log.info("图片响应头收到: status={} contentLength={}",status,
        connection.getEntity()==null?0:connection.getEntity().getContentLength());
    if(status<200 || status>=300) {

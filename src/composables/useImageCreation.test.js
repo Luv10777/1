@@ -17,6 +17,7 @@ test('image creation reads capabilities for members and lets guests browse witho
   let capabilityRequests = 0
   let apiRequests = 0
   const submissions = []
+  const bodies = []
   let auth
   try {
     ;({ auth } = await vite.ssrLoadModule('/src/stores/auth.js'))
@@ -28,16 +29,18 @@ test('image creation reads capabilities for members and lets guests browse witho
       const creation = { id: 42, workflow: 'POSTER', status: 'SUCCEEDED', items: [] }
       if (url.startsWith('/api/image-creations?') && options.method === 'POST') {
         submissions.push(url)
+        bodies.push(JSON.parse(options.body))
         return { ok: true, json: async () => ({ code: 200, data: creation }) }
       }
       if (url.endsWith('/42/thread')) return { ok: true, json: async () => ({ code: 200, data: [creation] }) }
       if (url === '/api/billing/summary') return { ok: true, json: async () => ({ code: 200, data: {
-        available: 500, generationTeam: { name: '服务商', available: 2200 },
+        available: 500, imageCredits: 3, imageModelCredits: { IMAGE_2_5: 3, IMAGE_2_6: 5 }, generationTeam: { name: '服务商', available: 2200 },
       } }) }
       if (String(url).endsWith('/capabilities')) {
         capabilityRequests++
         return { ok: true, json: async () => ({ code: 200, data: {
-          configured: true, qualities: ['2K'], qualityRatios: { '2K': ['3:4'] },
+          configured: true, qualities: ['2K', '4K'], qualityRatios: { '2K': ['3:4'], '4K': ['3:1'] },
+          models: [{ code: 'IMAGE_2_5', label: 'Image 2.5' }, { code: 'IMAGE_2_6', label: 'Image 2.6' }],
         } }) }
       }
       return { ok: true, json: async () => ({ code: 200, data: { items: [], totalPages: 0 } }) }
@@ -73,12 +76,27 @@ test('image creation reads capabilities for members and lets guests browse witho
     assert.equal(studio.capabilityState, 'ready')
     assert.equal(studio.configured, true)
     assert.equal(studio.generationWallet, 'PERSONAL')
+    assert.equal(studio.model, 'IMAGE_2_5')
+    assert.equal(studio.imageCredits, 3)
+    studio.model = 'IMAGE_2_6'
+    assert.equal(studio.imageCredits, 5, 'the price follows the chosen model')
+    studio.style = '门店三联图'
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(studio.ratio, '3:1', 'the triptych banner fixes the ratio')
+    assert.equal(studio.quality, '4K')
+    assert.equal(studio.supportsRatio('3:4'), false)
     studio.generationWallet = 'TEAM'
     studio.brief = '一张测试图片'
     studio.generate()
     await new Promise(resolve => setImmediate(resolve))
     assert.equal(studio.error, '')
     assert.deepEqual(submissions, ['/api/image-creations?wallet=TEAM'])
+    assert.equal(bodies[0].model, 'IMAGE_2_6')
+    assert.equal(bodies[0].ratio, '3:1')
+    assert.equal(bodies[0].style, '门店三联图')
+    studio.style = '手绘水彩'
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(studio.ratio, '3:4', 'leaving the triptych restores the default ratio')
     assert.equal(studio.current.id, 42)
     app.unmount()
     auth.state.user = null; auth.state.token = null

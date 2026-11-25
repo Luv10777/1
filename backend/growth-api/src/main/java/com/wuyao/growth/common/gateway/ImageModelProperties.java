@@ -33,10 +33,16 @@ public class ImageModelProperties {
  }
  public boolean textConfigured() {return !textUrl().isBlank() && text.credentialsConfigured();}
  public boolean generatorConfigured() {return !generatorUrl().isBlank() && generator.credentialsConfigured();}
+ /** Upstream model ID for a user-selected image model code; null or unknown means Image 2.5. */
+ public String generatorModel(String choice) {
+   return "IMAGE_2_6".equals(choice)?generator.getModel26():generator.getModel();
+ }
  public enum Protocol {OPENAI, BRIDGE}
  @Getter @Setter public static class Generator extends Endpoint {
    private Protocol protocol=Protocol.OPENAI;
    private String editsUrl="";
+   /** Upstream model ID for the user-facing "Image 2.6"; `model` serves "Image 2.5". Same URL and key. */
+   private String model26="";
    private String quality="";
    private String responseFormat="";
    private List<String> downloadAllowedOrigins=List.of();

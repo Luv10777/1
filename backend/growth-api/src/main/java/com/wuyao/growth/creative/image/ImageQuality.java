@@ -44,14 +44,15 @@ public final class ImageQuality {
             return false;
         }
     }
-    // 1K and 2K use the short edge; 4K uses a 3840px long edge for landscape/portrait.
+    // 1K and 2K use the short edge; 4K uses a 3840px long edge for landscape/portrait and the 3:1 banner.
     public static ImageDtos.Dimensions dimensions(String quality, String ratio) {
-        if (!ratio.matches("1:1|3:4|4:3|9:16|16:9|2:3|3:2"))
+        if (!ratio.matches("1:1|3:4|4:3|9:16|16:9|2:3|3:2|3:1"))
             throw BizException.of(ErrorCode.BAD_REQUEST, "不支持的图片比例");
         Map<String, Map<String, ImageDtos.Dimensions>> sizes = Map.of(
             "1K", Map.of("1:1", new ImageDtos.Dimensions(1024, 1024), "3:2", new ImageDtos.Dimensions(1536, 1024), "2:3", new ImageDtos.Dimensions(1024, 1536)),
             "2K", Map.of("1:1", new ImageDtos.Dimensions(2048, 2048), "16:9", new ImageDtos.Dimensions(2048, 1152), "9:16", new ImageDtos.Dimensions(1152, 2048)),
-            "4K", Map.of("16:9", new ImageDtos.Dimensions(3840, 2160), "9:16", new ImageDtos.Dimensions(2160, 3840))
+            "4K", Map.of("16:9", new ImageDtos.Dimensions(3840, 2160), "9:16", new ImageDtos.Dimensions(2160, 3840),
+                "3:1", new ImageDtos.Dimensions(3840, 1280))
         );
         ImageDtos.Dimensions size = sizes.getOrDefault(quality, Map.of()).get(ratio);
         if (size == null && !"4K".equals(quality)) {
@@ -61,7 +62,8 @@ public final class ImageQuality {
             double scale = (double) base / (Set.of("3:4", "4:3").contains(ratio) ? Math.max(x, y) : Math.min(x, y));
             size = new ImageDtos.Dimensions((int) Math.round(x * scale), (int) Math.round(y * scale));
         }
-        if (size == null) throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,
+        // 3:1 at 2K would need a 6144 px long edge, beyond what image models accept.
+        if (size == null || Math.max(size.width(), size.height()) > MAX_MODEL_EDGE) throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,
             "该画质不支持此比例，请选择 1K/2K/4K 对应的标准比例");
         return size;
     }

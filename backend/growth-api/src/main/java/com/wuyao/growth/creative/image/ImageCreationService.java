@@ -54,13 +54,19 @@ public class ImageCreationService {
    boolean planner=gateway.configured(config.selectedTextAlias());
    boolean generator=gateway.configured(ModelAlias.IMAGE_PRIMARY);
    var ratios=new LinkedHashMap<String,List<String>>();
-   for(String quality:config.getQualities()) ratios.put(quality,List.of("1:1","3:4","4:3","9:16","16:9","2:3","3:2").stream().filter(r->{
+   for(String quality:config.getQualities()) ratios.put(quality,List.of("1:1","3:4","4:3","9:16","16:9","2:3","3:2","3:1").stream().filter(r->{
      return ImageQuality.supportsOutput(quality,r,config);
    }).toList());
    return Map.of("configured",planner&&generator,"plannerConfigured",planner,"generatorConfigured",generator,
-       "qualities",config.getQualities(),"qualityRatios",ratios,
+       "qualities",config.getQualities(),"qualityRatios",ratios,"models",imageModels(),
        "sizeHint",ImageQuality.usesGptImage2(config)?"1K/2K 支持方图、横图和竖图；4K 仅支持 16:9 横屏或 9:16 竖屏。":"",
        "message",planner&&generator?"":"图片创作服务尚未配置，请联系管理员");
+ }
+ /** Models the user can pick, labelled as customers see them; Image 2.6 appears once its upstream ID is set. */
+ private List<Map<String,String>> imageModels() {
+   var models=new ArrayList<Map<String,String>>(List.of(Map.of("code","IMAGE_2_5","label","Image 2.5")));
+   if(!config.getGenerator().getModel26().isBlank()) models.add(Map.of("code","IMAGE_2_6","label","Image 2.6"));
+   return models;
  }
  @Transactional
  public ImageDtos.View create(ImageDtos.Create request,Long userId) {
@@ -90,7 +96,7 @@ public class ImageCreationService {
    var c=new ImageCreation(); c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(parent);c.setVariation(variation);c.setRequest(req);c.setRequestKey(req.requestKey());c.setRequestHash(hash);
     c.setBillingReservationId(reserveImage(req.requestKey(),
-        Math.multiplyExact(req.count(),BillingService.IMAGE_CREDITS),"图片创作 · 预占 "+req.count()+" 张",wallet));
+        Math.multiplyExact(req.count(),imageCredits(req)),"图片创作 · 预占 "+req.count()+" 张",wallet));
    creations.saveAndFlush(c);
    var task=tasks.submit("IMAGE_PLAN","DEFAULT",Map.of("creationId",c.getId()),"image-plan-"+c.getId(),userId);
    c.setTaskId(task.getId());
@@ -101,6 +107,8 @@ public class ImageCreationService {
  private void requireConfigured(ImageDtos.Create req) {
    if(!gateway.configured(config.selectedTextAlias())||!gateway.configured(ModelAlias.IMAGE_PRIMARY))
      throw BizException.of(ErrorCode.IMAGE_NOT_CONFIGURED,"图片创作模型尚未配置，请联系管理员");
+   if("IMAGE_2_6".equals(req.model()) && config.getGenerator().getModel26().isBlank())
+     throw BizException.of(ErrorCode.IMAGE_NOT_CONFIGURED,"Image 2.6 暂未开放，请先选择 Image 2.5");
    if(!config.getQualities().contains(req.quality()))
      throw BizException.of(ErrorCode.IMAGE_QUALITY_UNSUPPORTED,"当前图片模型尚不支持该画质");
    if(!ImageQuality.supportsOutput(req.quality(),req.ratio(),config))
@@ -113,7 +121,7 @@ public class ImageCreationService {
    String brief=r.brief()+"\n本次修改："+revision.instruction();
    if(brief.length()>2000) throw bad("修改历史过长，请新建创作");
    return createVersion(new ImageDtos.Create(revision.requestKey(),r.workflow(),brief,r.references(),r.ratio(),
-      r.quality(),r.count(),r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId()),userId,id,revision.variation(),wallet);
+      r.quality(),r.count(),r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId(),r.model()),userId,id,revision.variation(),wallet);
  }
  @Transactional(readOnly=true)
  public ImageDtos.View get(Long id) {return view(find(id));}
@@ -244,7 +252,7 @@ public class ImageCreationService {
    if(itemId==null) {
      c=creations.lock(id).orElseThrow();
      if(Objects.equals(c.getTaskId(),expectedTaskId) && "INTERRUPTED".equals(effective(c.getStatus(),c.getTaskId()))) {
-       long needed=Math.multiplyExact(c.getRequest().count(),BillingService.IMAGE_CREDITS);
+       long needed=Math.multiplyExact(c.getRequest().count(),imageCredits(c.getRequest()));
        if(c.getBillingReservationId()==null||billing.remaining(c.getBillingReservationId())==0) reserveRetry(c,needed,"plan-"+expectedTaskId);
        else billing.requireMembership("IMAGE");
        if(!c.isConcurrencyPermitHeld()) { acquirePermit(TenantContext.require()); c.setConcurrencyPermitHeld(true); }
@@ -263,7 +271,7 @@ public class ImageCreationService {
       if(!c.isConcurrencyPermitHeld()) { acquirePermit(TenantContext.require()); c.setConcurrencyPermitHeld(true); }
       boolean newGeneration=Set.of("FAILED","UPSTREAM_UNKNOWN").contains(i.getStatus());
       if(!i.isBillingHeld() && (i.getPreviewedAt()==null || newGeneration)) {
-        reserveRetry(c,BillingService.IMAGE_CREDITS,"item-"+i.getId()+"-"+expectedTaskId);
+        reserveRetry(c,imageCredits(c.getRequest()),"item-"+i.getId()+"-"+expectedTaskId);
         i.setBillingHeld(true);
       } else if(i.isBillingHeld()) billing.requireMembership("IMAGE");
       if(newGeneration) {
@@ -297,7 +305,7 @@ public class ImageCreationService {
    if(!source.getCreationId().equals(id)||!"SUCCEEDED".equals(source.getStatus())) throw bad("请先完成这张图片");
    var r=original.getRequest();
    String brief="修改文字："+edit.headline()+"\n"+edit.caption();
-   var req=new ImageDtos.Create(edit.requestKey(),r.workflow(),brief,r.references(),r.ratio(),r.quality(),1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
+   var req=new ImageDtos.Create(edit.requestKey(),r.workflow(),brief,r.references(),r.ratio(),r.quality(),1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId(),r.model());
    creations.lockRequest(TenantContext.require()+":"+edit.requestKey());
     String hash=paymentHash(req,itemId,wallet);
    var previous=creations.findByRequestKey(edit.requestKey());
@@ -311,7 +319,7 @@ public class ImageCreationService {
    var spec=new ImageDtos.Spec(source.getSpec().role(),"参考原图修改文字，尽量保持主体、构图、色彩与风格；去除旧标题和说明，按新的文案重新设计文字。",edit.headline(),edit.caption(),source.getId());
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(edit.requestKey());c.setRequestHash(hash);c.setRequest(req);
-    c.setBillingReservationId(reserveImage(edit.requestKey(),BillingService.IMAGE_CREDITS,"图片文字修改 · 预占 1 张",wallet));
+    c.setBillingReservationId(reserveImage(edit.requestKey(),imageCredits(req),"图片文字修改 · 预占 1 张",wallet));
    c.setPlan(new ImageDtos.Plan("参考原图修改文字，局部画面可能变化","",original.getPlan().visualDirection(),List.of(spec)));c.setStatus("GENERATING");creations.saveAndFlush(c);
    var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(c.getId());i.setSpec(spec);
    i.setBillingHeld(true);
@@ -334,7 +342,7 @@ public class ImageCreationService {
      if(!Set.of("LAYOUT","SCENE","MESSAGE").contains(direction)) throw bad("不支持的绘图换版方向");
      var r=original.getRequest();
      var req=new ImageDtos.Create(requestKey,r.workflow(),r.brief(),r.references(),r.ratio(),r.quality(),
-       1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId());
+       1,r.platform(),r.imageType(),r.purpose(),r.style(),r.templateId(),r.model());
       return createVersion(req,userId,id,direction,wallet);
    }
    if(variation!=null) throw bad("产品套图不支持该换版方向");
@@ -350,7 +358,7 @@ public class ImageCreationService {
    acquirePermit(tenantId);
    var c=new ImageCreation();c.setTenantId(tenantId);c.setCreatedBy(userId);c.setConcurrencyPermitHeld(true);
    c.setParentId(id);c.setRequestKey(requestKey);c.setRequestHash(fingerprint);
-    c.setBillingReservationId(reserveImage(requestKey,BillingService.IMAGE_CREDITS,"重新生成图片 · 预占 1 张",wallet));
+    c.setBillingReservationId(reserveImage(requestKey,imageCredits(original.getRequest()),"重新生成图片 · 预占 1 张",wallet));
    c.setRequest(original.getRequest());c.setPlan(original.getPlan());c.setStatus("GENERATING");creations.saveAndFlush(c);
    for(var source:originals) {
      var i=new ImageItem();i.setTenantId(c.getTenantId());i.setCreationId(c.getId());
@@ -699,10 +707,14 @@ public class ImageCreationService {
  }
  private void captureImage(ImageCreation c,ImageItem item) {
    if(c.getBillingReservationId()!=null && item.isBillingHeld()) {
-     billing.capture(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,
+     billing.capture(c.getBillingReservationId(),imageCredits(c.getRequest()),
        "image-delivered:"+item.getId()+":"+item.getGeneration(),"图片成功交付 · 1 张");
      item.setBillingHeld(false);
    }
+ }
+ /** Per-image price of the model this request chose; requests from before model choice are Image 2.5. */
+ static int imageCredits(ImageDtos.Create request) {
+   return BillingService.IMAGE_MODEL_CREDITS.get(request.model()==null?"IMAGE_2_5":request.model());
  }
  private void reserveRetry(ImageCreation c,long amount,String key) {
    if(c.getBillingReservationId()==null) {
@@ -715,7 +727,8 @@ public class ImageCreationService {
        captureImage(c,i);
        return;
      }
-     billing.releaseAmount(c.getBillingReservationId(),BillingService.IMAGE_CREDITS,key,"图片未交付 · 退回 "+BillingService.IMAGE_CREDITS+" 烟火");
+     int credits=imageCredits(c.getRequest());
+     billing.releaseAmount(c.getBillingReservationId(),credits,key,"图片未交付 · 退回 "+credits+" 烟火");
      i.setBillingHeld(false);
    }
  }
@@ -795,6 +808,7 @@ public class ImageCreationService {
    return new ImageDtos.View(c.getId(),c.getParentId(),c.getRequest().workflow(),c.getRequest().brief(),
      c.getRequest().quality(),c.getRequest().ratio(),state,c.getPlan()==null?"":c.getPlan().summary(),
      c.getPlan()==null?"":c.getPlan().question(),state.equals("INTERRUPTED")?"规划任务中断，可恢复重试":CustomerMessages.plain(c.getError(),"这次创作没有完成，可以重试。"),
-     done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId(),referenceViews(c),billing.generationWallet(c.getBillingReservationId()));
+     done,c.getRequest().count(),views,c.getCreatedAt(),c.getTaskId(),referenceViews(c),billing.generationWallet(c.getBillingReservationId()),
+     c.getRequest().model()==null?"IMAGE_2_5":c.getRequest().model());
  }
 }

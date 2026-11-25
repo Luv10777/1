@@ -15,6 +15,7 @@ const fileInput = ref(null)
 const dragging = ref(false)
 const settingsOpen = ref(false)
 const selectedStyle = computed(() => POSTER_STYLES.find(style => style.name === studio.value.style))
+const modelLabel = computed(() => studio.value.models.find(option => option.code === studio.value.model)?.label || 'Image 2.5')
 const serviceNotice = computed(() => studio.value.requiresLogin ? '登录后开始创作'
   : studio.value.capabilityState === 'checking' ? '正在检查创作服务…'
   : studio.value.capabilityState === 'error' ? `创作服务检查失败：${studio.value.capabilityError}`
@@ -104,8 +105,9 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="poster-settings">
-        <button type="button" class="poster-settings-toggle" :aria-expanded="settingsOpen" aria-controls="poster-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ studio.ratio }} · {{ studio.quality }}</small><ChevronRight :size="15" class="poster-settings-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
+        <button type="button" class="poster-settings-toggle" :aria-expanded="settingsOpen" aria-controls="poster-settings" @click="settingsOpen = !settingsOpen"><span>输出设置</span><small>{{ modelLabel }} · {{ studio.ratio }} · {{ studio.quality }}</small><ChevronRight :size="15" class="poster-settings-chevron" :class="{ open: settingsOpen }" aria-hidden="true" /></button>
         <div v-show="settingsOpen" id="poster-settings" class="poster-settings-body">
+          <div class="poster-setting-row"><span>模型</span><div class="poster-quality-grid poster-model-grid" role="group" aria-label="图片模型"><button v-for="option in studio.models" :key="option.code" type="button" :disabled="studio.locked" :aria-pressed="studio.model === option.code" :class="{ active: studio.model === option.code }" @click="studio.model = option.code">{{ option.label }}</button></div></div>
           <div class="poster-setting-row"><span>比例</span><AppSelect v-model="studio.ratio" class="poster-row-select" :disabled="studio.locked" aria-label="图片比例"><option v-for="ratio in IMAGE_RATIOS" :key="ratio" :value="ratio" :disabled="!studio.supportsRatio(ratio)">{{ ratio }}</option></AppSelect></div>
           <div class="poster-setting-row"><span>画质</span><div class="poster-quality-grid" role="group" aria-label="输出画质"><button v-for="quality in IMAGE_QUALITIES" :key="quality" type="button" :disabled="studio.locked || !studio.supportsQuality(quality)" :title="studio.supportsQuality(quality) ? undefined : '当前比例不支持该画质'" :aria-pressed="studio.quality === quality" :class="{ active: studio.quality === quality }" @click="studio.quality = quality">{{ quality }}</button></div></div>
         </div>

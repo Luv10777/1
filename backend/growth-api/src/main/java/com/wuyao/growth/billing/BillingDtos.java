@@ -14,14 +14,14 @@ public final class BillingDtos {
                           long giftAvailable, long purchasedAvailable, long held, boolean memberActive,
                           Instant memberUntil, PlanSnapshot plan, boolean canManage, boolean operator,
                           PaymentInstructions payment, String paymentMethod, GenerationTeam generationTeam,
-                          GenerationWallet workspaceGenerationWallet) {
+                          GenerationWallet workspaceGenerationWallet, java.util.Map<String, Integer> imageModelCredits) {
         public Summary(String currencyName, int creditsPerYuan, int imageCredits, int videoAnalysisCredits,
                        int liveCreditsPerHour, long available, long giftAvailable, long purchasedAvailable,
                        long held, boolean memberActive, Instant memberUntil, PlanSnapshot plan, boolean canManage,
                        boolean operator, PaymentInstructions payment, String paymentMethod) {
             this(currencyName, creditsPerYuan, imageCredits, videoAnalysisCredits, liveCreditsPerHour, available,
                     giftAvailable, purchasedAvailable, held, memberActive, memberUntil, plan, canManage, operator,
-                    payment, paymentMethod, null, GenerationWallet.PERSONAL);
+                    payment, paymentMethod, null, GenerationWallet.PERSONAL, java.util.Map.of());
         }
     }
     public record GenerationTeam(String name, long available) {}

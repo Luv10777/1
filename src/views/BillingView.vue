@@ -345,7 +345,7 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(paymentTimer); clearInterv
       <section class="yanhuo-section" aria-labelledby="rules-title">
         <header class="yanhuo-section-head"><h2 id="rules-title">计费说明</h2></header>
         <dl class="yanhuo-rule-grid">
-          <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong>生成中先预占，未交付的退回。</dd></div>
+          <div><dt>图片创作</dt><dd><strong><YanhuoIcon :size="14" />{{ account.imageCredits }} / 张</strong><template v-if="account.imageModelCredits?.IMAGE_2_6">Image 2.5 每张 {{ account.imageModelCredits.IMAGE_2_5 }}，Image 2.6 每张 {{ account.imageModelCredits.IMAGE_2_6 }}。</template>生成中先预占，未交付的退回。</dd></div>
           <div><dt>视频反推</dt><dd><strong><YanhuoIcon :size="14" />{{ account.videoAnalysisCredits }} / 次</strong>分析成功后扣除，失败或取消退回。</dd></div>
           <div><dt>视频生成</dt><dd><strong>按确认的报价</strong>先预占烟火，交付后按实际用量结算。</dd></div>
           <div><dt>直播</dt><dd><strong><YanhuoIcon :size="14" />{{ account.liveCreditsPerHour }} / 小时</strong>开播先预占一小时，按分钟结算，暂停不计费。</dd></div>

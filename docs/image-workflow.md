@@ -9,6 +9,26 @@
 产品图片类型保留商品主图、详情图和场景套图，不再提供“白底图”类型；用户仍可在描述里指定白色背景。
 未配置文本或图片模型时拒绝提交；需求理解与提示词润色各调用一次文本模型，图片渲染阶段不再追加文本模型调用。
 
+### 图片模型与价格
+
+用户在输出设置里选择模型，界面显示名和上游模型、价格对应如下（请求字段 `model`）：
+
+| 代码 | 显示名 | 上游模型（环境变量） | 每张 |
+|---|---|---|---|
+| `IMAGE_2_5` | Image 2.5 | `IMAGE_GENERATOR_MODEL` | 3 烟火 |
+| `IMAGE_2_6` | Image 2.6 | `IMAGE_GENERATOR_MODEL_2_6` | 5 烟火 |
+
+两个模型共用同一个生图地址和令牌。`IMAGE_GENERATOR_MODEL_2_6` 留空时 Image 2.6 不出现在能力列表里，提交会被拒绝。
+没有 `model` 字段的旧请求按 Image 2.5 执行和计费。修改、换版、重做沿用原创作的模型和单价。
+
+### 门店三联图
+
+灵感绘图的「门店三联图」风格生成一整张 3:1 营销横幅，用户自己切成店铺页的前三张图，系统不切图。
+选中后比例锁定为 3:1，可选 1K（3072×1024）和 4K（3840×1280）；2K 会超过 3840 像素的长边上限，不提供。
+风格指引要求画面连续、品牌名和小字不压在三等分线上。风格卡片缩略图来自 2026-11-25 的 Image 2.6 实测样张（虚构店名「山泉里」）。
+2026-11-25 在正式服用线上令牌实测：Flu 的 `gpt-image-2.5` 与 `gpt-image-2.6-flare` 都接受 3072×1024，原尺寸返回，
+分别约 72 秒和 88 秒，中文标题和店名都写对；两张都把一行小字放在了三分之一切线附近，用户切图时需要留意。
+
 ## 本地启动
 
 需要 Java 21、Maven、Docker。先按照后端 README 初始化 PostgreSQL、MinIO 和 JWT。
@@ -24,7 +44,8 @@ NEW_API_API_KEY=replace-on-server
 IMAGE_TEXT_MODEL=deepseek-flash
 IMAGE_TEXT_MAX_TOKENS=6000
 IMAGE_TEXT_TIMEOUT_SECONDS=300
-IMAGE_GENERATOR_MODEL=gpt-image-2.5-ultra-fast
+IMAGE_GENERATOR_MODEL=gpt-image-2.5
+IMAGE_GENERATOR_MODEL_2_6=gpt-image-2.6-flare
 IMAGE_GENERATOR_PROTOCOL=OPENAI
 IMAGE_GENERATOR_URL=https://new.fluapi.com/v1/images/generations
 IMAGE_GENERATOR_QUALITY=high

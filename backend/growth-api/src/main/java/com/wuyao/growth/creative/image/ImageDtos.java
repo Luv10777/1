@@ -16,14 +16,23 @@ public final class ImageDtos {
         @NotNull @Pattern(regexp = "POSTER|PRODUCT_SET") String workflow,
         @NotNull @Size(max = 2000) String brief,
         @NotNull @Size(max = 6) List<@Valid Reference> references,
-        @NotNull @Pattern(regexp = "1:1|3:4|4:3|9:16|16:9|2:3|3:2") String ratio,
+        @NotNull @Pattern(regexp = "1:1|3:4|4:3|9:16|16:9|2:3|3:2|3:1") String ratio,
         @Pattern(regexp = "1K|2K|4K") String quality,
         @Min(1) @Max(6) int count,
         @NotNull @Pattern(regexp = "TAOBAO|JD|PDD|XIAOHONGSHU|MEITUAN|TAOBAO_FLASH|DOUYIN_GROUP|DIANPING|WECHAT|DOUYIN|ELEME|OFFLINE|LOCAL") String platform,
         @NotNull @Pattern(regexp = "PRODUCT_MAIN|DETAIL|SCENE_SET|DISH|STORE|POSTER") String imageType,
         @NotNull @Size(max = 80) String purpose,
         @NotNull @Size(max = 80) String style,
-        @Size(max = 40) String templateId) {}
+        @Size(max = 40) String templateId,
+        // null on requests saved before models could be chosen; those run and bill as Image 2.5.
+        @Pattern(regexp = "IMAGE_2_5|IMAGE_2_6") String model) {
+        public Create(String requestKey, String workflow, String brief, List<Reference> references, String ratio,
+                      String quality, int count, String platform, String imageType, String purpose, String style,
+                      String templateId) {
+            this(requestKey, workflow, brief, references, ratio, quality, count, platform, imageType, purpose, style,
+                templateId, null);
+        }
+    }
     public record Revision(@NotBlank @Pattern(regexp = "[a-zA-Z0-9-]{8,80}") String requestKey,
                            @NotBlank @Size(max = 1000) String instruction,
                            @Pattern(regexp = "LAYOUT|SCENE|MESSAGE") String variation) {
@@ -41,7 +50,8 @@ public final class ImageDtos {
     public record View(Long id, Long parentId, String workflow, String brief, String quality,
                        String ratio, String status, String summary, String question, String error,
                        int completed, int count, List<ItemView> items, Instant createdAt, Long taskId,
-                       List<ReferenceView> references, com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet) {}
+                       List<ReferenceView> references, com.wuyao.growth.billing.BillingDtos.GenerationWallet billingWallet,
+                       String model) {}
     public record ReferenceView(Long assetId, String role, String name, String url) {}
     public record History(Long id, String workflow, String title, String brief, String quality, Instant createdAt,
                           String status, int completed, int count, String previewUrl, String previewThumbUrl,

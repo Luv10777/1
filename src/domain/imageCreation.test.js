@@ -22,6 +22,9 @@ test('quality resolves Flu standard 1K, 2K and 4K dimensions', () => {
   assert.throws(() => imageDimensions('4K', '3:4'))
   assert.deepEqual(imageDimensions('1K', '16:9'), { width: 1820, height: 1024 })
   assert.throws(() => imageDimensions('8K', '3:4'))
+  assert.deepEqual(imageDimensions('1K', '3:1'), { width: 3072, height: 1024 })
+  assert.deepEqual(imageDimensions('4K', '3:1'), { width: 3840, height: 1280 })
+  assert.throws(() => imageDimensions('2K', '3:1'), /不支持/)
   assert.throws(() => imageDimensions('4K', '0:1'))
 })
 test('upload rejects unrenderable or oversized reference files', () => {

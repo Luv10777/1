@@ -47,6 +47,7 @@ public class ImageRenderHandler implements TaskHandler {
      options.put("width",nativeSize.width());options.put("height",nativeSize.height());options.put("quality",c.getRequest().quality());
      options.put("seriesKey","creation-"+c.getId());
      options.put("workflow",c.getRequest().workflow());
+     options.put("model",config.generatorModel(c.getRequest().model()));
      if(!directUrl && item.getProviderJobId()!=null) options.put("jobId",item.getProviderJobId());
      else {
        var refs=new ArrayList<Map<String,Object>>();
@@ -85,7 +86,7 @@ public class ImageRenderHandler implements TaskHandler {
       if(item.getProviderJobId()==null && !service.reserveProviderSubmission(id,task)) return Map.of("status","NOT_RESUBMITTED");
      try {
      long providerStarted=System.nanoTime();
-     log.info("图片生成阶段开始: itemId={} model={} singleRequest=true",id,config.getGenerator().getModel());
+     log.info("图片生成阶段开始: itemId={} model={} singleRequest=true",id,options.get("model"));
      var response=gateway.invokeReal(new ProviderRequest(ModelAlias.IMAGE_PRIMARY,c.getTenantId(),
        finalPrompt,
        options,"image-item-"+id+"-"+item.getGeneration()));

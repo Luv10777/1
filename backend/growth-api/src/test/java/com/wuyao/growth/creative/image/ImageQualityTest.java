@@ -27,7 +27,7 @@ class ImageQualityTest {
    assertThat(ImageQuality.modelDimensions("2K", "2:3", p))
      .isEqualTo(new ImageDtos.Dimensions(2048,3072));
    for (String quality : List.of("1K", "2K", "4K")) {
-     for (String ratio : List.of("1:1", "3:4", "4:3", "9:16", "16:9", "2:3", "3:2")) {
+     for (String ratio : List.of("1:1", "3:4", "4:3", "9:16", "16:9", "2:3", "3:2", "3:1")) {
        try {
          var size=ImageQuality.modelDimensions(quality,ratio,p);
          assertThat(size.width()%16).as(quality+" "+ratio).isZero();
@@ -37,9 +37,12 @@ class ImageQualityTest {
          assertThat(Math.max(size.width(),size.height())).as(quality+" "+ratio)
            .isLessThanOrEqualTo(3840);
        } catch (RuntimeException ignored) {
-         // 4K only exposes the provider's native 16:9 and 9:16 tiers.
-         assertThat(quality).isEqualTo("4K");
-         assertThat(ratio).isNotIn("16:9", "9:16");
+         // 4K only exposes 16:9, 9:16 and the 3:1 banner; 3:1 has no 2K size.
+         if (ratio.equals("3:1")) assertThat(quality).isEqualTo("2K");
+         else {
+           assertThat(quality).isEqualTo("4K");
+           assertThat(ratio).isNotIn("16:9", "9:16");
+         }
        }
      }
    }
@@ -49,6 +52,13 @@ class ImageQualityTest {
    assertThat(ImageQuality.modelDimensions("4K","9:16",config())).isEqualTo(new ImageDtos.Dimensions(2160,3840));
    for(String ratio:List.of("1:1","3:4","4:3","2:3","3:2"))
      assertThatThrownBy(()->ImageQuality.modelDimensions("4K",ratio,config())).hasMessageContaining("该画质");
+ }
+ @Test void triptychBannerIsThreeToOneAt1KAnd4KOnly() {
+   var p=config();p.getGenerator().setModel("gpt-image-2.5");
+   assertThat(ImageQuality.modelDimensions("1K","3:1",p)).isEqualTo(new ImageDtos.Dimensions(3072,1024));
+   assertThat(ImageQuality.modelDimensions("4K","3:1",p)).isEqualTo(new ImageDtos.Dimensions(3840,1280));
+   assertThatThrownBy(()->ImageQuality.dimensions("2K","3:1")).hasMessageContaining("该画质");
+   assertThat(ImageQuality.supportsOutput("2K","3:1",p)).isFalse();
  }
  @Test void portraitPosterUsesTwoKDimensions() {
    assertThat(ImageQuality.modelDimensions("2K","3:4",config()))

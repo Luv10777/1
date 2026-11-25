@@ -1,5 +1,7 @@
 export const IMAGE_QUALITIES = ['1K', '2K', '4K']
-export const IMAGE_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2']
+export const IMAGE_RATIOS = ['1:1', '3:4', '4:3', '9:16', '16:9', '2:3', '3:2', '3:1']
+// Customer-facing names; the server maps each code to the upstream model and its price.
+export const IMAGE_MODELS = [{ code: 'IMAGE_2_5', label: 'Image 2.5' }, { code: 'IMAGE_2_6', label: 'Image 2.6' }]
 export const IMAGE_STATUS = {
   QUEUED: '等待处理', PLANNING: '正在理解需求与规划画面', GENERATING: '正在生成或接收图片',
   SAVING: '正在保存图片', SUCCEEDED: '已完成', PARTIAL: '部分完成',
@@ -20,7 +22,7 @@ export function imageDimensions(quality, ratio) {
   const sizes = {
     '1K': { '1:1': [1024, 1024], '3:2': [1536, 1024], '2:3': [1024, 1536] },
     '2K': { '1:1': [2048, 2048], '16:9': [2048, 1152], '9:16': [1152, 2048] },
-    '4K': { '16:9': [3840, 2160], '9:16': [2160, 3840] },
+    '4K': { '16:9': [3840, 2160], '9:16': [2160, 3840], '3:1': [3840, 1280] },
   }
   let size = sizes[quality]?.[ratio]
   if (!size && quality !== '4K') {
@@ -29,6 +31,8 @@ export function imageDimensions(quality, ratio) {
     const scale = base / (['3:4', '4:3'].includes(ratio) ? Math.max(x, y) : Math.min(x, y))
     size = [Math.round(x * scale), Math.round(y * scale)]
   }
+  // 3:1 at 2K would need a 6144 px long edge, beyond what image models accept.
+  if (size && Math.max(...size) > 3840) size = null
   if (!size) throw new Error('该画质不支持此比例')
   return { width: size[0], height: size[1] }
 }

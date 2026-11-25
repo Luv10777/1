@@ -1,7 +1,8 @@
 import { computed, reactive, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, downloadImage } from '../services/imageCreation'
-import { IMAGE_QUALITIES, imageDimensions, isImageActive, isImageSaving, validateImageFile, supportsImageSize } from '../domain/imageCreation'
+import { IMAGE_MODELS, IMAGE_QUALITIES, imageDimensions, isImageActive, isImageSaving, validateImageFile, supportsImageSize } from '../domain/imageCreation'
+import { TRIPTYCH_STYLE } from '../domain/posterStyles'
 import { readUser } from '../utils/tokenStore'
 import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -18,6 +19,7 @@ export function useImageCreation(workflow) {
   const imageType = ref(product.value ? 'PRODUCT_MAIN' : 'POSTER')
   const purpose = ref(product.value ? '美团 / 大众点评商品展示' : '')
   const style = ref('帮我搭配')
+  const model = ref(IMAGE_MODELS[0].code)
   const files = ref([])
   const busy = ref(false)
   const error = ref('')
@@ -52,12 +54,18 @@ export function useImageCreation(workflow) {
   const pendingKey = 'image-pending:' + (owner?.userId || owner?.id || 'session') + ':' + workflow
   const dimensions = computed(() => imageDimensions(quality.value, ratio.value))
   // 单价以服务端账单摘要为准；未读到时为 null，页面不显示具体数字。
-  const imageCredits = computed(() => billing.summary?.imageCredits ?? null)
+  const creditsOf = code => billing.summary?.imageModelCredits?.[code] ?? billing.summary?.imageCredits ?? null
+  const imageCredits = computed(() => creditsOf(model.value))
+  // 修改、换版、重做沿用原创作的模型，按原模型计价。
+  const revisionCredits = computed(() => creditsOf(current.value?.model || IMAGE_MODELS[0].code))
+  // 服务端只列出已配置的模型；还没读到能力时只给 Image 2.5。
+  const models = computed(() => capabilities.value?.models?.length ? capabilities.value.models : IMAGE_MODELS.slice(0, 1))
   // 灵感绘图默认 1 张；新手版对话页可以一次选 1–6 张，进阶版的灵感绘图不改张数。
   const estimatedCredits = computed(() => imageCredits.value == null ? null : Number(count.value) * imageCredits.value)
   const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
   const requiresLogin = computed(() => !auth.isAuthenticated)
   const supportsRatio = value => {
+    if (style.value === TRIPTYCH_STYLE && value !== '3:1') return false
     const ratios = capabilities.value?.qualityRatios
     if (!ratios) return true
     return Object.values(ratios).some(values => values?.includes(value))
@@ -235,7 +243,7 @@ export function useImageCreation(workflow) {
           references: submittedFiles.map(f => ({ assetId: f.assetId, role: f.role })),
           ratio: ratio.value, quality: quality.value, count: Number(count.value),
           platform: platform.value, imageType: imageType.value,
-          purpose: product.value ? purpose.value : '', style: style.value,
+          purpose: product.value ? purpose.value : '', style: style.value, model: model.value,
         } })
         if (!product.value) submittedFiles.forEach(file => { if (file.file) URL.revokeObjectURL(file.preview) })
       } catch (error) {
@@ -305,6 +313,7 @@ export function useImageCreation(workflow) {
     try {
       capabilities.value = await imageApi.capabilities()
       capabilityState.value = 'ready'
+      if (!models.value.some(option => option.code === model.value)) model.value = IMAGE_MODELS[0].code
       syncHighestQuality()
     } catch (e) {
       capabilityState.value = 'error'
@@ -328,6 +337,11 @@ export function useImageCreation(workflow) {
   })
   watch(() => route.query.creation, id => { if (id && String(current.value?.id) !== String(id)) load(id) })
   watch(ratio, syncHighestQuality)
+  // 三联图只做 3:1 横幅；换回其他风格时把比例还原成默认。
+  watch(style, (next, previous) => {
+    if (next === TRIPTYCH_STYLE) ratio.value = '3:1'
+    else if (previous === TRIPTYCH_STYLE && ratio.value === '3:1') ratio.value = product.value ? '1:1' : '3:4'
+  })
   watch(() => [auth.user?.id, auth.tenantId], () => { generationWallet.value = 'PERSONAL' })
   onBeforeUnmount(() => {
     alive = false; refreshSequence++; clearTimeout(pollTimer)
@@ -346,12 +360,12 @@ export function useImageCreation(workflow) {
     if (!locked.value && lastPrompt.value) brief.value = lastPrompt.value
   }
   return reactive({
-    product, brief, ratio, quality, count, platform, imageType, purpose, style, files, busy, error,
+    product, brief, ratio, quality, count, platform, imageType, purpose, style, model, models, files, busy, error,
     capabilities, capabilityState, capabilityError, current, thread, history, historyMore, historyOpen, revision, textEdit, editHeadline,
     editCaption, pending, lastPrompt, optimistic, optimisticBrief, dimensions, configured, active, saving, locked, workspaceTab, supportsRatio,
     refreshHistory, load, openCreation, renameCreation, addFiles, removeFile, generate, revise,
     retry, cancel, editText, saveText, download, regenerate, revisePoster, resetDraft, recallLastPrompt, canUseAsset,
     reportImageVisible, imageLoadFailed,
-    supportsQuality, loadCapabilities, billing, imageCredits, estimatedCredits, requiresLogin, generationWallet,
+    supportsQuality, loadCapabilities, billing, imageCredits, revisionCredits, estimatedCredits, requiresLogin, generationWallet,
   })
 }

@@ -127,6 +127,21 @@ class ImageModelHttpAdapterTest {
      assertThat(captured.get(5,TimeUnit.SECONDS)).contains("\"quality\":\"high\"").doesNotContain("response_format");
    }
   }
+ @Test void imageRequestUsesTheModelTheUserChose() throws Exception {
+   try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
+     var captured=pool.submit(()->respond(server,200,"{\"data\":[{\"b64_json\":\"aW1hZ2U=\"}]}"));
+     var p=openAiConfig(server);
+     p.getGenerator().setModel("gpt-image-2.5");p.getGenerator().setModel26("gpt-image-2.6-flare");
+     var base=imageRequest(List.of());
+     var options=new LinkedHashMap<String,Object>(base.options());options.put("model",p.generatorModel("IMAGE_2_6"));
+     var result=new ImageModelHttpAdapter(p,new ObjectMapper()).invoke(new ProviderRequest(ModelAlias.IMAGE_PRIMARY,1L,
+       base.prompt(),options,base.idempotencyKey()));
+     assertThat(captured.get(5,TimeUnit.SECONDS)).contains("\"model\":\"gpt-image-2.6-flare\"").doesNotContain("\"model\":\"gpt-image-2.5\"");
+     assertThat(result.output()).containsEntry("_model","gpt-image-2.6-flare");
+     assertThat(p.generatorModel(null)).isEqualTo("gpt-image-2.5");
+     assertThat(p.generatorModel("IMAGE_2_5")).isEqualTo("gpt-image-2.5");
+   }
+ }
  @Test void responseWithoutSingleImageLogsRedactedRelayError() throws Exception {
    try(var server=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"));var pool=Executors.newSingleThreadExecutor()) {
      String token="A".repeat(40);

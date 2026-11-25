@@ -393,7 +393,7 @@ onBeforeUnmount(() => window.removeEventListener("resize", fitPreview));
       <p v-if="dockMode === 'answer'" class="poster-dock-question">{{ studio.current.question }}</p>
       <div v-else class="poster-dock-options" role="group" aria-label="选择修改项">
         <label v-for="option in REVISION_OPTIONS" :key="option.type" :class="{ selected: editorOptions.includes(option.type) }"><input v-model="editorOptions" type="checkbox" :value="option.type" :disabled="studio.busy || !!studio.pending || !studio.configured" />{{ option.label }}</label>
-        <small>{{ studio.imageCredits != null ? `每张 ${studio.imageCredits} 烟火，` : '' }}成功交付后扣费</small>
+        <small>{{ studio.revisionCredits != null ? `每张 ${studio.revisionCredits} 烟火，` : '' }}成功交付后扣费</small>
       </div>
       <div v-if="dockMode === 'revise' && editorOptions.includes('TEXT')" class="poster-conversation-copy">
         <label><span>标题</span><input v-model="editorHeadline" maxlength="40" /></label>

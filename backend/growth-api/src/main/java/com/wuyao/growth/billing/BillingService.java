@@ -17,7 +17,12 @@ import java.util.UUID;
 
 @Service @RequiredArgsConstructor
 public class BillingService {
+    /** Image 2.5 (and every image created before models could be chosen). */
     public static final int IMAGE_CREDITS = 3;
+    public static final int IMAGE_2_6_CREDITS = 5;
+    /** Per-image price by the model code the image request selects. */
+    public static final java.util.Map<String,Integer> IMAGE_MODEL_CREDITS =
+        java.util.Map.of("IMAGE_2_5", IMAGE_CREDITS, "IMAGE_2_6", IMAGE_2_6_CREDITS);
     public static final int VIDEO_ANALYSIS_CREDITS = 1;
     public static final int VIDEO_PLAN_CREDITS = 1;
     public static final int IMAGE_INSPIRATION_CREDITS = 1;
@@ -54,7 +59,8 @@ public class BillingService {
             a==null?0:a.available(),a==null?0:a.getGiftAvailable(),a==null?0:a.getPurchasedAvailable(),
             a==null?0:a.getHeld(),a!=null&&a.active(Instant.now()),a==null?null:a.getMemberUntil(),
             a==null?null:a.getPlanSnapshot(),canManage,operator,payment(),config.getPaymentMethod(),teamWallet.summary(viewer),
-            teamWallet.isTeamAccount(TenantContext.require())?BillingDtos.GenerationWallet.TEAM:BillingDtos.GenerationWallet.PERSONAL);
+            teamWallet.isTeamAccount(TenantContext.require())?BillingDtos.GenerationWallet.TEAM:BillingDtos.GenerationWallet.PERSONAL,
+            IMAGE_MODEL_CREDITS);
     }
     @Transactional(readOnly=true)
     public List<BillingDtos.PlanSnapshot> plans() { return store.plans(false).stream().map(BillingPlan::snapshot).toList(); }
