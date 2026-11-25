@@ -146,6 +146,36 @@ class LibraryIntegrationTest {
     }
 
     @Test
+    void severalWorksAreMovedIntoAFolderAtOnceAndAnUnknownWorkStopsTheWholeBatch() throws Exception {
+        long first = api(post("/api/library/works"), tokenA, Map.of("kind", "IMAGE", "sourceId",
+                image(tenantA, userA, "SUCCEEDED", "t1/generated/7/1/a.png"))).path("workId").asLong();
+        long second = api(post("/api/library/works"), tokenA, Map.of("kind", "VIDEO", "sourceId",
+                video(tenantA, userA, "SUCCEEDED", "t1/generated-video/b.mp4"))).path("workId").asLong();
+        long others = api(post("/api/library/works"), tokenColleague, Map.of("kind", "IMAGE", "sourceId",
+                image(tenantA, colleagueA, "SUCCEEDED", "t1/generated/8/1/c.png"))).path("workId").asLong();
+        long folder = api(post("/api/library/folders"), tokenA, Map.of("name", "门店活动")).path("id").asLong();
+
+        // 夹了一件同事的作品，整批都不动。
+        refused(put("/api/library/works/folder"), tokenA, Map.of("workIds", java.util.List.of(first, others), "folderId", folder), 404, 1404);
+        assert0(folder);
+        refused(put("/api/library/works/folder"), tokenA, Map.of("workIds", java.util.List.of(), "folderId", folder), 400, 1400);
+
+        assertThat(api(put("/api/library/works/folder"), tokenA, Map.of("workIds", java.util.List.of(first, second, first), "folderId", folder)).asInt())
+                .isEqualTo(2);
+        JsonNode folders = api(get("/api/library/folders"), tokenA, null);
+        assertThat(folders.path("folders").get(0).path("workCount").asLong()).isEqualTo(2);
+        assertThat(folders.path("rootCount").asLong()).isZero();
+
+        // 移回未归类
+        api(put("/api/library/works/folder"), tokenA, body("workIds", java.util.List.of(second), "folderId", null));
+        assertThat(api(get("/api/library/folders"), tokenA, null).path("rootCount").asLong()).isEqualTo(1);
+    }
+
+    private void assert0(long folder) throws Exception {
+        assertThat(api(get("/api/library/works?folder=" + folder), tokenA, null).path("total").asLong()).isZero();
+    }
+
+    @Test
     void theMigrationPutsEveryEarlierFinishedWorkIntoItsCreatorsRootFolder() throws Exception {
         long image = image(tenantA, userA, "SUCCEEDED", "t1/generated/2/1/image.png");
         image(tenantA, userA, "FAILED", null);

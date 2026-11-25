@@ -54,6 +54,12 @@ public class LibraryController {
         return ApiResponse.ok(service.save(req, me.userId()));
     }
 
+    @PutMapping("/works/folder")
+    public ApiResponse<Integer> moveMany(@Valid @RequestBody LibraryDtos.BatchMoveRequest req,
+                                         @AuthenticationPrincipal AuthPrincipal me) {
+        return ApiResponse.ok(service.moveMany(req.workIds(), req.folderId(), me.userId()));
+    }
+
     @PutMapping("/works/{id}/folder")
     public ApiResponse<Void> move(@PathVariable Long id, @RequestBody LibraryDtos.MoveRequest req,
                                   @AuthenticationPrincipal AuthPrincipal me) {

@@ -3,6 +3,7 @@ package com.wuyao.growth.library;
 import com.wuyao.growth.creative.image.ImageDtos;
 import com.wuyao.growth.video.VideoDtos;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -30,6 +31,11 @@ public final class LibraryDtos {
     }
 
     public record MoveRequest(Long folderId) {
+    }
+
+    /** 批量移动：folderId 为空表示移回未归类。 */
+    public record BatchMoveRequest(@NotEmpty(message = "请选择要移动的作品") @Size(max = 100, message = "一次最多移动 100 件作品") List<@NotNull Long> workIds,
+                                   Long folderId) {
     }
 
     /** image 和 video 只有一个有值，与原来的作品接口字段一致。 */

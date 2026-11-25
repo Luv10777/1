@@ -38,7 +38,7 @@ Java 21 + Spring Boot 3.5.16 的模块化单体。业务模块共用认证、租
 2026-11-25 作品库改为手动保存并支持文件夹（`library` 模块，迁移 V89）：生成完的图片和视频不再自动进作品库，生成页上点「保存到作品库」选位置（未归类或某个文件夹）；
 作品库按账号分，文件夹只有一层、同一账号内不重名。`library_works` 只记位置（`IMAGE` 指图片 ID，`VIDEO` 指视频 ID），移出作品库、删除文件夹（里面的作品一起移出）都不动生成记录和文件。
 V89 把上线前已完成的作品登记到各自创建人的未归类里。接口：`GET/POST /api/library/folders`、`PUT/DELETE /api/library/folders/{id}`、
-`GET /api/library/works?folder=all|root|{id}&kind=`、`POST /api/library/works`（重复保存等于移动）、`PUT /api/library/works/{id}/folder`、`DELETE /api/library/works/{id}`、`GET /api/library/saved?kind=&sourceIds=`。
+`GET /api/library/works?folder=all|root|{id}&kind=`、`POST /api/library/works`（重复保存等于移动）、`PUT /api/library/works/{id}/folder`、`PUT /api/library/works/folder`（批量移动，一次最多 100 件，有一件不在作品库里整批不动）、`DELETE /api/library/works/{id}`、`GET /api/library/saved?kind=&sourceIds=`。
 文案创作「从作品库选」只列已保存的图片。
 
 任务中心和后台烟火日志统一显示模型名：图片为「一方志Image」，视频反推为「一方志反推」，

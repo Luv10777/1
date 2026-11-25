@@ -7,7 +7,7 @@ import { libraryApi, markLibraryRemoved, markLibrarySaved, syncLibraryFolder } f
 import { downloadMedia } from '../services/mediaDownload'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import LibraryFolderDialog from '../components/LibraryFolderDialog.vue'
-import { ArrowUpRight, Check, Clock3, Download, Edit3, Folder, FolderInput, FolderPlus, Image as ImageIcon, LayoutGrid, List, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-vue-next'
+import { ArrowUpRight, Check, SquareCheck, Clock3, Download, Edit3, Folder, FolderInput, FolderPlus, Image as ImageIcon, LayoutGrid, List, ListPlus, Pencil, Play, Plus, Search, Square, Trash2, X } from 'lucide-vue-next'
 
 const router = useRouter()
 const filters = [
@@ -47,12 +47,20 @@ const moveError = ref('')
 const removingWork = ref(null)
 const deletingFolder = ref(null)
 const actionError = ref('')
+// 批量整理：选中若干作品一起移动。pickTarget 有值时是从某个文件夹点「添加作品」进来的，选完直接放进它。
+const selecting = ref(false)
+const selectedIds = ref(new Set())
+const pickTarget = ref(null)
+const batchMoving = ref(false)
+const notice = ref('')
 
 const filteredWorks = computed(() => {
   const query = searchQuery.value.trim().toLocaleLowerCase()
   return works.value.filter(work => !query || `${work.title} ${work.tags.join(' ')}`.toLocaleLowerCase().includes(query))
 })
 const hasMoreWorks = computed(() => worksPage.value + 1 < totalPages.value)
+const selectedWorks = computed(() => works.value.filter(work => selectedIds.value.has(work.id)))
+const allVisibleSelected = computed(() => filteredWorks.value.length > 0 && filteredWorks.value.every(work => selectedIds.value.has(work.id)))
 
 function formatDate(value) {
   return new Date(value).toLocaleDateString('zh-CN')
@@ -154,8 +162,105 @@ async function loadFolders() {
 
 function selectFolder(key) {
   if (activeFolder.value === key) return
+  exitSelecting()
+  notice.value = ''
   activeFolder.value = key
   loadWorks(0)
+}
+
+function startSelecting(target = null) {
+  notice.value = ''
+  actionError.value = ''
+  selectedIds.value = new Set()
+  pickTarget.value = target
+  selecting.value = true
+}
+
+function exitSelecting() {
+  selecting.value = false
+  pickTarget.value = null
+  selectedIds.value = new Set()
+}
+
+/** 从文件夹点「添加作品」：去未归类里挑，选完放进这个文件夹。 */
+function pickIntoFolder(folder) {
+  selectFolder('root')
+  startSelecting(folder)
+}
+
+function toggleSelected(work) {
+  const next = new Set(selectedIds.value)
+  if (next.has(work.id)) next.delete(work.id)
+  else next.add(work.id)
+  selectedIds.value = next
+}
+
+function toggleAllVisible() {
+  const next = new Set(selectedIds.value)
+  const select = !allVisibleSelected.value
+  for (const work of filteredWorks.value) select ? next.add(work.id) : next.delete(work.id)
+  selectedIds.value = next
+}
+
+function onCardKeydown(event, work) {
+  // 只处理卡片本身的按键，卡片里按钮上的回车不打开详情。
+  if (event.target !== event.currentTarget) return
+  if (event.key === 'Enter') openCard(work)
+  else if (event.key === ' ' && selecting.value) { event.preventDefault(); toggleSelected(work) }
+}
+
+function openCard(work) {
+  if (selecting.value) toggleSelected(work)
+  else selectedWork.value = work
+}
+
+function startBatchMove() {
+  if (!selectedWorks.value.length) return
+  if (pickTarget.value) { moveSelected(pickTarget.value.id); return }
+  moveError.value = ''
+  batchMoving.value = true
+}
+
+/** 一次最多 100 件，多了分批发；后端整批要么都动、要么都不动。 */
+async function moveSelected(folderId) {
+  const chosen = selectedWorks.value
+  if (!chosen.length || moveBusy.value) return
+  moveBusy.value = true
+  moveError.value = ''
+  actionError.value = ''
+  let moved = 0, failure = ''
+  try {
+    for (let start = 0; start < chosen.length; start += 100) {
+      const batch = chosen.slice(start, start + 100)
+      await libraryApi.moveMany(batch.map(work => work.libraryId), folderId)
+      for (const work of batch) work.folderId = folderId
+      moved += batch.length
+    }
+  } catch (error) {
+    failure = error.message || '移动失败，请重试'
+    if (batchMoving.value && !moved) moveError.value = failure
+    else actionError.value = failure
+  }
+  try {
+    await loadFolders()
+    const name = folderName(folderId)
+    for (const work of chosen.slice(0, moved)) markLibrarySaved(work.kind, work.sourceId, { folderId, folderName: name })
+    if (!moved) return
+    const target = pickTarget.value
+    batchMoving.value = false
+    exitSelecting()
+    if (target) {
+      selectFolder(target.id)
+    } else if (activeFolder.value !== 'all') {
+      const here = activeFolder.value === 'root' ? null : activeFolder.value
+      works.value = works.value.filter(work => work.folderId === here)
+    }
+    const where = folderId == null ? '移回未归类' : `放进「${name}」`
+    const rest = failure ? `，其余 ${chosen.length - moved} 件没有移动` : ''
+    notice.value = `已把 ${moved} 件作品${where}${rest}`
+  } finally {
+    moveBusy.value = false
+  }
 }
 
 function selectFilter(key) {
@@ -289,12 +394,13 @@ function closeDetails() {
 
 function handleModalKeydown(event) {
   // 上面还叠着移动、确认这些弹窗时，Esc 先交给它们。
-  if (event.key !== 'Escape' || movingWork.value || removingWork.value || deletingFolder.value) return
+  if (event.key !== 'Escape' || movingWork.value || batchMoving.value || removingWork.value || deletingFolder.value) return
   if (nameDialog.value) {
     if (!nameBusy.value) nameDialog.value = null
     return
   }
-  closeDetails()
+  if (selectedWork.value) closeDetails()
+  else if (selecting.value) exitSelecting()
 }
 
 onMounted(() => {
@@ -359,31 +465,41 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 
     <div class="library-meta">
       <span>{{ currentFolder ? currentFolder.name : activeFolder === 'root' ? '未归类' : '全部作品' }} · 已载入 {{ filteredWorks.length }} 件作品</span>
-      <span v-if="currentFolder" class="folder-actions">
-        <button type="button" @click="openNameDialog(currentFolder)"><Pencil :size="13" aria-hidden="true" />重命名</button>
-        <button type="button" class="is-danger" @click="deletingFolder = currentFolder"><Trash2 :size="13" aria-hidden="true" />删除文件夹</button>
+      <span v-if="!selecting" class="folder-actions">
+        <button v-if="currentFolder" type="button" @click="pickIntoFolder(currentFolder)"><ListPlus :size="13" aria-hidden="true" />添加作品</button>
+        <button v-if="works.length" type="button" @click="startSelecting()"><SquareCheck :size="13" aria-hidden="true" />批量整理</button>
+        <template v-if="currentFolder">
+          <button type="button" @click="openNameDialog(currentFolder)"><Pencil :size="13" aria-hidden="true" />重命名</button>
+          <button type="button" class="is-danger" @click="deletingFolder = currentFolder"><Trash2 :size="13" aria-hidden="true" />删除文件夹</button>
+        </template>
       </span>
     </div>
+    <p v-if="selecting && pickTarget" class="pick-hint">从未归类里勾选作品，点下面的「放进「{{ pickTarget.name }}」」。</p>
+    <p v-if="notice" class="works-notice" role="status">{{ notice }}</p>
     <p v-if="actionError" class="works-error" role="alert">{{ actionError }}</p>
     <p v-if="worksError" class="works-error" role="alert">
       {{ worksError }} <button type="button" @click="loadWorks(worksPage)">重试</button>
     </p>
     <p v-if="downloadError && !selectedWork" class="works-error" role="alert">{{ downloadError.message }}</p>
 
-    <section class="works-grid" :class="{ 'list-layout': layout === 'list' }" aria-live="polite">
+    <section class="works-grid" :class="{ 'list-layout': layout === 'list', 'is-selecting': selecting }" aria-live="polite">
       <article
         v-for="work in filteredWorks"
         :key="work.id"
         class="work-card"
+        :class="{ 'is-selected': selecting && selectedIds.has(work.id) }"
         tabindex="0"
-        @click="selectedWork = work"
-        @keydown.enter.self="selectedWork = work"
+        :role="selecting ? 'checkbox' : undefined"
+        :aria-checked="selecting ? selectedIds.has(work.id) : undefined"
+        @click="openCard(work)"
+        @keydown="onCardKeydown($event, work)"
       >
         <div class="work-thumb">
+          <span v-if="selecting" class="select-mark" aria-hidden="true"><SquareCheck v-if="selectedIds.has(work.id)" :size="18" stroke-width="2" /><Square v-else :size="18" stroke-width="1.8" /></span>
           <img v-if="work.type === 'image'" class="work-media" :src="stableUrl(work.thumb)" :alt="work.title" loading="lazy" decoding="async" @error="work.thumb = work.url" />
           <video v-else class="work-media" :src="`${stableUrl(work.url)}#t=0.1`" :aria-label="work.title" muted playsinline preload="metadata" />
           <span v-if="work.type === 'video'" class="video-play-icon" aria-hidden="true"><Play :size="20" fill="currentColor" /></span>
-          <div class="thumb-overlay">
+          <div v-if="!selecting" class="thumb-overlay">
             <button class="download-button" type="button" :aria-label="downloadingWorks.has(work.id) ? '正在下载' : `下载${work.typeLabel}`" :title="`下载${work.typeLabel}`" :disabled="downloadingWorks.has(work.id)" :aria-busy="downloadingWorks.has(work.id)" @click.stop="downloadWork(work)">
               <Download :size="17" stroke-width="1.8" />
             </button>
@@ -399,7 +515,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
         <div class="work-body">
           <div class="work-title-row">
             <h2>{{ work.title }}</h2>
-            <button class="more-button" type="button" aria-label="查看详情" @click.stop="selectedWork = work"><ArrowUpRight :size="16" stroke-width="1.7" /></button>
+            <button v-if="!selecting" class="more-button" type="button" aria-label="查看详情" @click.stop="selectedWork = work"><ArrowUpRight :size="16" stroke-width="1.7" /></button>
           </div>
           <div class="work-date"><Clock3 :size="13" stroke-width="1.8" /> {{ formatDate(work.createdAt) }}<template v-if="activeFolder === 'all' && folderName(work.folderId)"> · <Folder :size="12" stroke-width="1.8" aria-hidden="true" />{{ folderName(work.folderId) }}</template></div>
           <div class="work-tags"><span v-for="tag in work.tags" :key="tag">{{ tag }}</span></div>
@@ -409,13 +525,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 
     <div v-if="!worksLoading && !worksError && !filteredWorks.length" class="empty-state">
       <ImageIcon :size="22" stroke-width="1.5" />
-      <strong>{{ works.length ? '没有找到匹配的作品' : currentFolder ? '这个文件夹还是空的' : '暂无作品' }}</strong>
-      <p v-if="!works.length">生成的图片和视频点「保存到作品库」后会出现在这里。</p>
+      <strong>{{ works.length ? '没有找到匹配的作品' : currentFolder ? '这个文件夹还是空的' : selecting && pickTarget ? '未归类里没有作品了' : '暂无作品' }}</strong>
+      <p v-if="!works.length && currentFolder">可以把作品库里已有的作品放进来。</p>
+      <p v-else-if="!works.length">生成的图片和视频点「保存到作品库」后会出现在这里。</p>
+      <button v-if="!works.length && currentFolder && rootCount" type="button" class="empty-action" @click="pickIntoFolder(currentFolder)"><ListPlus :size="14" aria-hidden="true" />从未归类里挑选作品</button>
     </div>
     <p v-if="worksLoading && !works.length" class="loading-state">正在读取作品…</p>
     <button v-if="hasMoreWorks" class="works-load-more" type="button" :disabled="worksLoading" @click="loadWorks(worksPage + 1)">
       {{ worksLoading ? '正在读取…' : '加载更多' }}
     </button>
+
+    <div v-if="selecting" class="batch-bar" role="toolbar" aria-label="批量整理">
+      <span class="batch-count">已选 {{ selectedWorks.length }} 件</span>
+      <button type="button" :disabled="!filteredWorks.length" @click="toggleAllVisible">{{ allVisibleSelected ? '取消全选' : `全选已载入（${filteredWorks.length}）` }}</button>
+      <span class="batch-spacer" />
+      <button type="button" @click="exitSelecting">取消</button>
+      <button type="button" class="is-primary" :disabled="!selectedWorks.length || moveBusy" :aria-busy="moveBusy" @click="startBatchMove">
+        <FolderInput :size="14" aria-hidden="true" />{{ moveBusy ? '正在移动…' : pickTarget ? `放进「${pickTarget.name}」` : '移动到…' }}
+      </button>
+    </div>
 
     <!-- .works-library 的 view-transition-name 会形成层叠上下文，弹窗留在里面会被顶栏和侧边栏压住。 -->
     <Teleport to="body">
@@ -461,6 +589,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
     <LibraryFolderDialog
       :open="!!movingWork" title="移动到" confirm-text="移到这里" :current-folder-id="movingWork?.folderId ?? null"
       :busy="moveBusy" :error="moveError" @confirm="moveWork" @cancel="movingWork = null" @folders-changed="loadFolders"
+    />
+    <LibraryFolderDialog
+      :open="batchMoving" :title="`把 ${selectedWorks.length} 件作品移到`" confirm-text="移到这里"
+      :current-folder-id="typeof activeFolder === 'number' ? activeFolder : null"
+      :busy="moveBusy" :error="moveError" @confirm="moveSelected" @cancel="batchMoving = false" @folders-changed="loadFolders"
     />
     <ConfirmDialog
       :open="!!removingWork" title="移出作品库" danger confirm-text="移出"
@@ -564,6 +697,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .empty-state { display: grid; justify-items: center; gap: 9px; padding: 72px 16px; color: var(--muted); }
 .empty-state strong { color: var(--ink); font-size: 13px; font-weight: 500; }
 .empty-state p { margin: 0; font-size: 12px; }
+.empty-action { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; min-height: 32px; padding: 0 12px; border: 1px solid var(--color-accent); border-radius: 4px; color: var(--color-accent-text); background: var(--surface); font-size: 12px; cursor: pointer; }
+.pick-hint, .works-notice { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+.works-notice { color: var(--color-accent-text); }
+.is-selecting .work-card:hover { transform: none; }
+.work-card.is-selected { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
+.select-mark { position: absolute; top: 9px; left: 9px; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 4px; color: var(--ink); background: var(--surface); }
+.is-selected .select-mark { color: var(--color-accent-text); }
+.batch-bar { position: sticky; bottom: 12px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); box-shadow: var(--shadow-paper-elevated); }
+.batch-count { color: var(--ink); font: 600 12px var(--font-mono); }
+.batch-spacer { flex: 1; }
+.batch-bar button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink); background: var(--surface); font-size: 12px; cursor: pointer; }
+.batch-bar button.is-primary { border-color: var(--color-accent); color: var(--color-on-accent); background: var(--color-accent); }
+.batch-bar button:disabled { opacity: .55; cursor: default; }
 .loading-state { padding: 28px 0; color: var(--muted); font-size: 12px; text-align: center; }
 .works-error { margin: 0 0 12px; color: var(--color-error); font-size: 12px; }
 .works-error button { padding: 0; border: 0; color: inherit; background: transparent; text-decoration: underline; cursor: pointer; }

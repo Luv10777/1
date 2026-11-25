@@ -16,6 +16,8 @@ export const libraryApi = {
     get('/api/library/works', { folder, ...(kind ? { kind } : {}), page, size }),
   save: (kind, sourceId, folderId = null) => post('/api/library/works', { kind, sourceId, folderId }),
   move: (workId, folderId) => put(`/api/library/works/${workId}/folder`, { folderId }),
+  /** 批量移动，一次最多 100 件；有一件不在作品库里就整批不动。folderId 为空表示移回未归类。 */
+  moveMany: (workIds, folderId) => put('/api/library/works/folder', { workIds, folderId }),
   remove: workId => del(`/api/library/works/${workId}`),
   saved: (kind, sourceIds) => get('/api/library/saved', { kind, sourceIds: sourceIds.join(',') }),
 }

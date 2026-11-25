@@ -304,3 +304,149 @@ test('works are filed into folders: create, open, move, remove, rename and delet
     }
   }
 })
+
+/** 挂载作品库页面，后端是内存里的一份作品库：folders 和 library 直接读写。 */
+async function mountLibrary({ folders, library }) {
+  const saved = Object.fromEntries(['window', 'document', 'fetch', 'Document', 'ShadowRoot'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  const body = { children: [], appendChild() {} }
+  globalThis.Document = class {}
+  globalThis.ShadowRoot = class {}
+  globalThis.window = { addEventListener() {}, removeEventListener() {} }
+  globalThis.document = { body, createElement: () => ({ click() {}, remove() {} }) }
+  const calls = []
+  const response = data => ({ ok: true, json: async () => ({ code: 200, data }) })
+  const count = id => library.filter(work => work.folderId === id).length
+  globalThis.fetch = async (url, options = {}) => {
+    const method = options.method || 'GET'
+    const path = url.split('?')[0]
+    const params = new URLSearchParams(url.split('?')[1] || '')
+    const data = options.body ? JSON.parse(options.body) : null
+    calls.push({ method, path, data })
+    if (method === 'GET' && path === '/api/library/folders') {
+      return response({ folders: folders.map(folder => ({ ...folder, workCount: count(folder.id) })), rootCount: count(null) })
+    }
+    if (method === 'GET' && path === '/api/library/works') {
+      const folder = params.get('folder')
+      return response({ items: library.filter(work => folder === 'all' || (folder === 'root' ? work.folderId === null : work.folderId === Number(folder))), totalPages: 1 })
+    }
+    if (method === 'PUT' && path === '/api/library/works/folder') {
+      for (const id of data.workIds) library.find(work => work.id === id).folderId = data.folderId
+      return response(data.workIds.length)
+    }
+    throw new Error(`unexpected request ${method} ${url}`)
+  }
+  const vite = await createServer({ configFile: false, optimizeDeps: { noDiscovery: true, entries: [] },
+    server: { middlewareMode: true, hmr: false }, appType: 'custom',
+    plugins: [{ name: 'works-batch-interaction', load(id) {
+      if (id.endsWith('.vue')) return compileScript(parse(readFileSync(id, 'utf8'), { filename: id }).descriptor,
+        { id: `works-batch-${id.split('/').pop()}`, inlineTemplate: true }).content
+    } }],
+  })
+  const { auth } = await vite.ssrLoadModule('/src/stores/auth.js')
+  auth.state.user = { id: 1, tenantId: 7 }
+  auth.state.token = { accessToken: 'test-only' }
+  const { default: Works } = await vite.ssrLoadModule('/src/views/WorksView.vue')
+  const renderer = createRenderer({
+    createElement: tag => ({ tag, props: {}, children: [], addEventListener() {}, removeEventListener() {}, focus() {}, getRootNode() { return { activeElement: null } } }),
+    createText: text => ({ text, children: [] }), createComment: text => ({ text, children: [] }),
+    setText: (node, text) => { node.text = text }, setElementText: (node, text) => { node.text = text; node.children = [] },
+    patchProp: (node, key, previous, value) => { node.props[key] = value },
+    insert(node, parent, anchor) {
+      if (node.parent) node.parent.children.splice(node.parent.children.indexOf(node), 1)
+      const index = anchor ? parent.children.indexOf(anchor) : -1
+      parent.children.splice(index < 0 ? parent.children.length : index, 0, node); node.parent = parent
+    },
+    remove(node) { if (node.parent) node.parent.children.splice(node.parent.children.indexOf(node), 1) },
+    parentNode: node => node.parent, nextSibling: node => node.parent?.children[node.parent.children.indexOf(node) + 1],
+    querySelector: () => body,
+    insertStaticContent(text, parent, anchor) {
+      const node = { text, children: [], parent }
+      const index = anchor ? parent.children.indexOf(anchor) : -1
+      parent.children.splice(index < 0 ? parent.children.length : index, 0, node)
+      return [node, node]
+    },
+  })
+  const root = { children: [] }
+  const app = renderer.createApp(Works)
+  app.provide(routerKey, { push() {} })
+  const nodes = function* (node) { yield node; for (const child of node.children) yield* nodes(child) }
+  const text = node => [node.text || '', ...node.children.map(text)].join('')
+  const settle = async () => { for (let i = 0; i < 4; i++) { await new Promise(resolve => setImmediate(resolve)); await nextTick() } }
+  const ui = {
+    root, body, calls, text,
+    all: () => [...nodes(root), ...nodes(body)],
+    within: node => [...nodes(node)],
+    button: (label, within) => [...(within ? nodes(within) : ui.all())]
+      .find(node => node.tag === 'button' && (node.props['aria-label'] === label || text(node).includes(label))),
+    click: async node => { assert.ok(node, 'element exists'); await node.props.onClick({ stopPropagation() {}, preventDefault() {} }); await settle() },
+    cards: () => [...nodes(root)].filter(node => node.tag === 'article'),
+    card: title => ui.cards().find(card => text(card).includes(title)),
+    folderBar: () => [...nodes(root)].find(node => node.tag === 'nav'),
+    batchBar: () => [...nodes(root)].find(node => node.props?.role === 'toolbar'),
+    settle,
+    async close() {
+      app.unmount(); await vite.close()
+      for (const [key, descriptor] of Object.entries(saved)) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+        else delete globalThis[key]
+      }
+    },
+  }
+  app.mount(root)
+  await settle()
+  return ui
+}
+
+test('existing works are moved into a folder in one go, either picked from the folder or selected anywhere', async () => {
+  const work = (id, title, folderId = null) => ({ id, kind: 'IMAGE', sourceId: id, folderId,
+    image: { id, creationId: id, title, url: `https://bucket.test/${id}.png`, createdAt: `2026-11-${10 + id}T08:00:00Z` } })
+  const folders = [{ id: 1, name: '七月海报' }, { id: 2, name: '门店活动' }]
+  const library = [work(1, '夏日海报'), work(2, '会员日'), work(3, '新品上市'), work(4, '开业', 2)]
+  const ui = await mountLibrary({ folders, library })
+  try {
+    // 空文件夹里直接去未归类挑作品。
+    await ui.click(ui.button('七月海报', ui.folderBar()))
+    assert.equal(ui.cards().length, 0)
+    await ui.click(ui.button('从未归类里挑选作品'))
+    assert.equal(ui.cards().length, 3, 'only unfiled works are offered')
+    assert.match(ui.text(ui.root), /从未归类里勾选作品/)
+    const pick = ui.button('放进「七月海报」', ui.batchBar())
+    assert.equal(pick.props.disabled, true, 'nothing selected yet')
+    // 选择模式下点卡片是勾选，不打开详情。
+    await ui.click(ui.card('夏日海报'))
+    await ui.click(ui.card('会员日'))
+    await ui.click(ui.card('会员日'))
+    await ui.click(ui.card('新品上市'))
+    assert.equal(ui.button('关闭详情'), undefined)
+    assert.match(ui.text(ui.batchBar()), /已选 2 件/)
+    assert.equal(ui.card('夏日海报').props['aria-checked'], true)
+    await ui.click(ui.button('放进「七月海报」', ui.batchBar()))
+    assert.deepEqual(ui.calls.filter(call => call.method === 'PUT').map(call => call.data), [{ workIds: [1, 3], folderId: 1 }])
+    assert.deepEqual(library.map(item => item.folderId), [1, null, 1, 2])
+    // 放完回到这个文件夹，退出选择模式。
+    assert.equal(ui.batchBar(), undefined)
+    assert.deepEqual(ui.cards().map(card => ui.text(card).match(/夏日海报|新品上市/)?.[0]), ['夏日海报', '新品上市'])
+    assert.match(ui.text(ui.root), /已把 2 件作品放进「七月海报」/)
+    assert.match(ui.text(ui.folderBar()), /七月海报2/)
+    assert.match(ui.text(ui.folderBar()), /未归类1/)
+
+    // 在全部作品里批量整理：全选后移到另一个文件夹。
+    await ui.click(ui.button('全部作品', ui.folderBar()))
+    await ui.click(ui.button('批量整理'))
+    await ui.click(ui.button('全选已载入（4）', ui.batchBar()))
+    assert.match(ui.text(ui.batchBar()), /已选 4 件/)
+    await ui.click(ui.card('开业'))
+    await ui.click(ui.button('移动到…', ui.batchBar()))
+    const dialog = ui.all().find(node => node.props?.role === 'dialog' && node.props['aria-label'] === '把 3 件作品移到')
+    assert.ok(dialog)
+    await ui.click(ui.within(dialog).find(node => node.props?.role === 'radio' && ui.text(node).includes('门店活动')))
+    await ui.click(ui.button('移到这里', dialog))
+    assert.deepEqual(library.map(item => item.folderId), [2, 2, 2, 2])
+    assert.equal(ui.cards().length, 4, 'everything stays listed under all works')
+    assert.match(ui.text(ui.card('会员日')), /门店活动/)
+    assert.match(ui.text(ui.folderBar()), /门店活动4/)
+    assert.match(ui.text(ui.folderBar()), /七月海报0/)
+  } finally {
+    await ui.close()
+  }
+})

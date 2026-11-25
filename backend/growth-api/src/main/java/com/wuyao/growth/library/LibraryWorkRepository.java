@@ -26,6 +26,8 @@ public interface LibraryWorkRepository extends JpaRepository<LibraryWork, Long> 
 
     Optional<LibraryWork> findByIdAndOwnerId(Long id, Long ownerId);
 
+    List<LibraryWork> findByOwnerIdAndIdIn(Long ownerId, Collection<Long> ids);
+
     List<LibraryWork> findByOwnerIdAndKindAndSourceIdIn(Long ownerId, String kind, Collection<Long> sourceIds);
 
     @Query("select w.folderId, count(w) from LibraryWork w where w.ownerId = :ownerId group by w.folderId")

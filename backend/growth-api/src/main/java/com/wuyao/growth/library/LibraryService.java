@@ -134,6 +134,18 @@ public class LibraryService {
         work.setFolderId(folderId);
     }
 
+    /** 批量移动。只要有一件不在这个账号的作品库里，整批都不动。返回移动的件数。 */
+    @Transactional
+    public int moveMany(List<Long> workIds, Long folderId, Long userId) {
+        lock(userId);
+        var ids = Set.copyOf(workIds);
+        if (folderId != null) folder(folderId, userId);
+        var rows = works.findByOwnerIdAndIdIn(userId, ids);
+        if (rows.size() != ids.size()) throw BizException.of(ErrorCode.NOT_FOUND, "有作品已不在作品库里，请刷新后重试");
+        rows.forEach(w -> w.setFolderId(folderId));
+        return rows.size();
+    }
+
     @Transactional
     public void remove(Long workId, Long userId) {
         lock(userId);
