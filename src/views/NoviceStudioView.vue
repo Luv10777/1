@@ -707,7 +707,7 @@ function videoTags(item) {
         <header><h2>风格</h2><small>不选就是「帮我搭配」，按画面需求自动匹配</small></header>
         <div class="ns-tiles is-styles">
           <button v-for="style in styleTiles" :key="style.name" type="button" class="ns-tile" :class="{ selected: studio.style === style.name }" :aria-pressed="studio.style === style.name" :title="style.fit" :disabled="studio.locked" @click="studio.style = style.name">
-            <img :src="style.image" alt="" :class="{ mark: style.mark }" loading="lazy" /><span>{{ style.name }}</span>
+            <img v-if="style.image" :src="style.image" alt="" :class="{ mark: style.mark }" loading="lazy" /><span v-else class="ns-tile-blank" aria-hidden="true"></span><span>{{ style.name }}</span>
           </button>
           <button type="button" class="ns-tile is-seasonal" :class="{ selected: studio.style === seasonalStyle }" :aria-pressed="studio.style === seasonalStyle" :disabled="studio.locked" @click="studio.style = seasonalStyle">
             <span class="ns-seasonal-art"><small>应时</small><strong>{{ moment.name }}</strong><small>{{ moment.days ? `${moment.days} 天后` : '就是今天' }}</small></span><span>应时 · {{ moment.name }}</span>

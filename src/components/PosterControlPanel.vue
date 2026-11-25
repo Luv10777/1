@@ -97,7 +97,7 @@ onBeforeUnmount(() => {
       <section class="poster-control-group">
         <div class="poster-group-heading"><span>风格</span></div>
         <div class="poster-style-row">
-          <img v-if="selectedStyle" class="poster-style-row-thumb" :src="selectedStyle.image" alt="" />
+          <img v-if="selectedStyle?.image" class="poster-style-row-thumb" :src="selectedStyle.image" alt="" />
           <span v-else class="poster-style-row-thumb is-empty" aria-hidden="true"><img src="/images/brand/yifangzhi-mark.png" alt="" /></span>
           <span class="poster-style-row-name" :class="{ muted: studio.style === '帮我搭配' }">{{ studio.style === '帮我搭配' ? '自动匹配 · 按画面需求选择' : studio.style }}</span>
           <button v-if="studio.style !== '帮我搭配'" type="button" class="poster-style-reset" :disabled="studio.locked" :aria-label="`取消风格 ${studio.style}`" title="改为帮我搭配" @click="studio.style = '帮我搭配'"><X :size="15" :stroke-width="1.8" aria-hidden="true" /></button>

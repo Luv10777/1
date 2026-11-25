@@ -2,7 +2,6 @@ import { computed, reactive, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { imageApi, uploadImageReference, downloadImage } from '../services/imageCreation'
 import { IMAGE_MODELS, IMAGE_QUALITIES, imageDimensions, isImageActive, isImageSaving, validateImageFile, supportsImageSize } from '../domain/imageCreation'
-import { TRIPTYCH_STYLE } from '../domain/posterStyles'
 import { readUser } from '../utils/tokenStore'
 import { billing, refreshBilling, requireAccount } from '../stores/billing'
 import { auth } from '../stores/auth'
@@ -65,7 +64,6 @@ export function useImageCreation(workflow) {
   const configured = computed(() => capabilityState.value === 'ready' && capabilities.value?.configured === true)
   const requiresLogin = computed(() => !auth.isAuthenticated)
   const supportsRatio = value => {
-    if (style.value === TRIPTYCH_STYLE && value !== '3:1') return false
     const ratios = capabilities.value?.qualityRatios
     if (!ratios) return true
     return Object.values(ratios).some(values => values?.includes(value))
@@ -337,11 +335,6 @@ export function useImageCreation(workflow) {
   })
   watch(() => route.query.creation, id => { if (id && String(current.value?.id) !== String(id)) load(id) })
   watch(ratio, syncHighestQuality)
-  // 三联图只做 3:1 横幅；换回其他风格时把比例还原成默认。
-  watch(style, (next, previous) => {
-    if (next === TRIPTYCH_STYLE) ratio.value = '3:1'
-    else if (previous === TRIPTYCH_STYLE && ratio.value === '3:1') ratio.value = product.value ? '1:1' : '3:4'
-  })
   watch(() => [auth.user?.id, auth.tenantId], () => { generationWallet.value = 'PERSONAL' })
   onBeforeUnmount(() => {
     alive = false; refreshSequence++; clearTimeout(pollTimer)

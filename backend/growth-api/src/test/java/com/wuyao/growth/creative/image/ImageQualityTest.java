@@ -53,7 +53,7 @@ class ImageQualityTest {
    for(String ratio:List.of("1:1","3:4","4:3","2:3","3:2"))
      assertThatThrownBy(()->ImageQuality.modelDimensions("4K",ratio,config())).hasMessageContaining("该画质");
  }
- @Test void triptychBannerIsThreeToOneAt1KAnd4KOnly() {
+ @Test void threeToOneIsOfferedAt1KAnd4KOnly() {
    var p=config();p.getGenerator().setModel("gpt-image-2.5");
    assertThat(ImageQuality.modelDimensions("1K","3:1",p)).isEqualTo(new ImageDtos.Dimensions(3072,1024));
    assertThat(ImageQuality.modelDimensions("4K","3:1",p)).isEqualTo(new ImageDtos.Dimensions(3840,1280));

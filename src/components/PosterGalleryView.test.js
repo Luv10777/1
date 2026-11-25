@@ -48,7 +48,7 @@ test('drawing controls and style gallery describe general images without a purpo
     assert.match(html, /灵感绘图/)
     assert.match(html, /生成图片/)
     assert.match(html, /森林里.*小狐狸/)
-    for (const style of ['写实摄影', '电影质感', '手绘水彩', '国风意境', '极简留白', '胶片纪实', '平面设计', '暗调光影', '门店三联图']) assert.ok(html.includes(style))
+    for (const style of ['写实摄影', '电影质感', '手绘水彩', '国风意境', '极简留白', '胶片纪实', '平面设计', '暗调光影', '美食特写', '3D 卡通', '清新日系', '国潮插画']) assert.ok(html.includes(style))
     assert.match(html, /Image 2\.6 · 3:4 · 2K/)
     assert.match(html, /aria-label="图片模型"/)
     assert.doesNotMatch(html, /poster-purpose-picker|朋友圈活动宣传|海报风格|营销海报/)

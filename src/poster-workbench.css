@@ -127,6 +127,8 @@
 .poster-style-card:hover:not(:disabled) .poster-style-image { box-shadow: 0 8px 24px rgba(44,62,80,.1); }
 .poster-style-card.is-selected .poster-style-image { box-shadow: 0 0 0 2px var(--poster-paper), 0 0 0 4px var(--poster-red); }
 .poster-style-image { display: block; width: 100%; aspect-ratio: 3 / 4; border-radius: 8px; object-fit: cover; background: var(--poster-subtle); transition: box-shadow .18s; }
+.poster-style-image.is-empty { display: grid; place-items: center; }
+.poster-style-image.is-empty img { width: 36px; height: 36px; object-fit: contain; mix-blend-mode: multiply; opacity: .35; }
 .poster-style-check { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--poster-red); color: #fff; }
 .poster-style-meta { display: block; padding: 0 2px; }
 .poster-style-meta strong { font-size: 13px; font-weight: 600; }

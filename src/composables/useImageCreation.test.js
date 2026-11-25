@@ -80,11 +80,9 @@ test('image creation reads capabilities for members and lets guests browse witho
     assert.equal(studio.imageCredits, 3)
     studio.model = 'IMAGE_2_6'
     assert.equal(studio.imageCredits, 5, 'the price follows the chosen model')
-    studio.style = '门店三联图'
+    studio.ratio = '3:1'
     await new Promise(resolve => setImmediate(resolve))
-    assert.equal(studio.ratio, '3:1', 'the triptych banner fixes the ratio')
     assert.equal(studio.quality, '4K')
-    assert.equal(studio.supportsRatio('3:4'), false)
     studio.generationWallet = 'TEAM'
     studio.brief = '一张测试图片'
     studio.generate()
@@ -93,10 +91,6 @@ test('image creation reads capabilities for members and lets guests browse witho
     assert.deepEqual(submissions, ['/api/image-creations?wallet=TEAM'])
     assert.equal(bodies[0].model, 'IMAGE_2_6')
     assert.equal(bodies[0].ratio, '3:1')
-    assert.equal(bodies[0].style, '门店三联图')
-    studio.style = '手绘水彩'
-    await new Promise(resolve => setImmediate(resolve))
-    assert.equal(studio.ratio, '3:4', 'leaving the triptych restores the default ratio')
     assert.equal(studio.current.id, 42)
     app.unmount()
     auth.state.user = null; auth.state.token = null
