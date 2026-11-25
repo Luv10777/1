@@ -233,6 +233,7 @@ test('works are filed into folders: create, open, move, remove, rename and delet
     const click = async node => { assert.ok(node, 'button exists'); await node.props.onClick({ stopPropagation() {}, preventDefault() {} }); await settle() }
     const cards = () => [...nodes(root)].filter(node => node.tag === 'article')
     const folderBar = () => [...nodes(root)].find(node => node.tag === 'nav')
+    const meta = () => text([...nodes(root)].find(node => node.props?.class === 'library-meta'))
     const typeInto = async value => {
       const input = [...nodes(body)].find(node => node.tag === 'input')
       input.props['onUpdate:modelValue'](value)
@@ -246,8 +247,8 @@ test('works are filed into folders: create, open, move, remove, rename and delet
     app.mount(root)
     await settle()
     assert.equal(cards().length, 2)
-    assert.match(text(folderBar()), /全部作品2/)
-    assert.match(text(folderBar()), /未归类2/)
+    assert.match(meta(), /全部作品 · 共 2 件作品/)
+    assert.doesNotMatch(text(folderBar()), /\d/, 'folder tabs show names only')
 
     // 新建文件夹后直接打开它，是空的。
     await click(button('新建文件夹', folderBar()))
@@ -266,18 +267,19 @@ test('works are filed into folders: create, open, move, remove, rename and delet
     await click(button('移到这里', dialog))
     assert.equal(library.find(work => work.id === 20).folderId, 1)
     assert.match(text(imageCard), /七月海报/, 'the card shows where it is filed')
-    assert.match(text(folderBar()), /七月海报1/)
-    assert.match(text(folderBar()), /未归类1/)
+    assert.doesNotMatch(text(folderBar()), /\d/)
 
     await click(button('七月海报', folderBar()))
     assert.equal(cards().length, 1)
+    assert.match(meta(), /七月海报 · 共 1 件作品/, 'the count is shown inside the folder')
 
     // 改名
     await click(button('重命名'))
     await typeInto('暑期海报')
     await submitForm()
     assert.equal(folders[0].name, '暑期海报')
-    assert.match(text(folderBar()), /暑期海报1/)
+    assert.match(text(folderBar()), /暑期海报/)
+    assert.match(meta(), /暑期海报 · 共 1 件作品/)
 
     // 未归类里的视频移出作品库
     await click(button('未归类', folderBar()))
@@ -294,7 +296,7 @@ test('works are filed into folders: create, open, move, remove, rename and delet
     await click([...nodes(body)].find(node => node.tag === 'button' && text(node).trim() === '删除'))
     assert.deepEqual(folders, [])
     assert.deepEqual(library, [])
-    assert.match(text(folderBar()), /全部作品0/)
+    assert.match(meta(), /全部作品 · 共 0 件作品/)
     assert.ok(calls.includes('DELETE /api/library/folders/1'))
   } finally {
     app?.unmount(); await vite.close()
@@ -382,6 +384,7 @@ async function mountLibrary({ folders, library }) {
     cards: () => [...nodes(root)].filter(node => node.tag === 'article'),
     card: title => ui.cards().find(card => text(card).includes(title)),
     folderBar: () => [...nodes(root)].find(node => node.tag === 'nav'),
+    meta: () => text([...nodes(root)].find(node => node.props?.class === 'library-meta')),
     batchBar: () => [...nodes(root)].find(node => node.props?.role === 'toolbar'),
     settle,
     async close() {
@@ -427,8 +430,7 @@ test('existing works are moved into a folder in one go, either picked from the f
     assert.equal(ui.batchBar(), undefined)
     assert.deepEqual(ui.cards().map(card => ui.text(card).match(/夏日海报|新品上市/)?.[0]), ['夏日海报', '新品上市'])
     assert.match(ui.text(ui.root), /已把 2 件作品放进「七月海报」/)
-    assert.match(ui.text(ui.folderBar()), /七月海报2/)
-    assert.match(ui.text(ui.folderBar()), /未归类1/)
+    assert.match(ui.meta(), /七月海报 · 共 2 件作品/)
 
     // 在全部作品里批量整理：全选后移到另一个文件夹。
     await ui.click(ui.button('全部作品', ui.folderBar()))
@@ -444,8 +446,8 @@ test('existing works are moved into a folder in one go, either picked from the f
     assert.deepEqual(library.map(item => item.folderId), [2, 2, 2, 2])
     assert.equal(ui.cards().length, 4, 'everything stays listed under all works')
     assert.match(ui.text(ui.card('会员日')), /门店活动/)
-    assert.match(ui.text(ui.folderBar()), /门店活动4/)
-    assert.match(ui.text(ui.folderBar()), /七月海报0/)
+    await ui.click(ui.button('门店活动', ui.folderBar()))
+    assert.match(ui.meta(), /门店活动 · 共 4 件作品/)
   } finally {
     await ui.close()
   }

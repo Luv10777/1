@@ -35,6 +35,8 @@ const foldersError = ref('')
 const currentFolder = computed(() => folders.value.find(folder => folder.id === activeFolder.value) || null)
 const allCount = computed(() => rootCount.value + folders.value.reduce((sum, folder) => sum + folder.workCount, 0))
 const folderName = id => folders.value.find(folder => folder.id === id)?.name || null
+// 文件夹标签上只显示名字，件数在打开后的标题行里显示。
+const placeCount = computed(() => currentFolder.value ? currentFolder.value.workCount : activeFolder.value === 'root' ? rootCount.value : allCount.value)
 
 // 新建 / 改名共用一个输入框；folder 为空是新建。
 const nameDialog = ref(null)
@@ -451,20 +453,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
     </header>
 
     <nav class="folder-bar" aria-label="作品库文件夹">
-      <button type="button" class="folder-chip" :class="{ active: activeFolder === 'all' }" :aria-pressed="activeFolder === 'all'" @click="selectFolder('all')">全部作品<small>{{ allCount }}</small></button>
-      <button type="button" class="folder-chip" :class="{ active: activeFolder === 'root' }" :aria-pressed="activeFolder === 'root'" @click="selectFolder('root')">未归类<small>{{ rootCount }}</small></button>
+      <button type="button" class="folder-chip" :class="{ active: activeFolder === 'all' }" :aria-pressed="activeFolder === 'all'" @click="selectFolder('all')">全部作品</button>
+      <button type="button" class="folder-chip" :class="{ active: activeFolder === 'root' }" :aria-pressed="activeFolder === 'root'" @click="selectFolder('root')">未归类</button>
       <button
         v-for="folder in folders" :key="folder.id" type="button" class="folder-chip" :class="{ active: activeFolder === folder.id }"
         :aria-pressed="activeFolder === folder.id" @click="selectFolder(folder.id)"
       >
-        <Folder :size="14" stroke-width="1.8" aria-hidden="true" /><span>{{ folder.name }}</span><small>{{ folder.workCount }}</small>
+        <Folder :size="14" stroke-width="1.8" aria-hidden="true" /><span>{{ folder.name }}</span>
       </button>
       <button type="button" class="folder-chip folder-new" @click="openNameDialog()"><FolderPlus :size="14" stroke-width="1.8" aria-hidden="true" />新建文件夹</button>
     </nav>
     <p v-if="foldersError" class="works-error" role="alert">{{ foldersError }} <button type="button" @click="loadFolders">重试</button></p>
 
     <div class="library-meta">
-      <span>{{ currentFolder ? currentFolder.name : activeFolder === 'root' ? '未归类' : '全部作品' }} · 已载入 {{ filteredWorks.length }} 件作品</span>
+      <span>{{ currentFolder ? currentFolder.name : activeFolder === 'root' ? '未归类' : '全部作品' }} · 共 {{ placeCount }} 件作品<template v-if="filteredWorks.length !== placeCount">（已载入 {{ filteredWorks.length }} 件）</template></span>
       <span v-if="!selecting" class="folder-actions">
         <button v-if="currentFolder" type="button" @click="pickIntoFolder(currentFolder)"><ListPlus :size="13" aria-hidden="true" />添加作品</button>
         <button v-if="works.length" type="button" @click="startSelecting()"><SquareCheck :size="13" aria-hidden="true" />批量整理</button>
@@ -654,7 +656,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleModalKeydown))
 .folder-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
 .folder-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; min-height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); background: var(--surface); font-size: 12px; cursor: pointer; }
 .folder-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.folder-chip small { font: 11px var(--font-mono); }
 .folder-chip:hover { color: var(--ink); }
 .folder-chip.active { border-color: var(--color-accent); color: var(--color-accent-text); font-weight: 600; }
 .folder-new { border-style: dashed; color: var(--color-accent-text); }
